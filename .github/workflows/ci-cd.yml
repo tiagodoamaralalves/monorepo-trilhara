@@ -1,0 +1,75 @@
+name: Trilhara CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────────
+  # 1. CI Frontend: Typecheck + Vite Build + Validação de Sintaxe do Caddyfile
+  # ──────────────────────────────────────────────────────────────────────────
+  frontend-ci:
+    name: "Frontend (React 18 + Vite 6 + Caddyfile)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 22 com cache npm
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependências limpas (npm ci)
+        run: npm --prefix frontend ci --prefer-offline --no-audit
+
+      - name: Typecheck (tsc -b) e Build de Produção (Vite)
+        run: npm --prefix frontend run build
+
+      - name: Validar sintaxe do Caddyfile
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine \
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 2. CI Backend: Quarkus Java 25 + Testes Integrados com MongoDB 7
+  # ──────────────────────────────────────────────────────────────────────────
+  backend-ci:
+    name: "Backend (Java 25 + Quarkus + MongoDB 7)"
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7-jammy
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand(\"ping\").ok'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 25 (Eclipse Temurin) com cache Maven
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "25"
+          cache: "maven"
+
+      - name: Executar testes automatizados do Backend
+        env:
+          MONGODB_URL: mongodb://localhost:27017
+          QUARKUS_MONGODB_DEVSERVICES_ENABLED: "false"
+        run: ./mvnw -f backend/pom.xml test -B

@@ -1,0 +1,297 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.container {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 32px;
+}
+
+.cockpitCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  width: 100%;
+  padding: 40px;
+  overflow: hidden;
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.24);
+}
+
+.cockpitCard::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  content: '';
+  background: linear-gradient(90deg, var(--primary), var(--primary-light), #10b981);
+}
+
+.running::before {
+  background: linear-gradient(90deg, #10b981, var(--primary-light));
+}
+
+.timerDisplay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  padding: 12px 0;
+}
+
+.statusText {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-soft);
+  font-size: 14px;
+  font-weight: 650;
+  text-align: center;
+}
+
+.statusRunning {
+  color: var(--green);
+}
+
+.statusPaused {
+  color: var(--yellow);
+}
+
+.pulseDot {
+  width: 8px;
+  height: 8px;
+  background: currentColor;
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  50% { transform: scale(1.3); opacity: 0.6; }
+}
+
+.clockDigits {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: clamp(64px, 15vw, 144px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  user-select: none;
+}
+
+.clockRunning {
+  color: var(--green);
+}
+
+.clockPaused {
+  color: var(--yellow);
+}
+
+.breakBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: 100%;
+  padding: 16px 18px;
+  background: var(--yellow-bg);
+  border: 1px solid var(--yellow-border);
+  border-radius: var(--radius-md);
+}
+
+.breakDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--yellow);
+}
+
+.breakCountdown {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.breakActions,
+.controlsRow,
+.breakShortcuts {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.controlsRow {
+  min-height: 48px;
+}
+
+.breakShortcuts {
+  width: 100%;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.breakLabel {
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.summaryCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+}
+
+.summaryLabel {
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.summaryMinutes {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+}
+
+.summarySubject {
+  color: var(--text-mid);
+  font-size: 12px;
+}
+
+.manualFields,
+.questionsFields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.questionsFields {
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.questionsFields legend {
+  padding: 0 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.questionsFields legend span {
+  color: var(--text-soft);
+  font-weight: 400;
+}
+
+.validationError {
+  color: var(--red);
+  font-size: 12px;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+
+.configModalContent {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.configSectionTitle {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.alarmsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.alarmInfoBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: var(--primary-bg);
+  border: 1px solid var(--border-focus);
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  color: var(--text);
+}
+
+.alarmInfoTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary-light);
+  font-weight: 700;
+}
+
+.alarmInfoItems {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-mid);
+  font-size: 12px;
+}
+
+@media (max-width: 620px) {
+  .cockpitCard {
+    gap: 22px;
+    padding: 28px 18px;
+  }
+
+  .breakBanner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 420px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+}

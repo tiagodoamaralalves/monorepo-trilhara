@@ -1,0 +1,772 @@
+.pomodoroPage {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 20px 48px;
+}
+
+.brandHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brandGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.brandLogo {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: block;
+}
+
+.brandName {
+  font-family: var(--font-display, var(--font-sans));
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.brandTag {
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--primary-bg);
+  border: 1px solid var(--primary-border-subtle);
+  color: var(--primary-light);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.headerTopActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.titleArea {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.titleText {
+  display: inline-block;
+}
+
+/* Switch toggle */
+.switchLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.switchTrack {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  border-radius: 9999px;
+  background: var(--surface-3, #cbd5e1);
+  border: 1px solid var(--border-strong);
+  transition: background var(--transition-fast, 150ms ease), border-color var(--transition-fast, 150ms ease);
+}
+
+.switchTrackActive {
+  background: #ef4444; /* Vermelho tomate vibrante */
+  border-color: #dc2626;
+}
+
+.switchThumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform var(--transition-fast, 150ms ease);
+}
+
+.switchThumbActive {
+  transform: translateX(20px);
+}
+
+.infoBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  cursor: pointer;
+  padding: 0;
+  transition: all var(--transition-fast, 150ms ease);
+}
+
+.infoBtn:hover {
+  background: var(--primary-bg);
+  border-color: var(--primary-border-subtle);
+  color: var(--primary-light);
+}
+
+.container {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 32px;
+}
+
+.cockpitCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  width: 100%;
+  padding: 40px;
+  overflow: hidden;
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.24);
+}
+
+.cockpitCard::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  content: '';
+  background: linear-gradient(90deg, var(--primary), var(--primary-light), #10b981);
+}
+
+.running::before {
+  background: linear-gradient(90deg, #10b981, var(--primary-light));
+}
+
+.timerDisplay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  padding: 12px 0;
+}
+
+.statusText {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-soft);
+  font-size: 14px;
+  font-weight: 650;
+  text-align: center;
+}
+
+.statusRunning {
+  color: var(--green);
+}
+
+.statusPaused {
+  color: var(--yellow);
+}
+
+.pulseDot {
+  width: 8px;
+  height: 8px;
+  background: currentColor;
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  50% {
+    transform: scale(1.3);
+    opacity: 0.6;
+  }
+}
+
+.pomodoroCycleRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pomodoroCycleBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: var(--radius-pill);
+  color: #ef4444;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.cycleInfoBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  cursor: pointer;
+  padding: 0;
+  transition: all var(--transition-fast, 150ms ease);
+}
+
+.cycleInfoBtn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  color: #dc2626;
+}
+
+.clockDigits {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: clamp(64px, 15vw, 144px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  user-select: none;
+}
+
+.clockEditable {
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  padding: 4px 12px;
+  border: 2px dashed transparent;
+  transition: all var(--transition-fast, 150ms ease);
+}
+
+.clockEditable:hover {
+  background: var(--surface-2);
+  color: var(--primary-light);
+  border-color: var(--border-focus);
+}
+
+.clockEditable:focus-visible {
+  outline: none;
+  border-color: var(--border-focus);
+  background: var(--surface-2);
+}
+
+.inlineEditWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.inlineEditForm {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  padding: 4px 12px;
+  background: var(--surface-2);
+  border: 2px dashed var(--border-focus);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-family: var(--font-mono) !important;
+  font-size: clamp(64px, 15vw, 144px) !important;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800 !important;
+  letter-spacing: -0.05em !important;
+  line-height: 1 !important;
+}
+
+.inlineInput {
+  font-family: inherit !important;
+  font-size: inherit !important;
+  font-variant-numeric: inherit !important;
+  font-weight: inherit !important;
+  letter-spacing: inherit !important;
+  line-height: inherit !important;
+  color: var(--primary-light);
+  background: transparent;
+  border: none !important;
+  border-bottom: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  text-decoration: none !important;
+  text-decoration-line: none !important;
+  padding: 0;
+  margin: 0;
+  text-align: center;
+  width: 2ch;
+  caret-color: var(--primary-light);
+  -webkit-font-smoothing: antialiased;
+}
+
+.inlineInput:focus,
+.inlineInput:focus-visible {
+  border: none !important;
+  border-bottom: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  color: var(--primary-light);
+  text-decoration: none !important;
+  text-decoration-line: none !important;
+}
+
+.inlineInput::selection {
+  background: rgba(56, 189, 248, 0.25);
+  color: var(--primary-light);
+  text-decoration: none !important;
+}
+
+.inlineInput::-webkit-outer-spin-button,
+.inlineInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.inlineInput[type='number'] {
+  -moz-appearance: textfield;
+}
+
+.inlineColon {
+  font-family: inherit !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  letter-spacing: inherit !important;
+  line-height: inherit !important;
+  color: var(--text-soft);
+  user-select: none;
+}
+
+.inlineEditHint {
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.clockRunning {
+  color: var(--green);
+}
+
+.clockPaused {
+  color: var(--yellow);
+}
+
+.breakBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: 100%;
+  padding: 16px 18px;
+  background: var(--yellow-bg);
+  border: 1px solid var(--yellow-border);
+  border-radius: var(--radius-md);
+}
+
+.breakDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--yellow);
+}
+
+.breakCountdown {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.breakActions,
+.controlsRow,
+.breakShortcuts {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.controlsRow {
+  min-height: 48px;
+}
+
+.breakShortcuts {
+  width: 100%;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.configModalContent {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.configSectionTitle {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.alarmsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.alarmInfoBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: var(--primary-bg);
+  border: 1px solid var(--border-focus);
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  color: var(--text);
+}
+
+.alarmInfoTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary-light);
+  font-weight: 700;
+}
+
+.alarmInfoItems {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-mid);
+  font-size: 12px;
+}
+
+/* Modal explicativo da Técnica Pomodoro */
+.explanationList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 0;
+}
+
+.explanationStep {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.stepNumber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--primary-bg);
+  border: 1px solid var(--primary-border-subtle);
+  color: var(--primary-light);
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.stepText {
+  flex: 1;
+}
+
+.explanationFooter {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.authorCredit strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.articleLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--primary-light);
+  text-decoration: none;
+  font-weight: 600;
+  transition: all var(--transition-fast, 150ms ease);
+}
+
+.articleLink:hover {
+  text-decoration: underline;
+  color: var(--primary);
+}
+
+@media (max-width: 620px) {
+  .cockpitCard {
+    gap: 22px;
+    padding: 28px 18px;
+  }
+
+  .breakBanner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 420px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── ESPELHO DA VISÃO HOJE NO POMODORO (FASE 7) ── */
+.pomodoroLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  gap: 24px;
+  align-items: start;
+  width: 100%;
+}
+
+@media (max-width: 960px) {
+  .pomodoroLayout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.agendaColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
+
+.agendaHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.agendaTitle {
+  font-family: var(--font-display, var(--font-sans));
+  font-size: 16px;
+  font-weight: 750;
+  color: var(--text);
+  margin: 0;
+}
+
+.visitorCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 32px 16px;
+}
+
+.visitorIconWrapper {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-light);
+  margin-bottom: 4px;
+}
+
+.visitorTitle {
+  font-family: var(--font-display, var(--font-sans));
+  font-size: 16px;
+  font-weight: 750;
+  color: var(--text);
+  margin: 0;
+}
+
+.visitorDescription {
+  font-size: 13px;
+  color: var(--text-mid);
+  line-height: 1.5;
+  max-width: 32ch;
+  margin: 0 0 8px;
+}
+
+.focoItemCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--primary-bg);
+  border: 1px solid var(--primary-border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.focoItemInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.focoItemTag {
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--primary-light);
+}
+
+.focoItemTitulo {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.removerFocoBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-soft);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: color var(--transition-fast, 150ms ease);
+}
+
+.removerFocoBtn:hover {
+  color: var(--text);
+}
+
+.agendaItemRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  transition: all var(--transition-fast, 150ms ease);
+}
+
+.agendaItemRow:hover {
+  background: var(--surface-2);
+}
+
+.agendaItemFocado {
+  background: var(--surface-2);
+  border-color: var(--primary-light);
+}
+
+.agendaItemContent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+  cursor: pointer;
+}
+
+.agendaItemTitulo {
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agendaCheckBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-soft);
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: all var(--transition-fast, 150ms ease);
+}
+
+.agendaCheckBtn:hover {
+  border-color: var(--primary-light);
+  color: var(--primary-light);
+  background: var(--primary-bg);
+}
+

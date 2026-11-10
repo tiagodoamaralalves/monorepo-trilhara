@@ -1,0 +1,998 @@
+.page {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+.container {
+  width: 100%;
+  max-width: var(--container-max, 1200px);
+  margin: 0 auto;
+  padding: 0 var(--space-6, 24px);
+}
+
+/* ── NAVBAR PÚBLICA MINIMALISTA ── */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: var(--header-glass-bg);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+
+.navbarInner {
+  max-width: var(--container-max, 1200px);
+  margin: 0 auto;
+  height: 64px;
+  padding: 0 var(--space-6, 24px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5, 20px);
+}
+
+.brandLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  text-decoration: none;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+.brandLink:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 4px;
+  border-radius: var(--radius-xs);
+}
+
+.brandMark {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.brandMark img {
+  width: 28px;
+  height: 28px;
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px rgba(96, 165, 250, 0.35));
+}
+
+.brandName {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.navLinks {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1, 4px);
+}
+
+.navAnchor {
+  background: transparent;
+  border: none;
+  color: var(--text-mid);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm, 13px);
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.navAnchor:hover {
+  color: var(--text);
+  background: var(--surface-1);
+}
+
+.navAnchor:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.navActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+}
+
+/* ── 1. HERO SECTION ── */
+.heroSection {
+  padding: var(--space-20, 80px) 0 var(--space-20, 80px);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.heroGrid {
+  display: grid;
+  grid-template-columns: 1.08fr 0.92fr;
+  gap: var(--space-12, 48px);
+  align-items: center;
+}
+
+.heroCopy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5, 20px);
+}
+
+.heroEyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  width: fit-content;
+  font-size: var(--text-xs, 12px);
+  font-weight: 600;
+  color: var(--text-mid);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+}
+
+.pulseDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.heroTitle {
+  font-family: var(--font-display);
+  font-size: var(--text-display, clamp(36px, 4vw, 52px));
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  color: var(--text);
+}
+
+.heroTitleAccent {
+  color: var(--primary-light);
+}
+
+.heroSubtitle {
+  font-size: var(--text-md, 17px);
+  line-height: 1.6;
+  color: var(--text-mid);
+  max-width: 52ch;
+}
+
+.heroCtaRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3, 12px);
+  padding-top: var(--space-1, 4px);
+}
+
+.heroMetaList {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  padding-top: var(--space-2, 8px);
+  color: var(--text-soft);
+  font-size: var(--text-xs, 12px);
+  font-weight: 500;
+}
+
+/* ── HERO VISUAL ARTIFACT (COESO E SILENCIOSO) ── */
+.heroVisualStage {
+  position: relative;
+}
+
+.heroMockCard {
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6, 24px);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5, 20px);
+}
+
+.heroMockHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3, 12px);
+}
+
+.mockKicker {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--primary-light);
+  margin-bottom: 4px;
+}
+
+.heroMockTitle {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.heroCountdownChip {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-mid);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.heroProgressBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+.heroProgressLabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-xs, 12px);
+  color: var(--text-mid);
+}
+
+.heroProgressPct {
+  color: var(--text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.mockProgressBar {
+  width: 100%;
+  height: 6px;
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.mockProgressFill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: var(--radius-pill);
+}
+
+.heroBlocksStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+.heroBlockRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 12px);
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+}
+
+.heroBlockCurrent {
+  background: var(--surface-2);
+  border-color: var(--primary);
+}
+
+.heroBlockDone {
+  opacity: 0.72;
+}
+
+.heroBlockInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.heroBlockName {
+  font-size: var(--text-sm, 13px);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.heroBlockTopic {
+  font-size: 11.5px;
+  color: var(--text-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.heroLiveTimerBadge {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary-light);
+  background: var(--primary-bg);
+  padding: 4px 8px;
+  border-radius: var(--radius-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.heroBlockDoneLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--green);
+}
+
+.heroBlockNextLabel {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-soft);
+}
+
+/* ── SEÇÕES E HEADINGS (ESPAÇO NEGATIVO INTENCIONAL) ── */
+.section {
+  padding: var(--space-20, 80px) 0;
+}
+
+.sectionBordered {
+  padding: var(--space-20, 80px) 0;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sectionHeading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-6, 24px);
+  margin-bottom: var(--space-10, 40px);
+}
+
+.sectionHeadingCenter {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.sectionHeadingText {
+  max-width: 620px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+.sectionHeadingAction {
+  flex-shrink: 0;
+}
+
+.eyebrow {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--primary-light);
+}
+
+.sectionTitle {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl, clamp(26px, 2.8vw, 34px));
+  font-weight: 800;
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.sectionSubtitle {
+  font-size: var(--text-base, 15px);
+  line-height: 1.6;
+  color: var(--text-mid);
+}
+
+/* ── 2. PILARES DO MÉTODO (4 COLUNAS LIMPAS) ── */
+.pillarsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-5, 20px);
+}
+
+.pillarCard {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6, 24px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+  transition: border-color var(--transition-fast);
+}
+
+.pillarCard:hover {
+  border-color: var(--border-strong);
+}
+
+.pillarIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--primary-bg);
+  color: var(--primary-light);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pillarTitle {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.pillarDescription {
+  font-size: var(--text-sm, 13.5px);
+  line-height: 1.55;
+  color: var(--text-mid);
+}
+
+/* ── 3. GRID DA VITRINE DO CATÁLOGO ── */
+.catalogGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-5, 20px);
+}
+
+/* ── 4. DEMONSTRAÇÃO INTERATIVA (SEGMENTED CONTROL) ── */
+.showcaseWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5, 20px);
+}
+
+.segmentedTabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  width: fit-content;
+}
+
+.segmentedTabBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-mid);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm, 13px);
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all var(--transition-fast);
+}
+
+.segmentedTabBtn:hover {
+  color: var(--text);
+}
+
+.segmentedTabBtn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.segmentedTabBtnActive {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.showcaseWindow {
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.mockWindowChrome {
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mockDots {
+  display: flex;
+  gap: 6px;
+}
+
+.mockDots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--surface-3);
+}
+
+.mockActiveTrackLabel {
+  font-size: var(--text-xs, 12px);
+  font-weight: 600;
+  color: var(--text-mid);
+}
+
+.mockWindowStatus {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--green);
+}
+
+.mockContentArea {
+  padding: var(--space-6, 24px);
+}
+
+.mockPaneGrid {
+  display: grid;
+  grid-template-columns: 1.4fr 0.6fr;
+  gap: var(--space-5, 20px);
+  align-items: stretch;
+}
+
+.mockTrilhaSpotlight {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5, 20px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 16px);
+}
+
+.mockSpotlightHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.mockCardHeading {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.mockCardSub {
+  font-size: var(--text-sm, 13px);
+  color: var(--text-mid);
+  margin-top: 2px;
+}
+
+.mockPercentBadge {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary-light);
+  background: var(--primary-bg);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.mockInlineStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3, 12px);
+  padding-top: var(--space-2, 8px);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.mockStatLabel {
+  display: block;
+  font-size: 11px;
+  color: var(--text-soft);
+  margin-bottom: 2px;
+}
+
+.mockStatVal {
+  font-size: var(--text-sm, 13px);
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.mockStatValSuccess {
+  font-size: var(--text-sm, 13px);
+  font-weight: 700;
+  color: var(--green);
+  font-variant-numeric: tabular-nums;
+}
+
+.mockSideCard {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5, 20px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-4, 16px);
+}
+
+.mockSideTitle {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.mockSideDesc {
+  font-size: var(--text-sm, 13px);
+  line-height: 1.55;
+  color: var(--text-mid);
+}
+
+.mockDisciplinasList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+.mockDiscRow {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.mockDiscMain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.disciplineColorDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mockDiscName {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.mockWeightPill {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.mockDiscRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mockDiscRatio {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-mid);
+  font-variant-numeric: tabular-nums;
+}
+
+.mockMiniTrack {
+  width: 100px;
+  height: 6px;
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.mockMiniFill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+}
+
+.mockScheduleGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3, 12px);
+}
+
+.mockScheduleCard {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mockScheduleCardActive {
+  border-color: var(--primary);
+  background: var(--surface-2);
+}
+
+.mockScheduleTop {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.mockScheduleTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.mockScheduleStatus {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-mid);
+  font-variant-numeric: tabular-nums;
+}
+
+.statusDone {
+  color: var(--green);
+}
+
+.statusActive {
+  color: var(--primary-light);
+}
+
+.mockKpiGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4, 16px);
+}
+
+.mockKpiBox {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mockKpiLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-soft);
+  letter-spacing: 0.05em;
+}
+
+.mockKpiValue {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.mockKpiTrend {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--green);
+}
+
+/* ── 5. FLUXO DE 3 PASSOS & CTA FINAL ── */
+.stepsGrid {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-6, 24px);
+  margin-bottom: var(--space-16, 64px);
+}
+
+.stepItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+  padding-top: var(--space-4, 16px);
+  border-top: 1px solid var(--border);
+}
+
+.stepNumber {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary-light);
+}
+
+.stepTitle {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.stepDesc {
+  font-size: var(--text-sm, 13.5px);
+  line-height: 1.55;
+  color: var(--text-mid);
+}
+
+.ctaBanner {
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  padding: var(--space-10, 40px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8, 32px);
+  flex-wrap: wrap;
+}
+
+.ctaBannerCopy {
+  max-width: 540px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+.ctaBannerTitle {
+  font-family: var(--font-display);
+  font-size: clamp(22px, 2.5vw, 30px);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.ctaBannerSub {
+  font-size: var(--text-base, 15px);
+  color: var(--text-mid);
+  line-height: 1.5;
+}
+
+.ctaBannerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3, 12px);
+}
+
+/* ── FOOTER ── */
+.footer {
+  padding: var(--space-6, 24px) 0;
+  margin-top: auto;
+}
+
+.footerInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4, 16px);
+}
+
+.footerBrand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  font-size: var(--text-xs, 12px);
+}
+
+.footerCopy {
+  color: var(--text-soft);
+}
+
+.footerLinks {
+  display: flex;
+  gap: var(--space-4, 16px);
+}
+
+.footerLinkBtn {
+  background: none;
+  border: none;
+  color: var(--text-mid);
+  font-size: var(--text-xs, 12px);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.footerLinkBtn:hover {
+  color: var(--text);
+}
+
+.iconGreen {
+  color: var(--green);
+  flex-shrink: 0;
+}
+
+.iconCyan {
+  color: var(--primary-light);
+  flex-shrink: 0;
+}
+
+.iconMuted {
+  color: var(--text-soft);
+  flex-shrink: 0;
+}
+
+/* ── RESPONSIVIDADE ── */
+@media (max-width: 1024px) {
+  .heroGrid,
+  .mockPaneGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .pillarsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .catalogGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 680px) {
+  .container,
+  .navbarInner {
+    padding-left: var(--space-4, 16px);
+    padding-right: var(--space-4, 16px);
+  }
+
+  .navLinks {
+    display: none;
+  }
+
+  .heroSection,
+  .section,
+  .sectionBordered {
+    padding: var(--space-12, 48px) 0;
+  }
+
+  .pillarsGrid,
+  .catalogGrid,
+  .stepsGrid,
+  .mockScheduleGrid,
+  .mockKpiGrid,
+  .mockInlineStats {
+    grid-template-columns: 1fr;
+  }
+
+  .sectionHeading,
+  .ctaBanner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

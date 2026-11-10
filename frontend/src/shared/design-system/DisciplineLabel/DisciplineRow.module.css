@@ -1,0 +1,110 @@
+.disciplineItem {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.disciplineItemClickable {
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.disciplineItemClickable:hover,
+.disciplineItemClickable:focus-visible {
+  border-color: var(--border-focus);
+  background: var(--surface-3);
+  outline: none;
+}
+
+.disciplineName {
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.topicCountButton,
+.topicCountButtonActive {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-height: var(--status-pill-height);
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.topicCountButton {
+  color: var(--text-soft);
+}
+
+.topicCountButtonActive {
+  color: var(--primary);
+}
+
+.disciplinePeso {
+  min-width: 56px;
+  text-align: right;
+  color: var(--text-mid);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.itemActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.topicItem {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.topicItemClickable {
+  cursor: pointer;
+}
+
+.topicItemClickable:hover,
+.topicItemClickable:focus-visible {
+  border-color: var(--border-focus);
+  background: var(--surface-3);
+  outline: none;
+}
+
+.topicNumber {
+  flex: 0 0 20px;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.topicText {
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+  word-break: break-word;
+}

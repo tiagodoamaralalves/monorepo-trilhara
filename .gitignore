@@ -1,0 +1,61 @@
+# Build Maven / Quarkus
+target/
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+!.mvn/wrapper/maven-wrapper.jar
+hs_err_pid*
+replay_pid*
+
+# Volumes de banco de dados (Docker) e logs
+/data/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+scripts/.quarkus-dev.pid
+
+# Variáveis de ambiente
+.env
+.env.*
+!.env.example
+
+# IDEs e Editores
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+!.vscode/mcp.json
+.project
+.classpath
+.settings/
+.factorypath
+.sts4-cache/
+
+# Arquivos temporários e de sistema operacional
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Agentes e Copilot
+.agents/
+.github/*
+!.github/workflows/
+
+# Node.js / Frontends (React, Vite, TypeScript)
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.vite/
+**/.vite/
+*.tsbuildinfo
+.eslintcache
+
+
+#outros
+.VSCodeCounter/

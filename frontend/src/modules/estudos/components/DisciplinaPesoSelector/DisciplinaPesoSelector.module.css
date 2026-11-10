@@ -1,0 +1,100 @@
+.selectorWrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--status-pill-height);
+  padding: 2px 4px 2px 10px;
+  border: 1px solid var(--purple-border);
+  border-radius: var(--radius-pill);
+  background: var(--purple-bg-subtle);
+  flex-wrap: wrap;
+}
+
+.compact {
+  gap: 6px;
+}
+
+.labelGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+
+.scaleIcon {
+  flex-shrink: 0;
+  color: var(--purple-icon);
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--purple-text);
+  line-height: 1;
+}
+
+/* ── Container de pílulas baseado em periodPills ── */
+.periodPills {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--purple-border);
+  padding: 1px 2px;
+  border-radius: var(--radius-pill, 9999px);
+  max-width: 100%;
+  overflow-x: auto;
+  user-select: none;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.periodPillsCompact {
+  padding: 1px 2px;
+  gap: 2px;
+}
+
+.periodPills::-webkit-scrollbar {
+  display: none;
+}
+
+.periodPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill, 9999px);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--purple-text-muted);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast, 0.15s ease);
+}
+
+.periodPillCompact {
+  height: 26px;
+  padding: 0 9px;
+}
+
+.periodPill:hover:not(.periodPillActive) {
+  color: var(--purple-hover-text);
+  background: var(--purple-bg-hover);
+}
+
+.periodPill:focus-visible {
+  outline: 2px solid var(--purple-focus);
+  outline-offset: 2px;
+}
+
+.periodPillActive {
+  background: var(--purple-gradient);
+  color: var(--on-primary-solid);
+  font-weight: 700;
+  box-shadow: var(--purple-shadow);
+}

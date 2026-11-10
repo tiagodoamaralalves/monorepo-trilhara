@@ -1,0 +1,129 @@
+.secaoContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--bg-surface-elevated, rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+}
+
+.secaoHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.secaoLabel {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-mid);
+}
+
+.addSecaoBtn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--primary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--radius-xs);
+  transition: all 120ms ease;
+}
+
+.addSecaoBtn:hover {
+  background: var(--primary-subtle, rgba(2, 132, 199, 0.15));
+}
+
+.secaoList {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.secaoItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid transparent;
+  background: transparent;
+  transition: all 120ms ease;
+}
+
+.secaoItem:hover {
+  background: var(--bg-hover);
+}
+
+.secaoItemAtiva {
+  background: var(--bg-active, rgba(255, 255, 255, 0.05));
+  font-weight: 600;
+}
+
+.secaoBtn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+}
+
+.secaoDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.secaoTitulo {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.miniBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-mid);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.miniBtn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}

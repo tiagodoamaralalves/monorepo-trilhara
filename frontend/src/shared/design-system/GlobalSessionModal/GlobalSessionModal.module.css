@@ -1,0 +1,218 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay-bg, rgba(0, 0, 0, 0.7));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 150ms ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.box {
+  background: var(--surface-1, #1a1b1e);
+  border: 1px solid var(--border-strong, #373a40);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: var(--shadow-lg, 0 20px 25px -5px rgba(0, 0, 0, 0.5));
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  animation: slideUp 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.header {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border, #2c2e33);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-main, #ffffff);
+  font-family: inherit;
+}
+
+.closeButton {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #909296);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--radius-sm, 6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 120ms ease;
+}
+
+.closeButton:hover:not(:disabled) {
+  background: var(--surface-hover, #25262b);
+  color: var(--text-main, #ffffff);
+}
+
+.closeButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.contextBadge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--surface-2, #25262b);
+  border: 1px solid var(--border, #2c2e33);
+  border-radius: var(--radius-md, 8px);
+  font-size: 0.88rem;
+  color: var(--text-muted, #c1c2c5);
+}
+
+.colorDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.contextHighlight {
+  color: var(--text-main, #ffffff);
+  font-weight: 600;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.fullWidth {
+  grid-column: 1 / -1;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-muted, #a6a7ab);
+}
+
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inputNumber {
+  font-variant-numeric: tabular-nums;
+}
+
+.unit {
+  font-size: 0.85rem;
+  color: var(--text-muted, #909296);
+  user-select: none;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface-2, #25262b);
+  border: 1px solid var(--border, #2c2e33);
+  border-radius: var(--radius-md, 8px);
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statLabel {
+  font-size: 0.75rem;
+  color: var(--text-muted, #909296);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.statValue {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-main, #ffffff);
+  font-variant-numeric: tabular-nums;
+}
+
+.alertWarning {
+  background: rgba(245, 159, 0, 0.12);
+  border: 1px solid rgba(245, 159, 0, 0.4);
+  color: #fcc419;
+  padding: 12px 14px;
+  border-radius: var(--radius-md, 8px);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.alertError {
+  background: rgba(250, 82, 82, 0.12);
+  border: 1px solid rgba(250, 82, 82, 0.4);
+  color: #ff8787;
+  padding: 12px 14px;
+  border-radius: var(--radius-md, 8px);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border, #2c2e33);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  background: var(--surface-1, #1a1b1e);
+  flex-wrap: wrap;
+}
+
+.footerLeft {
+  margin-right: auto;
+}

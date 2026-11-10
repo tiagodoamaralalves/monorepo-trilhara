@@ -1,0 +1,140 @@
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cicloAviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--purple-bg, rgba(139, 92, 246, 0.1));
+  border: 1px solid var(--purple, #8b5cf6);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+  margin-bottom: 12px;
+}
+
+.cicloAviso svg {
+  color: var(--purple, #8b5cf6);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.subtasksSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 12px;
+}
+
+.subtasksHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.subtasksTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.subtasksCount {
+  font-size: 12px;
+  color: var(--text-mid);
+}
+
+.subtasksList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.subtaskItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.subtaskItem:hover {
+  border-color: var(--border);
+}
+
+.subtaskText {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.subtaskTextDone {
+  color: var(--text-soft);
+  text-decoration: line-through;
+}
+
+.subtaskDeleteBtn {
+  background: none;
+  border: none;
+  color: var(--text-soft);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.subtaskDeleteBtn:hover {
+  color: var(--red, #ef4444);
+  background: var(--red-bg, rgba(239, 68, 68, 0.1));
+}
+
+.addSubtaskRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.addSubtaskInput {
+  flex: 1;
+  padding: 7px 12px;
+  font-size: 13px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.addSubtaskInput:focus {
+  border-color: var(--primary);
+}
+
+@media (max-width: 520px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+}

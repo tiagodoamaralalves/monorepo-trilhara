@@ -1,0 +1,124 @@
+{
+	{$CADDY_GLOBAL_OPTIONS}
+	admin off
+}
+
+(security_headers) {
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}
+
+(api_proxy) {
+	handle /api/* {
+		reverse_proxy app:8080
+	}
+
+	@quarkus_dev {
+		path /q/*
+		expression `{$EXPOSE_QUARKUS_DEV_UI:false} == true`
+	}
+	handle @quarkus_dev {
+		reverse_proxy app:8080
+	}
+}
+
+(spa_frontend) {
+	root * /srv/dist
+
+	# a) Chunks com hash do Vite: cache imutavel de 1 ano e 404 se ausente
+	@hashed_assets path /assets/*
+	handle @hashed_assets {
+		header Cache-Control "public, max-age=31536000, immutable"
+		try_files {path} =404
+		file_server
+	}
+
+	# Regras explicitas para Service Worker e Web Manifest (Fase 10)
+	@sw_script path /sw.js
+	handle @sw_script {
+		header Cache-Control "no-cache, no-store, must-revalidate"
+		header Service-Worker-Allowed "/"
+		try_files {path} =404
+		file_server
+	}
+
+	@manifest path /manifest.webmanifest
+	handle @manifest {
+		header Content-Type "application/manifest+json"
+		header Cache-Control "no-cache, must-revalidate"
+		try_files {path} =404
+		file_server
+	}
+
+	# b) Arquivos estaticos da raiz (favicon, manifest, fontes)
+	@static_files path *.svg *.ico *.png *.json *.woff2 *.webmanifest
+	handle @static_files {
+		try_files {path} =404
+		file_server
+	}
+
+	# c) Fallback SPA: no-cache estrito para index.html
+	handle {
+		header Cache-Control "no-cache, no-store, must-revalidate"
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# 1. Subdomínios dos Módulos React Unificados (Estudos, Tarefas, Pomodoro, Notas)
+estudos.{$DOMAIN:localhost},
+tarefas.{$DOMAIN:localhost},
+pomodoro.{$DOMAIN:localhost},
+notas.{$DOMAIN:localhost} {
+	import security_headers
+	encode zstd gzip
+	import api_proxy
+	import spa_frontend
+}
+
+# 2. Servidor Principal
+{$SITE_ADDRESS:localhost} {
+	import security_headers
+	encode zstd gzip
+	import api_proxy
+
+	# Redirecionamentos amigáveis com barra final
+	redir /tarefas /tarefas/
+	redir /estudos /estudos/
+	redir /pomodoro /pomodoro/
+	redir /notas /notas/
+
+	# Assets compartilhados se requisitados na raiz
+	handle /assets/* {
+		root * /srv/dist
+		header Cache-Control "public, max-age=31536000, immutable"
+		try_files {path} =404
+		file_server
+	}
+
+	# Rotas por caminho para os módulos do Frontend Unificado
+	handle_path /tarefas/* {
+		import spa_frontend
+	}
+
+	handle_path /estudos/* {
+		import spa_frontend
+	}
+
+	handle_path /pomodoro/* {
+		import spa_frontend
+	}
+
+	handle_path /notas/* {
+		import spa_frontend
+	}
+
+	# Raiz (/) e demais rotas: Frontend Unificado (SPA com fallback no index.html)
+	handle {
+		import spa_frontend
+	}
+}

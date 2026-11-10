@@ -1,0 +1,94 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5, 20px);
+}
+
+.profileSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+  padding: var(--space-4, 16px);
+  background-color: var(--color-bg-surface-elevated, #1a1a1a);
+  border: 1px solid var(--color-border-subtle, #333);
+  border-radius: var(--radius-md, 8px);
+}
+
+.profileRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--font-size-sm, 14px);
+}
+
+.label {
+  color: var(--color-text-secondary, #888);
+  font-weight: 500;
+}
+
+.value {
+  color: var(--color-text-primary, #fff);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.dangerZone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+  padding: var(--space-4, 16px);
+  border: 1px solid var(--color-danger-subtle, rgba(239, 68, 68, 0.3));
+  background-color: var(--color-danger-surface, rgba(239, 68, 68, 0.05));
+  border-radius: var(--radius-md, 8px);
+}
+
+.dangerHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  color: var(--color-danger, #ef4444);
+  font-size: var(--font-size-base, 16px);
+  font-weight: 600;
+}
+
+.dangerDescription {
+  font-size: var(--font-size-sm, 14px);
+  color: var(--color-text-secondary, #aaa);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.confirmationForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+  margin-top: var(--space-2, 8px);
+  padding-top: var(--space-3, 12px);
+  border-top: 1px solid var(--color-border-subtle, #333);
+}
+
+.confirmationInstructions {
+  font-size: var(--font-size-sm, 14px);
+  color: var(--color-text-primary, #fff);
+  margin: 0;
+}
+
+.highlightText {
+  color: var(--color-danger, #ef4444);
+  font-weight: 700;
+}
+
+.errorMessage {
+  font-size: var(--font-size-xs, 12px);
+  color: var(--color-danger, #ef4444);
+  background-color: var(--color-danger-surface, rgba(239, 68, 68, 0.1));
+  padding: var(--space-2, 8px);
+  border-radius: var(--radius-sm, 4px);
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2, 8px);
+  margin-top: var(--space-2, 8px);
+}

@@ -1,0 +1,96 @@
+import React, { useMemo } from 'react';
+import { AppSidebar } from '@shared/design-system';
+import { Trilha, PaginaAtiva, UsuarioAutenticado } from '../../types/trilhara';
+import { useStudyTimer } from '../../context/StudyTimerContext';
+import { formatarSegundos } from '../../utils/format';
+import { NAV_ITEMS } from './navigationConfig';
+import { TrilhaPod } from './TrilhaPod';
+import { MobileTrilhaControls } from './MobileTrilhaControls';
+
+const SEM_TRILHA_TIMER_ID = '__sem_trilha__';
+
+export interface NavbarProps {
+  trilhas: Trilha[];
+  trilhaAtiva?: Trilha | null;
+  paginaAtiva: PaginaAtiva;
+  usuario?: UsuarioAutenticado | null;
+  onNavegar: (pagina: PaginaAtiva) => void;
+  onSelecionarTrilha: (id: string) => void;
+  onAbrirEditarTrilha: () => void;
+  onAbrirNovaTrilha?: () => void;
+  onLogout?: () => void;
+  onAbrirConta?: () => void;
+}
+
+export const Navbar: React.FC<NavbarProps> = ({
+  trilhas,
+  trilhaAtiva,
+  paginaAtiva,
+  usuario,
+  onNavegar,
+  onSelecionarTrilha,
+  onAbrirEditarTrilha,
+  onAbrirNovaTrilha,
+  onLogout,
+  onAbrirConta
+}) => {
+  const timer = useStudyTimer(trilhaAtiva?.id || SEM_TRILHA_TIMER_ID);
+  const isTimerRunning = timer.running || timer.breakSeconds > 0;
+  const liveTimerText = useMemo(() => {
+    if (timer.breakSeconds > 0) return formatarSegundos(timer.breakSeconds);
+    if (timer.running || timer.seconds > 0) return formatarSegundos(timer.seconds);
+    return null;
+  }, [timer.breakSeconds, timer.running, timer.seconds]);
+
+  const getBadgeForItem = (id: PaginaAtiva): string | number | undefined => {
+    if (id === 'hub' && trilhas.length > 0) return trilhas.length;
+    if (id === 'disciplinas' && trilhaAtiva) return trilhaAtiva.disciplinas.length;
+    return undefined;
+  };
+
+  return (
+    <AppSidebar<PaginaAtiva>
+      brand={{
+        title: 'Trilhara',
+        subtitle: 'Estudos & Ciclos',
+        logoSrc: '/favicon.svg',
+        onClick: () => onNavegar('hub'),
+        titleAttr: 'Ir para minhas trilhas'
+      }}
+      user={
+        usuario
+          ? {
+              nome: usuario.nome,
+              email: usuario.email
+            }
+          : null
+      }
+      onLogout={onLogout}
+      onOpenAccount={onAbrirConta}
+      contextSlot={
+        <TrilhaPod
+          trilhas={trilhas}
+          trilhaAtiva={trilhaAtiva}
+          onSelecionarTrilha={onSelecionarTrilha}
+          onAbrirEditarTrilha={onAbrirEditarTrilha}
+          onAbrirNovaTrilha={onAbrirNovaTrilha}
+        />
+      }
+      mobileControlsSlot={
+        <MobileTrilhaControls
+          trilhas={trilhas}
+          trilhaAtiva={trilhaAtiva}
+          onSelecionarTrilha={onSelecionarTrilha}
+          onAbrirEditarTrilha={onAbrirEditarTrilha}
+        />
+      }
+      navLabel="Menu de Estudos"
+      items={NAV_ITEMS}
+      activeId={paginaAtiva}
+      onNavigate={onNavegar}
+      getBadge={getBadgeForItem}
+      getLiveText={(id) => (id === 'estudar' ? liveTimerText : null)}
+      getIsRunning={(id) => (id === 'estudar' ? isTimerRunning : false)}
+    />
+  );
+};

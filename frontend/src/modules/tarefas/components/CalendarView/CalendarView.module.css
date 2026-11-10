@@ -1,0 +1,361 @@
+.calendarSection {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.calendarToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.calendarToolbar h3 {
+  min-width: 180px;
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.calendarViewToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.calendarWeekday {
+  padding: 6px 4px;
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.calendarGrid .calendarDay {
+  display: flex;
+  height: auto;
+  min-height: 124px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.calendarGrid .calendarDay > span {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 4px;
+}
+
+.calendarGrid .calendarDay > span > span {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 3px;
+  white-space: normal;
+}
+
+.calendarDate {
+  align-self: flex-end;
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.calendarSubjects {
+  min-height: 0;
+}
+
+.calendarSubject {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.calendarSubjectLabel {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  gap: 4px;
+  color: var(--text-mid);
+  font-size: 10px;
+  line-height: 1.15;
+}
+
+.calendarSubjectLabel > span:first-child {
+  width: 6px;
+  height: 6px;
+}
+
+.calendarSubjectLabel > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendarSubjectLabelCompleted > span:last-child {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.calendarMore {
+  color: var(--primary-light);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.calendarDay:hover,
+.calendarDay:focus-visible {
+  border-color: var(--primary-light);
+  outline: none;
+}
+
+.outsideMonth {
+  opacity: 0.48;
+}
+
+.today {
+  border-color: var(--primary-light);
+}
+
+.calendarGrid .calendarDay.today:not(.selectedDay) {
+  background: var(--primary-bg);
+}
+
+.calendarGrid .calendarDay.today .calendarDate {
+  color: var(--primary-light);
+}
+
+.selectedDay {
+  background: var(--primary-bg);
+  border-color: var(--primary-light);
+}
+
+.weekCalendar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.weekDay {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.weekDay:hover,
+.weekDay:focus-visible {
+  border-color: var(--primary-light);
+  outline: none;
+}
+
+.weekDayToday,
+.weekDayToday:hover {
+  border-color: var(--primary-light);
+  background: var(--primary-bg);
+}
+
+.weekDayHeader {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.weekDayTitle {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.weekDayToday .weekDayTitle {
+  color: var(--primary-light);
+}
+
+.todayLabel {
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+  color: var(--primary-contrast);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.weekDayCount,
+.weekDayEmpty {
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.weekDaySubjects {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.weekDaySubjects > span {
+  min-width: 0;
+  color: var(--text-mid);
+  font-size: 12px;
+}
+
+/* ── MODAL DO DIA SELECIONADO ── */
+.dayBlockList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dayBlock {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.dayBlock > div:first-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.dayBlockHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dayBlockSubject {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.dayBlockMeta {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.dayBlockNotes {
+  font-size: 12px;
+  color: var(--text-mid);
+  margin: 2px 0 0;
+  white-space: pre-wrap;
+}
+
+.dayBlockActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modalFooterActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 8px;
+}
+
+.emptyDayContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  gap: 14px;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .dayBlock {
+    align-items: flex-start;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dayBlockActions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .dayBlockActions > button {
+    flex: 1 1 140px;
+  }
+}
+
+@media (max-width: 540px) {
+  .calendarSection {
+    padding: 16px;
+  }
+
+  .calendarGrid {
+    gap: 3px;
+  }
+
+  .calendarGrid .calendarDay {
+    min-height: 100px;
+    padding: 5px;
+    font-size: 12px;
+  }
+
+  .calendarToolbar h3 {
+    min-width: 120px;
+    flex: 1;
+  }
+
+  .calendarViewToggle {
+    margin-left: 0;
+  }
+}

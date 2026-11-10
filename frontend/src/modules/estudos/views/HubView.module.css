@@ -1,0 +1,29 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.bannerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.emptyActions {
+  display: flex;
+  gap: 12px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.divider {
+  height: 1px;
+  border: 0;
+  margin: 8px 0;
+  background: var(--border);
+}

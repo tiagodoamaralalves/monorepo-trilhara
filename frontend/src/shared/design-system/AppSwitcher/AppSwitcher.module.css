@@ -1,0 +1,203 @@
+.appSwitcherContainer {
+  position: relative;
+  width: 100%;
+}
+
+/* Botão gatilho no desktop / sidebar */
+.switcherTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-card, #16181d);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+  color: var(--text-primary, #f0f0f2);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  min-height: 38px;
+}
+
+.switcherTrigger:hover {
+  background: var(--bg-card-hover, #1f2229);
+  border-color: var(--border-dim, rgba(255, 255, 255, 0.15));
+}
+
+.switcherTrigger:focus-visible {
+  outline: 2px solid var(--accent-gold, #cba46a);
+  outline-offset: 2px;
+}
+
+.triggerContent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.triggerIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-gold, #cba46a);
+  flex-shrink: 0;
+}
+
+.triggerText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.currentAppName {
+  font-weight: 600;
+  color: var(--text-primary, #f0f0f2);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.switcherHint {
+  font-size: 10px;
+  color: var(--text-muted, #8b909a);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.chevronIcon {
+  color: var(--text-muted, #8b909a);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+/* Gatilho compacto (Sidebar recolhida) */
+.switcherTriggerCompact {
+  justify-content: center;
+  padding: 8px;
+  width: 40px;
+  height: 40px;
+  margin: 0 auto;
+}
+
+/* Popover do Menu */
+.switcherDropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 250px;
+  background: var(--bg-card, #16181d);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+  border-radius: 10px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+  padding: 8px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.switcherHeader {
+  padding: 6px 8px 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted, #8b909a);
+  border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+  margin-bottom: 4px;
+}
+
+/* Item de aplicativo */
+.appItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-primary, #f0f0f2);
+  text-decoration: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  min-height: 44px;
+}
+
+.appItem:hover {
+  background: var(--bg-card-hover, #1f2229);
+  border-color: var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.appItem:focus-visible {
+  outline: 2px solid var(--accent-gold, #cba46a);
+  outline-offset: -2px;
+}
+
+.appItemActive {
+  background: rgba(203, 164, 106, 0.12);
+  border-color: rgba(203, 164, 106, 0.3);
+}
+
+.appItemContent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.appIconWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--bg-canvas, #0d0e12);
+  color: var(--accent-gold, #cba46a);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  flex-shrink: 0;
+}
+
+.appItemActive .appIconWrap {
+  background: var(--accent-gold, #cba46a);
+  color: #0d0e12;
+}
+
+.appMeta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.appName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #f0f0f2);
+}
+
+.appDesc {
+  font-size: 11px;
+  color: var(--text-muted, #8b909a);
+}
+
+.activeBadge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(203, 164, 106, 0.2);
+  color: var(--accent-gold, #cba46a);
+  letter-spacing: 0.5px;
+}

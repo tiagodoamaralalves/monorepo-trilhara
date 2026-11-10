@@ -1,0 +1,331 @@
+.shell {
+  display: block;
+  min-height: 100vh;
+}
+
+.main {
+  width: calc(100% - 272px);
+  max-width: 1480px;
+  min-width: 0;
+  margin-left: 272px;
+  margin-right: auto;
+  padding: 24px 28px 48px;
+}
+
+.shell:has(aside[data-collapsed="true"]) .main {
+  margin-left: 78px;
+  width: calc(100% - 78px);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+}
+
+.todayStats,
+.todayStat {
+  display: flex;
+  align-items: center;
+}
+
+.todayStats {
+  gap: 16px;
+  color: var(--text-mid);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.todayStat {
+  gap: 6px;
+}
+
+.successIcon { color: var(--green, #10b981); }
+.primaryIcon { color: var(--primary-light, #3b82f6); }
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.listHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 12px;
+}
+
+.listHeaderTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.listHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sortSelectWrapper {
+  min-width: 180px;
+}
+
+.sortSelect {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  color: var(--text);
+  outline: none;
+  cursor: pointer;
+}
+
+.taskList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── SEÇÃO DE TAREFAS CONCLUÍDAS ── */
+.completedSection {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.completedHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 8px 4px;
+  cursor: pointer;
+  color: var(--text-mid);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  transition: color var(--transition-fast);
+}
+
+.completedHeader:hover {
+  color: var(--text);
+}
+
+.completedBadge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-soft);
+  background: var(--surface-2);
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+}
+
+/* ── AVISO DISCRETO DE CICLO ATIVO NO TOPO ── */
+.cicloBannerDiscreto {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--purple-border, rgba(139, 92, 246, 0.3));
+  border-left: 4px solid var(--purple, #8b5cf6);
+  border-radius: var(--radius-md);
+  gap: 12px;
+}
+
+.cicloBannerText {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+.cicloBannerIcon {
+  color: var(--purple, #8b5cf6);
+  flex-shrink: 0;
+}
+
+.cicloBannerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 960px) {
+  .shell {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .main,
+  .shell:has(aside[data-collapsed="true"]) .main {
+    width: 100%;
+    max-width: none;
+    margin-left: 0;
+    padding: 20px 18px calc(88px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (max-width: 640px) {
+  .main {
+    padding: 18px 14px calc(86px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .todayStats {
+    flex-wrap: wrap;
+  }
+
+  .cicloBannerDiscreto {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cicloBannerActions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+.loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--text-mid);
+  background: var(--bg);
+}
+
+/* ── ESTILOS PARA BLOCOS DE ESTUDO NA VISÃO HOJE E LISTA VIRTUAL (FASE 7) ── */
+.blocoItemRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast, 150ms ease);
+}
+
+.blocoItemRow:hover {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+}
+
+.blocoItemContent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.blocoCheckBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-soft);
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: all var(--transition-fast, 150ms ease);
+}
+
+.blocoCheckBtn:hover {
+  border-color: var(--primary-light);
+  color: var(--primary-light);
+  background: var(--primary-bg);
+}
+
+.blocoDetails {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.blocoTrilhaPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-soft);
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+}
+
+.blocoMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.virtualListTopBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.virtualListTitleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.virtualListTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.virtualListSubtitle {
+  font-size: 12px;
+  color: var(--text-soft);
+  margin: 0;
+}
+
+.carregarMaisBtnWrapper {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+}
+

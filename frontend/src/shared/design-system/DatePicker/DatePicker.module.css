@@ -1,0 +1,386 @@
+/* ── DatePicker & Calendar (Design System Trilhara) ── */
+
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  font-family: var(--font-sans);
+}
+
+.wrapperSm {
+  gap: 4px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.wrapperSm .label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.inputAnchor {
+  position: relative;
+  width: 100%;
+}
+
+.triggerWrapper {
+  position: relative;
+  width: 100%;
+}
+
+.clearPlaceholder {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.trigger {
+  width: 100%;
+  height: var(--control-height);
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--control-bg);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--transition-fast);
+  text-align: left;
+}
+
+.triggerSm {
+  height: var(--control-height-sm);
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.trigger:hover:not(:disabled) {
+  background: var(--control-bg-hover);
+  border-color: var(--border-focus);
+}
+
+.trigger:focus-visible,
+.triggerOpen {
+  outline: none;
+  background: var(--control-bg-focus);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.placeholder {
+  color: var(--text-soft);
+}
+
+.triggerValue {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.triggerIcons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-mid);
+  flex-shrink: 0;
+}
+
+.trigger:hover .calendarIcon,
+.triggerOpen .calendarIcon {
+  color: var(--primary-light);
+}
+
+.clearIcon {
+  position: absolute;
+  right: 36px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-xs);
+  color: var(--text-soft);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  z-index: 1;
+}
+
+.clearIconSm {
+  right: 30px;
+}
+
+.clearIcon:hover {
+  background: var(--surface-hover);
+  color: var(--red);
+}
+
+.clearIcon:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.disabledWrapper {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.disabledWrapper .trigger {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.hasError {
+  border-color: var(--red) !important;
+}
+
+.hasError:focus-visible,
+.hasError.triggerOpen {
+  box-shadow: 0 0 0 3px var(--red-bg) !important;
+}
+
+.errorText {
+  font-size: 11.5px;
+  color: var(--red);
+  font-weight: 500;
+}
+
+.helperText {
+  font-size: 11.5px;
+  color: var(--text-soft);
+}
+
+/* ── Popover ── */
+
+.popover {
+  position: absolute;
+  z-index: 600;
+  animation: calendarPop 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.popoverBottom {
+  top: calc(100% + 6px);
+  bottom: auto;
+}
+
+.popoverTop {
+  bottom: calc(100% + 6px);
+  top: auto;
+}
+
+.popoverLeft {
+  left: 0;
+}
+
+.popoverRight {
+  right: 0;
+}
+
+@keyframes calendarPop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── Calendar Visual Container ── */
+
+.calendar {
+  width: 280px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 14px;
+  user-select: none;
+  font-family: var(--font-sans);
+  backdrop-filter: blur(14px);
+}
+
+.calendarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.monthTitle {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.yearTitle {
+  font-weight: 500;
+  color: var(--text-mid);
+  margin-left: 2px;
+}
+
+.navButtons {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.navButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.navButton:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.navButton:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ── Dias da semana ── */
+
+.weekDays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 6px;
+  text-align: center;
+}
+
+.weekDay {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  padding: 3px 0;
+}
+
+/* ── Grade de dias ── */
+
+.daysGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.dayCell {
+  width: 32px;
+  height: 32px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.dayCell:hover:not(.disabled):not(.selected) {
+  background: var(--surface-3);
+  color: var(--text);
+  transform: scale(1.05);
+}
+
+.otherMonth {
+  color: var(--text-soft);
+  opacity: 0.35;
+}
+
+.today {
+  border-color: var(--border-focus);
+  color: var(--primary-light);
+  font-weight: 700;
+}
+
+.selected {
+  background: var(--primary) !important;
+  color: var(--on-primary-solid) !important;
+  font-weight: 800 !important;
+  border-color: transparent !important;
+  box-shadow: 0 2px 10px var(--primary-glow);
+  opacity: 1 !important;
+}
+
+.disabled {
+  opacity: 0.2 !important;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ── Rodapé de ações ── */
+
+.calendarFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.footerAction {
+  background: transparent;
+  border: none;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--primary-light);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-xs);
+  transition: all var(--transition-fast);
+}
+
+.footerAction:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.footerAction:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+

@@ -1,0 +1,46 @@
+# Regras Normativas — Reestruturação Trilhara
+
+## 1. Fronteiras de Fase, Componentes Compartilhados e Dependências (Seção "Como usar")
+- **Premissa de dados:** Não preservar compatibilidade com modelos, rotas ou dados de teste legados. O banco de desenvolvimento/teste inicia vazio no novo esquema.
+- **Fronteiras de mudança por fase:** Cada fase indica os domínios/arquivos principais e exclusões de escopo. Antes de editar, inventariar usos/imports e todos os call sites; mudanças transversais indispensáveis para compilar/testar são permitidas se justificadas e registradas no resumo. Não criar mocks/callbacks temporários que serão descartados por fase posterior.
+- **Contratos antes, componentes junto de quem consome:** A FASE 0 congela os contratos e tipos compartilhados, mas os componentes visuais compartilhados são implementados apenas na fase que os consome pela primeira vez:
+  - `AppSwitcher` -> implementado na **FASE 1** (junto do SSO e `AppSidebar`);
+  - `GlobalSessionModal` -> implementado na **FASE 5** (junto do serviço global de sessão e timers);
+  - `SectionErrorCard` -> implementado na **FASE 7** (junto da Visão Hoje compartilhada e listas virtuais);
+  - `SyncStatusBadge` -> implementado na **FASE 8** (junto do autosave e rascunho local de Notas).
+- **Dependências oficiais (não presumir conclusão por ordem numérica):**
+  - Grafo normativo: `F0 -> F1`; `F1 -> F2`; `F2 -> F3` e `F2 -> F4`; `F3 + F4 -> F5`; `F1 -> F6`; `F4 + F5 + F6 -> F7`; `F1 + F2 -> F8`; `F2..F8 -> F9`; `F6 + F9 -> F10`; `F0..F10 -> F11`.
+  - Execução linear segura: `F0 -> F1 -> F2 -> F3 -> F4 -> F5 -> F6 -> F7 -> F8 -> F9 -> F10 -> F11`.
+
+## 2. Inventário Oficial de Coleções (19 no total: 18 privadas + 1 catálogo público)
+- **Privadas** (17 coleções filhas têm `usuarioId: ObjectId`; em `usuarios`, o `_id` é o ID do usuário):
+  1. `usuarios`
+  2. `refresh_tokens`
+  3. `tokens_recuperacao_senha`
+  4. `tokens_confirmacao_email`
+  5. `trilhas`
+  6. `disciplinas`
+  7. `progresso_topicos`
+  8. `cronogramas`
+  9. `blocos_cronograma`
+  10. `sessoes`
+  11. `listas_tarefas`
+  12. `series_recorrentes`
+  13. `tarefas`
+  14. `cadernos`
+  15. `secoes`
+  16. `notas`
+  17. `push_subscriptions`
+  18. `lembretes_push`
+- **Catálogo público** (gerido por ADMIN):
+  19. `editais`
+
+## 3. Convenções Normativas de API e Implementação (Seção 0.4 — aplicam-se a F0–F11)
+- **Autenticação e Multi-tenancy:** Recursos privados exigem autenticação. Toda leitura/escrita de recurso raiz ou filho consulta simultaneamente ID e `usuarioId`; recurso de outro usuário e ID inexistente respondem `404`, sem revelar existência. Ausência de autenticação responde `401`; falha de autorização de função administrativa responde `403`.
+- **Identificadores HTTP:** IDs HTTP são strings hexadecimais de 24 caracteres. ID malformado em path/query/body responde `400 INVALID_IDENTIFIER`; ID válido mas inexistente/fora do tenant responde `404 NOT_FOUND`.
+- **Erros (RFC 9457):** Erros usam RFC 9457 (`application/problem+json`) com `type`, `title`, `status`, `detail`, `instance`; extensões estáveis `code` e `errors` são documentadas pelo produto. `detail` não é contrato de máquina; clientes decidem pelo status e `code`. Erros inesperados não expõem stack trace, consulta, segredo ou dado pessoal; são registrados com correlation/request ID.
+- **Paginação por offset:** Parâmetros `pagina` (1-based, default 1) e `tamanho` (default definido por endpoint, máximo 100); valor menor que 1 ou maior que o máximo retorna `400 INVALID_PAGINATION`. Resposta: `{ itens, pagina, tamanho, totalItens, totalPaginas }`. Toda listagem tem ordenação estável incluindo `_id` como desempate. Mudança do conjunto durante paginação pode alterar páginas; não se promete snapshot transacional.
+- **Datas, Instantes e Durações:** Datas de calendário são strings ISO estritas `yyyy-MM-dd`; instantes são RFC 3339 em API e `Instant`/BSON Date no banco. Duração é inteiro em segundos ou minutos conforme campo explicitamente nomeado. Não inferir fuso a partir do servidor (usar `X-Timezone` com fallback para `America/Sao_Paulo`).
+- **Idempotência:** Requisições de escrita idempotentes declaram escopo/chave, hash funcional, status de retry e retenção. Conflito de mesma chave com payload funcional diferente responde `409 IDEMPOTENCY_KEY_CONFLICT`; chave de outro usuário não colide.
+- **Operações Compostas:** Operações compostas sem transação multi-documento definem estados intermediários, recuperação/retry e efeitos parciais em requisito e teste. Nunca afirmar atomicidade se ela não for oferecida.
+- **Testes Frontend:** `vitest`, `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom` e `jsdom` são as dependências de teste frontend aprovadas para esta reestruturação; fixar versões compatíveis com React 18/Vite 6 no lockfile e usar os comandos `npm test` e `npm run build`.

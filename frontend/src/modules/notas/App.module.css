@@ -1,0 +1,120 @@
+.shell {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  position: relative;
+}
+
+.workspace {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  margin-left: 272px;
+  width: calc(100% - 272px);
+  min-width: 0;
+  transition: margin-left var(--transition-smooth, 0.22s cubic-bezier(0.16, 1, 0.3, 1)),
+              width var(--transition-smooth, 0.22s cubic-bezier(0.16, 1, 0.3, 1));
+}
+
+.workspaceCollapsed {
+  margin-left: 78px;
+  width: calc(100% - 78px);
+}
+
+.shell:has(aside[class*="sidebarCollapsed"]) .workspace,
+.shell:has(aside[data-collapsed="true"]) .workspace {
+  margin-left: 78px;
+  width: calc(100% - 78px);
+}
+
+/* Coluna 2: Painel de Páginas (Estilo OneNote) */
+.pagesColumn {
+  width: 290px;
+  min-width: 250px;
+  max-width: 360px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1);
+  border-right: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* Coluna 3: Editor Tiptap Full Canvas */
+.editorContainer {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  background: var(--bg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobileNavHeader {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+  flex-shrink: 0;
+}
+
+.emptyStateWrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.loading {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  color: var(--text-mid);
+  background: var(--bg);
+}
+
+@media (max-width: 960px) {
+  .shell {
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .workspace,
+  .workspaceCollapsed,
+  .shell:has(aside[class*="sidebarCollapsed"]) .workspace,
+  .shell:has(aside[data-collapsed="true"]) .workspace {
+    margin-left: 0 !important;
+    width: 100% !important;
+    flex-direction: row;
+    height: calc(100vh - 64px);
+  }
+
+  .mobileNavHeader {
+    display: flex;
+  }
+
+  .hideOnMobile {
+    display: none !important;
+  }
+
+  .pagesColumn {
+    width: 100%;
+    min-width: 100%;
+    max-width: 100%;
+    border-right: none;
+  }
+}

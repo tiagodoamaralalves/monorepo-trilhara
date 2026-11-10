@@ -1,0 +1,450 @@
+.disciplinasView,
+.topicosView {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Seletor de cor no ícone */
+.headerColorWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-top: 0;
+}
+
+.colorBadgeButton {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.colorBadgeButton:disabled {
+  cursor: default;
+}
+
+.colorBadgeButton:not(:disabled):hover,
+.colorBadgeButtonActive {
+  transform: scale(1.1);
+}
+
+.colorBadge {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background-color: var(--discipline-color);
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+
+.colorPopover {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: 0;
+  width: 380px;
+  max-width: min(380px, calc(100vw - 32px));
+  background: var(--surface-1);
+  border: 1px solid var(--border-focus);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg), 0 0 0 1px var(--primary-bg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  z-index: 100;
+  animation: popoverFadeIn 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.colorPopover::before {
+  position: absolute;
+  top: -6px;
+  left: 20px;
+  width: 10px;
+  height: 10px;
+  background: var(--surface-1);
+  border-top: 1px solid var(--border-focus);
+  border-left: 1px solid var(--border-focus);
+  content: '';
+  transform: rotate(45deg);
+}
+
+@keyframes popoverFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.colorPopoverHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.colorPopoverHeader > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.colorPopoverEyebrow {
+  color: var(--primary-light);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.colorPopoverTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+.colorPopoverDescription {
+  margin: 0;
+  color: var(--text-mid);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.selectedColorPreview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-mid);
+  font-size: 12px;
+}
+
+.selectedColorPreview strong {
+  margin-left: 4px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.selectedColorSwatch {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border: 2px solid var(--surface-1);
+  border-radius: 50%;
+  background: var(--discipline-color);
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+.formCadastro {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.topicField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.topicFieldHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 36px;
+  gap: 8px;
+}
+
+.topicFieldHeader label {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.confirmTopicsButton {
+  flex-shrink: 0;
+}
+
+/* Rolagem para grandes quantidades */
+.disciplineList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0 4px 0 0;
+  list-style: none;
+}
+
+.topicList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0 4px 0 0;
+  list-style: none;
+}
+
+.inlineEditInput {
+  flex: 1;
+  min-width: 0;
+}
+
+.inlineEditInput input {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.titleEditInput {
+  width: 100%;
+  min-width: 180px;
+}
+
+.titleEditInput > div {
+  box-sizing: border-box;
+  min-height: 48px;
+  border-color: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.titleEditInput input {
+  height: 48px;
+  padding: 0 10px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.editableTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.editableTitle svg {
+  flex: 0 0 auto;
+  color: var(--text-mid);
+  transition: color var(--transition-fast), transform var(--transition-fast);
+}
+
+.editableTitle:hover svg,
+.editableTitle:focus-visible svg {
+  color: var(--primary-light);
+  transform: translateY(-1px);
+}
+
+.discCount {
+  width: fit-content;
+}
+
+.modalSubtitleMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.modalContentMeta {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-mid);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.modalWeightSelector {
+  gap: 6px;
+}
+
+.modalWeightBadge {
+  flex-shrink: 0;
+}
+
+.modalTopicPill {
+  min-height: var(--status-pill-height);
+  height: var(--status-pill-height);
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-mid);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.modalTopicPill:not(:disabled):hover,
+.modalTopicPill:not(:disabled):focus-visible {
+  border-color: var(--border-focus);
+  background: var(--surface-3);
+  color: var(--primary-light);
+}
+
+.modalListWeightPill {
+  border-color: var(--border);
+  background: var(--surface-2);
+  color: var(--text-mid);
+}
+
+.modalListWeightPill .scaleIcon,
+.modalListWeightPill .label {
+  color: var(--text-mid);
+}
+
+.modalListWeightPill .pill {
+  background: var(--surface-3);
+  color: var(--text-mid);
+  box-shadow: none;
+}
+
+.modalListWeightPill:hover,
+.modalListWeightPill:focus-visible {
+  border-color: var(--pink-border);
+  background: var(--pink-bg-subtle);
+  color: var(--pink-text);
+}
+
+.modalListWeightPill:hover .scaleIcon,
+.modalListWeightPill:hover .label,
+.modalListWeightPill:focus-visible .scaleIcon,
+.modalListWeightPill:focus-visible .label {
+  color: var(--pink-text);
+}
+
+.modalListWeightPill:hover .pill,
+.modalListWeightPill:focus-visible .pill {
+  background: var(--pink-gradient);
+  color: var(--on-primary-solid);
+  box-shadow: var(--pink-shadow);
+}
+
+.topicCompletionButton {
+  min-height: var(--status-pill-height);
+  height: var(--status-pill-height);
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.topicCompletionButtonComplete {
+  background: var(--green-bg);
+  border-color: var(--green-border);
+  color: var(--green);
+}
+
+.topicCompletionButtonComplete:hover:not(:disabled) {
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--surface-1);
+}
+
+.topicCompletionButtonComplete:focus-visible {
+  background: var(--green-bg);
+  border-color: var(--green-border);
+  color: var(--green);
+}
+
+.topicCompletionButtonUndo {
+  background: var(--yellow-bg);
+  border-color: var(--yellow-border);
+  color: var(--yellow);
+}
+
+.topicCompletionButtonUndo:hover:not(:disabled) {
+  background: var(--yellow);
+  border-color: var(--yellow);
+  color: var(--surface-1);
+}
+
+.topicCompletionButtonUndo:focus-visible {
+  background: var(--yellow-bg);
+  border-color: var(--yellow-border);
+  color: var(--yellow);
+}
+
+.emptyList {
+  padding: 20px;
+  color: var(--text-soft);
+  font-size: 13px;
+  text-align: center;
+}
+
+.modalFooter {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+}
+
+.modalFooterLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modalFooterRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  .modalFooter {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .modalFooterLeft {
+    width: 100%;
+  }
+
+  .modalFooterLeft > * {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .modalFooterRight {
+    width: 100%;
+    margin-left: 0;
+    display: flex;
+    gap: 8px;
+  }
+
+  .modalFooterRight > * {
+    flex: 1;
+  }
+}
+

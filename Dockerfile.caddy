@@ -1,0 +1,11 @@
+# Etapa 1: Build do Frontend Unificado (React Modular: Estudos, Tarefas, Notas e Pomodoro)
+FROM node:22-alpine AS build-frontend
+WORKDIR /workspace/frontend
+COPY frontend/package*.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci --prefer-offline --no-audit
+COPY frontend/ ./
+RUN npm run build
+
+# Etapa 2: Runtime Caddy servindo o frontend unificado e fazendo proxy para a API e app antigo
+FROM caddy:2-alpine
+COPY --from=build-frontend /workspace/frontend/dist /srv/dist

@@ -1,0 +1,396 @@
+/* ── DESIGN SYSTEM TRILHARA: TOKENS GLOBAIS ── */
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Camadas de Superfície (Obsidian Dark UI — Intocado) */
+  --bg: #090b10;
+  --bg-elevated: #0d1017;
+  --surface-1: #11151f;
+  --surface-2: #171c29;
+  --surface-3: #1e2536;
+  --surface-hover: #232b3e;
+  --surface-glass: rgba(17, 21, 31, 0.75);
+  --surface-subtle-hover: rgba(255, 255, 255, 0.03);
+  --overlay-bg: rgba(9, 11, 16, 0.85);
+
+  /* Superfícies de Navegação e Containers Especiais */
+  --sidebar-bg: rgba(13, 16, 23, 0.92);
+  --sidebar-item-surface: var(--surface-1);
+  --header-glass-bg: rgba(9, 11, 16, 0.88);
+  --bottom-nav-bg: rgba(13, 16, 23, 0.94);
+  --bottom-nav-shadow: 0 -8px 28px rgba(0, 0, 0, 0.45);
+  --trilha-pod-bg: linear-gradient(180deg, rgba(23, 28, 41, 0.85) 0%, rgba(17, 21, 31, 0.9) 100%);
+  --auth-card-bg: linear-gradient(180deg, rgba(23, 28, 41, 0.92) 0%, rgba(15, 19, 28, 0.96) 100%);
+  --bg-ambient-1: rgba(14, 165, 233, 0.10);
+  --bg-ambient-2: rgba(16, 185, 129, 0.05);
+
+  /* Controles de Formulário e Popovers */
+  --control-bg: var(--surface-2);
+  --control-bg-hover: var(--surface-3);
+  --control-bg-focus: var(--surface-3);
+  --popover-bg: var(--surface-2);
+
+  /* Bordas e Divisores */
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.15);
+  --border-focus: #38bdf8;
+  --swatch-border: rgba(255, 255, 255, 0.22);
+
+  /* Tipografia */
+  --text: #f8fafc;
+  --text-mid: #94a3b8;
+  --text-soft: #64748b;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Nunito', var(--font-sans);
+  --font-mono: 'JetBrains Mono', ui-monospace, Menlo, Monaco, Consolas, monospace;
+
+  /* Marca & Acento Primário (Electric Cyan) */
+  --primary: #0ea5e9;
+  --primary-hover: #0284c7;
+  --primary-light: #38bdf8;
+  --primary-dark: #0284c7;
+  --primary-glow: rgba(14, 165, 233, 0.22);
+  --primary-bg: rgba(14, 165, 233, 0.12);
+  --primary-border-subtle: rgba(56, 189, 248, 0.35);
+  --primary-contrast: #07131d;
+  --on-primary-solid: #ffffff;
+
+  /* Estados Ativos de Navegação */
+  --nav-active-bg: linear-gradient(90deg, rgba(14, 165, 233, 0.16) 0%, rgba(14, 165, 233, 0.05) 100%);
+  --nav-active-border: rgba(56, 189, 248, 0.28);
+  --nav-active-shadow: 0 2px 12px rgba(14, 165, 233, 0.12);
+  --nav-badge-active-bg: rgba(14, 165, 233, 0.2);
+
+  /* Status Semânticos */
+  --green: #10b981;
+  --green-hover: #059669;
+  --green-text: #34d399;
+  --green-bg: rgba(16, 185, 129, 0.14);
+  --green-border: rgba(16, 185, 129, 0.3);
+
+  --yellow: #f59e0b;
+  --yellow-hover: #d97706;
+  --yellow-bg: rgba(245, 158, 11, 0.14);
+  --yellow-border: rgba(245, 158, 11, 0.3);
+
+  --red: #f43f5e;
+  --red-hover: #e11d48;
+  --red-text-banner: #fecdd3;
+  --red-bg: rgba(244, 63, 94, 0.14);
+  --red-border: rgba(244, 63, 94, 0.3);
+
+  /* Badges e pílulas de status */
+  --status-pill-height: 36px;
+  --status-pill-padding: 0 10px;
+  --neutral-bg: var(--surface-2);
+  --neutral-hover: var(--surface-3);
+  --neutral-border: var(--border-strong);
+
+  /* Semântica Purple (Pesos & Ciclos Ponderados) */
+  --purple: #a855f7;
+  --purple-bg: rgba(168, 85, 247, 0.14);
+  --purple-bg-subtle: rgba(168, 85, 247, 0.1);
+  --purple-bg-hover: rgba(168, 85, 247, 0.16);
+  --purple-bg-strong: rgba(168, 85, 247, 0.2);
+  --purple-badge-bg: rgba(168, 85, 247, 0.18);
+  --purple-border: rgba(168, 85, 247, 0.3);
+  --purple-border-strong: rgba(192, 132, 252, 0.55);
+  --purple-text: #d8b4fe;
+  --purple-text-strong: #e9d5ff;
+  --purple-text-muted: rgba(216, 180, 254, 0.72);
+  --purple-hover-text: #ffffff;
+  --purple-icon: #c084fc;
+  --purple-focus: #c084fc;
+  --purple-gradient: linear-gradient(135deg, #c084fc 0%, #a855f7 100%);
+  --purple-shadow: 0 2px 8px rgba(168, 85, 247, 0.45);
+
+  /* Semântica Pink (Hover de Pesos em Tópicos) */
+  --pink-bg-subtle: rgba(236, 72, 153, 0.1);
+  --pink-border: rgba(236, 72, 153, 0.55);
+  --pink-text: #f9a8d4;
+  --pink-gradient: linear-gradient(135deg, #f9a8d4 0%, #ec4899 100%);
+  --pink-shadow: 0 1px 4px rgba(236, 72, 153, 0.35);
+
+  /* Escala de Geometria */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-pill: 9999px;
+
+  /* Grade Modular de Espaçamento (Base 8pt / 4pt Sub-grid) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+
+  /* Containers e Larguras de Leitura */
+  --container-max: 1200px;
+  --container-wide: 1280px;
+  --measure-tight: 48ch;
+  --measure-base: 60ch;
+
+  /* Escala Tipográfica Estrita */
+  --text-xs: 0.75rem;     /* 12px */
+  --text-sm: 0.8125rem;   /* 13px */
+  --text-base: 0.9375rem; /* 15px */
+  --text-md: 1.0625rem;   /* 17px */
+  --text-lg: 1.25rem;     /* 20px */
+  --text-xl: 1.5rem;      /* 24px */
+  --text-2xl: clamp(1.75rem, 2.6vw, 2.25rem);
+  --text-display: clamp(2.25rem, 4vw, 3.35rem);
+
+  /* Controles */
+  --control-height-sm: 34px;
+  --control-height: 40px;
+  --control-height-lg: 46px;
+
+  /* Transições */
+  --transition-fast: 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-smooth: 220ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Sombras Minimalistas (Elevação Sutil por Luz e Borda) */
+  --shadow-xs: none;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.22);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.30);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.38);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-focus: 0 0 0 3px rgba(14, 165, 233, 0.18);
+}
+
+/* ── MODO CLARO (DAYLIGHT EDITORIAL UI — ALTO CONTRASTE & CONFORTO OCULAR) ── */
+[data-theme='light'] {
+  color-scheme: light;
+
+  /* Camadas de Superfície (Arquitetura Daylight Slate)
+   * Evita branco estourado no canvas principal (#F8FAFC) e reserva #FFFFFF
+   * exclusivamente para superfícies elevadas (cards, sidebar, modais, popovers).
+   */
+  --bg: #f8fafc;
+  --bg-elevated: #f1f5f9;
+  --surface-1: #ffffff;
+  --surface-2: #f1f5f9;
+  --surface-3: #e2e8f0;
+  --surface-hover: #cbd5e1;
+  --surface-glass: rgba(255, 255, 255, 0.86);
+  --surface-subtle-hover: rgba(15, 23, 42, 0.04);
+  --overlay-bg: rgba(15, 23, 42, 0.42);
+
+  /* Superfícies de Navegação e Containers Especiais */
+  --sidebar-bg: rgba(255, 255, 255, 0.96);
+  --sidebar-item-surface: #f8fafc;
+  --header-glass-bg: rgba(255, 255, 255, 0.92);
+  --bottom-nav-bg: rgba(255, 255, 255, 0.96);
+  --bottom-nav-shadow: 0 -4px 20px rgba(15, 23, 42, 0.07);
+  --trilha-pod-bg: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  --auth-card-bg: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  --bg-ambient-1: rgba(2, 132, 199, 0.05);
+  --bg-ambient-2: rgba(5, 150, 105, 0.03);
+
+  /* Controles de Formulário e Popovers */
+  --control-bg: #f8fafc;
+  --control-bg-hover: #f1f5f9;
+  --control-bg-focus: #ffffff;
+  --popover-bg: #ffffff;
+
+  /* Bordas e Divisores (Delimitação Elegante sem Poluição Visual) */
+  --border-subtle: #f1f5f9;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --border-focus: #0284c7;
+  --swatch-border: rgba(15, 23, 42, 0.16);
+
+  /* Tipografia (Grafite / Ardósia Escura — Zero Preto Puro #000000)
+   * --text (#0F172A sobre #FFFFFF): 17.4:1 (WCAG AAA)
+   * --text-mid (#475569 sobre #FFFFFF): 7.5:1 (WCAG AAA)
+   * --text-soft (#64748B sobre #FFFFFF): 4.76:1 (WCAG AA)
+   */
+  --text: #0f172a;
+  --text-mid: #475569;
+  --text-soft: #64748b;
+
+  /* Marca & Acento Primário Calibrado para Luz do Dia
+   * --primary (#0284C7): 4.54:1 com #FFFFFF (WCAG AA em botões sólidos)
+   * --primary-light (#0369A1): 6.33:1 sobre #FFFFFF / 5.7:1 sobre #F0F9FF (WCAG AA/AAA para textos/ícones de destaque)
+   */
+  --primary: #0284c7;
+  --primary-hover: #0369a1;
+  --primary-light: #0369a1;
+  --primary-dark: #075985;
+  --primary-glow: rgba(2, 132, 199, 0.16);
+  --primary-bg: rgba(2, 132, 199, 0.09);
+  --primary-border-subtle: rgba(2, 132, 199, 0.30);
+  --primary-contrast: #ffffff;
+  --on-primary-solid: #ffffff;
+
+  /* Estados Ativos de Navegação */
+  --nav-active-bg: linear-gradient(90deg, rgba(2, 132, 199, 0.11) 0%, rgba(2, 132, 199, 0.03) 100%);
+  --nav-active-border: rgba(2, 132, 199, 0.28);
+  --nav-active-shadow: 0 2px 8px rgba(2, 132, 199, 0.08);
+  --nav-badge-active-bg: rgba(2, 132, 199, 0.14);
+
+  /* Status Semânticos Calibrados (Fundos Pastel + Textos Escuros da Mesma Matiz — WCAG AA) */
+  --green: #047857;
+  --green-hover: #065f46;
+  --green-text: #047857;
+  --green-bg: rgba(5, 150, 105, 0.10);
+  --green-border: rgba(5, 150, 105, 0.28);
+
+  --yellow: #b45309;
+  --yellow-hover: #92400e;
+  --yellow-bg: rgba(217, 119, 6, 0.11);
+  --yellow-border: rgba(180, 83, 9, 0.28);
+
+  --red: #be123c;
+  --red-hover: #9f1239;
+  --red-text-banner: #9f1239;
+  --red-bg: rgba(225, 29, 72, 0.09);
+  --red-border: rgba(225, 29, 72, 0.25);
+
+  /* Semântica Purple Calibrada (Pesos & Ciclos Ponderados) */
+  --purple: #7e22ce;
+  --purple-bg: rgba(126, 34, 206, 0.10);
+  --purple-bg-subtle: rgba(126, 34, 206, 0.08);
+  --purple-bg-hover: rgba(126, 34, 206, 0.15);
+  --purple-bg-strong: rgba(126, 34, 206, 0.16);
+  --purple-badge-bg: rgba(255, 255, 255, 0.82);
+  --purple-border: rgba(126, 34, 206, 0.28);
+  --purple-border-strong: rgba(126, 34, 206, 0.48);
+  --purple-text: #6b21a8;
+  --purple-text-strong: #581c87;
+  --purple-text-muted: #7e22ce;
+  --purple-hover-text: #4c1d95;
+  --purple-icon: #7e22ce;
+  --purple-focus: #7e22ce;
+  --purple-gradient: linear-gradient(135deg, #9333ea 0%, #7e22ce 100%);
+  --purple-shadow: 0 2px 6px rgba(126, 34, 206, 0.22);
+
+  /* Semântica Pink Calibrada */
+  --pink-bg-subtle: rgba(219, 39, 119, 0.08);
+  --pink-border: rgba(219, 39, 119, 0.38);
+  --pink-text: #be185d;
+  --pink-gradient: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
+  --pink-shadow: 0 1px 4px rgba(219, 39, 119, 0.25);
+
+  /* Sombras Difusas e Naturais à Luz do Dia */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 12px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 12px 28px -4px rgba(15, 23, 42, 0.11), 0 4px 10px -2px rgba(15, 23, 42, 0.05);
+  --shadow-card-hover: 0 10px 24px -4px rgba(15, 23, 42, 0.09), 0 4px 8px -2px rgba(15, 23, 42, 0.04);
+  --shadow-focus: 0 0 0 3px rgba(2, 132, 199, 0.20);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  font-family: var(--font-sans);
+  background: var(--bg);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, var(--bg-ambient-1), transparent),
+    radial-gradient(ellipse 60% 40% at 85% 10%, var(--bg-ambient-2), transparent);
+  background-attachment: fixed;
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color var(--transition-smooth), color var(--transition-fast);
+}
+
+/* Scrollbar adaptável ao tema */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--surface-hover);
+}
+
+/* Tipografia tabular */
+.tabular-data {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* ── ACESSIBILIDADE WCAG 2.2 AA (FASE 11) ── */
+
+/* 1. Alvo Mínimo de Toque e Clique (SC 2.5.8 Target Size Minimum - 24x24px no Desktop) */
+button,
+a,
+input,
+select,
+textarea,
+[role="button"],
+[role="tab"],
+[role="checkbox"],
+[role="menuitem"],
+[tabindex]:not([tabindex="-1"]) {
+  min-width: 24px;
+  min-height: 24px;
+}
+
+/* 2. Área Mínima de Toque Touch/Mobile (SC 2.5.8 - 40x40px em pointer: coarse) */
+@media (pointer: coarse) {
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role="button"],
+  [role="tab"],
+  [role="checkbox"],
+  [role="menuitem"] {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+
+/* 3. Scroll Padding Bottom para Evitar Oclusão por Barra Inferior Mobile Fixa */
+@media (max-width: 900px) {
+  html,
+  body,
+  main,
+  [data-scroll-container],
+  [class*="content"],
+  [class*="container"],
+  [class*="list"],
+  [class*="lista"] {
+    scroll-padding-bottom: 88px;
+  }
+}
+
+/* 4. Suporte a Usuários com Sensibilidade a Movimento (prefers-reduced-motion) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

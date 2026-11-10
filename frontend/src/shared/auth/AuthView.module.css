@@ -1,0 +1,45 @@
+.page {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow-x: hidden;
+}
+
+.ambientGlow {
+  position: fixed;
+  inset: -120px 0 auto;
+  height: 580px;
+  background:
+    radial-gradient(ellipse 55% 60% at 20% 25%, color-mix(in srgb, var(--primary) 16%, transparent), transparent),
+    radial-gradient(ellipse 45% 50% at 85% 30%, color-mix(in srgb, var(--green) 10%, transparent), transparent);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.main {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 44px 28px 64px;
+}
+
+.gridSingle {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+@media (max-width: 560px) {
+  .main {
+    padding: 24px 16px 48px;
+  }
+}
+

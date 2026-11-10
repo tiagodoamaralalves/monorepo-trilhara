@@ -1,0 +1,8 @@
+node_modules/
+target/
+dist/
+build/
+.git/
+*.log
+package-lock.json
+pnpm-lock.yaml
