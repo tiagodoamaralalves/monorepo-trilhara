@@ -72,4 +72,4 @@ jobs:
         env:
           MONGODB_URL: mongodb://localhost:27017
           QUARKUS_MONGODB_DEVSERVICES_ENABLED: "false"
-        run: ./mvnw -f backend/pom.xml test -B
+        run: bash backend/mvnw -f backend/pom.xml test -B
