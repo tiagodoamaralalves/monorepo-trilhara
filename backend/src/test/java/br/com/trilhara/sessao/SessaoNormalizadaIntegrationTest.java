@@ -7,6 +7,7 @@ import static org.hamcrest.Matchers.hasSize;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,6 +31,7 @@ import jakarta.inject.Inject;
 class SessaoNormalizadaIntegrationTest {
 
     private static final String API_TRILHAS = "/api/trilhas";
+    private static final ZoneId FUSO_TESTES = ZoneId.of("America/Sao_Paulo");
 
     @Inject
     TrilhaRepository trilhaRepository;
@@ -127,7 +129,7 @@ class SessaoNormalizadaIntegrationTest {
                   "acertos": 8,
                   "chaveIdempotencia": "%s"
                 }
-                """.formatted(setup.disciplina1Id(), LocalDate.now(), chave);
+                """.formatted(setup.disciplina1Id(), LocalDate.now(FUSO_TESTES), chave);
 
         given()
                 .header("Authorization", "Bearer " + token)
@@ -174,7 +176,7 @@ class SessaoNormalizadaIntegrationTest {
         TrilhaEDisciplinas setup = criarTrilhaComDisciplinas(token);
 
         String chave = UUID.randomUUID().toString();
-        String hoje = LocalDate.now().toString();
+        String hoje = LocalDate.now(FUSO_TESTES).toString();
         String payload = """
                 {
                   "disciplinaId": "%s",
@@ -247,7 +249,7 @@ class SessaoNormalizadaIntegrationTest {
                   "questoes": 0,
                   "acertos": 0
                 }
-                """.formatted(setup.disciplina1Id(), LocalDate.now());
+                """.formatted(setup.disciplina1Id(), LocalDate.now(FUSO_TESTES));
 
         // Ausência de Idempotency-Key: 400 MISSING_IDEMPOTENCY_KEY
         given()
@@ -270,7 +272,7 @@ class SessaoNormalizadaIntegrationTest {
                   "acertos": 0,
                   "chaveIdempotencia": "chave-no-body-123"
                 }
-                """.formatted(setup.disciplina1Id(), LocalDate.now());
+                """.formatted(setup.disciplina1Id(), LocalDate.now(FUSO_TESTES));
 
         given()
                 .header("Authorization", "Bearer " + token)
@@ -291,7 +293,7 @@ class SessaoNormalizadaIntegrationTest {
         String token = gerarTokenParaUsuario(usuarioId);
         TrilhaEDisciplinas setup = criarTrilhaComDisciplinas(token);
 
-        String amanha = LocalDate.now().plusDays(1).toString();
+        String amanha = LocalDate.now(FUSO_TESTES).plusDays(1).toString();
         String payload = """
                 {
                   "disciplinaId": "%s",
@@ -319,7 +321,7 @@ class SessaoNormalizadaIntegrationTest {
         String token = gerarTokenParaUsuario(usuarioId);
         TrilhaEDisciplinas setup = criarTrilhaComDisciplinas(token);
 
-        LocalDate hoje = LocalDate.now();
+        LocalDate hoje = LocalDate.now(FUSO_TESTES);
 
         // Sessão 1: hoje - 2 dias (mais antiga)
         String s1Id = given()
@@ -426,7 +428,7 @@ class SessaoNormalizadaIntegrationTest {
                 .contentType(ContentType.JSON)
                 .body("""
                         {"disciplinaId":"%s","dataSessao":"%s","duracaoSegundos":150,"questoes":5,"acertos":5}
-                        """.formatted(setup.disciplina1Id(), LocalDate.now()))
+                        """.formatted(setup.disciplina1Id(), LocalDate.now(FUSO_TESTES)))
                 .when().post(API_TRILHAS + "/" + setup.trilhaId() + "/sessoes")
                 .then().statusCode(201).extract().path("id");
 
@@ -454,7 +456,7 @@ class SessaoNormalizadaIntegrationTest {
                 .contentType(ContentType.JSON)
                 .body("""
                         {"disciplinaId":"%s","dataSessao":"%s","duracaoSegundos":150,"questoes":5,"acertos":5}
-                        """.formatted(setup.disciplina1Id(), LocalDate.now()))
+                        """.formatted(setup.disciplina1Id(), LocalDate.now(FUSO_TESTES)))
                 .when()
                 .post(API_TRILHAS + "/" + setup.trilhaId() + "/sessoes")
                 .then()
@@ -477,7 +479,7 @@ class SessaoNormalizadaIntegrationTest {
         String token = gerarTokenParaUsuario(usuarioId);
         TrilhaEDisciplinas setup = criarTrilhaComDisciplinas(token);
 
-        LocalDate hoje = LocalDate.now();
+        LocalDate hoje = LocalDate.now(FUSO_TESTES);
 
         // Registra sessão na disciplina 1
         given()
@@ -647,7 +649,7 @@ class SessaoNormalizadaIntegrationTest {
                 .contentType(ContentType.JSON)
                 .body("""
                         {"disciplinaId":"%s","dataSessao":"%s","duracaoSegundos":120,"questoes":5,"acertos":5}
-                        """.formatted(setupA.disciplina1Id(), LocalDate.now()))
+                        """.formatted(setupA.disciplina1Id(), LocalDate.now(FUSO_TESTES)))
                 .when().post(API_TRILHAS + "/" + setupA.trilhaId() + "/sessoes")
                 .then().statusCode(201).extract().path("id");
 
