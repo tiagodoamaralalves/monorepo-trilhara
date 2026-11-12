@@ -171,7 +171,7 @@ export type SyncStatusState = 'salvo' | 'salvando' | 'alteracoes-locais' | 'erro
 // CONTRATOS FASE 2: TRILHAS, DISCIPLINAS E PROGRESSO NORMALIZADOS
 // =========================================================================
 
-export interface CronogramaAtivoResumoDTO {
+interface CronogramaAtivoResumoDTO {
   cronogramaAtivoId: string;
   modalidade: string;
   dataInicio: string;
@@ -180,11 +180,8 @@ export interface CronogramaAtivoResumoDTO {
 
 export interface TrilhaResumoDTO {
   id: string;
-  usuarioId?: string;
-  donoId?: string;
   nome: string;
   cargo?: string;
-  areaCargo?: string;
   banca?: string;
   dataProva?: string;
   cor?: string;
@@ -212,7 +209,6 @@ export interface DisciplinaDTO {
   cor?: string;
   peso: number;
   ordem?: number;
-  cadernoLink?: string;
   topicos: TopicoDTO[];
   totalTopicos?: number;
   topicosConcluidos?: number;
@@ -221,13 +217,10 @@ export interface DisciplinaDTO {
 
 export interface TrilhaDetalheDTO {
   id: string;
-  usuarioId?: string;
-  donoId?: string;
   origemEditalId?: string;
   origemVersao?: number;
   nome: string;
   cargo?: string;
-  areaCargo?: string;
   banca?: string;
   dataProva?: string;
   informacoesComplementares?: string;
@@ -239,18 +232,13 @@ export interface TrilhaDetalheDTO {
   cronogramaAtivoResumo?: CronogramaAtivoResumoDTO | null;
   disciplinas: DisciplinaDTO[];
   topicosConcluidosIds: string[];
+  /** Estrutura herdada de planejamento; remoção pertence às revisões de cronograma. */
   ciclos?: unknown[];
-  cronogramas?: unknown[];
-  cicloAtivoId?: string;
-  progresso?: Record<string, { done: boolean; doneAt?: string | null }>;
   criadoEm?: string;
   atualizadoEm?: string;
 }
 
 export interface ProgressoTopicoDTO {
-  id?: string;
-  usuarioId?: string;
-  trilhaId: string;
   topicoId: string;
   concluido: boolean;
   concluidoEm?: string;
@@ -260,14 +248,13 @@ interface CriarTopicoPayload {
   id?: string;
   nome: string;
   ordem?: number;
-}
+  }
 
 interface CriarDisciplinaPayload {
   id?: string;
   nome: string;
   cor?: string;
   peso?: number;
-  cadernoLink?: string;
   topicos?: CriarTopicoPayload[];
 }
 
@@ -277,11 +264,33 @@ interface AtualizarDisciplinaPayload {
   nome: string;
   cor?: string;
   peso?: number;
-  cadernoLink?: string;
   topicos?: CriarTopicoPayload[];
 }
 
 export type AtualizarDisciplinaRequest = AtualizarDisciplinaPayload;
+
+/**
+ * Payload de criação de trilha. É exatamente um entre `editalId` e `disciplinasIniciais`
+ * (enviar os dois responde 400 VALIDATION_ERROR em `errors.editalId`).
+ */
+export interface CriarTrilhaRequest {
+  nome: string;
+  cargo?: string;
+  banca?: string;
+  dataProva?: string;
+  cor?: string;
+  editalId?: string;
+  disciplinasIniciais?: CriarDisciplinaPayload[];
+  /** Metadados opcionais do formulário de edição. */
+  informacoesComplementares?: string;
+}
+
+export interface TrilhaImpactoExclusaoDTO {
+  disciplinas: number;
+  cronogramas: number;
+  sessoes: number;
+  cadernosVinculados: number;
+}
 
 
 // =========================================================================

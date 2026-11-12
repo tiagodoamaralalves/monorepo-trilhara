@@ -33,6 +33,7 @@ import br.com.trilhara.shared.mongo.BsonDates;
 import br.com.trilhara.shared.mongo.BsonIds;
 import br.com.trilhara.trilha.Disciplina;
 import br.com.trilhara.trilha.DisciplinaRepository;
+import br.com.trilhara.trilha.LeaseTrilhaService;
 import br.com.trilhara.trilha.TrilhaRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -64,6 +65,7 @@ public class CronogramaService {
     private final TrilhaRepository trilhaRepository;
     private final DisciplinaRepository disciplinaRepository;
     private final UserRepository userRepository;
+    private final LeaseTrilhaService leaseTrilhaService;
     private final TimezoneContext timezoneContext;
 
     @Inject
@@ -74,6 +76,7 @@ public class CronogramaService {
             TrilhaRepository trilhaRepository,
             DisciplinaRepository disciplinaRepository,
             UserRepository userRepository,
+            LeaseTrilhaService leaseTrilhaService,
             TimezoneContext timezoneContext) {
         this.cronogramaRepository = cronogramaRepository;
         this.blocoCronogramaRepository = blocoCronogramaRepository;
@@ -81,6 +84,7 @@ public class CronogramaService {
         this.trilhaRepository = trilhaRepository;
         this.disciplinaRepository = disciplinaRepository;
         this.userRepository = userRepository;
+        this.leaseTrilhaService = leaseTrilhaService;
         this.timezoneContext = timezoneContext;
     }
 
@@ -601,15 +605,7 @@ public class CronogramaService {
     }
 
     private void adquirirLeaseOuFalhar(ObjectId usuarioId, ObjectId trilhaId, String leaseToken) {
-        Instant expiraEm = Instant.now().plusSeconds(120);
-        boolean adquirido = trilhaRepository.adquirirLease(usuarioId, trilhaId, leaseToken, expiraEm);
-        if (!adquirido) {
-            trilhaRepository.buscarEntidade(usuarioId, trilhaId)
-                    .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
-            throw new DomainConflictException(
-                    CodigoErro.SCHEDULE_GENERATION_IN_PROGRESS,
-                    "Uma geração ou alteração de cronograma já está em andamento para esta trilha.");
-        }
+        leaseTrilhaService.adquirirOuFalhar(usuarioId, trilhaId, leaseToken);
     }
 
     private LocalDate calcularDataFim(String tipoPeriodo, LocalDate dataInicio, LocalDate dataFimInformada, Document trilhaDoc) {

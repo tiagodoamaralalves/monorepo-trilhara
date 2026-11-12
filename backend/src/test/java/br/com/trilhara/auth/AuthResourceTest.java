@@ -507,7 +507,6 @@ class AuthResourceTest {
         Response userB = cadastrarUsuario("Usuário B", "user.b." + UUID.randomUUID() + "@exemplo.com.br", "Senh@Forte2026!");
 
         String tokenA = userA.path("accessToken");
-        String idA = userA.path("usuario.id");
         String refreshA = userA.cookie("trilhara_rt");
 
         String tokenB = userB.path("accessToken");
@@ -519,12 +518,11 @@ class AuthResourceTest {
                 .body("""
                         {
                           "nome": "Trilha Privada do Usuário A",
-                          "disciplinas": [{"id":"d1","nome":"Português","topicos":[]}]
+                          "disciplinasIniciais": [{"id":"d1","nome":"Português","topicos":[]}]
                         }
                         """)
                 .when().post(TRILHAS)
                 .then().statusCode(201)
-                .body("donoId", equalTo(idA))
                 .extract().path("id");
 
         // Usuário B tenta acessar ou deletar a trilha do Usuário A usando seu próprio token -> 404

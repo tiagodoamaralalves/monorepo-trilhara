@@ -140,6 +140,19 @@ public class CadernoRepository {
         );
     }
 
+    /**
+     * Cadernos ativos vinculados à trilha, exibidos na confirmação de exclusão da trilha (D-38).
+     * O vínculo é apenas desfeito na exclusão da trilha — o caderno nunca é apagado por ela.
+     * Assinatura começa por {@code usuarioId} e o filtro o inclui (D-06a).
+     */
+    public long contarAtivosPorOrigemTrilha(ObjectId usuarioId, ObjectId origemTrilhaId) {
+        return collection.countDocuments(and(
+                eq("usuarioId", usuarioId),
+                eq("origemTrilhaId", origemTrilhaId),
+                eq("deletedAt", null)
+        ));
+    }
+
     public long esvaziarLixeira(ObjectId usuarioId) {
         return collection.deleteMany(
                 and(eq("usuarioId", usuarioId), ne("deletedAt", null))

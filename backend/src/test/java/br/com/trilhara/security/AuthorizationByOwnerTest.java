@@ -58,7 +58,7 @@ public class AuthorizationByOwnerTest {
     // IDs dos recursos criados pertencentes exclusivamente a Usuario A
     private ObjectId trilhaAId;
     private ObjectId disciplinaAId;
-    private String topicoAId = "topico-auditoria-a1";
+    private String topicoAId = new ObjectId().toHexString();
     private ObjectId cronogramaAId;
     private ObjectId blocoAId;
     private ObjectId sessaoAId;

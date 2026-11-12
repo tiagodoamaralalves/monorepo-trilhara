@@ -400,7 +400,8 @@ class TrilhaNormalizadaIntegrationTest {
                 .body(payloadIdInvalido)
                 .when().put(API_TRILHAS + "/{trilhaId}/disciplinas/{disciplinaId}", trilhaId, disciplinaId)
                 .then().statusCode(400)
-                .body("detail", containsString("ID desconhecido"));
+                .body("code", equalTo("VALIDATION_ERROR"))
+                .body("errors.topicos", hasItem(containsString("ID desconhecido")));
 
         // Atualiza a disciplina mantendo apenas Topico 1 e omitindo Topico 2
         String payloadRemocao = """
@@ -478,7 +479,7 @@ class TrilhaNormalizadaIntegrationTest {
                 .contentType(ContentType.JSON)
                 .body("{\"disciplinaIds\": [\"%s\", \"%s\", \"%s\"]}".formatted(d3, d1, d2))
                 .when().put(API_TRILHAS + "/{trilhaId}/disciplinas/reordenar", trilhaId)
-                .then().statusCode(200);
+                .then().statusCode(204);
 
         // Verifica se a ordem foi devidamente alterada
         given()
@@ -534,12 +535,12 @@ class TrilhaNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("2.8 Deve validar limites de 50 trilhas, 100 disciplinas e 500 tópicos")
-    void deveValidarLimitesDeTrilhasDisciplinasETopicos() {
+    @DisplayName("2.8 Deve responder 409 RESOURCE_LIMIT_EXCEEDED ao exceder limites de trilhas, disciplinas e tópicos")
+    void deveRetornar409ResourceLimitAoExcederLimites() {
         ObjectId usuarioId = new ObjectId();
         String token = gerarTokenParaUsuario(usuarioId);
 
-        // 1. Tenta criar disciplina com 501 tópicos -> 400 Bad Request
+        // 1. Disciplina com 501 tópicos -> 409 RESOURCE_LIMIT_EXCEEDED (limite de acervo, não de sintaxe)
         List<String> topicos501 = new ArrayList<>();
         for (int i = 0; i < 501; i++) {
             topicos501.add("{\"nome\": \"Topico " + i + "\"}");
@@ -561,10 +562,19 @@ class TrilhaNormalizadaIntegrationTest {
                 .contentType(ContentType.JSON)
                 .body(payloadTopicosExcedidos)
                 .when().post(API_TRILHAS)
-                .then().statusCode(400)
-                .body(containsString("500 tópicos"));
+                .then().statusCode(409)
+                .contentType(containsString("application/problem+json"))
+                .body("code", equalTo("RESOURCE_LIMIT_EXCEEDED"))
+                .body("type", equalTo("urn:trilhara:problem:resource-limit-exceeded"))
+                .body("detail", containsString("500 tópicos"));
+    }
 
-        // 2. Testa exclusividade mútua entre editalId e disciplinasIniciais
+    @Test
+    @DisplayName("2.9 Deve rejeitar edital e disciplinasIniciais juntos com 400 no campo editalId")
+    void deveRejeitarEditalEDisciplinasIniciaisJuntos() {
+        ObjectId usuarioId = new ObjectId();
+        String token = gerarTokenParaUsuario(usuarioId);
+
         given()
                 .header("Authorization", "Bearer " + token)
                 .contentType(ContentType.JSON)
@@ -577,7 +587,8 @@ class TrilhaNormalizadaIntegrationTest {
                         """)
                 .when().post(API_TRILHAS)
                 .then().statusCode(400)
-                .body("detail", containsString("simultaneamente"));
+                .body("code", equalTo("VALIDATION_ERROR"))
+                .body("errors.editalId", hasItem(containsString("apenas um destes campos")));
     }
 
     @Test
@@ -617,5 +628,263 @@ class TrilhaNormalizadaIntegrationTest {
                 .header("Authorization", "Bearer " + token)
                 .when().get(API_TRILHA, trilhaId)
                 .then().statusCode(404);
+    }
+
+    // =========================================================================
+    // R3 — ACHADOS DE REVISÃO
+    // =========================================================================
+
+    @Test
+    @DisplayName("R3.1 Não deve existir a rota legada PATCH /api/trilhas/{id}/progresso/{topicoId}")
+    void naoDeveExistirRotaLegadaDeProgresso() {
+        ObjectId usuarioId = new ObjectId();
+        String token = gerarTokenParaUsuario(usuarioId);
+
+        var res = given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body("{\"done\": true}")
+                .when().patch(API_TRILHA + "/progresso/{topicoId}", new ObjectId().toHexString(), new ObjectId().toHexString());
+
+        assertTrue(res.statusCode() == 404 || res.statusCode() == 405,
+                "Rota legada de progresso deveria estar removida (D-11); status obtido: " + res.statusCode());
+    }
+
+    @Test
+    @DisplayName("R3.2 Deve rejeitar edital inexistente com 400 VALIDATION_ERROR no campo editalId (SEC-09)")
+    void deveRejeitarEditalInexistenteCom400NoCampoEditalId() {
+        ObjectId usuarioId = new ObjectId();
+        String token = gerarTokenParaUsuario(usuarioId);
+
+        given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"nome": "Trilha Edital Fantasma", "editalId": "60c72b2f9b1d8b2bad000001"}
+                        """)
+                .when().post(API_TRILHAS)
+                .then().statusCode(400)
+                .body("code", equalTo("VALIDATION_ERROR"))
+                .body("errors.editalId", hasItem(containsString("Edital publicado não encontrado")));
+    }
+
+    @Test
+    @DisplayName("R3.3 Deve responder 404 ao marcar progresso de tópico de outra trilha")
+    void deveRetornar404AoMarcarProgressoDeTopicoDeOutraTrilha() {
+        ObjectId usuarioId = new ObjectId();
+        String token = gerarTokenParaUsuario(usuarioId);
+
+        String trilhaA = given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"nome": "Trilha A", "disciplinasIniciais": [{"nome": "D1", "topicos": [{"nome": "T1"}]}]}
+                        """)
+                .when().post(API_TRILHAS)
+                .then().statusCode(201)
+                .extract().path("id");
+
+        var trilhaB = given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"nome": "Trilha B", "disciplinasIniciais": [{"nome": "D2", "topicos": [{"nome": "T2"}]}]}
+                        """)
+                .when().post(API_TRILHAS)
+                .then().statusCode(201)
+                .extract().response();
+
+        String trilhaBId = trilhaB.path("id");
+        String topicoBId = trilhaB.path("disciplinas[0].topicos[0].id");
+
+        // Tópico existe, mas na trilha B — no path da trilha A responde 404
+        given()
+                .header("Authorization", "Bearer " + token)
+                .when().put(API_TRILHAS + "/{trilhaId}/topicos/{topicoId}/progresso", trilhaA, topicoBId)
+                .then().statusCode(404);
+
+        // Na trilha correta continua funcionando
+        given()
+                .header("Authorization", "Bearer " + token)
+                .when().put(API_TRILHAS + "/{trilhaId}/topicos/{topicoId}/progresso", trilhaBId, topicoBId)
+                .then().statusCode(200);
+    }
+
+    @Test
+    @DisplayName("R3.4 Deve responder 409 SCHEDULE_GENERATION_IN_PROGRESS ao excluir com lease ocupado")
+    void deveRetornar409SeLeaseOcupadoAoExcluirDisciplina() {
+        ObjectId usuarioId = new ObjectId();
+        String token = gerarTokenParaUsuario(usuarioId);
+
+        var criada = given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"nome": "Trilha Lease", "disciplinasIniciais": [{"nome": "D1"}]}
+                        """)
+                .when().post(API_TRILHAS)
+                .then().statusCode(201)
+                .extract().response();
+
+        String trilhaId = criada.path("id");
+        String disciplinaId = criada.path("disciplinas[0].id");
+
+        mongoClient.getDatabase("trilhara_test").getCollection("trilhas").updateOne(
+                new org.bson.Document("_id", new ObjectId(trilhaId)),
+                new org.bson.Document("$set", new org.bson.Document()
+                        .append("geracaoCronogramaLeaseToken", UUID.randomUUID().toString())
+                        .append("geracaoCronogramaEmAndamentoAte", java.util.Date.from(Instant.now().plusSeconds(120)))));
+
+        given()
+                .header("Authorization", "Bearer " + token)
+                .when().delete(API_TRILHAS + "/{trilhaId}/disciplinas/{disciplinaId}", trilhaId, disciplinaId)
+                .then().statusCode(409)
+                .body("code", equalTo("SCHEDULE_GENERATION_IN_PROGRESS"));
+
+        given()
+                .header("Authorization", "Bearer " + token)
+                .when().delete(API_TRILHA, trilhaId)
+                .then().statusCode(409)
+                .body("code", equalTo("SCHEDULE_GENERATION_IN_PROGRESS"));
+    }
+
+    @Test
+    @DisplayName("R3.5 Deve contar corretamente o impacto de exclusão da trilha")
+    void impactoExclusaoTrilhaContaCorretamente() {
+        ObjectId usuarioId = new ObjectId();
+        String token = gerarTokenParaUsuario(usuarioId);
+
+        var criada = given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                          "nome": "Trilha Impacto",
+                          "disciplinasIniciais": [
+                            {"nome": "D1", "topicos": [{"nome": "T1"}]},
+                            {"nome": "D2"}
+                          ]
+                        }
+                        """)
+                .when().post(API_TRILHAS)
+                .then().statusCode(201)
+                .extract().response();
+
+        String trilhaId = criada.path("id");
+        String disciplina1Id = criada.path("disciplinas[0].id");
+
+        var banco = mongoClient.getDatabase("trilhara_test");
+        banco.getCollection("cronogramas").insertOne(new org.bson.Document()
+                .append("_id", new ObjectId())
+                .append("usuarioId", usuarioId)
+                .append("trilhaId", new ObjectId(trilhaId))
+                .append("modalidade", "SEQUENCIAL")
+                .append("ativo", false));
+        banco.getCollection("sessoes").insertOne(new org.bson.Document()
+                .append("_id", new ObjectId())
+                .append("usuarioId", usuarioId)
+                .append("trilhaId", new ObjectId(trilhaId))
+                .append("disciplinaId", new ObjectId(disciplina1Id)));
+        banco.getCollection("cadernos").insertOne(new org.bson.Document()
+                .append("_id", new ObjectId())
+                .append("usuarioId", usuarioId)
+                .append("titulo", "Caderno Vinculado")
+                .append("origemTrilhaId", new ObjectId(trilhaId))
+                .append("deletedAt", null));
+
+        given()
+                .header("Authorization", "Bearer " + token)
+                .when().get(API_TRILHAS + "/{trilhaId}/impacto-exclusao", trilhaId)
+                .then().statusCode(200)
+                .body("disciplinas", equalTo(2))
+                .body("cronogramas", equalTo(1))
+                .body("sessoes", equalTo(1))
+                .body("cadernosVinculados", equalTo(1));
+    }
+
+    @Test
+    @DisplayName("R3.6 Deve rejeitar ID malformado na reordenação com 400 INVALID_IDENTIFIER")
+    void deveRejeitarIdMalformadoComInvalidIdentifierNaReordenacao() {
+        ObjectId usuarioId = new ObjectId();
+        String token = gerarTokenParaUsuario(usuarioId);
+
+        String trilhaId = given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"nome": "Trilha Reordenar Malformado", "disciplinasIniciais": [{"nome": "D1"}]}
+                        """)
+                .when().post(API_TRILHAS)
+                .then().statusCode(201)
+                .extract().path("id");
+
+        given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body("{\"disciplinaIds\": [\"xyz\"]}")
+                .when().put(API_TRILHAS + "/{trilhaId}/disciplinas/reordenar", trilhaId)
+                .then().statusCode(400)
+                .body("code", equalTo("INVALID_IDENTIFIER"))
+                .body("errors.disciplinaId", notNullValue());
+    }
+
+    @Test
+    @DisplayName("R3.7 Deve isolar todas as rotas de trilha, disciplina, progresso e impacto entre usuários")
+    void deveIsolarTodasAsRotasEntreUsuarios() {
+        ObjectId usuarioA = new ObjectId();
+        ObjectId usuarioB = new ObjectId();
+        String tokenA = gerarTokenParaUsuario(usuarioA);
+        String tokenB = gerarTokenParaUsuario(usuarioB);
+
+        var criada = given()
+                .header("Authorization", "Bearer " + tokenA)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"nome": "Trilha Isolada A", "disciplinasIniciais": [{"nome": "D1", "topicos": [{"nome": "T1"}]}]}
+                        """)
+                .when().post(API_TRILHAS)
+                .then().statusCode(201)
+                .extract().response();
+
+        String trilhaId = criada.path("id");
+        String disciplinaId = criada.path("disciplinas[0].id");
+        String topicoId = criada.path("disciplinas[0].topicos[0].id");
+
+        given().header("Authorization", "Bearer " + tokenB)
+                .when().get(API_TRILHA, trilhaId).then().statusCode(404);
+        given().header("Authorization", "Bearer " + tokenB)
+                .when().get(API_TRILHAS + "/{trilhaId}/impacto-exclusao", trilhaId).then().statusCode(404);
+        given().header("Authorization", "Bearer " + tokenB)
+                .contentType(ContentType.JSON).body("{\"nome\": \"Invasao\"}")
+                .when().put(API_TRILHA, trilhaId).then().statusCode(404);
+        given().header("Authorization", "Bearer " + tokenB)
+                .when().delete(API_TRILHA, trilhaId).then().statusCode(404);
+        given().header("Authorization", "Bearer " + tokenB)
+                .contentType(ContentType.JSON).body("{\"nome\": \"D Invasora\"}")
+                .when().post(API_TRILHAS + "/{trilhaId}/disciplinas", trilhaId).then().statusCode(404);
+        given().header("Authorization", "Bearer " + tokenB)
+                .contentType(ContentType.JSON)
+                .body("{\"nome\": \"D Invasora\", \"topicos\": []}")
+                .when().put(API_TRILHAS + "/{trilhaId}/disciplinas/{disciplinaId}", trilhaId, disciplinaId)
+                .then().statusCode(404);
+        given().header("Authorization", "Bearer " + tokenB)
+                .when().delete(API_TRILHAS + "/{trilhaId}/disciplinas/{disciplinaId}", trilhaId, disciplinaId)
+                .then().statusCode(404);
+        given().header("Authorization", "Bearer " + tokenB)
+                .when().put(API_TRILHAS + "/{trilhaId}/topicos/{topicoId}/progresso", trilhaId, topicoId)
+                .then().statusCode(404);
+        given().header("Authorization", "Bearer " + tokenB)
+                .when().delete(API_TRILHAS + "/{trilhaId}/topicos/{topicoId}/progresso", trilhaId, topicoId)
+                .then().statusCode(404);
+        given().header("Authorization", "Bearer " + tokenB)
+                .contentType(ContentType.JSON).body("{\"disciplinaIds\": [\"%s\"]}".formatted(disciplinaId))
+                .when().put(API_TRILHAS + "/{trilhaId}/disciplinas/reordenar", trilhaId)
+                .then().statusCode(404);
+
+        // A trilha de A continua intacta
+        given().header("Authorization", "Bearer " + tokenA)
+                .when().get(API_TRILHA, trilhaId)
+                .then().statusCode(200)
+                .body("disciplinas", hasSize(1));
     }
 }

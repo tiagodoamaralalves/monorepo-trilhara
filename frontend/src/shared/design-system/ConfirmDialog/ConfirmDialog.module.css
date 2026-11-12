@@ -3,3 +3,35 @@
   font-size: 14px;
   line-height: 1.55;
 }
+
+.confirmacaoTexto {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.confirmacaoLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-high);
+}
+
+.confirmacaoInput {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-high);
+  font-size: 14px;
+}
+
+.confirmacaoInput:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.confirmacaoAjuda {
+  font-size: 12px;
+  color: var(--text-mid);
+}

@@ -11,6 +11,14 @@ interface ConfirmOptions {
   cancelText?: string;
   /** `danger` é o padrão para destruição (D-37/D-38). */
   variant?: 'danger' | 'primary' | 'warning';
+  /**
+   * Exige que o usuário digite o valor exato antes de habilitar a ação destrutiva (D-38:
+   * recursos grandes, como excluir trilha, usam o padrão GitHub de confirmação por nome).
+   */
+  confirmacaoPorTexto?: {
+    valor: string;
+    rotulo: string;
+  };
 }
 
 interface ConfirmRequest extends ConfirmOptions {
@@ -31,6 +39,7 @@ export const ConfirmProvider: React.FC<React.PropsWithChildren> = ({ children })
   const pendingRef = useRef<ConfirmRequest[]>([]);
   const [current, setCurrent] = useState<ConfirmRequest | null>(null);
   const [confirmando, setConfirmando] = useState(false);
+  const [textoDigitado, setTextoDigitado] = useState('');
   const botaoSeguroRef = useRef<HTMLButtonElement>(null);
 
   const confirm = useCallback((options: ConfirmOptions) => new Promise<boolean>((resolve) => {
@@ -47,11 +56,13 @@ export const ConfirmProvider: React.FC<React.PropsWithChildren> = ({ children })
     pendingRef.current = pending;
     setCurrent(pending[0] || null);
     setConfirmando(false);
+    setTextoDigitado('');
   }, [confirmando]);
 
   // Foco inicial sempre no botão seguro (Cancelar), nunca na ação destrutiva.
   useEffect(() => {
     if (!current) return;
+    setTextoDigitado('');
     const frame = requestAnimationFrame(() => botaoSeguroRef.current?.focus());
     return () => cancelAnimationFrame(frame);
   }, [current]);
@@ -64,6 +75,10 @@ export const ConfirmProvider: React.FC<React.PropsWithChildren> = ({ children })
   );
 
   const variant = current?.variant ?? 'danger';
+  const exigeTexto = Boolean(current?.confirmacaoPorTexto);
+  const textoConfere = !exigeTexto
+    || (current?.confirmacaoPorTexto?.valor ?? '').trim() === textoDigitado.trim();
+  const campoTextoId = 'confirm-dialog-texto';
 
   return (
     <ConfirmContext.Provider value={value}>
@@ -91,6 +106,7 @@ export const ConfirmProvider: React.FC<React.PropsWithChildren> = ({ children })
                 type="button"
                 variant={variant}
                 loading={confirmando}
+                disabled={!textoConfere}
                 onClick={() => finish(true)}
               >
                 {current.confirmText || 'Confirmar'}
@@ -99,6 +115,26 @@ export const ConfirmProvider: React.FC<React.PropsWithChildren> = ({ children })
           }
         >
           <p className={styles.description}>{current.description}</p>
+          {exigeTexto && (
+            <div className={styles.confirmacaoTexto}>
+              <label className={styles.confirmacaoLabel} htmlFor={campoTextoId}>
+                {current.confirmacaoPorTexto?.rotulo}
+              </label>
+              <input
+                id={campoTextoId}
+                className={styles.confirmacaoInput}
+                type="text"
+                value={textoDigitado}
+                autoComplete="off"
+                onChange={(evento) => setTextoDigitado(evento.target.value)}
+                aria-describedby={`${campoTextoId}-ajuda`}
+                disabled={confirmando}
+              />
+              <span id={`${campoTextoId}-ajuda`} className={styles.confirmacaoAjuda}>
+                A ação só é liberada com o nome exato, sem espaços extras.
+              </span>
+            </div>
+          )}
         </Modal>
       )}
     </ConfirmContext.Provider>

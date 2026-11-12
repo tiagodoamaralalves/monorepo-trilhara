@@ -2,16 +2,26 @@ package br.com.trilhara.arquitetura;
 
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.simpleNameEndingWith;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import java.util.List;
+import java.util.Set;
+
+import org.bson.types.ObjectId;
 import org.junit.jupiter.api.DisplayName;
 
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
+import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.core.domain.JavaParameter;
 import com.tngtech.archunit.junit.ArchIgnore;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
+import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.lang.ConditionEvents;
+import com.tngtech.archunit.lang.SimpleConditionEvent;
 
 /**
  * Regras arquiteturais de isolamento por tenant (D-06).
@@ -24,6 +34,13 @@ import com.tngtech.archunit.lang.ArchRule;
 @AnalyzeClasses(packages = "br.com.trilhara")
 @DisplayName("R0 - Regras arquiteturais de isolamento por tenant (esqueleto D-06)")
 class TenantIsolationArchTest {
+
+    /**
+     * Métodos que recebem a entidade inteira (que carrega {@code usuarioId}) ou que são
+     * helpers internos de conversão BSON — não se aplica a regra do primeiro parâmetro.
+     */
+    private static final Set<String> EXCECOES_POR_ENTIDADE = Set.of(
+            "inserir", "inserirEmLote", "atualizar", "atualizarOrdem", "paraDocumento", "paraEntidade");
 
     /**
      * Ativa em R0: nenhum recurso HTTP acessa o MongoDB diretamente. Vale hoje
@@ -55,6 +72,36 @@ class TenantIsolationArchTest {
             .dependOnClassesThat()
             .resideInAPackage("..job..")
             .because("D-06(a): assinatura começa com ObjectId usuarioId e filtro por usuarioId.");
+
+    /**
+     * Habilitada na R3 (D-06a, escopo do domínio de estudos): todo método de consulta/escrita
+     * pública dos repositórios de {@code ..trilha..} recebe {@code ObjectId usuarioId} como
+     * primeiro parâmetro, exceto os métodos que recebem a entidade inteira (que já carrega o
+     * {@code usuarioId}).
+     */
+    @ArchTest
+    static final ArchRule repositoriosDeTrilhaExigemUsuarioId =
+            methods()
+                    .that().arePublic()
+                    .and().areDeclaredInClassesThat().resideInAPackage("..trilha..")
+                    .and().areDeclaredInClassesThat().haveSimpleNameEndingWith("Repository")
+                    .should(new ArchCondition<JavaMethod>("ter ObjectId usuarioId como primeiro parâmetro") {
+                        @Override
+                        public void check(JavaMethod metodo, ConditionEvents eventos) {
+                            String nome = metodo.getName();
+                            if (EXCECOES_POR_ENTIDADE.contains(nome)) {
+                                return;
+                            }
+                            List<JavaParameter> parametros = metodo.getParameters();
+                            boolean valido = !parametros.isEmpty()
+                                    && parametros.get(0).getRawType().isAssignableTo(ObjectId.class);
+                            if (!valido) {
+                                eventos.add(SimpleConditionEvent.violated(metodo,
+                                        metodo.getFullName() + " não recebe ObjectId usuarioId como primeiro parâmetro"));
+                            }
+                        }
+                    })
+                    .because("D-06(a): toda leitura/escrita de coleção privada começa por ObjectId usuarioId.");
 
     /**
      * Habilita em R2 (D-06b): acesso multi-tenant apenas em classes

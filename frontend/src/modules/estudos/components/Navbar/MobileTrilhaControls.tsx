@@ -1,13 +1,13 @@
 import React, { useMemo } from 'react';
 import { Pencil } from 'lucide-react';
 import { Button, Select } from '@shared/design-system';
-import { Trilha } from '../../types/trilhara';
+import { TrilhaResumoDTO, TrilhaDetalheDTO } from '../../types/trilhara';
 import { diasAte } from '../../utils/format';
 import styles from './TrilhaPod.module.css';
 
 export interface MobileTrilhaControlsProps {
-  trilhas: Trilha[];
-  trilhaAtiva?: Trilha | null;
+  trilhas: TrilhaResumoDTO[];
+  trilhaAtiva?: TrilhaResumoDTO | TrilhaDetalheDTO | null;
   onSelecionarTrilha: (id: string) => void;
   onAbrirEditarTrilha: () => void;
 }

@@ -88,7 +88,6 @@ public class DisciplinaRepository {
                 .append("cor", disciplina.cor())
                 .append("peso", disciplina.peso())
                 .append("ordem", disciplina.ordem())
-                .append("cadernoLink", disciplina.cadernoLink())
                 .append("topicos", topicosDoc)
                 .append("atualizadoEm", BsonDates.toBsonDate(disciplina.atualizadoEm() != null ? disciplina.atualizadoEm() : Instant.now()));
 
@@ -131,7 +130,6 @@ public class DisciplinaRepository {
                 .append("cor", disciplina.cor())
                 .append("peso", disciplina.peso())
                 .append("ordem", disciplina.ordem())
-                .append("cadernoLink", disciplina.cadernoLink())
                 .append("topicos", topicosDoc)
                 .append("criadoEm", BsonDates.toBsonDate(disciplina.criadoEm() != null ? disciplina.criadoEm() : Instant.now()))
                 .append("atualizadoEm", BsonDates.toBsonDate(disciplina.atualizadoEm() != null ? disciplina.atualizadoEm() : Instant.now()));
@@ -145,7 +143,6 @@ public class DisciplinaRepository {
         String cor = doc.getString("cor");
         Integer peso = doc.getInteger("peso", 1);
         Integer ordem = doc.getInteger("ordem", 0);
-        String cadernoLink = doc.getString("cadernoLink");
 
         List<TopicoEmbutido> topicos = new ArrayList<>();
         List<Document> topicosDoc = doc.getList("topicos", Document.class);
@@ -160,6 +157,6 @@ public class DisciplinaRepository {
         Instant criadoEm = BsonDates.lerInstant(doc, "criadoEm");
         Instant atualizadoEm = BsonDates.lerInstant(doc, "atualizadoEm");
 
-        return new Disciplina(id, usuarioId, trilhaId, nome, cor, peso, ordem, cadernoLink, topicos, criadoEm, atualizadoEm);
+        return new Disciplina(id, usuarioId, trilhaId, nome, cor, peso, ordem, topicos, criadoEm, atualizadoEm);
     }
 }

@@ -15,7 +15,7 @@ import {
   useToast
 } from '@shared/design-system';
 import logoMark from '@shared/assets/logo-mark.svg';
-import { EditalResumo, Trilha } from '../types/trilhara';
+import { EditalResumo, TrilhaDetalheDTO } from '../types/trilhara';
 import { ApiError } from '../services/api';
 import { EstudosStorage } from '../services/estudosStorage';
 import { EstudosService } from '../services/estudosService';
@@ -34,7 +34,7 @@ export interface LandingViewProps {
   onLogin?: () => void;
   onAbrirCatalogo?: () => void;
   onCriarConta?: (pendingEdital?: EditalResumo) => void;
-  onTrilhaImportada?: (trilha: Trilha) => void;
+  onTrilhaImportada?: (trilha: TrilhaDetalheDTO) => void;
 }
 
 const STORAGE_PENDING_EDITAL_KEY = 'trilhara:pending_import_edital_id';

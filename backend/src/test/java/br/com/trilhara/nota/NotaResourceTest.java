@@ -490,10 +490,10 @@ class NotaResourceTest {
 
         TopicoEmbutido topico1 = new TopicoEmbutido(new ObjectId().toHexString(), "Morfologia e Sintaxe", 0);
         TopicoEmbutido topico2 = new TopicoEmbutido(new ObjectId().toHexString(), "Pontuação e Crase", 1);
-        Disciplina disc1 = new Disciplina(disc1Id, usuarioAId, trilhaId, "Língua Portuguesa", "#4A6B82", 3, 0, null, List.of(topico1, topico2), Instant.now(), Instant.now());
+        Disciplina disc1 = new Disciplina(disc1Id, usuarioAId, trilhaId, "Língua Portuguesa", "#4A6B82", 3, 0, List.of(topico1, topico2), Instant.now(), Instant.now());
 
         TopicoEmbutido topico3 = new TopicoEmbutido(new ObjectId().toHexString(), "Atos Administrativos", 0);
-        Disciplina disc2 = new Disciplina(disc2Id, usuarioAId, trilhaId, "Direito Administrativo", "#D97706", 2, 1, null, List.of(topico3), Instant.now(), Instant.now());
+        Disciplina disc2 = new Disciplina(disc2Id, usuarioAId, trilhaId, "Direito Administrativo", "#D97706", 2, 1, List.of(topico3), Instant.now(), Instant.now());
 
         trilhaRepository.inserir(new TrilhaRepository.DadosInsercaoTrilha(
                 usuarioAId, trilhaId, "Trilha Auditor Fiscal", "Auditor", "FGV", null, "#8F9E8B", null, 0, null, Instant.now()));
@@ -553,7 +553,7 @@ class NotaResourceTest {
 
         ObjectId disc3Id = new ObjectId();
         TopicoEmbutido topicoNovo = new TopicoEmbutido(new ObjectId().toHexString(), "Impostos Federais", 0);
-        Disciplina disc3 = new Disciplina(disc3Id, usuarioAId, trilhaId, "Direito Tributário", "#10B981", 4, 2, null, List.of(topicoNovo), Instant.now(), Instant.now());
+        Disciplina disc3 = new Disciplina(disc3Id, usuarioAId, trilhaId, "Direito Tributário", "#10B981", 4, 2, List.of(topicoNovo), Instant.now(), Instant.now());
         disciplinaRepository.inserir(disc3);
 
         given()
@@ -583,7 +583,7 @@ class NotaResourceTest {
     void deveDesvincularNotasCadernosESecoesAoExcluirTrilha() {
         ObjectId trilhaId = new ObjectId();
         ObjectId discId = new ObjectId();
-        Disciplina disc = new Disciplina(discId, usuarioAId, trilhaId, "Economia", "#4A6B82", 2, 0, null, List.of(), Instant.now(), Instant.now());
+        Disciplina disc = new Disciplina(discId, usuarioAId, trilhaId, "Economia", "#4A6B82", 2, 0, List.of(), Instant.now(), Instant.now());
 
         trilhaRepository.inserir(new TrilhaRepository.DadosInsercaoTrilha(
                 usuarioAId, trilhaId, "Trilha Economia", "Economista", "FGV", null, "#8F9E8B", null, 0, null, Instant.now()));

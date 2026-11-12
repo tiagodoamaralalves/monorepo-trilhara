@@ -1,13 +1,13 @@
 import React, { useMemo } from 'react';
 import { Pencil, Plus, Route } from 'lucide-react';
 import { Button, Select, useSidebar } from '@shared/design-system';
-import { Trilha } from '../../types/trilhara';
+import { TrilhaResumoDTO, TrilhaDetalheDTO } from '../../types/trilhara';
 import { diasAte } from '../../utils/format';
 import styles from './TrilhaPod.module.css';
 
 export interface TrilhaPodProps {
-  trilhas: Trilha[];
-  trilhaAtiva?: Trilha | null;
+  trilhas: TrilhaResumoDTO[];
+  trilhaAtiva?: TrilhaDetalheDTO | null;
   onSelecionarTrilha: (id: string) => void;
   onAbrirEditarTrilha: () => void;
   onAbrirNovaTrilha?: () => void;
@@ -34,11 +34,9 @@ export const TrilhaPod: React.FC<TrilhaPodProps> = ({
 
   const progressoTrilha = useMemo(() => {
     if (!trilhaAtiva) return null;
-    const todosTopicos = trilhaAtiva.disciplinas.flatMap((d) => d.topicos);
-    const total = todosTopicos.length;
-    const concluidos = todosTopicos.filter((t) => trilhaAtiva.progresso?.[t.id]?.done).length;
-    const pct = total > 0 ? Math.round((concluidos / total) * 100) : 0;
-    return { total, concluidos, pct };
+    const total = trilhaAtiva.disciplinas.flatMap((d) => d.topicos).length;
+    const concluidos = trilhaAtiva.topicosConcluidosIds.length;
+    return { total, concluidos, pct: Math.round(trilhaAtiva.percentualProgresso ?? 0) };
   }, [trilhaAtiva]);
 
   if (trilhas.length === 0) {

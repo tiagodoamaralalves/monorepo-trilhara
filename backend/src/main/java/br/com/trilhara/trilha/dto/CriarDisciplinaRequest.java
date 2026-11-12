@@ -8,6 +8,13 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+/**
+ * Payload de criação de disciplina.
+ *
+ * <p>O limite de 500 tópicos não é declarado com {@code @Size}: limite de acervo é conflito
+ * de estado com os dados atuais do usuário e responde {@code 409 RESOURCE_LIMIT_EXCEEDED} no
+ * serviço, nunca {@code 400} de sintaxe do payload (D-04).</p>
+ */
 public record CriarDisciplinaRequest(
         String id,
         @NotBlank(message = "O nome da disciplina é obrigatório.")
@@ -18,9 +25,6 @@ public record CriarDisciplinaRequest(
         @Min(value = 1, message = "O peso mínimo é 1.")
         @Max(value = 5, message = "O peso máximo é 5.")
         Integer peso,
-        @Size(max = 2048, message = "O link do caderno deve ter no máximo 2048 caracteres.")
-        String cadernoLink,
-        @Size(max = 500, message = "Cada disciplina pode ter no máximo 500 tópicos.")
         List<@Valid CriarTopicoRequest> topicos) {
 
     public CriarDisciplinaRequest {

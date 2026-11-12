@@ -1,4 +1,4 @@
-import { EditalResumo, Trilha } from '../types/trilhara';
+import { EditalResumo, TrilhaDetalheDTO } from '../types/trilhara';
 import { EstudosService } from '../services/estudosService';
 
 export const ESFERAS_DISPONIVEIS = [
@@ -167,18 +167,21 @@ const OBJECT_ID_REGEX = /^[a-f0-9]{24}$/i;
  * - Editais da API (ObjectId): usa o endpoint de importação; erros são propagados.
  * - Itens da vitrine local (fallback offline): cria a trilha a partir do snapshot local.
  */
-export async function importarOuClonarEdital(edital: EditalResumo): Promise<Trilha> {
+export async function importarOuClonarEdital(edital: EditalResumo): Promise<TrilhaDetalheDTO> {
   if (OBJECT_ID_REGEX.test(edital.id)) {
     return await EstudosService.importarEdital(edital.id);
   }
 
   return await EstudosService.criarTrilha({
     nome: edital.nome,
-    areaCargo: [edital.area, edital.cargo].filter(Boolean).join(' - ') || edital.cargo,
+    cargo: [edital.area, edital.cargo].filter(Boolean).join(' - ') || edital.cargo,
     banca: edital.banca,
     dataProva: edital.dataProva,
-    disciplinas: edital.disciplinas,
-    progresso: {},
-    ciclos: []
+    disciplinasIniciais: (edital.disciplinas ?? []).map((disciplina) => ({
+      nome: disciplina.nome,
+      cor: disciplina.cor,
+      peso: disciplina.peso,
+      topicos: (disciplina.topicos ?? []).map((topico) => ({ nome: topico.nome }))
+    }))
   });
 }

@@ -16,6 +16,10 @@ import jakarta.validation.constraints.Size;
 /**
  * Entidade normalizada da coleção 'disciplinas'.
  * Conforme REQUISITOS-REESTRUTURACAO-DADOS.md §4.1 e PLANO-IMPLEMENTACAO-REESTRUTURACAO.md §2.2.
+ *
+ * <p>O campo {@code cadernoLink} foi removido (DC-04): vínculo entre disciplina e notas é
+ * derivado de {@code cadernos.origemTrilhaId}, nunca de uma URL guardada na disciplina. O limite
+ * de 500 tópicos pertence ao serviço ({@code 409 RESOURCE_LIMIT_EXCEEDED}), não ao BSON.</p>
  */
 public record Disciplina(
         ObjectId id,
@@ -25,8 +29,7 @@ public record Disciplina(
         @Size(max = 32, message = "A cor da disciplina deve ter no máximo 32 caracteres.") String cor,
         @Positive @Min(value = 1, message = "O peso mínimo da disciplina é 1.") @Max(value = 5, message = "O peso máximo da disciplina é 5.") Integer peso,
         @NotNull Integer ordem,
-        @Size(max = 2048, message = "O link do caderno deve ter no máximo 2048 caracteres.") String cadernoLink,
-        @NotNull @Size(max = Disciplina.MAX_TOPICOS, message = "Cada disciplina pode ter no máximo 500 tópicos.") List<@Valid TopicoEmbutido> topicos,
+        @NotNull List<@Valid TopicoEmbutido> topicos,
         Instant criadoEm,
         Instant atualizadoEm) {
 

@@ -6,14 +6,15 @@ import java.time.Instant;
  * DTO leve de resumo retornado por GET /api/trilhas para o Hub.
  * Não transfere arrays de tópicos.
  * Conforme REQUISITOS-REESTRUTURACAO-DADOS.md §4.1 e PLANO-IMPLEMENTACAO-REESTRUTURACAO.md §2.3.
+ *
+ * <p>Identificadores de usuário são omitidos do contrato público (D-06): o cliente nunca
+ * precisa deles e a trilha já é implicitamente do usuário autenticado. {@code cargo} é o
+ * único campo de área/cargo, espelhando {@code AtualizarMetadadosTrilhaRequest.obterCargoEfetivo()}.</p>
  */
 public record TrilhaResumoDTO(
         String id,
-        String usuarioId,
-        String donoId,
         String nome,
         String cargo,
-        String areaCargo,
         String banca,
         String dataProva,
         String cor,

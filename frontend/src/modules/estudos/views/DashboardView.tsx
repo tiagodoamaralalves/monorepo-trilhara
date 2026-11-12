@@ -25,7 +25,7 @@ import {
   EstatisticaDisciplinaDTO,
   EstatisticasTrilhaDTO,
   Sessao,
-  Trilha
+  TrilhaDetalheDTO
 } from '../types/trilhara';
 import { EstudosService, PaginaSessoes } from '../services/estudosService';
 import { PlanejamentoStorage } from '../services/planejamentoStorage';
@@ -86,13 +86,18 @@ function corNivelAcerto(percentual: number): string {
   return 'var(--red)';
 }
 
-function cicloAtual(trilha: Trilha): Ciclo | undefined {
-  return trilha.ciclos.find((ciclo) => ciclo.id === trilha.cicloAtivoId)
-    || trilha.ciclos.at(-1);
+/**
+ * Estrutura herdada de planejamento: `ciclos` chega no detalhe como passagem da F2 e a
+ * remoção pertence às revisões de cronograma. Sem `ciclos`, não há ciclo atual.
+ */
+function cicloAtual(trilha: TrilhaDetalheDTO): Ciclo | undefined {
+  const ciclos = (trilha.ciclos ?? []) as Ciclo[];
+  return ciclos.find((ciclo) => ciclo.id === (trilha as { cicloAtivoId?: string }).cicloAtivoId)
+    || ciclos.at(-1);
 }
 
 export interface DashboardViewProps {
-  trilha: Trilha;
+  trilha: TrilhaDetalheDTO;
   onIrParaDisciplinas: () => void;
 }
 
@@ -258,12 +263,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     : null;
 
   const cobertura = useMemo(() => {
+    const concluidosIds = new Set(trilha.topicosConcluidosIds ?? []);
     const total = trilha.disciplinas.reduce(
       (soma, d) => soma + (d.topicos ? d.topicos.length : 0),
       0
     );
     const concluidos = trilha.disciplinas.reduce(
-      (soma, d) => soma + (d.topicos ? d.topicos.filter((t) => trilha.progresso?.[t.id]?.done || trilha.topicosConcluidosIds?.includes(t.id)).length : 0),
+      (soma, d) => soma + (d.topicos ? d.topicos.filter((t) => concluidosIds.has(t.id)).length : 0),
       0
     );
     return {

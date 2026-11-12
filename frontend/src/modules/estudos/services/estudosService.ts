@@ -10,7 +10,6 @@ import {
   BlocoHojeDTO
 } from '@shared/contracts';
 import {
-  Trilha,
   AtualizacaoMetadadosTrilha,
   Sessao,
   DisciplinaProgramada,
@@ -22,79 +21,17 @@ import {
   ProgressoTopicoDTO,
   CriarDisciplinaRequest,
   AtualizarDisciplinaRequest,
+  CriarTrilhaRequest,
+  TrilhaImpactoExclusaoDTO,
   RegistrarSessaoPayload,
   SessaoRegistradaDTO,
   EstatisticasTrilhaDTO,
-  RemocaoSessoesDisciplinaResponse,
-  ItemProgresso,
-  Ciclo
+  RemocaoSessoesDisciplinaResponse
 } from '../types/trilhara';
 
-export function adaptarTrilhaDetalhe(dto: TrilhaDetalheDTO): Trilha {
-  const progresso: Record<string, ItemProgresso> = {};
-  if (Array.isArray(dto.topicosConcluidosIds)) {
-    for (const topicoId of dto.topicosConcluidosIds) {
-      progresso[topicoId] = { done: true };
-    }
-  }
-  return {
-    id: dto.id,
-    usuarioId: dto.usuarioId,
-    donoId: dto.donoId,
-    origemEditalId: dto.origemEditalId,
-    origemVersao: dto.origemVersao,
-    nome: dto.nome,
-    cargo: dto.cargo,
-    areaCargo: dto.areaCargo || dto.cargo || '',
-    banca: dto.banca,
-    dataProva: dto.dataProva,
-    informacoesComplementares: dto.informacoesComplementares,
-    cor: dto.cor,
-    disciplinas: (dto.disciplinas || []).map((d) => ({
-      id: d.id,
-      nome: d.nome,
-      cor: d.cor,
-      peso: d.peso ?? 1,
-      cadernoLink: d.cadernoLink,
-      ordem: d.ordem,
-      topicos: (d.topicos || []).map((t) => ({
-        id: t.id,
-        nome: t.nome,
-        ordem: t.ordem
-      }))
-    })),
-    topicosConcluidosIds: dto.topicosConcluidosIds || [],
-    progresso,
-    ciclos: ((dto as { ciclos?: Ciclo[] }).ciclos || []) as Ciclo[],
-    cicloAtivoId: dto.cicloAtivoId,
-    criadoEm: dto.criadoEm,
-    atualizadoEm: dto.atualizadoEm
-  };
-}
-
-export function adaptarTrilhaResumo(dto: TrilhaResumoDTO): Trilha {
-  return {
-    id: dto.id,
-    usuarioId: dto.usuarioId,
-    donoId: dto.donoId,
-    origemEditalId: dto.origemEditalId,
-    nome: dto.nome,
-    cargo: dto.cargo,
-    areaCargo: dto.areaCargo || dto.cargo || '',
-    banca: dto.banca,
-    dataProva: dto.dataProva,
-    cor: dto.cor,
-    totalDisciplinas: dto.totalDisciplinas,
-    totalTopicos: dto.totalTopicos,
-    topicosConcluidos: dto.topicosConcluidos,
-    percentualProgresso: dto.percentualProgresso,
-    cronogramaAtivoResumo: dto.cronogramaAtivoResumo,
-    disciplinas: [],
-    progresso: {},
-    ciclos: [],
-    criadoEm: dto.criadoEm,
-    atualizadoEm: dto.atualizadoEm
-  };
+/** Deriva o conjunto de tópicos concluídos usado pela UI a partir do detalhe da trilha. */
+export function topicosConcluidosDe(detalhe: TrilhaDetalheDTO): ReadonlySet<string> {
+  return new Set(detalhe.topicosConcluidosIds ?? []);
 }
 
 export interface ResumoEstatisticas {
@@ -117,38 +54,35 @@ export interface PaginaSessoes {
 
 export const EstudosService = {
   // ── TRILHAS ──
-  async listarTrilhas(): Promise<Trilha[]> {
-    const resumos = await request<TrilhaResumoDTO[]>('/trilhas');
-    return resumos.map(adaptarTrilhaResumo);
+  async listarTrilhas(): Promise<TrilhaResumoDTO[]> {
+    return await request<TrilhaResumoDTO[]>('/trilhas');
   },
 
-  async buscarTrilha(id: string): Promise<Trilha> {
-    const detalhe = await request<TrilhaDetalheDTO>(`/trilhas/${encodeURIComponent(id)}`);
-    return adaptarTrilhaDetalhe(detalhe);
+  async buscarTrilha(id: string): Promise<TrilhaDetalheDTO> {
+    return await request<TrilhaDetalheDTO>(`/trilhas/${encodeURIComponent(id)}`);
   },
 
-  async criarTrilha(payload: Partial<Trilha>): Promise<Trilha> {
-    const res = await request<TrilhaDetalheDTO>('/trilhas', {
+  async criarTrilha(payload: CriarTrilhaRequest): Promise<TrilhaDetalheDTO> {
+    return await request<TrilhaDetalheDTO>('/trilhas', {
       method: 'POST',
       body: JSON.stringify(payload)
     });
-    return adaptarTrilhaDetalhe(res);
   },
 
-  async atualizarTrilha(id: string, payload: Partial<Trilha>): Promise<Trilha> {
-    const res = await request<TrilhaDetalheDTO>(`/trilhas/${encodeURIComponent(id)}`, {
+  async atualizarMetadadosTrilha(
+    id: string,
+    payload: AtualizacaoMetadadosTrilha
+  ): Promise<TrilhaDetalheDTO> {
+    return await request<TrilhaDetalheDTO>(`/trilhas/${encodeURIComponent(id)}`, {
       method: 'PUT',
       body: JSON.stringify(payload)
     });
-    return adaptarTrilhaDetalhe(res);
   },
 
-  async atualizarMetadadosTrilha(id: string, payload: AtualizacaoMetadadosTrilha): Promise<Trilha> {
-    const res = await request<TrilhaDetalheDTO>(`/trilhas/${encodeURIComponent(id)}/metadados`, {
-      method: 'PATCH',
-      body: JSON.stringify(payload)
-    });
-    return adaptarTrilhaDetalhe(res);
+  async obterImpactoExclusaoTrilha(id: string): Promise<TrilhaImpactoExclusaoDTO> {
+    return await request<TrilhaImpactoExclusaoDTO>(
+      `/trilhas/${encodeURIComponent(id)}/impacto-exclusao`
+    );
   },
 
   async excluirTrilha(id: string): Promise<void> {
@@ -157,7 +91,7 @@ export const EstudosService = {
     });
   },
 
-  // ── DISCIPLINAS (GRANULAR FASE 2) ──
+  // ── DISCIPLINAS (GRANULAR) ──
   async criarDisciplina(trilhaId: string, payload: CriarDisciplinaRequest): Promise<DisciplinaDTO> {
     return await request<DisciplinaDTO>(`/trilhas/${encodeURIComponent(trilhaId)}/disciplinas`, {
       method: 'POST',
@@ -188,14 +122,14 @@ export const EstudosService = {
     );
   },
 
-  async reordenarDisciplinas(trilhaId: string, ordemIds: string[]): Promise<void> {
+  async reordenarDisciplinas(trilhaId: string, disciplinaIds: string[]): Promise<void> {
     await request(`/trilhas/${encodeURIComponent(trilhaId)}/disciplinas/reordenar`, {
       method: 'PUT',
-      body: JSON.stringify({ ordemIds })
+      body: JSON.stringify({ disciplinaIds })
     });
   },
 
-  // ── PROGRESSO DE TÓPICOS (IDEMPOTENTE FASE 2) ──
+  // ── PROGRESSO DE TÓPICOS (IDEMPOTENTE) ──
   async marcarTopicoConcluido(trilhaId: string, topicoId: string): Promise<ProgressoTopicoDTO> {
     return await request<ProgressoTopicoDTO>(
       `/trilhas/${encodeURIComponent(trilhaId)}/topicos/${encodeURIComponent(topicoId)}/progresso`,
@@ -212,19 +146,6 @@ export const EstudosService = {
         method: 'DELETE'
       }
     );
-  },
-
-  async atualizarProgressoTopico(
-    trilhaId: string,
-    topicoId: string,
-    done: boolean
-  ): Promise<Trilha> {
-    if (done) {
-      await this.marcarTopicoConcluido(trilhaId, topicoId);
-    } else {
-      await this.desmarcarTopicoConcluido(trilhaId, topicoId);
-    }
-    return await this.buscarTrilha(trilhaId);
   },
 
   // ── CATÁLOGO DE EDITAIS ──
@@ -249,11 +170,11 @@ export const EstudosService = {
     return await request<PaginaEditais>(`/editais${query}`);
   },
 
-  async importarEdital(editalId: string): Promise<Trilha> {
-    const res = await request<TrilhaDetalheDTO>(`/trilhas/importar/${encodeURIComponent(editalId)}`, {
-      method: 'POST'
+  async importarEdital(editalId: string): Promise<TrilhaDetalheDTO> {
+    return await request<TrilhaDetalheDTO>('/trilhas', {
+      method: 'POST',
+      body: JSON.stringify({ nome: '', editalId })
     });
-    return adaptarTrilhaDetalhe(res);
   },
 
   // ── CICLOS & DISCIPLINAS DO DIA ──

@@ -189,6 +189,17 @@ public class SessaoRepository {
         )).getDeletedCount();
     }
 
+    /**
+     * Contagem de sessões da trilha, exibida na confirmação de exclusão da trilha (D-38).
+     * Assinatura começa por {@code usuarioId} e o filtro o inclui (D-06a).
+     */
+    public long contarPorTrilha(ObjectId usuarioId, ObjectId trilhaId) {
+        return sessoes.countDocuments(and(
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_TRILHA_ID, trilhaId)
+        ));
+    }
+
     public record FiltroPaginacao(
             ObjectId usuarioId,
             ObjectId trilhaId,

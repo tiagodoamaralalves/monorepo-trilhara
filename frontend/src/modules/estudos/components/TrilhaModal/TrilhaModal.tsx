@@ -9,23 +9,28 @@ import {
   Textarea,
   useToast
 } from '@shared/design-system';
-import { AtualizacaoMetadadosTrilha, Trilha } from '../../types/trilhara';
+import { AtualizacaoMetadadosTrilha, TrilhaDetalheDTO, TrilhaImpactoExclusaoDTO } from '../../types/trilhara';
 import { EstudosService } from '../../services/estudosService';
 import styles from './TrilhaModal.module.css';
 
-const LIMITES = { nome: 120, areaCargo: 120, banca: 80, informacoesComplementares: 2000 } as const;
+const LIMITES = { nome: 120, cargo: 120, banca: 80, informacoesComplementares: 2000 } as const;
 
 interface FormTrilha {
   nome: string;
-  areaCargo: string;
+  cargo: string;
   banca: string;
   dataProva: string;
   informacoesComplementares: string;
 }
 
-const paraFormulario = (trilha?: Trilha | null): FormTrilha => ({
+/** Trilha exibida no modal: o resumo do Hub ou o detalhe carregado. */
+type TrilhaDoModal = Pick<TrilhaDetalheDTO, 'id' | 'nome' | 'cargo' | 'banca' | 'dataProva'> & {
+  informacoesComplementares?: string;
+};
+
+const paraFormulario = (trilha?: TrilhaDoModal | null): FormTrilha => ({
   nome: trilha?.nome ?? '',
-  areaCargo: trilha?.areaCargo ?? '',
+  cargo: trilha?.cargo ?? '',
   banca: trilha?.banca ?? '',
   dataProva: trilha?.dataProva ?? '',
   informacoesComplementares: trilha?.informacoesComplementares ?? ''
@@ -33,9 +38,9 @@ const paraFormulario = (trilha?: Trilha | null): FormTrilha => ({
 
 export interface TrilhaModalProps {
   isOpen: boolean;
-  trilha?: Trilha | null;
+  trilha?: TrilhaDoModal | null;
   onClose: () => void;
-  onTrilhaSalva: (trilha: Trilha, modo: 'criada' | 'editada') => void;
+  onTrilhaSalva: (trilha: TrilhaDetalheDTO, modo: 'criada' | 'editada') => void;
   onExcluirTrilha?: (id: string) => Promise<boolean>;
 }
 
@@ -57,6 +62,8 @@ export const TrilhaModal: React.FC<TrilhaModalProps> = ({
   const [erroNome, setErroNome] = useState('');
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
   const [textoConfirmacao, setTextoConfirmacao] = useState('');
+  const [impacto, setImpacto] = useState<TrilhaImpactoExclusaoDTO | null>(null);
+  const [carregandoImpacto, setCarregandoImpacto] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
 
   useEffect(() => {
@@ -65,7 +72,28 @@ export const TrilhaModal: React.FC<TrilhaModalProps> = ({
     setErroNome('');
     setConfirmarExclusao(false);
     setTextoConfirmacao('');
+    setImpacto(null);
   }, [trilha, isOpen]);
+
+  // D-38: exclusão de trilha exige o impacto em números e o nome exato.
+  useEffect(() => {
+    if (!confirmarExclusao || !trilha) return;
+    let ativo = true;
+    setCarregandoImpacto(true);
+    EstudosService.obterImpactoExclusaoTrilha(trilha.id)
+      .then((dados) => {
+        if (ativo) setImpacto(dados);
+      })
+      .catch(() => {
+        if (ativo) setImpacto(null);
+      })
+      .finally(() => {
+        if (ativo) setCarregandoImpacto(false);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [confirmarExclusao, trilha]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -79,7 +107,7 @@ export const TrilhaModal: React.FC<TrilhaModalProps> = ({
 
     const dados: AtualizacaoMetadadosTrilha = {
       nome: nomeLimpo,
-      areaCargo: form.areaCargo.trim() || undefined,
+      cargo: form.cargo.trim() || undefined,
       banca: form.banca.trim() || undefined,
       dataProva: form.dataProva || undefined,
       informacoesComplementares: form.informacoesComplementares.trim() || undefined
@@ -93,10 +121,11 @@ export const TrilhaModal: React.FC<TrilhaModalProps> = ({
         onTrilhaSalva(atualizada, 'editada');
       } else {
         const nova = await EstudosService.criarTrilha({
-          ...dados,
-          disciplinas: [],
-          progresso: {},
-          ciclos: []
+          nome: nomeLimpo,
+          cargo: dados.cargo,
+          banca: dados.banca,
+          dataProva: dados.dataProva,
+          disciplinasIniciais: []
         });
         toast.success(`Trilha "${nova.nome}" criada com sucesso!`);
         onTrilhaSalva(nova, 'criada');
@@ -114,7 +143,9 @@ export const TrilhaModal: React.FC<TrilhaModalProps> = ({
     }
   };
 
-  const confirmacaoValida = textoConfirmacao.trim().toLowerCase() === 'excluir';
+  // D-38: recurso grande confirma digitando o nome exato da trilha (padrão GitHub).
+  const confirmacaoValida = Boolean(trilha)
+    && textoConfirmacao.trim() === (trilha?.nome ?? '').trim();
 
   const handleExcluir = async () => {
     if (!trilha || !onExcluirTrilha || !confirmacaoValida || excluindo) return;
@@ -134,6 +165,12 @@ export const TrilhaModal: React.FC<TrilhaModalProps> = ({
   const fecharSeOcioso = () => {
     if (!salvando && !excluindo) onClose();
   };
+
+  const descricaoImpacto = impacto
+    ? `${impacto.disciplinas} disciplina(s), ${impacto.cronogramas} cronograma(s), ${impacto.sessoes} sessão(ões) e ${impacto.cadernosVinculados} caderno(s) vinculado(s).`
+    : carregandoImpacto
+      ? 'Calculando o impacto da exclusão…'
+      : 'O impacto da exclusão não pôde ser calculado.';
 
   return (
     <>
@@ -179,9 +216,9 @@ export const TrilhaModal: React.FC<TrilhaModalProps> = ({
           <Input
             label="Área/Cargo"
             placeholder="Ex: Controle Externo e Gestão Pública, Auditor Federal..."
-            value={form.areaCargo}
-            maxLength={LIMITES.areaCargo}
-            onChange={(event) => atualizarCampo('areaCargo', event.target.value)}
+            value={form.cargo}
+            maxLength={LIMITES.cargo}
+            onChange={(event) => atualizarCampo('cargo', event.target.value)}
           />
           <Input
             label="Banca ou instituição"
@@ -219,7 +256,7 @@ export const TrilhaModal: React.FC<TrilhaModalProps> = ({
           isOpen={confirmarExclusao}
           onClose={() => !excluindo && setConfirmarExclusao(false)}
           title="Excluir trilha"
-          subtitle="Esta ação não pode ser desfeita. Sessões e planejamentos da trilha também serão removidos."
+          subtitle="Esta ação não pode ser desfeita."
           icon={<Trash2 size={22} />}
           footer={
             <>
@@ -250,14 +287,17 @@ export const TrilhaModal: React.FC<TrilhaModalProps> = ({
             }}
           >
             <p>
-              Digite <strong>excluir</strong> para confirmar a remoção de “{trilha?.nome}”.
+              Serão excluídos: <strong>{descricaoImpacto}</strong>
+            </p>
+            <p>
+              Digite o nome exato <strong>{trilha?.nome}</strong> para confirmar.
             </p>
             <Input
-              label="Confirmação"
+              label="Confirme o nome da trilha"
               value={textoConfirmacao}
               onChange={(event) => setTextoConfirmacao(event.target.value)}
-              placeholder="excluir"
-              maxLength={20}
+              placeholder={trilha?.nome}
+              maxLength={120}
               autoComplete="off"
             />
           </form>

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { AppSidebar } from '@shared/design-system';
-import { Trilha, PaginaAtiva, UsuarioAutenticado } from '../../types/trilhara';
+import { TrilhaResumoDTO, TrilhaDetalheDTO, PaginaAtiva, UsuarioAutenticado } from '../../types/trilhara';
 import { useStudyTimer } from '../../context/StudyTimerContext';
 import { formatarSegundos } from '../../utils/format';
 import { NAV_ITEMS } from './navigationConfig';
@@ -10,8 +10,8 @@ import { MobileTrilhaControls } from './MobileTrilhaControls';
 const SEM_TRILHA_TIMER_ID = '__sem_trilha__';
 
 export interface NavbarProps {
-  trilhas: Trilha[];
-  trilhaAtiva?: Trilha | null;
+  trilhas: TrilhaResumoDTO[];
+  trilhaAtiva?: TrilhaDetalheDTO | null;
   paginaAtiva: PaginaAtiva;
   usuario?: UsuarioAutenticado | null;
   onNavegar: (pagina: PaginaAtiva) => void;

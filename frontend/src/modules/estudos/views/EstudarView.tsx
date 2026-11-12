@@ -20,7 +20,7 @@ import {
   useGlobalSessionModal
 } from '@shared/design-system';
 import {
-  Trilha,
+  TrilhaDetalheDTO,
   RegistroPlanejamentoPendente
 } from '../types/trilhara';
 import { useStudyTimer } from '../context/StudyTimerContext';
@@ -39,10 +39,10 @@ interface PauseConfig {
 }
 
 export interface EstudarViewProps {
-  trilha: Trilha | null;
+  trilha: TrilhaDetalheDTO | null;
   disciplinaInicialId?: string;
-  onTrilhaCriada: (trilha: Trilha) => void;
-  onTrilhaAtualizada: (trilha: Trilha) => void;
+  onTrilhaCriada: (trilha: TrilhaDetalheDTO) => void;
+  onTrilhaAtualizada: (trilha: TrilhaDetalheDTO) => void;
   onSessaoRegistrada: () => void;
   registroPlanejamento?: RegistroPlanejamentoPendente | null;
   onRegistroPlanejamentoConcluido?: (registro: RegistroPlanejamentoPendente) => void;

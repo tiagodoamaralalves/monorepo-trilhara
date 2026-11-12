@@ -17,12 +17,3 @@ export function obterCorDisponivel(
 ): string {
   return sharedObterCorDisponivel(disciplinas, ignorarDisciplinaId);
 }
-
-export function criarIdDisciplina(prefixo: string, idsUsados: Set<string>): string {
-  const base = `${prefixo}_${Date.now().toString(36)}`;
-  let sufixo = 1;
-  while (idsUsados.has(`${base}_${sufixo}`)) sufixo += 1;
-  const id = `${base}_${sufixo}`;
-  idsUsados.add(id);
-  return id;
-}

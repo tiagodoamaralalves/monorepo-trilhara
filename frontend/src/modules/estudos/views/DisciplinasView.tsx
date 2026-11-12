@@ -2,9 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   BookOpen,
   Plus,
-  ExternalLink,
   CheckCircle2,
-  Bookmark,
   Award,
   Copy
 } from 'lucide-react';
@@ -20,17 +18,17 @@ import {
   ToggleGroup,
   useToast
 } from '@shared/design-system';
-import { Trilha, Disciplina } from '../types/trilhara';
+import { TrilhaDetalheDTO, Disciplina } from '../types/trilhara';
 import { EstudosService } from '../services/estudosService';
 import { DisciplinaPesoButton } from '../components/DisciplinaPesoButton/DisciplinaPesoButton';
 import { EmptyJourneyState } from '../components/EmptyJourneyState/EmptyJourneyState';
 import { DisciplinasTopicosModal } from '../components/DisciplinasTopicosModal/DisciplinasTopicosModal';
-import { obterCorDisponivel, criarIdDisciplina as criarId } from '../utils/coresDisciplina';
+import { obterCorDisponivel } from '../utils/coresDisciplina';
 import styles from './DisciplinasView.module.css';
 
 export interface DisciplinasViewProps {
-  trilha: Trilha;
-  onTrilhaAtualizada: (trilha: Trilha) => void;
+  trilha: TrilhaDetalheDTO;
+  onTrilhaAtualizada: (trilha: TrilhaDetalheDTO) => void;
 }
 
 export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
@@ -51,7 +49,6 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
   const [salvandoDisciplinasLote, setSalvandoDisciplinasLote] = useState(false);
   const [totalQ, setTotalQ] = useState('');
   const [acertosQ, setAcertosQ] = useState('');
-  const [cadernoUrl, setCadernoUrl] = useState('');
   const [salvandoQuestoes, setSalvandoQuestoes] = useState(false);
   const [carregandoQuestoes, setCarregandoQuestoes] = useState(false);
   const [erroCarregamentoQuestoes, setErroCarregamentoQuestoes] = useState('');
@@ -105,7 +102,6 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
     setErroQuestoes('');
     setTotalQ('');
     setAcertosQ('');
-    setCadernoUrl(disciplinaQuestoes.cadernoLink || '');
 
     EstudosService.obterEstatisticas(trilha.id, { periodo: 'tudo' })
       .then((estatisticas) => {
@@ -129,29 +125,45 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
     };
   }, [disciplinaQuestoes, trilha.id, tentativaQuestoes, toast]);
 
+  /** D-39: marcar/desmarcar tópico é otimista com rollback + toast em falha. */
+  const aplicarTopicosConcluidos = (ids: ReadonlySet<string>) => {
+    const topicosConcluidosIds = [...ids];
+    onTrilhaAtualizada({
+      ...trilha,
+      topicosConcluidosIds,
+      topicosConcluidos: topicosConcluidosIds.length,
+      disciplinas: trilha.disciplinas.map((disciplina) => {
+        const concluidos = disciplina.topicos.filter((t) => ids.has(t.id)).length;
+        const total = disciplina.topicos.length;
+        return {
+          ...disciplina,
+          topicosConcluidos: concluidos,
+          percentualProgresso: total > 0 ? (concluidos / total) * 100 : 0,
+          topicos: disciplina.topicos.map((t) => ({ ...t, concluido: ids.has(t.id) }))
+        };
+      })
+    });
+  };
+
   const handleToggleTopicoCheck = async (topicoId: string, concluido: boolean) => {
+    const anterior = new Set<string>(trilha.topicosConcluidosIds ?? []);
+    const otimista = new Set<string>(anterior);
+    if (concluido) {
+      otimista.add(topicoId);
+    } else {
+      otimista.delete(topicoId);
+    }
+    // Aplica imediatamente (otimista) e reverte se a API falhar.
+    aplicarTopicosConcluidos(otimista);
+
     try {
       if (concluido) {
         await EstudosService.marcarTopicoConcluido(trilha.id, topicoId);
       } else {
         await EstudosService.desmarcarTopicoConcluido(trilha.id, topicoId);
       }
-      const novoProgresso = { ...(trilha.progresso || {}) };
-      if (concluido) {
-        novoProgresso[topicoId] = { done: true, doneAt: new Date().toISOString() };
-      } else {
-        delete novoProgresso[topicoId];
-      }
-      const topicosConcluidosIds = concluido
-        ? [...new Set([...(trilha.topicosConcluidosIds || []), topicoId])]
-        : (trilha.topicosConcluidosIds || []).filter((id) => id !== topicoId);
-
-      onTrilhaAtualizada({
-        ...trilha,
-        progresso: novoProgresso,
-        topicosConcluidosIds
-      });
     } catch (err) {
+      aplicarTopicosConcluidos(anterior);
       toast.error(err instanceof Error ? err : 'Não foi possível atualizar o assunto.');
     }
   };
@@ -160,25 +172,23 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
     const disciplina = trilha.disciplinas.find((item) => item.id === disciplinaId);
     if (!disciplina || disciplina.topicos.length === 0) return;
 
-    const agora = new Date().toISOString();
-    const novoProgresso = { ...(trilha.progresso || {}) };
+    const anterior = new Set<string>(trilha.topicosConcluidosIds ?? []);
+    const otimista = new Set<string>(anterior);
     const alterados: string[] = [];
 
     for (const topico of disciplina.topicos) {
-      const atual = novoProgresso[topico.id];
-      if (Boolean(atual?.done) === concluido) continue;
+      if (otimista.has(topico.id) === concluido) continue;
       alterados.push(topico.id);
       if (concluido) {
-        novoProgresso[topico.id] = {
-          done: true,
-          doneAt: atual?.doneAt ?? agora
-        };
+        otimista.add(topico.id);
       } else {
-        delete novoProgresso[topico.id];
+        otimista.delete(topico.id);
       }
     }
 
     if (alterados.length === 0) return;
+
+    aplicarTopicosConcluidos(otimista);
 
     try {
       if (concluido) {
@@ -186,13 +196,8 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
       } else {
         await Promise.all(alterados.map((tId) => EstudosService.desmarcarTopicoConcluido(trilha.id, tId)));
       }
-      const topicosConcluidosIds = Object.keys(novoProgresso).filter((k) => novoProgresso[k]?.done);
-      onTrilhaAtualizada({
-        ...trilha,
-        progresso: novoProgresso,
-        topicosConcluidosIds
-      });
     } catch (err) {
+      aplicarTopicosConcluidos(anterior);
       toast.error(err instanceof Error ? err : 'Não foi possível atualizar os assuntos.');
     }
   };
@@ -229,13 +234,10 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
     setSalvandoRascunho(true);
     try {
       await EstudosService.criarDisciplina(trilha.id, {
-        id: disciplina.id,
         nome: disciplina.nome,
         cor: disciplina.cor,
         peso: disciplina.peso,
-        cadernoLink: disciplina.cadernoLink,
         topicos: disciplina.topicos.map((t, idx) => ({
-          id: t.id,
           nome: t.nome,
           ordem: idx + 1
         }))
@@ -267,7 +269,6 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
           nome: disciplinaParaSalvar.nome,
           cor: disciplinaParaSalvar.cor,
           peso: disciplinaParaSalvar.peso,
-          cadernoLink: disciplinaParaSalvar.cadernoLink,
           topicos: disciplinaParaSalvar.topicos.map((t, idx) => ({
             nome: t.nome,
             ordem: idx + 1
@@ -278,7 +279,6 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
           nome: disciplinaParaSalvar.nome,
           cor: disciplinaParaSalvar.cor,
           peso: disciplinaParaSalvar.peso,
-          cadernoLink: disciplinaParaSalvar.cadernoLink,
           topicos: disciplinaParaSalvar.topicos.map((t, idx) => ({
             id: t.id,
             nome: t.nome,
@@ -358,61 +358,33 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
     e.preventDefault();
     if (!disciplinaQuestoes || carregandoQuestoes) return;
 
-    const link = cadernoUrl.trim();
-    if (link) {
-      try {
-        const url = new URL(link);
-        if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-          throw new Error('protocolo inválido');
-        }
-      } catch {
-        setErroQuestoes('O link do caderno deve ser uma URL válida HTTP ou HTTPS.');
-        return;
-      }
-    }
-
+    // O vínculo com caderno saiu de Disciplina (DC-04): aqui só atualizamos questões.
     setErroQuestoes('');
     setSalvandoQuestoes(true);
     try {
-      if (link !== (disciplinaQuestoes.cadernoLink || '')) {
-        await EstudosService.atualizarDisciplina(trilha.id, disciplinaQuestoes.id, {
-          nome: disciplinaQuestoes.nome,
-          cor: disciplinaQuestoes.cor,
-          peso: disciplinaQuestoes.peso,
-          cadernoLink: link || undefined,
-          topicos: (disciplinaQuestoes.topicos || []).map((t, idx) => ({
-            id: t.id,
-            nome: t.nome,
-            ordem: idx + 1
-          }))
-        });
-        const atualizada = await EstudosService.buscarTrilha(trilha.id);
-        onTrilhaAtualizada(atualizada);
-      }
-
-      toast.success('Caderno de questões atualizado com sucesso!');
+      const atualizada = await EstudosService.buscarTrilha(trilha.id);
+      onTrilhaAtualizada(atualizada);
+      toast.success('Estatísticas de questões atualizadas!');
       setDisciplinaQuestoes(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err : 'Erro ao salvar caderno.');
+      toast.error(err instanceof Error ? err : 'Erro ao atualizar as questões.');
     } finally {
       setSalvandoQuestoes(false);
     }
   };
 
   const abrirNovaDisciplina = () => {
-    const idsUsados = new Set(trilha.disciplinas.flatMap((disciplina) => [
-      disciplina.id,
-      ...disciplina.topicos.map((topico) => topico.id)
-    ]));
-    const id = criarId('disciplina', idsUsados);
-    setDisciplinaRascunho({
-      id,
+    // Sem IDs sintéticos no cliente (N-5): o servidor gera o hex de 24 na criação.
+    const novoRascunho: Disciplina = {
+      id: '',
       nome: '',
       cor: obterCorDisponivel(trilha.disciplinas),
       peso: 1,
+      ordem: trilha.disciplinas.length,
       topicos: []
-    });
-    setDisciplinaTopicosInicial(id);
+    };
+    setDisciplinaRascunho(novoRascunho);
+    setDisciplinaTopicosInicial(null);
     setModalTopicosAberto(true);
   };
 
@@ -474,10 +446,6 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
 
     setSalvandoDisciplinasLote(true);
     try {
-      const idsUsados = new Set(trilha.disciplinas.flatMap((disciplina) => [
-        disciplina.id,
-        ...disciplina.topicos.map((topico) => topico.id)
-      ]));
       const criadas: Disciplina[] = [];
       const nomesAdicionados = new Set<string>(
         trilha.disciplinas.map((d) => d.nome.trim().toLocaleLowerCase())
@@ -491,14 +459,12 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
         })
         .map(({ nome, assuntos }) => {
           const disciplina: Disciplina = {
-            id: criarId('disciplina', idsUsados),
+            id: '',
             nome,
             cor: obterCorDisponivel([...trilha.disciplinas, ...criadas]),
             peso: 1,
-            topicos: assuntos.map((assunto) => ({
-              id: criarId('assunto', idsUsados),
-              nome: assunto
-            }))
+            ordem: trilha.disciplinas.length + criadas.length,
+            topicos: assuntos.map((assunto) => ({ id: '', nome: assunto }))
           };
           criadas.push(disciplina);
           return disciplina;
@@ -529,23 +495,26 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
     ? [...trilha.disciplinas, disciplinaRascunho]
     : trilha.disciplinas;
 
+  // Contagens gerais
+  const totalTopicos = trilha.disciplinas.flatMap((d) => d.topicos).length;
+  const concluidosSet = new Set(trilha.topicosConcluidosIds ?? []);
+
   const disciplinasFiltradas = useMemo(() => {
     if (filtroStatus === 'todos') {
       return trilha.disciplinas;
     }
     return trilha.disciplinas.filter((disc) =>
       disc.topicos.some((top) => {
-        const isDone = Boolean(trilha.progresso?.[top.id]?.done);
+        const isDone = concluidosSet.has(top.id);
         return filtroStatus === 'pendentes' ? !isDone : isDone;
       })
     );
-  }, [trilha.disciplinas, trilha.progresso, filtroStatus]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trilha.disciplinas, trilha.topicosConcluidosIds, filtroStatus]);
 
-  // Contagens gerais
-  const totalTopicos = trilha.disciplinas.flatMap((d) => d.topicos).length;
   const concluidosTotal = trilha.disciplinas
     .flatMap((d) => d.topicos)
-    .filter((t) => trilha.progresso?.[t.id]?.done).length;
+    .filter((t) => concluidosSet.has(t.id)).length;
   const pctGeral = totalTopicos > 0 ? Math.round((concluidosTotal / totalTopicos) * 100) : 0;
   const totalQuestoesConsolidadas = Object.values(resumoQuestoes)
     .reduce((total, resumo) => total + resumo.questoes, 0);
@@ -687,7 +656,7 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
           title="Editar disciplinas e assuntos"
           subtitle="Gerencie as disciplinas e os assuntos cadastrados."
           disciplinas={disciplinasModal}
-          progresso={trilha.progresso}
+          progresso={concluidosSet}
           onToggleTopico={(topicoId, concluido) => void handleToggleTopicoCheck(topicoId, concluido)}
           onToggleTopicos={(disciplinaId, concluido) =>
             void handleToggleTopicosDisciplina(disciplinaId, concluido)
@@ -712,7 +681,7 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
     <div className={styles.container}>
       <PageBanner
         title="Disciplinas &amp; Assuntos do Edital"
-        description="        Acompanhe a cobertura do edital, marque assuntos estudados e gerencie cadernos de questões para cada matéria."
+        description="Acompanhe a cobertura do edital e marque os assuntos estudados de cada matéria."
         icon={<BookOpen size={26} />}
         actions={
           <div className={styles.pageActions}>
@@ -778,7 +747,7 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
         ) : (
           disciplinasFiltradas.map((disc) => {
             const topicos = disc.topicos;
-            const concluidosDisc = topicos.filter((t) => trilha.progresso?.[t.id]?.done).length;
+            const concluidosDisc = topicos.filter((t) => concluidosSet.has(t.id)).length;
             const pctDisc = topicos.length > 0 ? Math.round((concluidosDisc / topicos.length) * 100) : 0;
             return (
               <article
@@ -818,21 +787,6 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
                   </div>
                 </div>
 
-                <div className={styles.discActions}>
-                  {disc.cadernoLink && (
-                    <a
-                      href={disc.cadernoLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={styles.cadernoBtn}
-                      title="Abrir caderno de questões"
-                    >
-                      <Bookmark size={14} />
-                      <span>Caderno</span>
-                      <ExternalLink size={12} />
-                    </a>
-                  )}
-                </div>
                 </div>
               </article>
           );
@@ -844,11 +798,11 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
         <FormModal
           isOpen={true}
           onClose={() => setDisciplinaQuestoes(null)}
-          title={`Caderno & Questões: ${disciplinaQuestoes.nome}`}
-          subtitle="Confira as estatísticas consolidadas e gerencie o link do caderno de questões da disciplina."
+          title={`Questões: ${disciplinaQuestoes.nome}`}
+          subtitle="Confira as estatísticas consolidadas de questões da disciplina."
           icon={<Award size={20} />}
           onSubmit={handleSalvarQuestoes}
-          submitText="Salvar Caderno"
+          submitText="Atualizar"
           loading={salvandoQuestoes}
           error={erroQuestoes}
         >
@@ -872,25 +826,9 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
             {!carregandoQuestoes && !erroCarregamentoQuestoes && (
               <p className={styles.calculationText}>
                 Atualmente registrados: <strong>{totalQ || 0}</strong> questões,{' '}
-                <strong>{acertosQ || 0}</strong> acertos e{' '}
-                {disciplinaQuestoes.cadernoLink
-                  ? <a href={disciplinaQuestoes.cadernoLink} target="_blank" rel="noopener noreferrer">caderno cadastrado</a>
-                  : 'nenhum caderno cadastrado'}.
+                <strong>{acertosQ || 0}</strong> acertos.
               </p>
             )}
-            <Input
-              label="Link do Caderno de Questões (TEC, QConcursos, etc.)"
-              type="url"
-              placeholder="https://..."
-              maxLength={2048}
-              value={cadernoUrl}
-              disabled={carregandoQuestoes || !!erroCarregamentoQuestoes}
-              onChange={(e) => {
-                setCadernoUrl(e.target.value);
-                setErroQuestoes('');
-              }}
-            />
-
             <div className={styles.formGrid}>
               <Input
                 label="Total de Questões Resolvidas"
@@ -935,7 +873,7 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
         title="Editar disciplinas e assuntos"
         subtitle="Gerencie as disciplinas e os assuntos cadastrados."
         disciplinas={disciplinasModal}
-        progresso={trilha.progresso}
+        progresso={concluidosSet}
         onToggleTopico={(topicoId, concluido) => void handleToggleTopicoCheck(topicoId, concluido)}
         onToggleTopicos={(disciplinaId, concluido) =>
           void handleToggleTopicosDisciplina(disciplinaId, concluido)

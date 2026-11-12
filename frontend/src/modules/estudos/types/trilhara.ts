@@ -1,11 +1,12 @@
 import {
-  CronogramaAtivoResumoDTO,
   TrilhaResumoDTO,
   TrilhaDetalheDTO,
   DisciplinaDTO,
   ProgressoTopicoDTO,
   CriarDisciplinaRequest,
   AtualizarDisciplinaRequest,
+  CriarTrilhaRequest,
+  TrilhaImpactoExclusaoDTO,
   RegistrarSessaoPayload,
   SessaoRegistradaDTO,
   EstatisticaDisciplinaDTO,
@@ -20,6 +21,8 @@ export type {
   ProgressoTopicoDTO,
   CriarDisciplinaRequest,
   AtualizarDisciplinaRequest,
+  CriarTrilhaRequest,
+  TrilhaImpactoExclusaoDTO,
   RegistrarSessaoPayload,
   SessaoRegistradaDTO,
   EstatisticaDisciplinaDTO,
@@ -27,27 +30,27 @@ export type {
   RemocaoSessoesDisciplinaResponse
 };
 
-export interface Topico {
-  id: string;
-  nome: string;
-  ordem?: number;
-}
+/**
+ * Metadados editáveis da trilha. Derivado do contrato único (`PUT /api/trilhas/{id}`),
+ * sem tipo de transporte paralelo.
+ */
+export type AtualizacaoMetadadosTrilha = Pick<
+  TrilhaDetalheDTO,
+  'nome' | 'cargo' | 'banca' | 'dataProva' | 'informacoesComplementares'
+>;
 
-export interface Disciplina {
-  id: string;
-  nome: string;
-  cor?: string;
-  peso: number;
-  cadernoLink?: string;
-  ordem?: number;
-  topicos: Topico[];
-}
+/** tipo de disciplina usado pela UI: o próprio DTO do backend. */
+export type Disciplina = DisciplinaDTO;
+
+/** tópico usado pela UI: o próprio DTO do backend. */
+export type Topico = DisciplinaDTO['topicos'][number];
 
 interface DisciplinaConfigCiclo {
   disciplinaId: string;
   participa: boolean;
 }
 
+/** Estrutura herdada de planejamento (remoção pertence às revisões de cronograma). */
 export interface Ciclo {
   id: string;
   nome: string;
@@ -59,42 +62,11 @@ export interface Ciclo {
   disciplinasConfig: DisciplinaConfigCiclo[];
 }
 
-export interface ItemProgresso {
-  done: boolean;
-  doneAt?: string | null;
-}
-
-export interface Trilha {
-  id: string;
-  usuarioId?: string;
-  donoId?: string;
-  origemEditalId?: string;
-  origemVersao?: number;
-  nome: string;
-  cargo?: string;
-  areaCargo?: string;
-  banca?: string;
-  dataProva?: string; // YYYY-MM-DD
-  informacoesComplementares?: string;
-  cor?: string;
-  disciplinas: Disciplina[];
-  topicosConcluidosIds?: string[];
-  progresso: Record<string, ItemProgresso>;
-  ciclos: Ciclo[];
-  cicloAtivoId?: string;
-  totalDisciplinas?: number;
-  totalTopicos?: number;
-  topicosConcluidos?: number;
-  percentualProgresso?: number;
-  cronogramaAtivoResumo?: CronogramaAtivoResumoDTO | null;
-  criadoEm?: string;
-  atualizadoEm?: string;
-}
-
-export type AtualizacaoMetadadosTrilha = Pick<
-  Trilha,
-  'nome' | 'areaCargo' | 'banca' | 'dataProva' | 'informacoesComplementares'
->;
+/**
+ * Progresso de uma trilha é o conjunto de IDs de tópicos concluídos, derivado de
+ * `topicosConcluidosIds` (D-11). Nunca um mapa `{ topicoId: { done } }`.
+ */
+export type ProgressoTrilha = ReadonlySet<string>;
 
 export interface EditalResumo {
   id: string;
@@ -186,3 +158,4 @@ export type PaginaAtiva =
   | 'disciplinas'
   | 'estudar'
   | 'dashboard';
+

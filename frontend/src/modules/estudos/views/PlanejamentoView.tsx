@@ -9,7 +9,7 @@ import {
   Pagina,
   DisponibilidadeSemanalDTO,
 } from '../services/estudosService';
-import { Trilha, RegistroPlanejamentoPendente } from '../types/trilhara';
+import { TrilhaDetalheDTO, TrilhaResumoDTO, RegistroPlanejamentoPendente } from '../types/trilhara';
 import { ModalidadeCronograma, CriarCronogramaPayload } from '@shared/contracts';
 import styles from './PlanejamentoView.module.css';
 
@@ -24,8 +24,8 @@ const DIAS_SEMANA = [
 ];
 
 export interface PlanejamentoProps {
-  trilha?: Trilha;
-  onTrilhaAtualizada?: (atualizada: Trilha) => void;
+  trilha?: TrilhaDetalheDTO;
+  onTrilhaAtualizada?: (atualizada: TrilhaDetalheDTO) => void;
   onRegistrarBloco?: (registro: RegistroPlanejamentoPendente) => void;
   registroPlanejamentoRevision?: number;
   onIniciarEstudo?: (disciplinaId: string, registro: RegistroPlanejamentoPendente) => void;
@@ -39,9 +39,9 @@ export function PlanejamentoView({
   onIrParaDisciplinas,
 }: PlanejamentoProps = {}) {
   const { abrirModal } = useGlobalSessionModal();
-  const [trilhas, setTrilhas] = useState<Trilha[]>(trilhaProp ? [trilhaProp] : []);
+  const [trilhas, setTrilhas] = useState<TrilhaResumoDTO[]>([]);
   const [selectedTrilhaId, setSelectedTrilhaId] = useState<string>(trilhaProp ? trilhaProp.id : '');
-  const [selectedTrilhaDetalhe, setSelectedTrilhaDetalhe] = useState<Trilha | null>(trilhaProp || null);
+  const [selectedTrilhaDetalhe, setSelectedTrilhaDetalhe] = useState<TrilhaDetalheDTO | null>(trilhaProp || null);
   const [loadingTrilhas, setLoadingTrilhas] = useState(!trilhaProp);
 
   // Cronogramas
@@ -458,7 +458,7 @@ export function PlanejamentoView({
           >
             {trilhas.map(t => (
               <option key={t.id} value={t.id}>
-                {t.nome} ({t.totalDisciplinas || t.disciplinas?.length || 0} disciplinas)
+                {t.nome} ({t.totalDisciplinas} disciplinas)
               </option>
             ))}
           </select>

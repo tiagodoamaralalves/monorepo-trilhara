@@ -12,7 +12,7 @@ import {
   TopicRow,
   useConfirm
 } from '@shared/design-system';
-import { Disciplina, ItemProgresso, Topico } from '../../types/trilhara';
+import { Disciplina, ProgressoTrilha, Topico } from '../../types/trilhara';
 import { obterCorDisponivel, obterCoresEmUso } from '../../utils/coresDisciplina';
 import { DisciplinaPesoSelector } from '../DisciplinaPesoSelector/DisciplinaPesoSelector';
 import { DisciplinaPesoButton } from '../DisciplinaPesoButton/DisciplinaPesoButton';
@@ -31,7 +31,8 @@ export interface DisciplinasTopicosModalProps {
   initialDisciplinaId?: string | null;
   initialEditing?: boolean;
   creatingDiscipline?: boolean;
-  progresso?: Record<string, ItemProgresso>;
+  /** Conjunto de IDs de tópicos concluídos (derivado de `topicosConcluidosIds`). */
+  progresso?: ProgressoTrilha;
   /** Se true ou se onChange for fornecido, permite adicionar, renomear e excluir disciplinas/assuntos */
   editable?: boolean;
   onChange?: (disciplinas: Disciplina[]) => void;
@@ -370,7 +371,7 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
   );
   const totalTopicosSelecionados = disciplinaSelecionada?.topicos.length ?? 0;
   const topicosConcluidosSelecionados = disciplinaSelecionada
-    ? disciplinaSelecionada.topicos.filter((topico) => progresso?.[topico.id]?.done).length
+    ? disciplinaSelecionada.topicos.filter((topico) => progresso?.has(topico.id)).length
     : 0;
   const percentualSelecionado = totalTopicosSelecionados > 0
     ? Math.round((topicosConcluidosSelecionados / totalTopicosSelecionados) * 100)
@@ -641,7 +642,7 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
                     leading={
                       onToggleTopico ? (
                         <Checkbox
-                          checked={Boolean(progresso?.[topico.id]?.done)}
+                          checked={Boolean(progresso?.has(topico.id))}
                           aria-label={`Marcar assunto ${topico.nome} como concluído`}
                           onChange={(event) => onToggleTopico(topico.id, event.target.checked)}
                         />

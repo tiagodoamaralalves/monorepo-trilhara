@@ -16,14 +16,14 @@
 |---|---|---|---|
 | A1 | Usuário A nunca acessa, altera ou exclui dados do usuário B por ID conhecido | `security/AuthorizationByOwnerTest` (13, anti-IDOR ⇒ 404); `test/fase9ExclusaoConta.test.tsx` | Coberto |
 | A2 | Datas de calendário não mudam entre navegador/backend; 21h–23h59 em `America/Sao_Paulo` usam a data local via `X-Timezone`; instantes em BSON Date | `shared/TimezoneContextTest` (6); `shared/mongo/BsonRoundTripTest` (7); `test/sessaoNormalizada.test.ts` | Coberto |
-| A3 | Trilha grande não exige transferir disciplinas/tópicos ao listar Hub | `trilha/TrilhaNormalizadaIntegrationTest` (9) | Parcial — falta assert de payload/`explain` em trilha de 2.000 tópicos; `MongoExplainBenchmarkTest` é opt-in |
-| A4 | Marcar/desmarcar tópico afeta somente aquele progresso e agregados | `trilha/TrilhaNormalizadaIntegrationTest` | Parcial — cobre progresso, não os agregados derivados |
+| A3 | Trilha grande não exige transferir disciplinas/tópicos ao listar Hub | `trilha/TrilhaNormalizadaIntegrationTest` (17, inclui `deveCriarTrilhaERetornarResumoSemArrayDeTopicosNoHub`) | Parcial — falta assert de payload/`explain` em trilha de 2.000 tópicos; `MongoExplainBenchmarkTest` é opt-in. **R3:** o resumo não tem mais `disciplinas`/`progresso` no contrato |
+| A4 | Marcar/desmarcar tópico afeta somente aquele progresso e agregados | `trilha/TrilhaNormalizadaIntegrationTest#deveRetornar404AoMarcarProgressoDeTopicoDeOutraTrilha`; `test/topicoOtimista.test.tsx` | **Coberto na R3** — inclui isolamento por trilha no path e rollback otimista |
 | A5 | Regenerar cronograma substitui blocos via `versaoGeracao`/`versaoAtiva`, mantém sessões/progresso; concorrência nunca deixa dois ativos | `cronograma/CronogramaNormalizadoIntegrationTest` (8, inclui `deveCoordenarConcorrenciaComLockAtomicoNaTrilha`) + índice parcial único `idx_cronogramas_usuario_trilha_ativo_unique` | Coberto |
 | A6 | Tarefas/Pomodoro mostram as mesmas tarefas manuais Hoje + blocos do dia; nenhum bloco é gravado como tarefa | `test/fase7IntegracaoDiaria.test.tsx` (9); `tarefa/Fase6TarefaResourceTest` (4) | Coberto |
 | A7 | Concluir manual nunca cria sessão; concluir bloco abre o modal global; cancelar não conclui | `test/fase5GlobalSessionTimer.test.tsx` (13); `fase7IntegracaoDiaria.test.tsx` | Coberto |
 | A8 | Retry após timeout não duplica sessão nem conclusão | `sessao/SessaoNormalizadaIntegrationTest` (9) + índice único `idx_sessoes_usuario_chaveIdempotencia_unique` | Parcial — falta retry concorrente com `operationId` repetido em `concluir-atrasados` |
 | A9 | Sessão de 95s persiste `duracaoSegundos=95` e soma 95s; estatísticas conferem; editar/excluir recalcula | `sessao/SessaoNormalizadaIntegrationTest`; `test/sessaoNormalizada.test.ts` (6) | Coberto |
-| A10 | Remover disciplina preserva histórico por padrão e permite apagar sessões/métricas explicitamente | `trilha/TrilhaNormalizadaIntegrationTest`; `sessao/SessaoNormalizadaIntegrationTest` | Coberto |
+| A10 | Remover disciplina preserva histórico por padrão e permite apagar sessões/métricas explicitamente | `trilha/TrilhaNormalizadaIntegrationTest#deveRetornar409SeLeaseOcupadoAoExcluirDisciplina`; `sessao/SessaoNormalizadaIntegrationTest` | Coberto (R3 adicionou a guarda de lease na exclusão) |
 | A11 | Alterar `dataVencimento` de ocorrência mantém `dataOriginalOcorrencia` e não recria na data original | `tarefa/Fase6RecorrenciaEngineTest` (5); índice `idx_tarefas_usuario_serie_dataOriginal_unique` | Coberto |
 | A12 | Autosave/busca/lixeira de Notas não transferem Markdown completo; rascunho local preservado em falha de rede | `nota/NotaResourceTest` (11); `nota/NotaSnippetExtractorTest` (2); `test/fase8Notas.test.tsx` (13) | Coberto |
 | A13 | Tarefas/notas em lixeira restauradas no prazo/contexto originais; purgadas após o prazo | `tarefa/Fase6TarefaResourceTest`; `test/fase6Tarefas.test.ts` (8) | Parcial — falta teste de purga após prazo |
@@ -135,3 +135,24 @@
 | Regras ArchUnit de pacotes legados habilitadas | `TenantIsolationArchTest.pacotesLegadosProibidos` | Coberto |
 | `rg "trilhara_auth_token|trilhara_user|trilhara:u:anon" frontend/src` → 0 | comando executado no gate | Coberto |
 | Gate comum verde (backend/frontend/raiz) | `docs/REVISAO-IMPLEMENTADA-R2.md` §8 | Coberto |
+
+## F. Critérios específicos da R3 (F2: trilhas, disciplinas, tópicos e progresso)
+
+| Critério | Teste / comando | Status |
+|---|---|---|
+| Rota legada `PATCH /api/trilhas/{id}/progresso/{topicoId}` removida (D-11) | `TrilhaNormalizadaIntegrationTest#naoDeveExistirRotaLegadaDeProgresso` | Coberto |
+| Limites 50/100/500 respondem `409 RESOURCE_LIMIT_EXCEEDED` | `#deveRetornar409ResourceLimitAoExcederLimites` | Coberto |
+| `editalId` **xor** `disciplinasIniciais` → 400 `VALIDATION_ERROR` em `errors.editalId` | `#deveRejeitarEditalEDisciplinasIniciaisJuntos` | Coberto |
+| `editalId` inexistente/não publicado → 400 no campo (SEC-09) | `#deveRejeitarEditalInexistenteCom400NoCampoEditalId` | Coberto |
+| Tópico de outra trilha no path → 404 | `#deveRetornar404AoMarcarProgressoDeTopicoDeOutraTrilha` | Coberto |
+| ID malformado na reordenação → 400 `INVALID_IDENTIFIER` | `#deveRejeitarIdMalformadoComInvalidIdentifierNaReordenacao` | Coberto |
+| Lease de 120 s nas exclusões de trilha e disciplina (409 se ocupado) | `#deveRetornar409SeLeaseOcupadoAoExcluirDisciplina`; `LeaseTrilhaService` | Coberto |
+| `GET /impacto-exclusao` com as quatro contagens | `#impactoExclusaoTrilhaContaCorretamente` | Coberto |
+| Isolamento A×B em todas as rotas de trilha/disciplina/progresso | `#deveIsolarTodasAsRotasEntreUsuarios`; `security/AuthorizationByOwnerTest` | Coberto |
+| `Disciplina`/DTOs/UI sem `cadernoLink` (DC-04) | `grep -rE "adaptarTrilha\|progresso/\{topicoId\}\|cadernoId" frontend/src/modules/estudos backend/src/main/java/br/com/trilhara/trilha` → 0 | Coberto |
+| Sem adaptadores nem tipo `Trilha` duplo (DC-05/D-11) | `verificar-legado.sh` → `adaptadores-legados` 8 → **0**; `npx knip` exit 0 | Coberto |
+| Hub com `Skeleton`/`EmptyState`/`SectionErrorCard`+retry | `src/test/hub.test.tsx` (5) | Coberto |
+| Marcar/desmarcar tópico otimista com rollback (D-39) | `src/test/topicoOtimista.test.tsx` (2) | Coberto |
+| Exclusão de trilha com nome exato e impacto em números (D-38) | `src/test/excluirTrilha.test.tsx` (3) | Coberto |
+| Regra ArchUnit de `usuarioId` habilitada para o pacote `trilha` | `TenantIsolationArchTest#repositoriosDeTrilhaExigemUsuarioId` | Coberto |
+| Gate comum verde | `docs/REVISAO-IMPLEMENTADA-R3.md` §5 (190 backend / 177 frontend) | Coberto |

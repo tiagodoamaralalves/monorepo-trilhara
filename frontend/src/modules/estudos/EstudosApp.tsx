@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { registrarFalha } from '@shared/diagnostico';
 import { Navbar } from './components/Navbar/Navbar';
-import { HubView } from './views/HubView';
+import { HubView, StatusCarregamento } from './views/HubView';
 import { PlanejamentoView } from './views/PlanejamentoView';
 import { DisciplinasView } from './views/DisciplinasView';
 import { EstudarView } from './views/EstudarView';
@@ -13,7 +13,8 @@ import { TrilhaModal } from './components/TrilhaModal/TrilhaModal';
 import {
   EditalResumo,
   RegistroPlanejamentoPendente,
-  Trilha,
+  TrilhaDetalheDTO,
+  TrilhaResumoDTO,
   PaginaAtiva,
   UsuarioAutenticado
 } from './types/trilhara';
@@ -34,13 +35,36 @@ import {
   EDITAIS_VITRINE_FALLBACK,
   importarOuClonarEdital
 } from './data/catalogoVitrine';
-import { Button, PageBanner, useToast } from '@shared/design-system';
+import { PageBanner, useToast } from '@shared/design-system';
 import { BarChart2, BookOpen, Calendar } from 'lucide-react';
 import { StudyTimerProvider } from './context/StudyTimerContext';
 import { EmptyJourneyState } from './components/EmptyJourneyState/EmptyJourneyState';
 import styles from './App.module.css';
 
 const STORAGE_PENDING_EDITAL_KEY = 'trilhara:pending_import_edital_id';
+
+/**
+ * Projeta o resumo leve a partir do detalhe devolvido por `POST /api/trilhas`, evitando um
+ * refetch imediato da listagem. Não é um adaptador de contrato: os dois lados são DTOs do backend.
+ */
+function resumoDe(detalhe: TrilhaDetalheDTO): TrilhaResumoDTO {
+  return {
+    id: detalhe.id,
+    nome: detalhe.nome,
+    cargo: detalhe.cargo,
+    banca: detalhe.banca,
+    dataProva: detalhe.dataProva,
+    cor: detalhe.cor,
+    origemEditalId: detalhe.origemEditalId,
+    totalDisciplinas: detalhe.totalDisciplinas ?? detalhe.disciplinas.length,
+    totalTopicos: detalhe.totalTopicos ?? 0,
+    topicosConcluidos: detalhe.topicosConcluidos ?? 0,
+    percentualProgresso: detalhe.percentualProgresso ?? 0,
+    cronogramaAtivoResumo: detalhe.cronogramaAtivoResumo ?? null,
+    criadoEm: detalhe.criadoEm,
+    atualizadoEm: detalhe.atualizadoEm
+  };
+}
 
 const PAGINAS: PaginaAtiva[] = [
   'landing',
@@ -91,9 +115,9 @@ export default function EstudosApp() {
   const [pendingEdital, setPendingEdital] = useState<EditalResumo | null>(null);
   const [abrirModalNovoAposAuth, setAbrirModalNovoAposAuth] = useState(false);
 
-  const [trilhas, setTrilhas] = useState<Trilha[]>([]);
+  const [trilhas, setTrilhas] = useState<TrilhaResumoDTO[]>([]);
   const [trilhaAtivaId, setTrilhaAtivaId] = useState<string>('');
-  const [trilhaAtivaDetalhe, setTrilhaAtivaDetalhe] = useState<Trilha | null>(null);
+  const [trilhaAtivaDetalhe, setTrilhaAtivaDetalhe] = useState<TrilhaDetalheDTO | null>(null);
   const [carregandoDetalhe, setCarregandoDetalhe] = useState(false);
   const [paginaAtiva, setPaginaAtiva] = useState<PaginaAtiva>(paginaNaUrl);
   const [disciplinaInicialId, setDisciplinaInicialId] = useState('');
@@ -102,14 +126,13 @@ export default function EstudosApp() {
   const [blocoPlanejamentoNoCronometro, setBlocoPlanejamentoNoCronometro] =
     useState<RegistroPlanejamentoPendente | null>(null);
   const [registroPlanejamentoRevision, setRegistroPlanejamentoRevision] = useState(0);
-  const [carregando, setCarregando] = useState(false);
-  const [erroCarregamento, setErroCarregamento] = useState<string | null>(null);
+  const [statusLista, setStatusLista] = useState<StatusCarregamento>('carregando');
 
   // Modais globais
   const [modalNovaTrilha, setModalNovaTrilha] = useState(
     () => new URLSearchParams(window.location.search).get('modal') === 'novo'
   );
-  const [trilhaEmEdicao, setTrilhaEmEdicao] = useState<Trilha | null>(null);
+  const [trilhaEmEdicao, setTrilhaEmEdicao] = useState<TrilhaResumoDTO | null>(null);
 
   const navegar = useCallback((pagina: PaginaAtiva) => {
     setPaginaAtiva(pagina);
@@ -140,15 +163,15 @@ export default function EstudosApp() {
     if (!AuthStorage.obterAccessToken()) {
       setTrilhas([]);
       setTrilhaAtivaId('');
-      setCarregando(false);
+      setStatusLista('sucesso');
       return;
     }
 
-    setCarregando(true);
-    setErroCarregamento(null);
+    setStatusLista('carregando');
     try {
       const lista = await EstudosService.listarTrilhas();
       setTrilhas(lista);
+      setStatusLista('sucesso');
 
       let idSalvo: string | null = null;
       try {
@@ -171,11 +194,9 @@ export default function EstudosApp() {
         setTrilhaAtivaId('');
         return;
       }
-      const mensagem = err instanceof Error ? err.message : 'Falha ao carregar trilhas.';
-      setErroCarregamento(mensagem);
-      toast.error(mensagem);
-    } finally {
-      setCarregando(false);
+      // Falha recuperável: a seção mostra `SectionErrorCard` com retry, nunca "sem trilhas".
+      setStatusLista('erro');
+      registrarFalha('estudos.listarTrilhas', err);
     }
   }, [toast, logout]);
 
@@ -256,37 +277,54 @@ export default function EstudosApp() {
     };
   }, [trilhaAtivaId]);
 
-  const trilhaResumoAtiva = useMemo(() => {
+  const trilhaResumoAtiva = useMemo<TrilhaResumoDTO | null>(() => {
     return trilhas.find((t) => t.id === trilhaAtivaId) || trilhas[0] || null;
   }, [trilhas, trilhaAtivaId]);
 
-  const trilhaAtiva: Trilha | null = useMemo(() => {
+  /** Detalhe sob demanda: a trilha ativa é sempre o DTO completo de `GET /api/trilhas/{id}`. */
+  const trilhaAtiva: TrilhaDetalheDTO | null = useMemo(() => {
     if (trilhaAtivaDetalhe && trilhaAtivaDetalhe.id === trilhaResumoAtiva?.id) {
       return trilhaAtivaDetalhe;
     }
-    return trilhaResumoAtiva;
+    return null;
   }, [trilhaAtivaDetalhe, trilhaResumoAtiva]);
 
-  const handleTrilhaAtualizada = (atualizada: Trilha) => {
+  const handleTrilhaAtualizada = (atualizada: TrilhaDetalheDTO) => {
     setTrilhaAtivaDetalhe(atualizada);
     setTrilhas((prev) =>
       prev.map((t) =>
         t.id === atualizada.id
           ? {
               ...t,
-              ...atualizada,
-              totalDisciplinas: atualizada.disciplinas?.length ?? t.totalDisciplinas,
-              totalTopicos:
-                atualizada.disciplinas?.reduce((acc, d) => acc + (d.topicos?.length || 0), 0) ??
-                t.totalTopicos,
+              nome: atualizada.nome,
+              cargo: atualizada.cargo,
+              banca: atualizada.banca,
+              dataProva: atualizada.dataProva,
+              cor: atualizada.cor,
+              totalDisciplinas:
+                atualizada.totalDisciplinas ?? atualizada.disciplinas.length,
+              totalTopicos: atualizada.totalTopicos ?? t.totalTopicos,
               topicosConcluidos:
-                atualizada.topicosConcluidosIds?.length ??
-                Object.values(atualizada.progresso || {}).filter((p) => p.done).length
+                atualizada.topicosConcluidos ?? t.topicosConcluidos,
+              percentualProgresso:
+                atualizada.percentualProgresso ?? t.percentualProgresso,
+              cronogramaAtivoResumo:
+                atualizada.cronogramaAtivoResumo ?? t.cronogramaAtivoResumo
             }
           : t
       )
     );
-    setTrilhaEmEdicao((atual) => (atual?.id === atualizada.id ? atualizada : atual));
+    setTrilhaEmEdicao((atual) =>
+      atual?.id === atualizada.id
+        ? {
+            ...atual,
+            nome: atualizada.nome,
+            cargo: atualizada.cargo,
+            banca: atualizada.banca,
+            dataProva: atualizada.dataProva
+          }
+        : atual
+    );
   };
 
   const iniciarRegistroPlanejado = (registro: RegistroPlanejamentoPendente) => {
@@ -424,15 +462,17 @@ export default function EstudosApp() {
     }
   };
 
-  const handleTrilhaCriada = (nova: Trilha) => {
+  const handleTrilhaCriada = (nova: TrilhaDetalheDTO) => {
     fecharNovaTrilha();
-    setTrilhas((prev) => [nova, ...prev]);
+    setTrilhaAtivaDetalhe(nova);
+    setTrilhas((prev) => [resumoDe(nova), ...prev]);
     handleSelecionarTrilha(nova.id);
     navegar('hub');
   };
 
-  const handleTrilhaImportada = (importada: Trilha) => {
-    setTrilhas((prev) => [importada, ...prev]);
+  const handleTrilhaImportada = (importada: TrilhaDetalheDTO) => {
+    setTrilhaAtivaDetalhe(importada);
+    setTrilhas((prev) => [resumoDe(importada), ...prev]);
     handleSelecionarTrilha(importada.id);
     navegar('hub');
   };
@@ -602,7 +642,7 @@ export default function EstudosApp() {
         onNavegar={navegar}
         onSelecionarTrilha={handleSelecionarTrilha}
         onAbrirEditarTrilha={() => {
-          if (trilhaAtiva) setTrilhaEmEdicao(trilhaAtiva);
+          if (trilhaAtiva) setTrilhaEmEdicao(resumoDe(trilhaAtiva));
         }}
         onAbrirNovaTrilha={abrirNovaTrilha}
         onLogout={() => void handleLogout()}
@@ -611,22 +651,17 @@ export default function EstudosApp() {
 
       {/* Conteúdo da Página */}
       <main className={styles.main}>
-        {carregando || (carregandoDetalhe && paginaAtiva !== 'hub' && !trilhaAtivaDetalhe) ? (
+        {statusLista === 'carregando' || (carregandoDetalhe && paginaAtiva !== 'hub' && !trilhaAtivaDetalhe) ? (
           <div className={styles.loading}>
             Carregando trilha e assuntos...
-          </div>
-        ) : erroCarregamento ? (
-          <div className={styles.loadError} role="alert">
-            <p>Não foi possível carregar suas trilhas: {erroCarregamento}</p>
-            <Button type="button" variant="secondary" onClick={() => void carregarTrilhas()}>
-              Tentar novamente
-            </Button>
           </div>
         ) : (
           <>
             {paginaAtiva === 'hub' && (
               <HubView
                 trilhas={trilhas}
+                status={statusLista}
+                onRecarregar={() => void carregarTrilhas()}
                 trilhaAtivaId={trilhaAtivaId}
                 onSelecionarTrilha={handleSelecionarTrilha}
                 onNavegar={navegar}
@@ -660,7 +695,8 @@ export default function EstudosApp() {
                 onCancelarRegistroPlanejamento={cancelarRegistroPlanejado}
                 somenteModalRegistro
                 onTrilhaCriada={(nova) => {
-                  setTrilhas((prev) => [nova, ...prev]);
+                  setTrilhaAtivaDetalhe(nova);
+                  setTrilhas((prev) => [resumoDe(nova), ...prev]);
                   handleSelecionarTrilha(nova.id);
                 }}
                 onTrilhaAtualizada={handleTrilhaAtualizada}
@@ -688,7 +724,8 @@ export default function EstudosApp() {
                 onRegistroPlanejamentoConcluido={finalizarRegistroPlanejado}
                 onCancelarRegistroPlanejamento={cancelarRegistroPlanejado}
                 onTrilhaCriada={(nova) => {
-                  setTrilhas((prev) => [nova, ...prev]);
+                  setTrilhaAtivaDetalhe(nova);
+                  setTrilhas((prev) => [resumoDe(nova), ...prev]);
                   handleSelecionarTrilha(nova.id);
                 }}
                 onTrilhaAtualizada={handleTrilhaAtualizada}

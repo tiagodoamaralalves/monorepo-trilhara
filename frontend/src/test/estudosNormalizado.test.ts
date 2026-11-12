@@ -1,15 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  EstudosService,
-  adaptarTrilhaResumo,
-  adaptarTrilhaDetalhe
-} from '../modules/estudos/services/estudosService';
-import type {
-  TrilhaResumoDTO,
-  TrilhaDetalheDTO
-} from '../modules/estudos/types/trilhara';
+import { EstudosService, topicosConcluidosDe } from '../modules/estudos/services/estudosService';
+import type { TrilhaResumoDTO, TrilhaDetalheDTO } from '../modules/estudos/types/trilhara';
 
-describe('EstudosService e Contratos Normalizados (FASE 2)', () => {
+/**
+ * Contratos de Estudos após a R3: o serviço devolve os DTOs do backend sem adaptadores
+ * (D-11/DC-05) e o progresso é derivado de `topicosConcluidosIds`.
+ */
+describe('EstudosService e Contratos Normalizados (R3)', () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
@@ -20,108 +17,50 @@ describe('EstudosService e Contratos Normalizados (FASE 2)', () => {
     globalThis.fetch = originalFetch;
   });
 
-  it('adaptarTrilhaResumo deve converter TrilhaResumoDTO preservando contadores e metadados leves', () => {
-    const dto: TrilhaResumoDTO = {
-      id: 't-123',
-      usuarioId: 'u-456',
-      donoId: 'u-456',
-      nome: 'Receita Federal',
-      cargo: 'Auditor Fiscal',
-      areaCargo: 'Auditor Fiscal',
-      banca: 'FGV',
-      dataProva: '2026-12-01',
-      totalDisciplinas: 5,
-      totalTopicos: 40,
-      topicosConcluidos: 10,
-      percentualProgresso: 25.0,
-      cronogramaAtivoResumo: {
-        cronogramaAtivoId: 'c-1',
-        modalidade: 'CICLO',
-        dataInicio: '2026-01-01',
-        dataFim: '2026-12-01'
-      }
-    };
-
-    const trilha = adaptarTrilhaResumo(dto);
-    expect(trilha.id).toBe('t-123');
-    expect(trilha.nome).toBe('Receita Federal');
-    expect(trilha.areaCargo).toBe('Auditor Fiscal');
-    expect(trilha.totalDisciplinas).toBe(5);
-    expect(trilha.totalTopicos).toBe(40);
-    expect(trilha.topicosConcluidos).toBe(10);
-    expect(trilha.percentualProgresso).toBe(25.0);
-    expect(trilha.cronogramaAtivoResumo?.cronogramaAtivoId).toBe('c-1');
-    expect(trilha.disciplinas).toEqual([]);
-    expect(trilha.progresso).toEqual({});
-  });
-
-  it('adaptarTrilhaDetalhe deve construir mapa de progresso a partir de topicosConcluidosIds', () => {
-    const dto: TrilhaDetalheDTO = {
-      id: 't-1',
-      usuarioId: 'u-1',
-      donoId: 'u-1',
-      nome: 'Analista Judiciário',
-      cargo: 'Analista',
-      areaCargo: 'Analista',
-      disciplinas: [
-        {
-          id: 'd-1',
-          trilhaId: 't-1',
-          nome: 'Direito Constitucional',
-          cor: '#ff0000',
-          peso: 2,
-          ordem: 1,
-          totalTopicos: 2,
-          topicosConcluidos: 1,
-          percentualProgresso: 50.0,
-          topicos: [
-            { id: 'top-1', nome: 'Direitos Fundamentais', ordem: 1 },
-            { id: 'top-2', nome: 'Poder Judiciário', ordem: 2 }
-          ]
-        }
-      ],
-      topicosConcluidosIds: ['top-1'],
-      cronogramas: []
-    };
-
-    const trilha = adaptarTrilhaDetalhe(dto);
-    expect(trilha.id).toBe('t-1');
-    expect(trilha.disciplinas.length).toBe(1);
-    expect(trilha.disciplinas[0].topicos.length).toBe(2);
-    expect(trilha.progresso['top-1']?.done).toBe(true);
-    expect(trilha.progresso['top-2']).toBeUndefined();
-    expect(trilha.topicosConcluidosIds).toEqual(['top-1']);
-  });
-
-  it('listarTrilhas deve chamar GET /api/trilhas e retornar lista adaptada', async () => {
-    const mockResumos: TrilhaResumoDTO[] = [
+  it('listarTrilhas devolve TrilhaResumoDTO sem adaptação', async () => {
+    const resumos: TrilhaResumoDTO[] = [
       {
-        id: 't-1',
-        nome: 'Trilha 1',
-        totalDisciplinas: 2,
-        totalTopicos: 10,
-        topicosConcluidos: 4,
-        percentualProgresso: 40.0
+        id: 't-123',
+        nome: 'Receita Federal',
+        cargo: 'Auditor Fiscal',
+        banca: 'FGV',
+        dataProva: '2026-12-01',
+        totalDisciplinas: 5,
+        totalTopicos: 40,
+        topicosConcluidos: 10,
+        percentualProgresso: 25.0,
+        cronogramaAtivoResumo: {
+          cronogramaAtivoId: 'c-1',
+          modalidade: 'SEQUENCIAL',
+          dataInicio: '2026-01-01',
+          dataFim: '2026-12-01'
+        }
       }
     ];
 
     globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
       expect(url).toContain('/api/trilhas');
-      return new Response(JSON.stringify(mockResumos), {
+      return new Response(JSON.stringify(resumos), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
     });
 
     const lista = await EstudosService.listarTrilhas();
-    expect(lista.length).toBe(1);
-    expect(lista[0].id).toBe('t-1');
-    expect(lista[0].totalTopicos).toBe(10);
-    expect(lista[0].percentualProgresso).toBe(40.0);
+    expect(lista).toHaveLength(1);
+    expect(lista[0].id).toBe('t-123');
+    expect(lista[0].totalDisciplinas).toBe(5);
+    expect(lista[0].totalTopicos).toBe(40);
+    expect(lista[0].topicosConcluidos).toBe(10);
+    expect(lista[0].percentualProgresso).toBe(25.0);
+    expect(lista[0].cronogramaAtivoResumo?.cronogramaAtivoId).toBe('c-1');
+    // O resumo não carrega árvore de tópicos (requisito §4.1).
+    expect(lista[0]).not.toHaveProperty('disciplinas');
+    expect(lista[0]).not.toHaveProperty('progresso');
   });
 
-  it('buscarTrilha deve chamar GET /api/trilhas/{id} e retornar detalhe completo', async () => {
-    const mockDetalhe: TrilhaDetalheDTO = {
+  it('buscarTrilha chama GET /api/trilhas/{id} e o progresso é derivado de topicosConcluidosIds', async () => {
+    const detalhe: TrilhaDetalheDTO = {
       id: 't-abc',
       nome: 'Trilha ABC',
       disciplinas: [
@@ -131,46 +70,125 @@ describe('EstudosService e Contratos Normalizados (FASE 2)', () => {
           nome: 'Português',
           peso: 1,
           ordem: 1,
-          totalTopicos: 1,
+          totalTopicos: 2,
           topicosConcluidos: 1,
-          percentualProgresso: 100.0,
-          topicos: [{ id: 't-1', nome: 'Sintaxe', ordem: 1 }]
+          percentualProgresso: 50.0,
+          topicos: [
+            { id: 'top-1', nome: 'Sintaxe', ordem: 1, concluido: true },
+            { id: 'top-2', nome: 'Crase', ordem: 2, concluido: false }
+          ]
         }
       ],
-      topicosConcluidosIds: ['t-1'],
-      cronogramas: []
+      topicosConcluidosIds: ['top-1']
     };
 
     globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
       expect(url).toContain('/api/trilhas/t-abc');
-      return new Response(JSON.stringify(mockDetalhe), {
+      return new Response(JSON.stringify(detalhe), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
     });
 
-    const detalhe = await EstudosService.buscarTrilha('t-abc');
-    expect(detalhe.id).toBe('t-abc');
-    expect(detalhe.disciplinas[0].nome).toBe('Português');
-    expect(detalhe.progresso['t-1']?.done).toBe(true);
+    const trilha = await EstudosService.buscarTrilha('t-abc');
+    const progresso = topicosConcluidosDe(trilha);
+
+    expect(trilha.id).toBe('t-abc');
+    expect(trilha.disciplinas[0].topicos).toHaveLength(2);
+    expect(progresso.has('top-1')).toBe(true);
+    expect(progresso.has('top-2')).toBe(false);
+    expect(trilha).not.toHaveProperty('progresso');
   });
 
-  it('criarDisciplina deve chamar POST /api/trilhas/{id}/disciplinas', async () => {
-    let chamadaMetodo = '';
+  it('criarTrilha envia disciplinasIniciais em POST /api/trilhas', async () => {
+    let bodyEnviado: unknown = null;
+    let urlChamada = '';
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      urlChamada = url;
+      bodyEnviado = JSON.parse(init?.body as string);
+      return new Response(
+        JSON.stringify({ id: 't-nova', nome: 'Nova', disciplinas: [], topicosConcluidosIds: [] }),
+        { status: 201, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    await EstudosService.criarTrilha({
+      nome: 'Nova',
+      disciplinasIniciais: [{ nome: 'D1', topicos: [{ nome: 'T1' }] }]
+    });
+
+    expect(urlChamada).toContain('/api/trilhas');
+    expect(urlChamada).not.toContain('/importar/');
+    expect((bodyEnviado as { disciplinasIniciais: unknown[] }).disciplinasIniciais).toHaveLength(1);
+    expect(bodyEnviado).not.toHaveProperty('disciplinas');
+  });
+
+  it('importarEdital usa POST /api/trilhas com editalId, sem rota dedicada de importação', async () => {
+    let urlChamada = '';
+    let bodyEnviado: unknown = null;
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      urlChamada = url;
+      bodyEnviado = JSON.parse(init?.body as string);
+      return new Response(
+        JSON.stringify({ id: 't-imp', nome: 'Importada', disciplinas: [], topicosConcluidosIds: [] }),
+        { status: 201, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    await EstudosService.importarEdital('60c72b2f9b1d8b2bad000001');
+
+    expect(urlChamada).toContain('/api/trilhas');
+    expect(urlChamada).not.toContain('/importar/');
+    expect((bodyEnviado as { editalId: string }).editalId).toBe('60c72b2f9b1d8b2bad000001');
+  });
+
+  it('atualizarMetadadosTrilha usa PUT /api/trilhas/{id} (sem rota /metadados)', async () => {
+    let urlChamada = '';
+    let metodo = '';
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      urlChamada = url;
+      metodo = init?.method || '';
+      return new Response(
+        JSON.stringify({ id: 't-1', nome: 'Atualizada', disciplinas: [], topicosConcluidosIds: [] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    await EstudosService.atualizarMetadadosTrilha('t-1', { nome: 'Atualizada', cargo: 'Auditor' });
+
+    expect(metodo).toBe('PUT');
+    expect(urlChamada).toContain('/api/trilhas/t-1');
+    expect(urlChamada).not.toContain('/metadados');
+  });
+
+  it('obterImpactoExclusaoTrilha chama GET /api/trilhas/{id}/impacto-exclusao', async () => {
+    let urlChamada = '';
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
+      urlChamada = url;
+      return new Response(
+        JSON.stringify({ disciplinas: 2, cronogramas: 1, sessoes: 3, cadernosVinculados: 1 }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    const impacto = await EstudosService.obterImpactoExclusaoTrilha('t-1');
+    expect(urlChamada).toContain('/api/trilhas/t-1/impacto-exclusao');
+    expect(impacto).toEqual({ disciplinas: 2, cronogramas: 1, sessoes: 3, cadernosVinculados: 1 });
+  });
+
+  it('criarDisciplina chama POST /api/trilhas/{id}/disciplinas sem cadernoLink', async () => {
+    let metodo = '';
     let bodyEnviado: unknown = null;
 
     globalThis.fetch = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
-      chamadaMetodo = init?.method || '';
+      metodo = init?.method || '';
       bodyEnviado = JSON.parse(init?.body as string);
       return new Response(
-        JSON.stringify({
-          id: 'nova-d',
-          trilhaId: 't-1',
-          nome: 'Direito Administrativo',
-          peso: 1,
-          ordem: 1,
-          topicos: []
-        }),
+        JSON.stringify({ id: 'nova-d', trilhaId: 't-1', nome: 'Direito Administrativo', peso: 1, ordem: 1, topicos: [] }),
         { status: 201, headers: { 'Content-Type': 'application/json' } }
       );
     });
@@ -182,111 +200,61 @@ describe('EstudosService e Contratos Normalizados (FASE 2)', () => {
       topicos: [{ nome: 'Atos Administrativos', ordem: 1 }]
     });
 
-    expect(chamadaMetodo).toBe('POST');
+    expect(metodo).toBe('POST');
     expect(res.id).toBe('nova-d');
-    expect((bodyEnviado as { nome: string }).nome).toBe('Direito Administrativo');
+    expect(bodyEnviado).not.toHaveProperty('cadernoLink');
   });
 
-  it('atualizarDisciplina deve chamar PUT /api/trilhas/{id}/disciplinas/{discId}', async () => {
-    let urlChamada = '';
-    let chamadaMetodo = '';
-
-    globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
-      urlChamada = url;
-      chamadaMetodo = init?.method || '';
-      return new Response(
-        JSON.stringify({
-          id: 'd-1',
-          trilhaId: 't-1',
-          nome: 'Português Atualizado',
-          peso: 2,
-          ordem: 1,
-          topicos: []
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      );
-    });
-
-    const res = await EstudosService.atualizarDisciplina('t-1', 'd-1', {
-      nome: 'Português Atualizado',
-      cor: '#00ff00',
-      peso: 2,
-      topicos: [{ id: 'top-1', nome: 'Crase', ordem: 1 }]
-    });
-
-    expect(chamadaMetodo).toBe('PUT');
-    expect(urlChamada).toContain('/api/trilhas/t-1/disciplinas/d-1');
-    expect(res.nome).toBe('Português Atualizado');
-  });
-
-  it('excluirDisciplina deve chamar DELETE /api/trilhas/{id}/disciplinas/{discId}', async () => {
-    let urlChamada = '';
-    let chamadaMetodo = '';
-
-    globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
-      urlChamada = url;
-      chamadaMetodo = init?.method || '';
-      return new Response(null, { status: 204 });
-    });
-
-    await EstudosService.excluirDisciplina('t-1', 'd-del');
-    expect(chamadaMetodo).toBe('DELETE');
-    expect(urlChamada).toContain('/api/trilhas/t-1/disciplinas/d-del');
-  });
-
-  it('reordenarDisciplinas deve chamar PUT /api/trilhas/{id}/disciplinas/reordenar com ordemIds', async () => {
-    let chamadaMetodo = '';
+  it('reordenarDisciplinas envia disciplinaIds (nome do contrato, não ordemIds)', async () => {
+    let metodo = '';
     let bodyEnviado: unknown = null;
 
     globalThis.fetch = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
-      chamadaMetodo = init?.method || '';
+      metodo = init?.method || '';
       bodyEnviado = JSON.parse(init?.body as string);
       return new Response(null, { status: 204 });
     });
 
     await EstudosService.reordenarDisciplinas('t-1', ['d-2', 'd-1', 'd-3']);
-    expect(chamadaMetodo).toBe('PUT');
-    expect((bodyEnviado as { ordemIds: string[] }).ordemIds).toEqual(['d-2', 'd-1', 'd-3']);
+
+    expect(metodo).toBe('PUT');
+    expect((bodyEnviado as { disciplinaIds: string[] }).disciplinaIds).toEqual(['d-2', 'd-1', 'd-3']);
+    expect(bodyEnviado).not.toHaveProperty('ordemIds');
   });
 
-  it('marcarTopicoConcluido deve chamar PUT /api/trilhas/{trilhaId}/topicos/{topicoId}/progresso', async () => {
+  it('marcarTopicoConcluido chama PUT /api/trilhas/{trilhaId}/topicos/{topicoId}/progresso', async () => {
     let urlChamada = '';
-    let chamadaMetodo = '';
+    let metodo = '';
 
     globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
       urlChamada = url;
-      chamadaMetodo = init?.method || '';
+      metodo = init?.method || '';
       return new Response(
-        JSON.stringify({
-          id: 'prog-1',
-          usuarioId: 'u-1',
-          trilhaId: 't-1',
-          topicoId: 'top-1',
-          concluido: true,
-          concluidoEm: '2026-11-09T12:00:00Z'
-        }),
+        JSON.stringify({ topicoId: 'top-1', concluido: true, concluidoEm: '2026-11-09T12:00:00Z' }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
     });
 
     const res = await EstudosService.marcarTopicoConcluido('t-1', 'top-1');
-    expect(chamadaMetodo).toBe('PUT');
+
+    expect(metodo).toBe('PUT');
     expect(urlChamada).toContain('/api/trilhas/t-1/topicos/top-1/progresso');
     expect(res.concluido).toBe(true);
   });
 
-  it('desmarcarTopicoConcluido deve chamar DELETE /api/trilhas/{trilhaId}/topicos/{topicoId}/progresso', async () => {
+  it('desmarcarTopicoConcluido chama DELETE /api/trilhas/{trilhaId}/topicos/{topicoId}/progresso', async () => {
     let urlChamada = '';
-    let chamadaMetodo = '';
+    let metodo = '';
 
     globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
       urlChamada = url;
-      chamadaMetodo = init?.method || '';
+      metodo = init?.method || '';
       return new Response(null, { status: 204 });
     });
 
     await EstudosService.desmarcarTopicoConcluido('t-1', 'top-1');
-    expect(chamadaMetodo).toBe('DELETE');
+
+    expect(metodo).toBe('DELETE');
     expect(urlChamada).toContain('/api/trilhas/t-1/topicos/top-1/progresso');
   });
 });

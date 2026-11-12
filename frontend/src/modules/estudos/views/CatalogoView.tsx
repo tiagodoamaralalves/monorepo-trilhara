@@ -14,7 +14,7 @@ import {
   PublicHeader,
   useToast
 } from '@shared/design-system';
-import { EditalResumo, Trilha } from '../types/trilhara';
+import { EditalResumo, TrilhaDetalheDTO } from '../types/trilhara';
 import { ApiError } from '../services/api';
 import { EstudosService } from '../services/estudosService';
 import { EstudosStorage } from '../services/estudosStorage';
@@ -36,7 +36,7 @@ export interface CatalogoViewProps {
   onLogin?: () => void;
   onCriarConta?: () => void;
   onRichAuth?: (edital: EditalResumo) => void;
-  onTrilhaImportada: (trilha: Trilha) => void;
+  onTrilhaImportada: (trilha: TrilhaDetalheDTO) => void;
 }
 
 const STORAGE_PENDING_EDITAL_KEY = 'trilhara:pending_import_edital_id';
