@@ -5,100 +5,96 @@ import {
   SessaoRegistradaDTO
 } from '../contracts/domainContracts';
 
-export interface ExecutarDuasEtapasParams {
+/** Resultado da etapa 1 já concluída em uma abertura anterior do modal (D-22.4/§6.4). */
+interface SessaoJaSalva {
+  id: string;
+  trilhaId?: string;
+  disciplinaId?: string;
+  duracaoSegundos?: number;
+  dataSessao?: string;
+}
+
+export interface ExecutarFluxoParams {
   trilhaId: string;
   blocoId: string;
   payload: RegistrarSessaoPayload;
-  chaveIdempotencia?: string;
-  sessaoJaSalva?: SessaoRegistradaDTO | null;
+  chave: string;
+  /** Sessão já criada por uma tentativa anterior: a etapa 1 não é reenviada. */
+  sessaoSalva?: SessaoJaSalva | null;
 }
 
-export interface ExecutarDuasEtapasResultado {
-  sessao: SessaoRegistradaDTO;
-  bloco: BlocoCronogramaItemDTO;
-  sessaoEstavaPreviamenteSalva: boolean;
+export interface ResultadoFluxo {
+  sessaoSalva: boolean;
+  sessaoId?: string;
+  blocoConcluido: boolean;
+  /** Preenchido quando a etapa 2 falha: "sessão salva, bloco ainda pendente" (§6.4). */
+  erro?: Error;
 }
 
 /**
- * Serviço centralizado para criação de sessões de estudo e conclusão de blocos de cronograma.
- * Atende aos requisitos da FASE 5 (GlobalSessionModal, retry isolado e idempotência).
+ * Serviço único de registro de sessão e conclusão de bloco (F5/R6).
+ *
+ * - `registrarSessao` é o **único** caminho para `POST /api/trilhas/{trilhaId}/sessoes`, com a
+ *   chave de idempotência no cabeçalho `Idempotency-Key` **e** no corpo (contrato do backend);
+ * - `executarFluxo` orquestra as duas etapas e **não reverte** a sessão quando a conclusão do
+ *   bloco falha: devolve `sessaoSalva: true` + `erro` para retry exclusivo da etapa 2;
+ * - a chave é sempre responsabilidade do chamador (`GlobalSessionModal` a gera na abertura).
  */
 export const sessaoGlobalService = {
-  /**
-   * Registra uma sessão de estudo associada a uma disciplina e trilha.
-   * Envia a chaveIdempotencia tanto no cabeçalho `Idempotency-Key` quanto no corpo da requisição.
-   */
   async registrarSessao(
     trilhaId: string,
     payload: RegistrarSessaoPayload,
-    chaveIdempotencia?: string
+    chave: string
   ): Promise<SessaoRegistradaDTO> {
-    const chave = chaveIdempotencia || payload.chaveIdempotencia;
-    const headers: Record<string, string> = {};
-    if (chave) {
-      headers['Idempotency-Key'] = chave;
-    }
+    return request<SessaoRegistradaDTO>(`/trilhas/${encodeURIComponent(trilhaId)}/sessoes`, {
+      method: 'POST',
+      headers: { 'Idempotency-Key': chave },
+      body: JSON.stringify({ ...payload, chaveIdempotencia: chave })
+    });
+  },
 
-    return await request<SessaoRegistradaDTO>(
-      `/trilhas/${encodeURIComponent(trilhaId)}/sessoes`,
-      {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          ...payload,
-          chaveIdempotencia: chave
-        })
-      }
-    );
+  /** Conclui o bloco (`PATCH { concluido: true }`). */
+  async concluirBloco(blocoId: string): Promise<void> {
+    await request<BlocoCronogramaItemDTO>(`/blocos/${encodeURIComponent(blocoId)}/conclusao`, {
+      method: 'PATCH',
+      body: JSON.stringify({ concluido: true })
+    });
+  },
+
+  /** Reabre o bloco (`PATCH { concluido: false }`); não exclui sessões (§6.4). */
+  async reabrirBloco(blocoId: string): Promise<void> {
+    await request<BlocoCronogramaItemDTO>(`/blocos/${encodeURIComponent(blocoId)}/conclusao`, {
+      method: 'PATCH',
+      body: JSON.stringify({ concluido: false })
+    });
   },
 
   /**
-   * Conclui ou desmarca um bloco de cronograma individualmente.
+   * Executa o fluxo de duas etapas com retry isolado da conclusão.
+   *
+   * A etapa 2 nunca rejeita: a falha é reportada em `erro` com `sessaoSalva: true`, para que o
+   * modal ofereça **"Tentar concluir bloco novamente"** sem reenviar a sessão.
    */
-  async concluirBloco(
-    blocoId: string,
-    concluido = true
-  ): Promise<BlocoCronogramaItemDTO> {
-    return await request<BlocoCronogramaItemDTO>(
-      `/blocos/${encodeURIComponent(blocoId)}/conclusao`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({ concluido })
-      }
-    );
-  },
+  async executarFluxo(params: ExecutarFluxoParams): Promise<ResultadoFluxo> {
+    let sessaoId = params.sessaoSalva?.id;
 
-  /**
-   * Executa o fluxo em 2 etapas com suporte a recuperação e isolamento de retry:
-   * - Etapa 1: Registra a sessão de estudo (se ainda não salva nesta abertura).
-   * - Etapa 2: Atualiza o status do bloco para concluído.
-   * Se a Etapa 1 suceder e a Etapa 2 falhar, o chamador retém `sessaoJaSalva` e pode
-   * retentar exclusivamente a Etapa 2 sem reenviar a Etapa 1.
-   */
-  async executarFluxoDuasEtapas(
-    params: ExecutarDuasEtapasParams
-  ): Promise<ExecutarDuasEtapasResultado> {
-    let sessao: SessaoRegistradaDTO;
-    let sessaoEstavaPreviamenteSalva = false;
-
-    if (params.sessaoJaSalva) {
-      sessao = params.sessaoJaSalva;
-      sessaoEstavaPreviamenteSalva = true;
-    } else {
-      sessao = await this.registrarSessao(
-        params.trilhaId,
-        params.payload,
-        params.chaveIdempotencia
-      );
+    if (!sessaoId) {
+      const sessao = await this.registrarSessao(params.trilhaId, params.payload, params.chave);
+      sessaoId = sessao.id;
     }
 
-    const bloco = await this.concluirBloco(params.blocoId, true);
-
-    return {
-      sessao,
-      bloco,
-      sessaoEstavaPreviamenteSalva
-    };
+    try {
+      await this.concluirBloco(params.blocoId);
+      return { sessaoSalva: true, sessaoId, blocoConcluido: true };
+    } catch (erro) {
+      return {
+        sessaoSalva: true,
+        sessaoId,
+        blocoConcluido: false,
+        erro: erro instanceof Error ? erro : new Error('Falha ao concluir o bloco.')
+      };
+    }
   }
 };
+
 

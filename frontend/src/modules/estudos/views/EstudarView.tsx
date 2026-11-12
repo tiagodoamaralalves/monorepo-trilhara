@@ -23,15 +23,15 @@ import {
   TrilhaDetalheDTO,
   RegistroBlocoPendente
 } from '../types/trilhara';
-import { useStudyTimer } from '../context/StudyTimerContext';
+import { useStudyTimer } from '@shared/timers/estudoTimer';
 import { formatarSegundos } from '../utils/format';
-import { AlarmService } from '../services/alarmService';
+import { AlarmService } from '@shared/services/alarmService';
 import styles from './EstudarView.module.css';
 
-const SEM_TRILHA_TIMER_ID = '__sem_trilha__';
 const NOVA_DISCIPLINA = '__nova__';
-const CHAVE_PAUSA_CURTA = 'trilhara_pomodoro_short';
-const CHAVE_PAUSA_LONGA = 'trilhara_pomodoro_long';
+
+/** Pausas do cronômetro de Estudos: persistidas na chave escopada por usuário (D-21). */
+const PAUSAS_PADRAO = { short: 5, long: 15 };
 
 interface PauseConfig {
   short: number;
@@ -48,11 +48,6 @@ export interface EstudarViewProps {
   contextoBlocoPlanejamento?: RegistroBlocoPendente | null;
 }
 
-function lerDuracaoPausa(chave: string, padrao: number, maximo: number): number {
-  const valor = Number(window.localStorage.getItem(chave));
-  return Number.isInteger(valor) && valor >= 1 && valor <= maximo ? valor : padrao;
-}
-
 export const EstudarView: React.FC<EstudarViewProps> = ({
   trilha,
   disciplinaInicialId,
@@ -62,12 +57,12 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
   const toast = useToast();
   const { abrirModal } = useGlobalSessionModal();
 
-  const [timerId, setTimerId] = useState(trilha?.id || SEM_TRILHA_TIMER_ID);
-  const timer = useStudyTimer(timerId);
+  const timer = useStudyTimer();
   const [disciplinaId, setDisciplinaId] = useState(trilha?.disciplinas[0]?.id || '');
   const [modalPausasAberto, setModalPausasAberto] = useState(false);
-  const [pausas, setPausas] = useState<PauseConfig>({ short: 5, long: 15 });
-  const [configPausas, setConfigPausas] = useState<PauseConfig>({ short: 5, long: 15 });
+  const [pausas, setPausas] = useState<PauseConfig>(timer.pausas ?? PAUSAS_PADRAO);
+  const [configPausas, setConfigPausas] = useState<PauseConfig>(timer.pausas ?? PAUSAS_PADRAO);
+
 
   const duracaoMinutos = contextoBlocoPlanejamento?.duracaoMinutos || 0;
 
@@ -94,7 +89,6 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
   }, [timer.seconds, timer.startedAt]);
 
   useEffect(() => {
-    setTimerId(trilha?.id || SEM_TRILHA_TIMER_ID);
     setDisciplinaId(trilha?.disciplinas[0]?.id || '');
   }, [trilha?.id, trilha?.disciplinas]);
 
@@ -105,29 +99,24 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
     setDisciplinaId(disciplinaInicialId);
   }, [disciplinaInicialId, trilha?.id, trilha?.disciplinas]);
 
+  const definirContextoBloco = timer.setTimerContext;
   useEffect(() => {
-    if (contextoBlocoPlanejamento) {
-      setDisciplinaId(contextoBlocoPlanejamento.disciplinaId);
-      timer.setTimerContext(
-        contextoBlocoPlanejamento.trilhaId,
-        contextoBlocoPlanejamento.disciplinaId,
-        contextoBlocoPlanejamento.blocoId,
-        'regressivo',
-        contextoBlocoPlanejamento.duracaoMinutos * 60
-      );
-    }
-  }, [contextoBlocoPlanejamento, timer]);
+    if (!contextoBlocoPlanejamento) return;
+    setDisciplinaId(contextoBlocoPlanejamento.disciplinaId);
+    void definirContextoBloco(
+      contextoBlocoPlanejamento.trilhaId,
+      contextoBlocoPlanejamento.disciplinaId,
+      contextoBlocoPlanejamento.blocoId,
+      'regressivo',
+      contextoBlocoPlanejamento.duracaoMinutos * 60
+    );
+  }, [contextoBlocoPlanejamento, definirContextoBloco]);
 
+  // Pausas configuradas vivem no estado do timer (chave escopada por usuário, D-21).
   useEffect(() => {
-    try {
-      setPausas({
-        short: lerDuracaoPausa(CHAVE_PAUSA_CURTA, 5, 60),
-        long: lerDuracaoPausa(CHAVE_PAUSA_LONGA, 15, 120)
-      });
-    } catch (err) {
-      toast.error(err instanceof Error ? err : 'Não foi possível carregar as configurações de pausa.');
-    }
-  }, [toast]);
+    setPausas({ ...timer.pausas });
+  }, [timer.pausas]);
+
 
   const disciplinaOptions = [
     { value: '', label: 'Selecione uma disciplina' },
@@ -141,10 +130,12 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
 
   const disciplinaAtual = trilha?.disciplinas.find((d) => d.id === disciplinaId);
 
-  // Abertura do GlobalSessionModal ao encerrar o cronômetro
-  const encerrarESalvar = () => {
+  // Abertura do GlobalSessionModal ao encerrar o cronômetro.
+  // D-22.1: o timer é apenas **pausado** aqui; o reset só ocorre após 201/200 da sessão,
+  // informado pelo modal via `onSuccess`.
+  const encerrarESalvar = async () => {
     if (timer.seconds < 60) {
-      timer.reset(timerId);
+      timer.reset();
       toast.info('Sessões com menos de 1 minuto não são salvas. O cronômetro foi encerrado.');
       return;
     }
@@ -163,7 +154,7 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
       disciplinaCor: disciplinaAtual?.cor,
       trilhaNome: trilha?.nome,
       onSuccess: () => {
-        timer.reset(timerId);
+        timer.reset();
         onSessaoRegistrada();
       }
     });
@@ -190,8 +181,7 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
     const curta = Math.min(60, Math.max(1, Math.trunc(configPausas.short)));
     const longa = Math.min(120, Math.max(1, Math.trunc(configPausas.long)));
     try {
-      window.localStorage.setItem(CHAVE_PAUSA_CURTA, String(curta));
-      window.localStorage.setItem(CHAVE_PAUSA_LONGA, String(longa));
+      timer.setPausas({ short: curta, long: longa });
       setPausas({ short: curta, long: longa });
       setConfigPausas({ short: curta, long: longa });
       setModalPausasAberto(false);
@@ -201,16 +191,19 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
     }
   };
 
+
   const iniciarPausa = (tipo: 'short' | 'long') => {
     timer.startBreak(tipo, pausas[tipo]);
   };
 
   const tempoFormatado = formatarSegundos(timer.seconds);
-  const status = timer.running
-    ? 'Foco em andamento'
-    : timer.seconds > 0 || timer.startedAt
-      ? 'Foco pausado. O tempo não está sendo contado'
-      : 'Inicie o foco quando estiver pronto';
+  const status = !timer.ativo
+    ? 'Entre para usar o cronômetro'
+    : timer.running
+      ? 'Foco em andamento'
+      : timer.seconds > 0 || timer.startedAt
+        ? 'Foco pausado. O tempo não está sendo contado'
+        : 'Inicie o foco quando estiver pronto';
 
   return (
     <div className={styles.page}>
@@ -311,9 +304,11 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
                 type="button"
                 size="lg"
                 leftIcon={<Play size={18} />}
+                disabled={!timer.ativo}
+                title={timer.ativo ? undefined : 'Entre para usar o cronômetro'}
                 onClick={() => {
                   void AlarmService.solicitarPermissaoNotificacao();
-                  timer.start();
+                  void timer.start();
                 }}
               >
                 {timer.seconds > 0 || timer.startedAt ? 'Continuar foco' : 'Iniciar foco'}
@@ -336,7 +331,8 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
                 variant="danger"
                 size="lg"
                 leftIcon={<Square size={16} />}
-                onClick={encerrarESalvar}
+                disabled={!timer.ativo}
+                onClick={() => void encerrarESalvar()}
               >
                 Encerrar e salvar
               </Button>
@@ -344,10 +340,24 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
           </div>
 
           <div className={styles.breakShortcuts}>
-            <Button type="button" variant="outline" size="sm" leftIcon={<Coffee size={14} />} onClick={() => iniciarPausa('short')}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              leftIcon={<Coffee size={14} />}
+              disabled={!timer.ativo}
+              onClick={() => iniciarPausa('short')}
+            >
               Pausa curta ({pausas.short} min)
             </Button>
-            <Button type="button" variant="outline" size="sm" leftIcon={<Coffee size={14} />} onClick={() => iniciarPausa('long')}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              leftIcon={<Coffee size={14} />}
+              disabled={!timer.ativo}
+              onClick={() => iniciarPausa('long')}
+            >
               Pausa longa ({pausas.long} min)
             </Button>
           </div>

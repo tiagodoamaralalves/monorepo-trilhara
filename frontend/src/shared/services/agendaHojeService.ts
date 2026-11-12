@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { registrarFalha } from '../diagnostico';
 import { request } from '../auth/api';
+import { assinar, publicar } from '../sync/barramento';
+
 import {
   BlocoHojeDTO,
   TarefasHojeDTO,
@@ -111,13 +113,12 @@ export function agruparAtrasadas(atrasadas: TarefaDTO[]): GrupoAtrasadas[] {
   return grupos;
 }
 
-const CANAL_NOME = 'trilhara_agenda_hoje';
 const THROTTLE_MS = 5000;
 
 class AgendaHojeManager {
   private cacheDados: AgendaHojeData | null = null;
   private ouvintes: Set<(dados: AgendaHojeData) => void> = new Set();
-  private canal: BroadcastChannel | null = null;
+  private listenersGlobaisInstalados = false;
   private ultimoCarregamentoTimestamp = 0;
   private carregamentoEmAndamento: Promise<AgendaHojeData> | null = null;
 
@@ -126,20 +127,13 @@ class AgendaHojeManager {
   }
 
   private iniciarListenersGlobais() {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || this.listenersGlobaisInstalados) return;
+    this.listenersGlobaisInstalados = true;
 
-    if ('BroadcastChannel' in window) {
-      try {
-        this.canal = new BroadcastChannel(CANAL_NOME);
-        this.canal.onmessage = (event) => {
-          if (event.data?.tipo === 'AGENDA_ATUALIZADA') {
-            this.recarregarComThrottle();
-          }
-        };
-      } catch {
-        this.canal = null;
-      }
-    }
+    // Barramento único (D-21): sessão encerrada e bloco concluído invalidam a agenda.
+    // O manager é um singleton com a vida da aplicação; as assinaturas não são removidas.
+    assinar('AGENDA_INVALIDADA', () => this.recarregarComThrottle());
+    assinar('SESSAO_ENCERRADA', () => this.recarregarComThrottle());
 
     const handlerVisibilidade = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
@@ -155,16 +149,13 @@ class AgendaHojeManager {
     window.addEventListener('focus', handlerFocus);
   }
 
+  /**
+   * Invalida a agenda nesta aba (recarrega imediatamente) e nas demais, via
+   * `AGENDA_INVALIDADA` no barramento único (D-22.6).
+   */
   public notificarMudanca() {
-    if (this.canal) {
-      try {
-        this.canal.postMessage({ tipo: 'AGENDA_ATUALIZADA', timestamp: Date.now() });
-      } catch {
-        // Fallback silencioso
-      }
-    }
-    // Dispara recarregamento imediato sem throttle
-    this.recarregar();
+    publicar('AGENDA_INVALIDADA', null);
+    void this.recarregar();
   }
 
   public recarregarComThrottle(): Promise<AgendaHojeData | null> {
@@ -185,6 +176,7 @@ class AgendaHojeManager {
     this.carregamentoEmAndamento = null;
     this.ouvintes.clear();
   }
+
 
   public subscrever(ouvinte: (dados: AgendaHojeData) => void): () => void {
     this.ouvintes.add(ouvinte);

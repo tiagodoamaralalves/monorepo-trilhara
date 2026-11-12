@@ -478,7 +478,7 @@ export function PlanejamentoView({
 
   const handleReabrirBloco = async (bloco: BlocoCronogramaItemDTO) => {
     try {
-      await sessaoGlobalService.concluirBloco(bloco.id, false);
+      await sessaoGlobalService.reabrirBloco(bloco.id);
       await recarregarTudo();
     } catch (err) {
       tratarErro(err, 'Erro ao reabrir o bloco.');

@@ -33,7 +33,6 @@ import {
 } from './data/catalogoVitrine';
 import { PageBanner, useToast } from '@shared/design-system';
 import { BarChart2, BookOpen, Calendar } from 'lucide-react';
-import { StudyTimerProvider } from './context/StudyTimerContext';
 import { EmptyJourneyState } from './components/EmptyJourneyState/EmptyJourneyState';
 import styles from './App.module.css';
 
@@ -525,7 +524,6 @@ export default function EstudosApp() {
   }
 
   return (
-    <StudyTimerProvider>
     <div className={styles.shell}>
       {/* Painel Lateral (Desktop) & Navegação Embutida (Mobile) */}
       <Navbar
@@ -666,7 +664,6 @@ export default function EstudosApp() {
       />
 
     </div>
-    </StudyTimerProvider>
   );
 }
 

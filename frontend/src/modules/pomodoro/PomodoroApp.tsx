@@ -40,6 +40,7 @@ import { formatarRelogio as formatarSegundos } from '@shared/format';
 import { registrarFalha } from '@shared/diagnostico';
 import { useAuth } from '@shared/auth';
 import { useAgendaHoje } from '@shared/services/agendaHojeService';
+import { assinar, publicar } from '@shared/sync/barramento';
 import { BlocoHojeDTO } from '@shared/contracts/domainContracts';
 import { TarefaService } from '../tarefas/services/tarefaService';
 import logoMark from '@shared/assets/logo-mark.svg';
@@ -78,30 +79,42 @@ interface PomodoroConfig {
 }
 
 const DEFAULT_POMODORO_MINUTES = 25;
-const STORAGE_POMODORO_MINUTES_KEY = 'trilhara_pomodoro_focus_minutes';
-const STORAGE_POMODORO_SECONDS_KEY = 'trilhara_pomodoro_focus_seconds';
-const STORAGE_CONFIG_KEY = 'trilhara_pomodoro_config';
-const STORAGE_SOUND_KEY = 'trilhara_alarme_som';
-const STORAGE_NOTIF_KEY = 'trilhara_alarme_notif';
-const LEGACY_STORAGE_SOUND_KEY = 'trilhara_pomodoro_sound';
-const LEGACY_STORAGE_NOTIF_KEY = 'trilhara_pomodoro_notification';
-const STORAGE_POMODORO_MODE_KEY = 'trilhara_pomodoro_mode_active';
 
-function lerDuracaoLocalStorage(chave: string, padrao: number, minimo: number, maximo: number): number {
-  if (typeof window === 'undefined') return padrao;
-  const valor = Number(window.localStorage.getItem(chave));
-  return Number.isInteger(valor) && valor >= minimo && valor <= maximo ? valor : padrao;
+/**
+ * Estado completo do Pomodoro persistido sob a chave escopada por conta (D-21/§8).
+ *
+ * Visitante usa `trilhara:anon:pomodoro_timer`; ao autenticar o estado anônimo **não** é
+ * migrado. Configuração (duração, pausas, som, notificação) vive aqui — nunca em chave global.
+ */
+interface EstadoPomodoroPersistido {
+  pomodoroMode?: boolean;
+  isRunning?: boolean;
+  targetEndTime?: number | null;
+  stopwatchStartTime?: number | null;
+  stopwatchBaseSeconds?: number;
+  timerSeconds?: number;
+  pomodoroDurationSeconds?: number;
+  pomodoroCyclesCount?: number;
+  breakType?: BreakType | null;
+  breakEndTime?: number | null;
+  breakSeconds?: number;
+  pausas?: PomodoroConfig;
+  somAtivo?: boolean;
+  notificacaoAtiva?: boolean;
+  updatedAt?: number;
 }
 
-function lerBooleanoLocalStorage(chave: string, padrao: boolean, chaveFallback?: string): boolean {
-  if (typeof window === 'undefined') return padrao;
-  const valor = window.localStorage.getItem(chave);
-  if (valor !== null) return valor === 'true';
-  if (chaveFallback) {
-    const valorFallback = window.localStorage.getItem(chaveFallback);
-    if (valorFallback !== null) return valorFallback === 'true';
+function lerEstadoPomodoro(usuarioId?: string | null): EstadoPomodoroPersistido {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(getPomodoroTimerStorageKey(usuarioId));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as EstadoPomodoroPersistido;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (e) {
+    registrarFalha('estado-local.pomodoro', e);
+    return {};
   }
-  return padrao;
 }
 
 class SoundEngine {
@@ -235,8 +248,6 @@ export default function PomodoroApp() {
 
   const usuarioId = usuario?.id || null;
   const usuarioIdRef = useRef<string | null>(usuarioId);
-  const instanceIdRef = useRef<string>(`pomo_${crypto.randomUUID().slice(0, 8)}`);
-  const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
 
   const handleConcluirTarefa = async (tarefaId: string) => {
     try {
@@ -266,43 +277,27 @@ export default function PomodoroApp() {
     });
   };
 
-  const [pomodoroMode, setPomodoroMode] = useState<boolean>(() => {
-    try {
-      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(getPomodoroTimerStorageKey(usuarioId)) : null;
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (typeof parsed.pomodoroMode === 'boolean') return parsed.pomodoroMode;
-      }
-    } catch (e) {
-      registrarFalha('estado-local.pomodoroMode', e);
-    }
-    return lerBooleanoLocalStorage(STORAGE_POMODORO_MODE_KEY, true);
-  });
+  const estadoInicialRef = useRef<EstadoPomodoroPersistido | null>(null);
+  if (estadoInicialRef.current === null) {
+    estadoInicialRef.current = lerEstadoPomodoro(usuarioId);
+  }
+  const estadoInicial = estadoInicialRef.current;
+
+  const [pomodoroMode, setPomodoroMode] = useState<boolean>(
+    () => estadoInicial.pomodoroMode ?? true
+  );
 
   const [infoModalAberto, setInfoModalAberto] = useState(false);
-  const [pomodoroCyclesCount, setPomodoroCyclesCount] = useState(0);
+  const [pomodoroCyclesCount, setPomodoroCyclesCount] = useState<number>(
+    () => estadoInicial.pomodoroCyclesCount ?? 0
+  );
 
   // Tempo do modo Pomodoro em segundos (regressivo, editável com minutos e segundos)
-  const [pomodoroDurationSeconds, setPomodoroDurationSeconds] = useState<number>(() => {
-    try {
-      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(getPomodoroTimerStorageKey(usuarioId)) : null;
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (typeof parsed.pomodoroDurationSeconds === 'number' && parsed.pomodoroDurationSeconds > 0) {
-          return parsed.pomodoroDurationSeconds;
-        }
-      }
-    } catch (e) {
-      registrarFalha('estado-local.pomodoroDuration', e);
-    }
-    const secStr = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_POMODORO_SECONDS_KEY) : null;
-    if (secStr) {
-      const val = Number.parseInt(secStr, 10);
-      if (!Number.isNaN(val) && val > 0) return val;
-    }
-    const mins = lerDuracaoLocalStorage(STORAGE_POMODORO_MINUTES_KEY, DEFAULT_POMODORO_MINUTES, 1, 360);
-    return mins * 60;
-  });
+  const [pomodoroDurationSeconds, setPomodoroDurationSeconds] = useState<number>(
+    () =>
+      estadoInicial.pomodoroDurationSeconds
+      ?? DEFAULT_POMODORO_MINUTES * 60
+  );
 
   const pomodoroMinutes = Math.max(1, Math.round(pomodoroDurationSeconds / 60));
 
@@ -310,26 +305,8 @@ export default function PomodoroApp() {
   // - Modo Pomodoro: regressivo (inicia no pomodoroDurationSeconds)
   // - Timer Manual: progressivo (inicia em 0)
   const [timerSeconds, setTimerSeconds] = useState<number>(() => {
-    try {
-      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(getPomodoroTimerStorageKey(usuarioId)) : null;
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (typeof parsed.timerSeconds === 'number') return parsed.timerSeconds;
-      }
-    } catch (e) {
-      registrarFalha('estado-local.timerSeconds', e);
-    }
-    const isPomodoroActive = lerBooleanoLocalStorage(STORAGE_POMODORO_MODE_KEY, true);
-    if (isPomodoroActive) {
-      const secStr = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_POMODORO_SECONDS_KEY) : null;
-      if (secStr) {
-        const val = Number.parseInt(secStr, 10);
-        if (!Number.isNaN(val) && val > 0) return val;
-      }
-      const mins = lerDuracaoLocalStorage(STORAGE_POMODORO_MINUTES_KEY, DEFAULT_POMODORO_MINUTES, 1, 360);
-      return mins * 60;
-    }
-    return 0; // Timer Manual começa em 0
+    if (typeof estadoInicial.timerSeconds === 'number') return estadoInicial.timerSeconds;
+    return (estadoInicial.pomodoroMode ?? true) ? (estadoInicial.pomodoroDurationSeconds ?? DEFAULT_POMODORO_MINUTES * 60) : 0;
   });
 
   const [isRunning, setIsRunning] = useState(false);
@@ -344,18 +321,15 @@ export default function PomodoroApp() {
   const secondsInputRef = useRef<HTMLInputElement>(null);
   const inlineFormRef = useRef<HTMLFormElement>(null);
 
-  const [pausas, setPausas] = useState<PomodoroConfig>(() => ({
-    short: lerDuracaoLocalStorage('trilhara_pomodoro_short', 5, 1, 60),
-    long: lerDuracaoLocalStorage('trilhara_pomodoro_long', 15, 1, 120)
-  }));
+  const [pausas, setPausas] = useState<PomodoroConfig>(
+    () => estadoInicial.pausas ?? { short: 5, long: 15 }
+  );
   const [configModalAberto, setConfigModalAberto] = useState(false);
   const [configPausas, setConfigPausas] = useState<PomodoroConfig>(pausas);
 
-  const [somAtivo, setSomAtivo] = useState<boolean>(() =>
-    lerBooleanoLocalStorage(STORAGE_SOUND_KEY, true, LEGACY_STORAGE_SOUND_KEY)
-  );
-  const [notificacaoAtiva, setNotificacaoAtiva] = useState<boolean>(() =>
-    lerBooleanoLocalStorage(STORAGE_NOTIF_KEY, true, LEGACY_STORAGE_NOTIF_KEY)
+  const [somAtivo, setSomAtivo] = useState<boolean>(() => estadoInicial.somAtivo ?? true);
+  const [notificacaoAtiva, setNotificacaoAtiva] = useState<boolean>(
+    () => estadoInicial.notificacaoAtiva ?? true
   );
 
   const timerSecondsRef = useRef(timerSeconds);
@@ -370,161 +344,67 @@ export default function PomodoroApp() {
   const stopwatchBaseSecondsRef = useRef<number>(0);
   const breakEndTimeRef = useRef<number | null>(null);
 
+  // Escuta o barramento único (D-21) e também o evento `storage` da própria chave escopada.
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_POMODORO_MODE_KEY, String(pomodoroMode));
-  }, [pomodoroMode]);
+    const aplicarEstado = (s: EstadoPomodoroPersistido) => {
+      if (typeof s.pomodoroMode === 'boolean') setPomodoroMode(s.pomodoroMode);
+      if (typeof s.pomodoroDurationSeconds === 'number') setPomodoroDurationSeconds(s.pomodoroDurationSeconds);
+      setPomodoroCyclesCount(s.pomodoroCyclesCount ?? 0);
+      if (s.pausas) setPausas(s.pausas);
+      if (typeof s.somAtivo === 'boolean') setSomAtivo(s.somAtivo);
+      if (typeof s.notificacaoAtiva === 'boolean') setNotificacaoAtiva(s.notificacaoAtiva);
 
-  // Persiste a duração de foco configurada do Pomodoro
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_POMODORO_SECONDS_KEY, String(pomodoroDurationSeconds));
-    window.localStorage.setItem(STORAGE_POMODORO_MINUTES_KEY, String(pomodoroMinutes));
-  }, [pomodoroDurationSeconds, pomodoroMinutes]);
-
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(pausas));
-    window.localStorage.setItem('trilhara_pomodoro_short', String(pausas.short));
-    window.localStorage.setItem('trilhara_pomodoro_long', String(pausas.long));
-  }, [pausas]);
-
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_SOUND_KEY, String(somAtivo));
-  }, [somAtivo]);
-
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_NOTIF_KEY, String(notificacaoAtiva));
-  }, [notificacaoAtiva]);
-
-  // Sincroniza preferências de alarme se alteradas em outra aba ou pelo módulo de Estudos
-  useEffect(() => {
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === STORAGE_SOUND_KEY && event.newValue !== null) {
-        setSomAtivo(event.newValue === 'true');
-      } else if (event.key === STORAGE_NOTIF_KEY && event.newValue !== null) {
-        setNotificacaoAtiva(event.newValue === 'true');
-      } else if (event.key === getPomodoroTimerStorageKey(usuarioIdRef.current) && event.newValue) {
-        try {
-          const s = JSON.parse(event.newValue);
-          if (s) {
-            setPomodoroMode(s.pomodoroMode);
-            setPomodoroDurationSeconds(s.pomodoroDurationSeconds);
-            setPomodoroCyclesCount(s.pomodoroCyclesCount ?? 0);
-            if (s.pausas) setPausas(s.pausas);
-            if (typeof s.somAtivo === 'boolean') setSomAtivo(s.somAtivo);
-            if (typeof s.notificacaoAtiva === 'boolean') setNotificacaoAtiva(s.notificacaoAtiva);
-
-            if (s.breakType && s.breakEndTime) {
-              const rest = Math.max(0, Math.ceil((s.breakEndTime - Date.now()) / 1000));
-              setBreakType(s.breakType);
-              setBreakSeconds(rest);
-              breakEndTimeRef.current = s.breakEndTime;
-              setIsRunning(false);
-            } else if (s.isRunning) {
-              setBreakType(null);
-              setBreakSeconds(0);
-              if (s.pomodoroMode && s.targetEndTime) {
-                const rest = Math.max(0, Math.ceil((s.targetEndTime - Date.now()) / 1000));
-                setTimerSeconds(rest);
-                targetEndTimeRef.current = s.targetEndTime;
-                setIsRunning(rest > 0);
-              } else if (!s.pomodoroMode && s.stopwatchStartTime) {
-                const elapsed = Math.floor((Date.now() - s.stopwatchStartTime) / 1000);
-                setTimerSeconds(s.stopwatchBaseSeconds + elapsed);
-                stopwatchStartTimeRef.current = s.stopwatchStartTime;
-                stopwatchBaseSecondsRef.current = s.stopwatchBaseSeconds;
-                setIsRunning(true);
-              }
-            } else {
-              setIsRunning(false);
-              setTimerSeconds(s.timerSeconds);
-              setBreakType(null);
-              setBreakSeconds(0);
-              targetEndTimeRef.current = null;
-              stopwatchStartTimeRef.current = null;
-            }
-          }
-        } catch (e) {
-          registrarFalha('estado-local.sincronizarTimer', e);
+      if (s.breakType && s.breakEndTime) {
+        const rest = Math.max(0, Math.ceil((s.breakEndTime - Date.now()) / 1000));
+        setBreakType(s.breakType);
+        setBreakSeconds(rest);
+        breakEndTimeRef.current = s.breakEndTime;
+        setIsRunning(false);
+      } else if (s.isRunning) {
+        setBreakType(null);
+        setBreakSeconds(0);
+        if (s.pomodoroMode && s.targetEndTime) {
+          const rest = Math.max(0, Math.ceil((s.targetEndTime - Date.now()) / 1000));
+          setTimerSeconds(rest);
+          targetEndTimeRef.current = s.targetEndTime;
+          setIsRunning(rest > 0);
+        } else if (!s.pomodoroMode && s.stopwatchStartTime) {
+          const elapsed = Math.floor((Date.now() - s.stopwatchStartTime) / 1000);
+          setTimerSeconds((s.stopwatchBaseSeconds ?? 0) + elapsed);
+          stopwatchStartTimeRef.current = s.stopwatchStartTime;
+          stopwatchBaseSecondsRef.current = s.stopwatchBaseSeconds ?? 0;
+          setIsRunning(true);
         }
+      } else {
+        setIsRunning(false);
+        if (typeof s.timerSeconds === 'number') setTimerSeconds(s.timerSeconds);
+        setBreakType(null);
+        setBreakSeconds(0);
+        targetEndTimeRef.current = null;
+        stopwatchStartTimeRef.current = null;
       }
     };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+
+    const cancelar = assinar('TIMER_POMODORO_ATUALIZADO', (mensagem) => {
+      const payload = mensagem.payload as EstadoPomodoroPersistido | null;
+      if (payload) aplicarEstado(payload);
+    });
+
+    return cancelar;
   }, []);
 
-  // BroadcastChannel para sincronização instantânea de estado entre abas
+  // Logout (D-21.d): pausa o timer e persiste sob a chave escopada da conta que saiu.
   useEffect(() => {
-    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
-    try {
-      const channel = new BroadcastChannel('trilhara_pomodoro_timer');
-      broadcastChannelRef.current = channel;
-
-      channel.onmessage = (event) => {
-        const data = event.data;
-        if (!data || data.senderId === instanceIdRef.current) return;
-        if (data.usuarioId !== usuarioIdRef.current) return;
-
-        if (data.type === 'SYNC_POMODORO' && data.state) {
-          const s = data.state;
-          setPomodoroMode(s.pomodoroMode);
-          setPomodoroDurationSeconds(s.pomodoroDurationSeconds);
-          setPomodoroCyclesCount(s.pomodoroCyclesCount ?? 0);
-          if (s.pausas) setPausas(s.pausas);
-          if (typeof s.somAtivo === 'boolean') setSomAtivo(s.somAtivo);
-          if (typeof s.notificacaoAtiva === 'boolean') setNotificacaoAtiva(s.notificacaoAtiva);
-
-          if (s.breakType && s.breakEndTime) {
-            const rest = Math.max(0, Math.ceil((s.breakEndTime - Date.now()) / 1000));
-            setBreakType(s.breakType);
-            setBreakSeconds(rest);
-            breakEndTimeRef.current = s.breakEndTime;
-            setIsRunning(false);
-          } else if (s.isRunning) {
-            setBreakType(null);
-            setBreakSeconds(0);
-            if (s.pomodoroMode && s.targetEndTime) {
-              const rest = Math.max(0, Math.ceil((s.targetEndTime - Date.now()) / 1000));
-              setTimerSeconds(rest);
-              targetEndTimeRef.current = s.targetEndTime;
-              setIsRunning(rest > 0);
-            } else if (!s.pomodoroMode && s.stopwatchStartTime) {
-              const elapsed = Math.floor((Date.now() - s.stopwatchStartTime) / 1000);
-              setTimerSeconds(s.stopwatchBaseSeconds + elapsed);
-              stopwatchStartTimeRef.current = s.stopwatchStartTime;
-              stopwatchBaseSecondsRef.current = s.stopwatchBaseSeconds;
-              setIsRunning(true);
-            }
-          } else {
-            setIsRunning(false);
-            setTimerSeconds(s.timerSeconds);
-            setBreakType(null);
-            setBreakSeconds(0);
-            targetEndTimeRef.current = null;
-            stopwatchStartTimeRef.current = null;
-          }
-        }
-      };
-
-      return () => {
-        channel.close();
-        broadcastChannelRef.current = null;
-      };
-    } catch (e) {
-      registrarFalha('broadcast.encerrar', e);
-    }
-  }, []);
-
-  // Logout e Troca de Conta: pausa o timer e persiste sob a chave isolada da conta
-  useEffect(() => {
-    const handleLogout = (e?: Event) => {
-      const customEvent = e as CustomEvent<{ usuarioId?: string }>;
-      const uidAntigo = customEvent?.detail?.usuarioId || usuarioIdRef.current;
+    const handleLogout = (evento: Event) => {
+      const detalhe = (evento as CustomEvent<{ usuarioId?: string }>).detail;
+      const uidAntigo = detalhe?.usuarioId || usuarioIdRef.current;
       targetEndTimeRef.current = null;
       stopwatchStartTimeRef.current = null;
       setIsRunning(false);
+      if (!uidAntigo) return;
       try {
-        const key = getPomodoroTimerStorageKey(uidAntigo);
         window.localStorage.setItem(
-          key,
+          getPomodoroTimerStorageKey(uidAntigo),
           JSON.stringify({
             pomodoroMode,
             isRunning: false,
@@ -544,12 +424,12 @@ export default function PomodoroApp() {
           })
         );
       } catch (e) {
-        registrarFalha('broadcast.publicar', e);
+        registrarFalha('estado-local.logout', e);
       }
     };
 
-    window.addEventListener('trilhara:auth:logout', handleLogout);
-    return () => window.removeEventListener('trilhara:auth:logout', handleLogout);
+    window.addEventListener('trilhara:logout', handleLogout);
+    return () => window.removeEventListener('trilhara:logout', handleLogout);
   }, [
     pomodoroMode,
     pomodoroDurationSeconds,
@@ -559,33 +439,27 @@ export default function PomodoroApp() {
     notificacaoAtiva
   ]);
 
-  // Ao alternar usuarioId (login/troca de usuário)
+  // Ao alternar usuarioId (login/troca de usuário) lê a chave da nova conta.
+  // O estado anônimo **não** é migrado (D-21b).
   useEffect(() => {
-    if (usuarioIdRef.current !== usuarioId) {
-      usuarioIdRef.current = usuarioId;
-      try {
-        const raw = window.localStorage.getItem(getPomodoroTimerStorageKey(usuarioId));
-        if (raw) {
-          const s = JSON.parse(raw);
-          setPomodoroMode(s.pomodoroMode);
-          setPomodoroDurationSeconds(s.pomodoroDurationSeconds);
-          setTimerSeconds(s.timerSeconds);
-          setIsRunning(false);
-          setBreakType(null);
-          setBreakSeconds(0);
-          setPomodoroCyclesCount(s.pomodoroCyclesCount ?? 0);
-          if (s.pausas) setPausas(s.pausas);
-        } else {
-          setIsRunning(false);
-          setBreakType(null);
-          setBreakSeconds(0);
-          setTimerSeconds(pomodoroDurationSeconds);
-        }
-      } catch (e) {
-        registrarFalha('estado-local.restaurarTimer', e);
-      }
-    }
-  }, [usuarioId, pomodoroDurationSeconds]);
+    if (usuarioIdRef.current === usuarioId) return;
+    usuarioIdRef.current = usuarioId;
+    const s = lerEstadoPomodoro(usuarioId);
+    setIsRunning(false);
+    setBreakType(null);
+    setBreakSeconds(0);
+    setPomodoroMode(s.pomodoroMode ?? true);
+    setPomodoroDurationSeconds(s.pomodoroDurationSeconds ?? DEFAULT_POMODORO_MINUTES * 60);
+    setPomodoroCyclesCount(s.pomodoroCyclesCount ?? 0);
+    setPausas(s.pausas ?? { short: 5, long: 15 });
+    setSomAtivo(s.somAtivo ?? true);
+    setNotificacaoAtiva(s.notificacaoAtiva ?? true);
+    setTimerSeconds(
+      typeof s.timerSeconds === 'number'
+        ? s.timerSeconds
+        : s.pomodoroDurationSeconds ?? DEFAULT_POMODORO_MINUTES * 60
+    );
+  }, [usuarioId]);
 
   const salvarETransmitir = useCallback((overrides: Record<string, unknown> = {}) => {
     const key = getPomodoroTimerStorageKey(usuarioIdRef.current);
@@ -614,18 +488,8 @@ export default function PomodoroApp() {
       registrarFalha('estado-local.gravar', e);
     }
 
-    if (broadcastChannelRef.current) {
-      try {
-        broadcastChannelRef.current.postMessage({
-          type: 'SYNC_POMODORO',
-          senderId: instanceIdRef.current,
-          usuarioId: usuarioIdRef.current,
-          state: estadoSalvar
-        });
-      } catch (e) {
-        registrarFalha('broadcast.transmitir', e);
-      }
-    }
+    // Barramento único (D-21): a mensagem já carrega `usuarioId` e é filtrada no recebimento.
+    publicar('TIMER_POMODORO_ATUALIZADO', estadoSalvar);
   }, [
     pomodoroMode,
     isRunning,

@@ -20,7 +20,7 @@
 | A4 | Marcar/desmarcar tópico afeta somente aquele progresso e agregados | `trilha/TrilhaNormalizadaIntegrationTest#deveRetornar404AoMarcarProgressoDeTopicoDeOutraTrilha`; `test/topicoOtimista.test.tsx` | **Coberto na R3** — inclui isolamento por trilha no path e rollback otimista |
 | A5 | Regenerar cronograma substitui blocos via `versaoGeracao`/`versaoAtiva`, mantém sessões/progresso; concorrência nunca deixa dois ativos | `cronograma/CronogramaNormalizadoIntegrationTest` (8, inclui `deveCoordenarConcorrenciaComLockAtomicoNaTrilha`) + índice parcial único `idx_cronogramas_usuario_trilha_ativo_unique` | **Coberto na R5** — contador atômico `trilha.proximaVersaoCronograma`, fencing no ponteiro e `duplicateModalityNaoAlteraBlocos` |
 | A6 | Tarefas/Pomodoro mostram as mesmas tarefas manuais Hoje + blocos do dia; nenhum bloco é gravado como tarefa | `test/fase7IntegracaoDiaria.test.tsx` (9); `tarefa/Fase6TarefaResourceTest` (4) | Coberto |
-| A7 | Concluir manual nunca cria sessão; concluir bloco abre o modal global; cancelar não conclui | `test/fase5GlobalSessionTimer.test.tsx` (13); `fase7IntegracaoDiaria.test.tsx` | Coberto |
+| A7 | Concluir manual nunca cria sessão; concluir bloco abre o modal global; cancelar não conclui | `test/globalSessionModal.test.tsx` (10); `test/sessaoGlobalService.test.ts` (5); `fase7IntegracaoDiaria.test.tsx` (9) | **Coberto na R6** — cancelar mantém o timer pausado e não conclui o bloco |
 | A8 | Retry após timeout não duplica sessão nem conclusão | `sessao/SessaoNormalizadaIntegrationTest` (9) + índice único `idx_sessoes_usuario_chaveIdempotencia_unique` | Parcial — falta retry concorrente com `operationId` repetido em `concluir-atrasados` |
 | A9 | Sessão de 95s persiste `duracaoSegundos=95` e soma 95s; estatísticas conferem; editar/excluir recalcula | `sessao/SessaoNormalizadaIntegrationTest`; `test/sessaoNormalizada.test.ts` (6) | Coberto |
 | A10 | Remover disciplina preserva histórico por padrão e permite apagar sessões/métricas explicitamente | `trilha/TrilhaNormalizadaIntegrationTest#deveRetornar409SeLeaseOcupadoAoExcluirDisciplina`; `sessao/SessaoNormalizadaIntegrationTest` | Coberto (R3 adicionou a guarda de lease na exclusão) |
@@ -159,7 +159,7 @@
 
 ---
 
-## E. Critérios específicos da R4 (F3: sessões, histórico e estatísticas)
+## G. Critérios específicos da R4 (F3: sessões, histórico e estatísticas)
 
 | Critério | Teste / evidência | Status |
 |---|---|---|
@@ -188,3 +188,33 @@
 | Regra ArchUnit do pacote `sessao` habilitada | `TenantIsolationArchTest#repositoriosDeSessaoExigemUsuarioId` | Coberto |
 | Contagem de testes ≥ baseline R0 (144 backend / 109 frontend) | 221 backend / 183 frontend | Coberto |
 | Gate comum verde | `docs/REVISAO-IMPLEMENTADA-R4.md` §5 | Coberto |
+
+## H. Critérios específicos da R6 (F5: `GlobalSessionModal`, `sessaoGlobalService` e timers)
+
+| Critério | Teste / comando | Status |
+|---|---|---|
+| `registrarSessao` envia `Idempotency-Key` no header e `chaveIdempotencia` no corpo com o mesmo valor | `sessaoGlobalService.test.ts#envia header Idempotency-Key e body com a mesma chave` | Coberto |
+| Fluxo em 2 etapas conclui sessão e bloco | `#executa o fluxo de duas etapas concluindo sessão e bloco` | Coberto |
+| Falha na etapa 2 → retry só do PATCH (POST chamado 1×) | `#falha na etapa 2 permite retry apenas do PATCH sem reenviar o POST` | Coberto |
+| `401` → evento `trilhara:auth-required` e retry com a mesma chave | `#401 dispara trilhara:auth-required e o retry reutiliza a mesma chave após login` | Coberto |
+| Desconcluir bloco não exclui sessões e usa `PATCH {concluido:false}` | `#concluirBloco envia PATCH concluido true e reabrirBloco envia false` | Coberto |
+| 4 modos abrem com título e campos corretos; rótulo fixo **Salvar sessão** | `globalSessionModal.test.tsx#abre em ESTUDOS_TIMER com título, tempo medido e rótulo fixo`; `#abre em BLOCO_DIRETO...`; `#abre em BLOCO_TIMER e MANUAL...` | Coberto |
+| **Concluir sem salvar sessão** só em modos com bloco | `#"Concluir sem salvar sessão" aparece apenas em modos com bloco` | Coberto |
+| Cancelar mantém o timer pausado com o tempo acumulado (D-22.1) | `#cancelar mantém o cronômetro pausado com o tempo acumulado` | Coberto |
+| Fechar sujo pede confirmação de descarte (D-22.2) | `#fechar com campos alterados pede confirmação de descarte` | Coberto |
+| Duração mínima de 60 s com `40 s` → erro inline | `#40 s exibe erro inline de duração mínima` | Coberto |
+| Acertos > questões → erro inline por campo | `#acertos maiores que questões exibem erro inline` | Coberto |
+| Offline mantém os campos e mostra "Sem conexão. Seus dados foram mantidos." | `#offline mantém os campos preenchidos e exibe banner de conexão` | Coberto |
+| Salvar zera o timer e **remove** a chave `study_timer` (D-22.1) | `#salvar com sucesso zera o timer e remove a chave`; `studyTimer.test.tsx#reset remove a chave do usuário (D-22.1)` | Coberto |
+| Sem usuário, o cronômetro de Estudos fica inativo e não grava nenhuma chave | `studyTimer.test.tsx#sem usuário fica inativo, ignora o início e não grava nenhuma chave` | Coberto |
+| Chaves de timer isoladas entre Usuário A e Usuário B | `#isola as chaves de Usuário A e Usuário B` | Coberto |
+| Logout pausa, acumula e persiste sob a conta | `#logout pausa, acumula o tempo e persiste na chave da conta` | Coberto |
+| Mensagem do barramento de outro `usuarioId` é descartada | `#ignora mensagem do barramento com usuarioId diferente`; `barramento.test.ts#descarta mensagem de outro usuarioId` | Coberto |
+| Alarme não abre modal nem grava sessão | `#o alarme não abre modal de sessão` | Coberto |
+| Drift ≤ 1 s após 10 min suspenso (timestamp absoluto) | `#mantém drift ≤ 1 s após 10 min "suspenso" (timestamp absoluto)` | Coberto |
+| Visitante do Pomodoro usa `trilhara:anon:pomodoro_timer` e o login não migra | `pomodoro.test.tsx#visitante usa trilhara:anon:pomodoro_timer`; `#login não migra o estado anônimo para a chave da conta` | Coberto |
+| Configuração do Pomodoro escopada por conta (sem chaves globais) | `#não há chaves globais de configuração do Pomodoro`; `#configuração pertence ao objeto persistido da conta` | Coberto |
+| Barramento único `v:1`, filtro por `usuarioId` e fallback `storage` | `barramento.test.ts` (8) | Coberto |
+| Os 4 apps abrem o modal só via `useGlobalSessionModal()` | `rg "abrirModal\\(" frontend/src/modules` → apenas chamadas do hook | Coberto |
+| Grep de canais antigos zerado | `rg "trilhara_study_timer|trilhara_pomodoro_timer|trilhara_agenda_hoje|'trilhara:auth'|\|\| 'anon'" frontend/src` → 0 | Coberto |
+| Gate comum verde | `docs/REVISAO-IMPLEMENTADA-R6.md` §5 | Coberto |

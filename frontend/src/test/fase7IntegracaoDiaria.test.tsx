@@ -12,6 +12,7 @@ import {
   ConfirmProvider
 } from '../shared/design-system';
 import { AuthContext, AuthContextValue } from '../shared/auth/AuthContext';
+import { StudyTimerProvider } from '../shared/timers/estudoTimer';
 import * as apiModule from '../shared/auth/api';
 import { TarefaService } from '../modules/tarefas/services/tarefaService';
 import PomodoroApp from '../modules/pomodoro/PomodoroApp';
@@ -294,10 +295,12 @@ describe('FASE 7 — Integração Diária: SectionErrorCard, AgendaHojeService, 
         <ToastProvider>
           <ConfirmProvider>
             <AuthContext.Provider value={mockAuthValue('user-pomo')}>
+              <StudyTimerProvider>
               <GlobalSessionModalProvider>
                 <PomodoroApp />
                 <GlobalSessionModal />
               </GlobalSessionModalProvider>
+              </StudyTimerProvider>
             </AuthContext.Provider>
           </ConfirmProvider>
         </ToastProvider>
@@ -355,10 +358,12 @@ describe('FASE 7 — Integração Diária: SectionErrorCard, AgendaHojeService, 
         <ToastProvider>
           <ConfirmProvider>
             <AuthContext.Provider value={mockAuthValue('user-pomo-2')}>
+              <StudyTimerProvider>
               <GlobalSessionModalProvider>
                 <PomodoroApp />
                 <GlobalSessionModal />
               </GlobalSessionModalProvider>
+              </StudyTimerProvider>
             </AuthContext.Provider>
           </ConfirmProvider>
         </ToastProvider>
@@ -409,10 +414,12 @@ describe('FASE 7 — Integração Diária: SectionErrorCard, AgendaHojeService, 
         <ToastProvider>
           <ConfirmProvider>
             <AuthContext.Provider value={mockAuthValue('user-pomo-3')}>
+              <StudyTimerProvider>
               <GlobalSessionModalProvider>
                 <PomodoroApp />
                 <GlobalSessionModal />
               </GlobalSessionModalProvider>
+              </StudyTimerProvider>
             </AuthContext.Provider>
           </ConfirmProvider>
         </ToastProvider>
@@ -434,8 +441,9 @@ describe('FASE 7 — Integração Diária: SectionErrorCard, AgendaHojeService, 
       });
 
       // Em modo BLOCO_DIRETO, exibe a opção de concluir sem salvar sessão
+      // D-22.3: o rótulo do botão principal é fixo ("Salvar sessão").
       expect(screen.getByText(/Concluir sem salvar sessão/i)).toBeInTheDocument();
-      expect(screen.getByText(/Salvar Sessão e Concluir Bloco/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Salvar sessão$/i })).toBeInTheDocument();
     });
 
     it('visitante não autenticado em PomodoroApp vê cronômetro funcional e card convidativo', () => {
@@ -443,9 +451,11 @@ describe('FASE 7 — Integração Diária: SectionErrorCard, AgendaHojeService, 
         <ToastProvider>
           <ConfirmProvider>
             <AuthContext.Provider value={mockAuthValue(null)}>
+              <StudyTimerProvider>
               <GlobalSessionModalProvider>
                 <PomodoroApp />
               </GlobalSessionModalProvider>
+              </StudyTimerProvider>
             </AuthContext.Provider>
           </ConfirmProvider>
         </ToastProvider>
@@ -541,10 +551,12 @@ describe('FASE 7 — Integração Diária: SectionErrorCard, AgendaHojeService, 
         <ToastProvider>
           <ConfirmProvider>
             <AuthContext.Provider value={mockAuthValue('user-tarefas-virtual')}>
+              <StudyTimerProvider>
               <GlobalSessionModalProvider>
                 <TarefasApp />
                 <GlobalSessionModal />
               </GlobalSessionModalProvider>
+              </StudyTimerProvider>
             </AuthContext.Provider>
           </ConfirmProvider>
         </ToastProvider>

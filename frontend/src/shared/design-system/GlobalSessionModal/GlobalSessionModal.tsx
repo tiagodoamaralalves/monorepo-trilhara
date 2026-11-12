@@ -1,12 +1,19 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { X, AlertCircle } from 'lucide-react';
+import { X, AlertCircle, WifiOff } from 'lucide-react';
 import { Button } from '../Button/Button';
 import { Input } from '../Input/Input';
 import { Select } from '../Select/Select';
 import { DatePicker } from '../DatePicker/DatePicker';
 import { useToast } from '../Toast/Toast';
+import { useConfirm } from '../ConfirmDialog/ConfirmDialog';
 import { useGlobalSessionModal } from './GlobalSessionModalContext';
 import { sessaoGlobalService } from '../../services/sessaoGlobalService';
+import { useStudyTimer } from '../../timers/estudoTimer';
+import { AUTH_REQUIRED_EVENT } from '../../auth/api';
+import { classificarErro, extrairErrosDeCampo } from '../../api';
+import { publicar } from '../../sync/barramento';
+import { useUnsavedChanges } from '../../hooks';
+import { formatarRelogio } from '../../format';
 import {
   SessaoRegistradaDTO,
   TrilhaResumoDTO,
@@ -16,72 +23,121 @@ import { request } from '../../auth/api';
 import styles from './GlobalSessionModal.module.css';
 
 function obterHojeISO(): string {
-  const d = new Date();
-  const ano = d.getFullYear();
-  const mes = String(d.getMonth() + 1).padStart(2, '0');
-  const dia = String(d.getDate()).padStart(2, '0');
+  const agora = new Date();
+  const ano = agora.getFullYear();
+  const mes = String(agora.getMonth() + 1).padStart(2, '0');
+  const dia = String(agora.getDate()).padStart(2, '0');
   return `${ano}-${mes}-${dia}`;
+}
+
+/** "Tempo medido: 25 min 37 s" — auxiliar exibido quando o timer originou a duração. */
+function descreverTempoMedido(segundos: number): string {
+  const horas = Math.floor(segundos / 3600);
+  const minutos = Math.floor((segundos % 3600) / 60);
+  const resto = segundos % 60;
+  const partes: string[] = [];
+  if (horas > 0) partes.push(`${horas} h`);
+  if (minutos > 0) partes.push(`${minutos} min`);
+  if (resto > 0 || partes.length === 0) partes.push(`${resto} s`);
+  return `Tempo medido: ${partes.join(' ')}`;
+}
+
+interface CriadosInline {
+  trilhaId?: string;
+  disciplinaId?: string;
+}
+
+interface ErroCampo {
+  campo: string;
+  mensagem: string;
 }
 
 export const GlobalSessionModal: React.FC = () => {
   const { isOpen, params, fecharModal } = useGlobalSessionModal();
   const toast = useToast();
+  const { confirm } = useConfirm();
+  const timer = useStudyTimer();
 
   const titleId = useId();
   const modalBoxRef = useRef<HTMLDivElement>(null);
   const previousActiveElementRef = useRef<HTMLElement | null>(null);
   const hoursInputRef = useRef<HTMLInputElement>(null);
 
-  // Estados do formulário
+  // Identificador da chave de idempotência desta abertura; só muda ao abrir um novo modal.
   const [chaveIdempotencia, setChaveIdempotencia] = useState<string>('');
+  const [trilhaId, setTrilhaId] = useState<string>('');
+  const [disciplinaId, setDisciplinaId] = useState<string>('');
+  const [criadosInline, setCriadosInline] = useState<CriadosInline>({});
+  const [sessaoSalva, setSessaoSalva] = useState<boolean>(false);
+  const [sessaoId, setSessaoId] = useState<string | undefined>(undefined);
+  const [erro, setErro] = useState<unknown>(null);
+  const [sujo, setSujo] = useState<boolean>(false);
+
+  // Campos do formulário
   const [horas, setHoras] = useState<string>('0');
   const [minutos, setMinutos] = useState<string>('0');
   const [dataSessao, setDataSessao] = useState<string>(obterHojeISO());
   const [questoes, setQuestoes] = useState<string>('');
   const [acertos, setAcertos] = useState<string>('');
 
-  // Seleção e criação inline de Trilha e Disciplina
+  // Duração original em segundos (preservada se o usuário não editar horas/minutos).
+  const [duracaoOriginalSegundos, setDuracaoOriginalSegundos] = useState<number>(0);
+  const [duracaoEditada, setDuracaoEditada] = useState<boolean>(false);
+
+  // Trilhas/disciplinas para o modo MANUAL
   const [trilhas, setTrilhas] = useState<TrilhaResumoDTO[]>([]);
-  const [selectedTrilhaId, setSelectedTrilhaId] = useState<string>('');
   const [disciplinas, setDisciplinas] = useState<{ id: string; nome: string; cor?: string }[]>([]);
-  const [selectedDisciplinaId, setSelectedDisciplinaId] = useState<string>('');
   const [novaTrilhaNome, setNovaTrilhaNome] = useState<string>('');
   const [novaDisciplinaNome, setNovaDisciplinaNome] = useState<string>('');
 
-  // Controle de submissão e fluxo em 2 etapas
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [sessaoSalva, setSessaoSalva] = useState<boolean>(false);
-  const [sessaoSalvaDTO, setSessaoSalvaDTO] = useState<SessaoRegistradaDTO | null>(null);
-  const [erroParcialEtapa2, setErroParcialEtapa2] = useState<string | null>(null);
-  const [erroValidacao, setErroValidacao] = useState<string | null>(null);
+  const [errosCampo, setErrosCampo] = useState<ErroCampo[]>([]);
+  const [erroOffline, setErroOffline] = useState<boolean>(false);
+  const [blocoPendente, setBlocoPendente] = useState<boolean>(false);
+  const [aguardandoLogin, setAguardandoLogin] = useState<boolean>(false);
 
-  // Inicialização ao abrir modal
+  const pausarTimer = timer.pause;
+  const resetarTimer = timer.reset;
+  const modoComTimer = params?.modo === 'ESTUDOS_TIMER' || params?.modo === 'BLOCO_TIMER';
+  const modoComBloco = Boolean(params?.blocoId);
+
+
+  // Inicialização ao abrir modal (D-22): a chave de idempotência nasce aqui e só muda em uma
+  // nova abertura; nos modos com timer o cronômetro é **pausado**, nunca zerado.
   useEffect(() => {
     if (!isOpen || !params) return;
 
     previousActiveElementRef.current = (params.triggerElement || document.activeElement) as HTMLElement | null;
-    const novaChave = crypto.randomUUID();
-    setChaveIdempotencia(novaChave);
+    setChaveIdempotencia(crypto.randomUUID());
 
     const duracaoTotalSegundos = Math.max(0, params.duracaoInicialSegundos ?? 0);
-    const duracaoMinutosCalculados = Math.floor(duracaoTotalSegundos / 60);
-    const h = Math.floor(duracaoMinutosCalculados / 60);
-    const m = duracaoMinutosCalculados % 60;
-    setHoras(String(h));
-    setMinutos(String(m));
+    setDuracaoOriginalSegundos(duracaoTotalSegundos);
+    setDuracaoEditada(false);
+    setHoras(String(Math.floor(duracaoTotalSegundos / 3600)));
+    setMinutos(String(Math.floor((duracaoTotalSegundos % 3600) / 60)));
 
     setDataSessao(params.dataSessao || obterHojeISO());
     setQuestoes('');
     setAcertos('');
-    setSelectedTrilhaId(params.trilhaId || '');
-    setSelectedDisciplinaId(params.disciplinaId || '');
+    setTrilhaId(params.trilhaId || '');
+    setDisciplinaId(params.disciplinaId || '');
+    setCriadosInline({});
     setNovaTrilhaNome('');
     setNovaDisciplinaNome('');
-    setErroValidacao(null);
-    setErroParcialEtapa2(null);
+    setErro(null);
+    setErrosCampo([]);
+    setErroOffline(false);
+    setBlocoPendente(false);
+    setAguardandoLogin(false);
     setSessaoSalva(false);
-    setSessaoSalvaDTO(null);
+    setSessaoId(undefined);
     setIsSaving(false);
+    setSujo(false);
+
+    // D-22.1: pausa o cronômetro ao abrir; o tempo acumulado permanece para retry/cancelamento.
+    if (params.modo === 'ESTUDOS_TIMER' || params.modo === 'BLOCO_TIMER') {
+      pausarTimer();
+    }
 
     // Carrega lista de trilhas se estiver em modo MANUAL ou se faltar trilhaId
     if (params.modo === 'MANUAL' || !params.trilhaId) {
@@ -89,15 +145,15 @@ export const GlobalSessionModal: React.FC = () => {
         .then((lista) => {
           setTrilhas(lista || []);
           if (!params.trilhaId && lista && lista.length > 0) {
-            setSelectedTrilhaId(lista[0].id);
+            setTrilhaId(lista[0].id);
           }
         })
         .catch(() => {
-          // Ignora erro inicial de listagem
+          // Falha de listagem mantém o seletor vazio; o usuário pode criar inline.
         });
     }
 
-    // Foco inicial somente se nenhum elemento dentro do modal já estiver focado
+    // Foco inicial no primeiro campo editável.
     const timerFocus = setTimeout(() => {
       if (modalBoxRef.current && !modalBoxRef.current.contains(document.activeElement)) {
         hoursInputRef.current?.focus();
@@ -105,19 +161,19 @@ export const GlobalSessionModal: React.FC = () => {
     }, 0);
 
     return () => clearTimeout(timerFocus);
-  }, [isOpen, params]);
+  }, [isOpen, params, pausarTimer]);
 
   // Carrega disciplinas quando a trilha selecionada mudar
   useEffect(() => {
-    if (!isOpen || !selectedTrilhaId || selectedTrilhaId === '__nova__') {
-      if (selectedTrilhaId === '__nova__') {
+    if (!isOpen || !trilhaId || trilhaId === '__nova__') {
+      if (trilhaId === '__nova__') {
         setDisciplinas([]);
-        setSelectedDisciplinaId('__nova__');
+        setDisciplinaId('__nova__');
       }
       return;
     }
 
-    request<TrilhaDetalheDTO>(`/trilhas/${selectedTrilhaId}`)
+    request<TrilhaDetalheDTO>(`/trilhas/${trilhaId}`)
       .then((detalhe) => {
         const discList = (detalhe.disciplinas || []).map((d) => ({
           id: d.id,
@@ -125,25 +181,45 @@ export const GlobalSessionModal: React.FC = () => {
           cor: d.cor
         }));
         setDisciplinas(discList);
-        if (!selectedDisciplinaId || !discList.some((d) => d.id === selectedDisciplinaId)) {
-          if (discList.length > 0) {
-            setSelectedDisciplinaId(discList[0].id);
-          }
+        if (!disciplinaId || !discList.some((d) => d.id === disciplinaId)) {
+          if (discList.length > 0) setDisciplinaId(discList[0].id);
         }
       })
       .catch(() => {
         setDisciplinas([]);
       });
-  }, [isOpen, selectedTrilhaId, selectedDisciplinaId]);
+  }, [isOpen, trilhaId, disciplinaId]);
 
-  // Restaura foco ao fechar
-  const handleFechar = useCallback(() => {
-    if (isSaving) return;
+
+  useUnsavedChanges('sessao:global', isOpen && sujo && !sessaoSalva);
+
+  /** Fecha de fato: devolve o foco ao elemento acionador. */
+  const fecharAgora = useCallback(() => {
     fecharModal();
     if (previousActiveElementRef.current && typeof previousActiveElementRef.current.focus === 'function') {
       previousActiveElementRef.current.focus();
     }
-  }, [isSaving, fecharModal]);
+  }, [fecharModal]);
+
+  /**
+   * D-22.2: com campos alterados pede confirmação ("Descartar registro?"); sem alterações
+   * fecha direto. Cancelar mantém o timer pausado com o tempo acumulado (D-22.1).
+   */
+  const handleFechar = useCallback(async () => {
+    if (isSaving) return;
+    if (!sujo || sessaoSalva) {
+      fecharAgora();
+      return;
+    }
+    const descartar = await confirm({
+      title: 'Descartar registro?',
+      description: 'As alterações feitas não serão salvas.',
+      confirmText: 'Descartar',
+      cancelText: 'Continuar editando'
+    });
+    if (descartar) fecharAgora();
+  }, [confirm, fecharAgora, isSaving, sessaoSalva, sujo]);
+
 
   // Focus trap e Escape key
   useEffect(() => {
@@ -153,7 +229,7 @@ export const GlobalSessionModal: React.FC = () => {
       if (e.key === 'Escape') {
         if (!isSaving) {
           e.preventDefault();
-          handleFechar();
+          void handleFechar();
         }
         return;
       }
@@ -202,131 +278,217 @@ export const GlobalSessionModal: React.FC = () => {
     return ((ac / numQuestoes) * 100).toFixed(1);
   }, [numQuestoes, numAcertos]);
 
-  const duracaoTotalSegundos = (Number(horas) || 0) * 3600 + (Number(minutos) || 0) * 60;
+  const duracaoTotalSegundos = duracaoEditada
+    ? (Number(horas) || 0) * 3600 + (Number(minutos) || 0) * 60
+    : duracaoOriginalSegundos;
 
-  // Ação secundária exclusiva para BLOCO_DIRETO: "Concluir sem salvar sessão"
+  /** Mapeia um erro da API para o estado do modal (D-22.5). */
+  const tratarErro = useCallback((falha: unknown): void => {
+    const categoria = classificarErro(falha);
+    setErro(falha);
+
+    if (categoria === 'rede' || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+      setErroOffline(true);
+      setErrosCampo([]);
+      return;
+    }
+
+    setErroOffline(false);
+
+    if (categoria === 'autenticacao') {
+      // Abre o AuthModal por cima; o retry com a mesma chave/payload é automático.
+      setAguardandoLogin(true);
+      window.dispatchEvent(new CustomEvent(AUTH_REQUIRED_EVENT));
+      return;
+    }
+
+    if (categoria === 'validacao') {
+      const mapa = extrairErrosDeCampo(falha);
+      const lista = Object.entries(mapa).map(([campo, mensagens]) => ({
+        campo,
+        mensagem: mensagens[0] ?? 'Valor inválido.'
+      }));
+      setErrosCampo(lista);
+      if (lista.length === 0) {
+        const mensagem = falha instanceof Error ? falha.message : 'Dados inválidos.';
+        setErrosCampo([{ campo: 'geral', mensagem }]);
+      }
+      return;
+    }
+
+    setErrosCampo([]);
+  }, []);
+
+  const mensagemErroGeral = useMemo(() => {
+    if (erroOffline) return null;
+    const candidato = erro as { code?: string; message?: string } | null;
+    if (candidato?.code === 'IDEMPOTENCY_KEY_CONFLICT') {
+      return 'Esta chave de idempotência já foi usada com dados diferentes.';
+    }
+    if (!erro) return null;
+    return candidato?.message ?? 'Não foi possível registrar a sessão. Tente novamente.';
+  }, [erro, erroOffline]);
+
+  const erroDoCampo = useCallback(
+    (campo: string): string | undefined =>
+      errosCampo.find((item) => item.campo === campo)?.mensagem,
+    [errosCampo]
+  );
+
+  const sucessoFinalizado = useCallback(
+    (sessao: SessaoRegistradaDTO | undefined, blocoConcluido: boolean) => {
+      setSessaoSalva(true);
+      setSujo(false);
+      // D-22.1: só depois de 201/200 dos dois passos o cronômetro é zerado.
+      if (modoComTimer && blocoConcluido !== false) resetarTimer();
+      publicar('AGENDA_INVALIDADA', null);
+      publicar('SESSAO_ENCERRADA', null);
+      params?.onSuccess?.(sessao, blocoConcluido);
+      fecharAgora();
+    },
+    [fecharAgora, modoComTimer, params, resetarTimer]
+  );
+
+  /** Ação secundária: apenas em modos com bloco (§6.4 / D-22.3). */
   const handleConcluirSemSalvar = async () => {
     if (!params?.blocoId || isSaving) return;
     setIsSaving(true);
-    setErroValidacao(null);
+    setErro(null);
     try {
-      await sessaoGlobalService.concluirBloco(params.blocoId, true);
+      await sessaoGlobalService.concluirBloco(params.blocoId);
       toast.success('Bloco marcado como concluído.');
-      if (params.onSuccess) {
-        params.onSuccess(undefined, true);
-      }
-      handleFechar();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Erro ao concluir bloco.';
-      setErroValidacao(msg);
-      toast.error(msg);
+      setSujo(false);
+      publicar('AGENDA_INVALIDADA', null);
+      params.onSuccess?.(undefined, true);
+      fecharAgora();
+    } catch (falha) {
+      tratarErro(falha);
+      const mensagem = falha instanceof Error ? falha.message : 'Erro ao concluir bloco.';
+      toast.error(mensagem);
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Submissão principal (Salvar sessão / Fluxo 2 etapas / Retry etapa 2)
+  /** Submissão principal: salvar sessão, fluxo em 2 etapas e retry isolado da etapa 2. */
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (isSaving || !params) return;
 
-    // Se estiver em estado de retry da Etapa 2 (sessão já salva, bloco pendente)
+    // Retry da etapa 2 (sessão já salva, bloco pendente): nenhum POST é refeito (§6.4).
     if (sessaoSalva && params.blocoId) {
       setIsSaving(true);
-      setErroParcialEtapa2(null);
-      setErroValidacao(null);
+      setErro(null);
       try {
-        await sessaoGlobalService.concluirBloco(params.blocoId, true);
+        await sessaoGlobalService.concluirBloco(params.blocoId);
         toast.success('Bloco concluído com sucesso!');
-        if (params.onSuccess) {
-          params.onSuccess(sessaoSalvaDTO || undefined, true);
-        }
-        handleFechar();
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Erro ao concluir bloco.';
-        setErroParcialEtapa2('A sessão de estudo foi salva com sucesso, mas não foi possível marcar o bloco como concluído.');
-        toast.error(msg);
+        setBlocoPendente(false);
+        sucessoFinalizado(sessaoId ? ({ id: sessaoId } as SessaoRegistradaDTO) : undefined, true);
+      } catch (falha) {
+        setBlocoPendente(true);
+        tratarErro(falha);
+        toast.error(falha instanceof Error ? falha.message : 'Erro ao concluir bloco.');
       } finally {
         setIsSaving(false);
       }
       return;
     }
 
-    // Validações
+    setErrosCampo([]);
+    setErro(null);
+
+    // Validações locais com erro inline por campo (D-22.5).
+    const validacoes: ErroCampo[] = [];
     if (duracaoTotalSegundos < 60) {
-      setErroValidacao('A duração mínima para registrar uma sessão é de 1 minuto (60 segundos).');
+      validacoes.push({
+        campo: 'duracaoSegundos',
+        mensagem: 'A duração mínima para registrar uma sessão é de 1 minuto (60 segundos).'
+      });
+    }
+    if (params.modo === 'MANUAL' && dataSessao > obterHojeISO()) {
+      validacoes.push({ campo: 'dataSessao', mensagem: 'A data da sessão não pode ser futura.' });
+    }
+    if (numQuestoes !== undefined && (isNaN(numQuestoes) || numQuestoes < 0)) {
+      validacoes.push({
+        campo: 'questoes',
+        mensagem: 'O número de questões deve ser zero ou positivo.'
+      });
+    }
+    if (numAcertos !== undefined) {
+      if (isNaN(numAcertos) || numAcertos < 0) {
+        validacoes.push({
+          campo: 'acertos',
+          mensagem: 'O número de acertos deve ser zero ou positivo.'
+        });
+      } else if (numQuestoes !== undefined && numAcertos > numQuestoes) {
+        validacoes.push({
+          campo: 'acertos',
+          mensagem: 'O número de acertos não pode ser maior que o total de questões.'
+        });
+      }
+    }
+    if (validacoes.length > 0) {
+      setErrosCampo(validacoes);
       return;
     }
 
-    if (params.modo === 'MANUAL') {
-      const hoje = obterHojeISO();
-      if (dataSessao > hoje) {
-        setErroValidacao('A data da sessão não pode ser futura.');
-        return;
-      }
-    }
-
-    if (numQuestoes !== undefined) {
-      if (isNaN(numQuestoes) || numQuestoes < 0) {
-        setErroValidacao('O número de questões deve ser zero ou positivo.');
-        return;
-      }
-      if (numAcertos !== undefined) {
-        if (isNaN(numAcertos) || numAcertos < 0) {
-          setErroValidacao('O número de acertos deve ser zero ou positivo.');
-          return;
-        }
-        if (numAcertos > numQuestoes) {
-          setErroValidacao('O número de acertos não pode ser maior que o total de questões.');
-          return;
-        }
-      }
-    }
-
     // Trilha e disciplina efetivas
-    let trilhaEfetivaId = selectedTrilhaId || params.trilhaId;
-    let disciplinaEfetivaId = selectedDisciplinaId || params.disciplinaId;
+    let trilhaEfetivaId = trilhaId || params.trilhaId || '';
+    let disciplinaEfetivaId = disciplinaId || params.disciplinaId || '';
 
     setIsSaving(true);
-    setErroValidacao(null);
-    setErroParcialEtapa2(null);
 
     try {
-      // Criação inline de trilha se necessário
+      // Criação inline (D-22.4): os IDs ficam em `criadosInline` e um retry nunca recria.
       if (trilhaEfetivaId === '__nova__' || !trilhaEfetivaId) {
-        if (!novaTrilhaNome.trim()) {
-          setErroValidacao('Informe o nome da nova trilha.');
-          setIsSaving(false);
-          return;
+        if (criadosInline.trilhaId) {
+          trilhaEfetivaId = criadosInline.trilhaId;
+          disciplinaEfetivaId = criadosInline.disciplinaId || disciplinaEfetivaId;
+        } else {
+          if (!novaTrilhaNome.trim()) {
+            setErrosCampo([{ campo: 'novaTrilha', mensagem: 'Informe o nome da nova trilha.' }]);
+            setIsSaving(false);
+            return;
+          }
+          const discNome = novaDisciplinaNome.trim() || 'Geral';
+          const novaTrilha = await request<TrilhaDetalheDTO>('/trilhas', {
+            method: 'POST',
+            body: JSON.stringify({
+              nome: novaTrilhaNome.trim(),
+              disciplinas: [{ nome: discNome, peso: 1, topicos: [] }]
+            })
+          });
+          trilhaEfetivaId = novaTrilha.id;
+          disciplinaEfetivaId = novaTrilha.disciplinas?.[0]?.id || '';
+          setCriadosInline({ trilhaId: novaTrilha.id, disciplinaId: disciplinaEfetivaId });
         }
-        const discNome = novaDisciplinaNome.trim() || 'Geral';
-        const novaTrilha = await request<TrilhaDetalheDTO>('/trilhas', {
-          method: 'POST',
-          body: JSON.stringify({
-            nome: novaTrilhaNome.trim(),
-            disciplinas: [{ nome: discNome, peso: 1, topicos: [] }]
-          })
-        });
-        trilhaEfetivaId = novaTrilha.id;
-        disciplinaEfetivaId = novaTrilha.disciplinas?.[0]?.id || '';
       } else if (disciplinaEfetivaId === '__nova__' || !disciplinaEfetivaId) {
-        if (!novaDisciplinaNome.trim()) {
-          setErroValidacao('Informe o nome da nova disciplina.');
-          setIsSaving(false);
-          return;
-        }
-        const novaDisc = await request<{ id: string }>(`/trilhas/${trilhaEfetivaId}/disciplinas`, {
-          method: 'POST',
-          body: JSON.stringify({ nome: novaDisciplinaNome.trim(), peso: 1, topicos: [] })
-        }).catch(() => null);
-
-        if (novaDisc) {
+        if (criadosInline.disciplinaId) {
+          disciplinaEfetivaId = criadosInline.disciplinaId;
+        } else {
+          if (!novaDisciplinaNome.trim()) {
+            setErrosCampo([
+              { campo: 'novaDisciplina', mensagem: 'Informe o nome da nova disciplina.' }
+            ]);
+            setIsSaving(false);
+            return;
+          }
+          const novaDisc = await request<{ id: string }>(
+            `/trilhas/${encodeURIComponent(trilhaEfetivaId)}/disciplinas`,
+            {
+              method: 'POST',
+              body: JSON.stringify({ nome: novaDisciplinaNome.trim(), peso: 1, topicos: [] })
+            }
+          );
           disciplinaEfetivaId = novaDisc.id;
+          setCriadosInline((atual) => ({ ...atual, disciplinaId: novaDisc.id }));
         }
       }
 
       if (!trilhaEfetivaId || !disciplinaEfetivaId) {
-        setErroValidacao('Selecione ou crie uma trilha e disciplina válidas.');
+        setErrosCampo([
+          { campo: 'geral', mensagem: 'Selecione ou crie uma trilha e disciplina válidas.' }
+        ]);
         setIsSaving(false);
         return;
       }
@@ -335,60 +497,49 @@ export const GlobalSessionModal: React.FC = () => {
         disciplinaId: disciplinaEfetivaId,
         dataSessao: params.modo === 'MANUAL' ? dataSessao : obterHojeISO(),
         duracaoSegundos: duracaoTotalSegundos,
-        questoes: numQuestoes,
-        acertos: numAcertos,
+        ...(numQuestoes !== undefined ? { questoes: numQuestoes } : {}),
+        ...(numAcertos !== undefined ? { acertos: numAcertos } : {}),
         chaveIdempotencia
       };
 
       if (!params.blocoId) {
-        // Sessão avulsa sem bloco vinculado
+        // Sessão avulsa (sem bloco vinculado).
         const sessao = await sessaoGlobalService.registrarSessao(
           trilhaEfetivaId,
           payload,
           chaveIdempotencia
         );
         toast.success('Sessão registrada com sucesso!');
-        if (params.onSuccess) {
-          params.onSuccess(sessao, false);
-        }
-        handleFechar();
+        sucessoFinalizado(sessao, true);
       } else {
-        // Fluxo em 2 etapas com bloco vinculado
-        let sessao: SessaoRegistradaDTO;
-        try {
-          sessao = await sessaoGlobalService.registrarSessao(
-            trilhaEfetivaId,
-            payload,
-            chaveIdempotencia
-          );
-          setSessaoSalva(true);
-          setSessaoSalvaDTO(sessao);
-        } catch (errSessao: unknown) {
-          const msg = errSessao instanceof Error ? errSessao.message : 'Falha ao salvar sessão.';
-          setErroValidacao(msg);
-          toast.error(msg);
-          setIsSaving(false);
-          return;
-        }
+        // Fluxo em 2 etapas: a etapa 2 não rejeita; reporta `blocoConcluido` e `erro`.
+        const resultado = await sessaoGlobalService.executarFluxo({
+          trilhaId: trilhaEfetivaId,
+          blocoId: params.blocoId,
+          payload,
+          chave: chaveIdempotencia,
+          sessaoSalva: sessaoId ? { id: sessaoId } : null
+        });
 
-        // Etapa 2: Concluir o bloco
-        try {
-          await sessaoGlobalService.concluirBloco(params.blocoId, true);
+        if (resultado.sessaoId) setSessaoId(resultado.sessaoId);
+        setSessaoSalva(resultado.sessaoSalva);
+
+        if (resultado.blocoConcluido) {
           toast.success('Sessão e conclusão de bloco salvas com sucesso!');
-          if (params.onSuccess) {
-            params.onSuccess(sessao, true);
-          }
-          handleFechar();
-        } catch (errBloco: unknown) {
-          const msg = errBloco instanceof Error ? errBloco.message : 'Falha ao concluir bloco.';
-          setErroParcialEtapa2('A sessão de estudo foi salva com sucesso, mas não foi possível marcar o bloco como concluído.');
-          toast.error(msg);
+          sucessoFinalizado(
+            resultado.sessaoId ? ({ id: resultado.sessaoId } as SessaoRegistradaDTO) : undefined,
+            true
+          );
+        } else {
+          setBlocoPendente(true);
+          if (resultado.erro) tratarErro(resultado.erro);
         }
       }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Erro ao processar solicitação.';
-      setErroValidacao(msg);
-      toast.error(msg);
+    } catch (falha) {
+      tratarErro(falha);
+      if (!params.blocoId) {
+        toast.error(falha instanceof Error ? falha.message : 'Erro ao registrar a sessão.');
+      }
     } finally {
       setIsSaving(false);
     }
@@ -447,19 +598,47 @@ export const GlobalSessionModal: React.FC = () => {
         </header>
 
         <form onSubmit={handleSubmit} className={styles.body}>
-          {erroParcialEtapa2 && (
+          {erroOffline && (
+            <div className={styles.alertWarning} role="alert">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, marginBottom: 4 }}>
+                <WifiOff size={18} />
+                Sem conexão
+              </div>
+              Sem conexão. Seus dados foram mantidos.
+              <div style={{ marginTop: 8 }}>
+                <Button type="button" variant="secondary" size="sm" onClick={() => void handleSubmit()}>
+                  Tentar novamente
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {blocoPendente && (
             <div className={styles.alertWarning} role="alert">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, marginBottom: 4 }}>
                 <AlertCircle size={18} />
                 Atenção: Ação parcial
               </div>
-              {erroParcialEtapa2}
+              A sessão de estudo foi salva, mas não foi possível marcar o bloco como concluído.
             </div>
           )}
 
-          {erroValidacao && (
+          {aguardandoLogin && !erroOffline && (
+            <div className={styles.alertError} role="status">
+              Sua sessão expirou. Entre novamente para concluir o registro — os dados foram
+              mantidos e serão reenviados com a mesma chave.
+            </div>
+          )}
+
+          {mensagemErroGeral && !blocoPendente && (
             <div className={styles.alertError} role="alert">
-              {erroValidacao}
+              {mensagemErroGeral}
+            </div>
+          )}
+
+          {erroDoCampo('geral') && (
+            <div className={styles.alertError} role="alert">
+              {erroDoCampo('geral')}
             </div>
           )}
 
@@ -489,46 +668,62 @@ export const GlobalSessionModal: React.FC = () => {
                 <Select
                   id="sessao-trilha-select"
                   options={trilhaOptions}
-                  value={selectedTrilhaId}
-                  onChange={(val) => setSelectedTrilhaId(val)}
+                  value={trilhaId}
+                  onChange={(val) => {
+                    setTrilhaId(val);
+                    setSujo(true);
+                  }}
                   disabled={isSaving || sessaoSalva}
+                  error={erroDoCampo('trilhaId')}
                 />
               </div>
 
-              {selectedTrilhaId === '__nova__' && (
+              {trilhaId === '__nova__' && (
                 <div className={styles.formGroup}>
                   <label className={styles.label} htmlFor="sessao-nova-trilha">Nome da Nova Trilha</label>
                   <Input
                     id="sessao-nova-trilha"
                     value={novaTrilhaNome}
-                    onChange={(e) => setNovaTrilhaNome(e.target.value)}
+                    onChange={(e) => {
+                      setNovaTrilhaNome(e.target.value);
+                      setSujo(true);
+                    }}
                     placeholder="Ex: Concurso Auditor Fiscal"
+                    error={erroDoCampo('novaTrilha')}
                     disabled={isSaving || sessaoSalva}
                   />
                 </div>
               )}
 
-              {selectedTrilhaId !== '__nova__' && (
+              {trilhaId !== '__nova__' && (
                 <div className={styles.formGroup}>
                   <label className={styles.label} htmlFor="sessao-disciplina-select">Disciplina</label>
                   <Select
                     id="sessao-disciplina-select"
                     options={disciplinaOptions}
-                    value={selectedDisciplinaId}
-                    onChange={(val) => setSelectedDisciplinaId(val)}
+                    value={disciplinaId}
+                    onChange={(val) => {
+                      setDisciplinaId(val);
+                      setSujo(true);
+                    }}
                     disabled={isSaving || sessaoSalva}
+                    error={erroDoCampo('disciplinaId')}
                   />
                 </div>
               )}
 
-              {(selectedDisciplinaId === '__nova__' || selectedTrilhaId === '__nova__') && (
+              {(disciplinaId === '__nova__' || trilhaId === '__nova__') && (
                 <div className={styles.formGroup}>
                   <label className={styles.label} htmlFor="sessao-nova-disciplina">Nome da Nova Disciplina</label>
                   <Input
                     id="sessao-nova-disciplina"
                     value={novaDisciplinaNome}
-                    onChange={(e) => setNovaDisciplinaNome(e.target.value)}
+                    onChange={(e) => {
+                      setNovaDisciplinaNome(e.target.value);
+                      setSujo(true);
+                    }}
                     placeholder="Ex: Direito Constitucional"
+                    error={erroDoCampo('novaDisciplina')}
                     disabled={isSaving || sessaoSalva}
                   />
                 </div>
@@ -536,7 +731,7 @@ export const GlobalSessionModal: React.FC = () => {
             </>
           )}
 
-          {/* Duração em Horas e Minutos */}
+          {/* Duração em Horas e Minutos (D-22: segundos originais preservados) */}
           <div className={styles.formGrid}>
             <div className={styles.formGroup}>
               <label className={styles.label} htmlFor="sessao-horas">Horas</label>
@@ -545,12 +740,18 @@ export const GlobalSessionModal: React.FC = () => {
                   id="sessao-horas"
                   ref={hoursInputRef}
                   type="number"
+                  inputMode="numeric"
                   min="0"
                   max="24"
                   value={horas}
-                  onChange={(e) => setHoras(e.target.value)}
+                  onChange={(e) => {
+                    setHoras(e.target.value);
+                    setDuracaoEditada(true);
+                    setSujo(true);
+                  }}
                   disabled={isSaving || sessaoSalva}
                   className={styles.inputNumber}
+                  error={erroDoCampo('duracaoSegundos')}
                 />
                 <span className={styles.unit}>h</span>
               </div>
@@ -562,10 +763,15 @@ export const GlobalSessionModal: React.FC = () => {
                 <Input
                   id="sessao-minutos"
                   type="number"
+                  inputMode="numeric"
                   min="0"
                   max="59"
                   value={minutos}
-                  onChange={(e) => setMinutos(e.target.value)}
+                  onChange={(e) => {
+                    setMinutos(e.target.value);
+                    setDuracaoEditada(true);
+                    setSujo(true);
+                  }}
                   disabled={isSaving || sessaoSalva}
                   className={styles.inputNumber}
                 />
@@ -573,6 +779,12 @@ export const GlobalSessionModal: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {duracaoOriginalSegundos > 0 && !duracaoEditada && (
+            <p className={styles.helperText} data-testid="tempo-medido">
+              {descreverTempoMedido(duracaoOriginalSegundos)} ({formatarRelogio(duracaoOriginalSegundos)})
+            </p>
+          )}
 
           {/* Data da Sessão: editável em MANUAL; somente leitura nos demais */}
           <div className={styles.formGroup}>
@@ -604,10 +816,14 @@ export const GlobalSessionModal: React.FC = () => {
                 type="number"
                 min="0"
                 value={questoes}
-                onChange={(e) => setQuestoes(e.target.value)}
+                onChange={(e) => {
+                  setQuestoes(e.target.value);
+                  setSujo(true);
+                }}
                 placeholder="Ex: 20"
                 disabled={isSaving || sessaoSalva}
                 className={styles.inputNumber}
+                error={erroDoCampo('questoes')}
               />
             </div>
 
@@ -616,12 +832,17 @@ export const GlobalSessionModal: React.FC = () => {
               <Input
                 id="sessao-acertos"
                 type="number"
+                inputMode="numeric"
                 min="0"
                 value={acertos}
-                onChange={(e) => setAcertos(e.target.value)}
+                onChange={(e) => {
+                  setAcertos(e.target.value);
+                  setSujo(true);
+                }}
                 placeholder="Ex: 17"
                 disabled={isSaving || sessaoSalva}
                 className={styles.inputNumber}
+                error={erroDoCampo('acertos')}
               />
             </div>
           </div>
@@ -643,12 +864,12 @@ export const GlobalSessionModal: React.FC = () => {
           )}
 
           <div className={styles.footer}>
-            {params.modo === 'BLOCO_DIRETO' && !sessaoSalva && (
+            {modoComBloco && !sessaoSalva && (
               <div className={styles.footerLeft}>
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={handleConcluirSemSalvar}
+                  onClick={() => void handleConcluirSemSalvar()}
                   disabled={isSaving}
                 >
                   Concluir sem salvar sessão
@@ -659,7 +880,7 @@ export const GlobalSessionModal: React.FC = () => {
             <Button
               type="button"
               variant="secondary"
-              onClick={handleFechar}
+              onClick={() => void handleFechar()}
               disabled={isSaving}
             >
               Cancelar
@@ -668,15 +889,10 @@ export const GlobalSessionModal: React.FC = () => {
             <Button
               type="submit"
               variant="primary"
+              loading={isSaving}
               disabled={isSaving}
             >
-              {isSaving
-                ? 'Salvando...'
-                : erroParcialEtapa2
-                ? 'Tentar concluir bloco novamente'
-                : params.blocoId
-                ? 'Salvar sessão e concluir bloco'
-                : 'Salvar Sessão'}
+              {blocoPendente ? 'Tentar concluir bloco novamente' : 'Salvar sessão'}
             </Button>
           </div>
         </form>

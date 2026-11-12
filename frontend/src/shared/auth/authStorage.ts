@@ -1,5 +1,6 @@
 import { AuthResponse, UsuarioAutenticado } from './types';
 import { registrarFalha } from '../diagnostico';
+import { assinar, definirUsuarioCorrente, publicar } from '../sync/barramento';
 
 /**
  * Sessão em memória (D-09).
@@ -10,36 +11,29 @@ import { registrarFalha } from '../diagnostico';
  * `GET /api/auth/me`.
  */
 export const AUTH_CHANGE_EVENT = 'trilhara:auth-change';
-const AUTH_LOGOUT_EVENT = 'trilhara:auth:logout';
-export const AUTH_CONTA_EXCLUIDA_EVENT = 'trilhara:auth:conta-excluida';
-const BROADCAST_CHANNEL_NAME = 'trilhara_auth_channel';
+/** Logout local ou propagado por outra aba (D-21.d). */
+const AUTH_LOGOUT_EVENT = 'trilhara:logout';
+/** Conta excluída nesta aba ou em outra (D-21.d). */
+export const AUTH_CONTA_EXCLUIDA_EVENT = 'trilhara:conta-excluida';
 
 let accessTokenEmMemoria: string | null = null;
 let usuarioEmMemoria: UsuarioAutenticado | null = null;
 
-let broadcastChannel: BroadcastChannel | null = null;
-if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-  try {
-    broadcastChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
-    broadcastChannel.onmessage = (event) => {
-      if (event.data?.type === 'AUTH_SYNC') {
-        window.dispatchEvent(new CustomEvent(AUTH_CHANGE_EVENT, { detail: { fromBroadcast: true } }));
-      } else if (event.data?.type === 'AUTH_LOGOUT') {
-        // Sessão de outra aba da mesma origem deixou de existir: espelha localmente.
-        accessTokenEmMemoria = null;
-        usuarioEmMemoria = null;
-        window.dispatchEvent(new CustomEvent(AUTH_LOGOUT_EVENT, { detail: { usuarioId: event.data.usuarioId } }));
-        window.dispatchEvent(new CustomEvent(AUTH_CHANGE_EVENT, { detail: { fromBroadcast: true } }));
-      } else if (event.data?.type === 'ACCOUNT_DELETED') {
-        if (event.data.usuarioId) {
-          limparDadosLocaisDoUsuario(event.data.usuarioId, false);
-        }
-      }
-    };
-  } catch {
-    broadcastChannel = null;
-  }
-}
+// Sincronização entre abas pelo barramento único (D-21), sem canal próprio.
+assinar('SESSAO_ENCERRADA', (mensagem) => {
+  accessTokenEmMemoria = null;
+  usuarioEmMemoria = null;
+  window.dispatchEvent(
+    new CustomEvent(AUTH_LOGOUT_EVENT, { detail: { usuarioId: mensagem.usuarioId } })
+  );
+  window.dispatchEvent(new CustomEvent(AUTH_CHANGE_EVENT, { detail: { fromBroadcast: true } }));
+});
+
+assinar('CONTA_EXCLUIDA', (mensagem) => {
+  const usuarioId = mensagem.usuarioId;
+  if (usuarioId) limparDadosLocaisDoUsuario(usuarioId, false);
+});
+
 
 /**
  * Remove todas as chaves `trilhara:u:${usuarioId}:*` da origem atual e a sessão em memória.
@@ -81,12 +75,9 @@ export function limparDadosLocaisDoUsuario(usuarioId: string, emitirBroadcast: b
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent(AUTH_CONTA_EXCLUIDA_EVENT, { detail: { usuarioId } }));
-      if (emitirBroadcast && broadcastChannel) {
-        try {
-          broadcastChannel.postMessage({ type: 'ACCOUNT_DELETED', usuarioId, timestamp: Date.now() });
-        } catch {
-          // Ignora erro de postMessage
-        }
+      if (emitirBroadcast) {
+        // Outra aba ainda pode ter a conta em memória: `usuarioId` explícito no envelope.
+        publicar('CONTA_EXCLUIDA', null, usuarioId);
       }
     }
   } catch (err) {
@@ -97,15 +88,9 @@ export function limparDadosLocaisDoUsuario(usuarioId: string, emitirBroadcast: b
 function notificarMudancaAuth(): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(AUTH_CHANGE_EVENT));
-    if (broadcastChannel) {
-      try {
-        broadcastChannel.postMessage({ type: 'AUTH_SYNC', timestamp: Date.now() });
-      } catch {
-        // Ignora erro de postMessage
-      }
-    }
   }
 }
+
 
 export const AuthStorage = {
   /** Access token em memória; nunca persistido. */
@@ -123,6 +108,7 @@ export const AuthStorage = {
     accessTokenEmMemoria = resposta.accessToken ?? null;
     if (resposta.usuario) {
       usuarioEmMemoria = resposta.usuario;
+      definirUsuarioCorrente(resposta.usuario.id);
     }
     notificarMudancaAuth();
   },
@@ -130,6 +116,7 @@ export const AuthStorage = {
   /** Atualiza o perfil em memória (ex.: e-mail confirmado, tema alterado). */
   atualizarUsuario(usuario: UsuarioAutenticado): void {
     usuarioEmMemoria = usuario;
+    definirUsuarioCorrente(usuario.id);
     notificarMudancaAuth();
   },
 
@@ -141,17 +128,10 @@ export const AuthStorage = {
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent(AUTH_LOGOUT_EVENT, { detail: { usuarioId: usuarioAtual?.id } }));
-      if (broadcastChannel) {
-        try {
-          broadcastChannel.postMessage({
-            type: 'AUTH_LOGOUT',
-            usuarioId: usuarioAtual?.id,
-            timestamp: Date.now()
-          });
-        } catch {
-          // Ignora erro de postMessage
-        }
+      if (usuarioAtual?.id) {
+        publicar('SESSAO_ENCERRADA', null, usuarioAtual.id);
       }
+      definirUsuarioCorrente(null);
       try {
         window.sessionStorage.removeItem('trilhara:pending_import_edital_id');
       } catch {
@@ -161,6 +141,7 @@ export const AuthStorage = {
 
     notificarMudancaAuth();
   },
+
 
   limparDadosLocaisDoUsuario(usuarioId: string): void {
     limparDadosLocaisDoUsuario(usuarioId);

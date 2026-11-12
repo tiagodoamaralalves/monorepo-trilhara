@@ -8,6 +8,39 @@ import { SyncStatusBadge } from '../shared/design-system/SyncStatusBadge/SyncSta
 import { GlobalSessionModal } from '../shared/design-system/GlobalSessionModal/GlobalSessionModal';
 import { GlobalSessionModalProvider, useGlobalSessionModal } from '../shared/design-system/GlobalSessionModal/GlobalSessionModalContext';
 import { ToastProvider } from '../shared/design-system/Toast/Toast';
+import { AuthContext, AuthContextValue } from '../shared/auth/AuthContext';
+import { StudyTimerProvider } from '../shared/timers/estudoTimer';
+
+const mockAuthValue = (usuarioId: string): AuthContextValue => ({
+  usuario: {
+    id: usuarioId,
+    nome: 'Aluno A11y',
+    email: 'a11y@trilhara.com.br',
+    emailVerificado: true,
+    ativo: true,
+    criadoEm: '2026-11-09T00:00:00Z',
+    papeis: ['USER'],
+    preferencias: {
+      tema: 'dark',
+      disponibilidadeSemanalMinutos: [0, 0, 0, 0, 0, 0, 0],
+      padraoLembreteMinutosAntes: 15
+    }
+  },
+  isAuthenticated: true,
+  carregando: false,
+  isAuthModalOpen: false,
+  abrirAuthModal: vi.fn(),
+  fecharAuthModal: vi.fn(),
+  isContaModalOpen: false,
+  abrirContaModal: vi.fn(),
+  fecharContaModal: vi.fn(),
+  excluirConta: vi.fn(),
+  login: vi.fn(),
+  cadastrar: vi.fn(),
+  logout: vi.fn(),
+  verificarSessao: vi.fn(),
+  setUsuario: vi.fn()
+});
 
 // Componente auxiliar para teste de foco e fechamento do Modal
 const ModalHarness: React.FC<{ isSaving?: boolean }> = ({ isSaving = false }) => {
@@ -207,9 +240,15 @@ describe('FASE 11 — Auditoria e Testes Automatizados de Acessibilidade (WCAG 2
     it('deve abrir GlobalSessionModal, fechar com Escape e restaurar foco ao triggerElement', async () => {
       render(
         <ToastProvider>
-          <GlobalSessionModalProvider>
-            <GlobalSessionHarness />
-          </GlobalSessionModalProvider>
+          <ConfirmProvider>
+            <AuthContext.Provider value={mockAuthValue('user-a11y')}>
+              <StudyTimerProvider>
+                <GlobalSessionModalProvider>
+                  <GlobalSessionHarness />
+                </GlobalSessionModalProvider>
+              </StudyTimerProvider>
+            </AuthContext.Provider>
+          </ConfirmProvider>
         </ToastProvider>
       );
 

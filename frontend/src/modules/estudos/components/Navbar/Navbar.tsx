@@ -1,13 +1,11 @@
 import React, { useMemo } from 'react';
 import { AppSidebar } from '@shared/design-system';
 import { TrilhaResumoDTO, TrilhaDetalheDTO, PaginaAtiva, UsuarioAutenticado } from '../../types/trilhara';
-import { useStudyTimer } from '../../context/StudyTimerContext';
+import { useStudyTimer } from '@shared/timers/estudoTimer';
 import { formatarSegundos } from '../../utils/format';
 import { NAV_ITEMS } from './navigationConfig';
 import { TrilhaPod } from './TrilhaPod';
 import { MobileTrilhaControls } from './MobileTrilhaControls';
-
-const SEM_TRILHA_TIMER_ID = '__sem_trilha__';
 
 export interface NavbarProps {
   trilhas: TrilhaResumoDTO[];
@@ -34,7 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   onAbrirConta
 }) => {
-  const timer = useStudyTimer(trilhaAtiva?.id || SEM_TRILHA_TIMER_ID);
+  const timer = useStudyTimer();
   const isTimerRunning = timer.running || timer.breakSeconds > 0;
   const liveTimerText = useMemo(() => {
     if (timer.breakSeconds > 0) return formatarSegundos(timer.breakSeconds);
