@@ -99,7 +99,7 @@ class AuthResourceTest {
                 .body("usuario.id", notNullValue())
                 .body("usuario.nome", equalTo("Ana Beatriz Silva"))
                 .body("usuario.email", equalTo(email.toLowerCase()))
-                .body("usuario.roles", hasItem("USER"))
+                .body("usuario.papeis", hasItem("USER"))
                 .body("$", not(org.hamcrest.Matchers.hasKey("senha")))
                 .body("usuario", not(org.hamcrest.Matchers.hasKey("senhaHash")))
                 .extract().response();
@@ -216,7 +216,7 @@ class AuthResourceTest {
                 .then().statusCode(200)
                 .body("nome", equalTo("Carlos Souza"))
                 .body("email", equalTo(email))
-                .body("roles", hasItem("USER"));
+                .body("papeis", hasItem("USER"));
     }
 
     @Test

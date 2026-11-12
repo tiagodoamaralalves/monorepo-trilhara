@@ -10,7 +10,9 @@ import java.util.regex.Pattern;
 import org.bson.types.ObjectId;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import br.com.trilhara.auth.dto.PreferenciasDTO;
 import br.com.trilhara.auth.dto.UsuarioResponse;
+import br.com.trilhara.shared.mongo.BsonIds;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.NotFoundException;
@@ -174,6 +176,22 @@ public class UserService {
         return repository.listar(pagina, tamanho).stream()
                 .map(UsuarioResponse::de)
                 .toList();
+    }
+
+    /** Preferências persistidas com defaults normativos (D-10). */
+    public PreferenciasDTO preferenciasDe(String usuarioId) {
+        ObjectId alvo = BsonIds.parse(usuarioId, "usuarioId");
+        String tema = repository.obterTema(alvo).orElse(PreferenciasDTO.TEMA_PADRAO);
+        List<Integer> disponibilidade = repository.obterDisponibilidadeSemanal(alvo);
+        int padrao = repository.obterPadraoLembreteMinutos(alvo);
+        return new PreferenciasDTO(tema, disponibilidade, padrao);
+    }
+
+    /** Atualiza o tema do usuário autenticado e devolve as preferências completas. */
+    public PreferenciasDTO atualizarTema(String usuarioId, String tema) {
+        ObjectId alvo = BsonIds.parse(usuarioId, "usuarioId");
+        repository.salvarTema(alvo, tema);
+        return preferenciasDe(usuarioId);
     }
 
     public static String normalizarEmail(String email) {

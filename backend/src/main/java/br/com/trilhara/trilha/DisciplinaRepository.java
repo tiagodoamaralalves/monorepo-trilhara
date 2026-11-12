@@ -157,8 +157,8 @@ public class DisciplinaRepository {
                         tDoc.getInteger("ordem", 0)));
             }
         }
-        Instant criadoEm = BsonDates.toInstant(doc, "criadoEm");
-        Instant atualizadoEm = BsonDates.toInstant(doc, "atualizadoEm");
+        Instant criadoEm = BsonDates.lerInstant(doc, "criadoEm");
+        Instant atualizadoEm = BsonDates.lerInstant(doc, "atualizadoEm");
 
         return new Disciplina(id, usuarioId, trilhaId, nome, cor, peso, ordem, cadernoLink, topicos, criadoEm, atualizadoEm);
     }

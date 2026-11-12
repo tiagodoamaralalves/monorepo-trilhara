@@ -69,10 +69,9 @@ class TenantIsolationArchTest {
             .because("D-06(b): purgas/scheduler/exclusão de conta vivem em ..job.. sem HTTP.");
 
     /**
-     * Habilita em R13 (D-06/DC-01): pacotes legados proibidos.
-     * O grep já dá 0 ocorrências hoje; a regra é a guarda anti-regressão.
+     * Habilitada em R2: guarda anti-regressão dos pacotes legados (Anexo C / DC-01).
+     * O grep já dá 0 ocorrências; a regra impede reintrodução.
      */
-    @ArchIgnore(reason = "Habilitar em R13 (DC-01): guarda anti-regressão de pacotes legados")
     @ArchTest
     static final ArchRule pacotesLegadosProibidos = noClasses()
             .should()

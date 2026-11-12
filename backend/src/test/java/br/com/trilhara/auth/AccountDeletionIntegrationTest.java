@@ -403,7 +403,17 @@ class AccountDeletionIntegrationTest {
                 .append("criadoEm", agora)
                 .append("expiraEm", Date.from(Instant.now().plusSeconds(3600))));
 
-        // 4. lembretes_push
+        // 4. tokens_handoff_sso (D-08)
+        db.getCollection("tokens_handoff_sso").insertOne(new Document()
+                .append("_id", new ObjectId())
+                .append("usuarioId", usuarioId)
+                .append("codigoHash", UUID.randomUUID().toString())
+                .append("origemDestino", "http://localhost:5174/")
+                .append("criadoEm", agora)
+                .append("expiraEm", Date.from(Instant.now().plusSeconds(60)))
+                .append("consumidoEm", null));
+
+        // 5. lembretes_push
         db.getCollection("lembretes_push").insertOne(new Document()
                 .append("usuarioId", usuarioId)
                 .append("tarefaId", new ObjectId())

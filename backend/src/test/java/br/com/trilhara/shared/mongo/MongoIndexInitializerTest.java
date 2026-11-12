@@ -1,13 +1,12 @@
 package br.com.trilhara.shared.mongo;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.bson.Document;
@@ -24,11 +23,18 @@ import com.mongodb.client.model.Indexes;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 
+/**
+ * R2 — tabela canônica de índices (D-07).
+ *
+ * <p>Valida nome, chaves e <strong>todas</strong> as opções (unique, TTL, filtro parcial,
+ * idioma/pesos de texto), a idempotência, o reporte de drift e a detecção de conflito de
+ * opções (que deve deixar o readiness {@code DOWN}).</p>
+ */
 @QuarkusTest
-@DisplayName("FASE 1 - Inicializador Centralizado e Idempotente das 19 Coleções do MongoDB")
+@DisplayName("R2 - Índices canônicos das 20 coleções (D-07) e readiness")
 class MongoIndexInitializerTest {
 
-    private static final String BANCO_TESTE = "trilhara_fase1_indexes_test";
+    private static final String BANCO_TESTE = "trilhara_r2_indexes_test";
 
     @Inject
     MongoClient mongoClient;
@@ -52,92 +58,142 @@ class MongoIndexInitializerTest {
     }
 
     @Test
-    @DisplayName("Deve criar idempotentemente todos os índices das 19 coleções em banco vazio")
-    void deveCriarIndicesDas19ColecoesEmBancoVazio() {
-        // Primeira execução: cria tudo em banco vazio
-        assertDoesNotThrow(() -> indexInitializer.inicializarIndices(testDb));
+    @DisplayName("deveCriarExatamenteIndicesCanonicos: nome, chaves e opções de cada índice")
+    void deveCriarExatamenteIndicesCanonicos() {
+        DiagnosticoIndices diagnostico = indexInitializer.inicializarIndices(testDb);
+        assertTrue(diagnostico.saudavel(), "Sem conflitos após criar em banco vazio: " + diagnostico.conflitos());
 
-        // Tabela esperada de coleções e seus índices mínimos
-        Map<String, List<String>> indicesEsperadosPorColecao = Map.ofEntries(
-                Map.entry("usuarios", List.of("idx_usuarios_email_unique", "idx_usuarios_criadoEm_desc")),
-                Map.entry("refresh_tokens", List.of("idx_refresh_tokens_tokenHash_unique", "idx_refresh_tokens_usuario_familia", "idx_refresh_tokens_expiraEm")),
-                Map.entry("tokens_recuperacao_senha", List.of("idx_tokens_recuperacao_tokenHash_unique", "idx_tokens_recuperacao_usuario", "idx_tokens_recuperacao_expiraEm")),
-                Map.entry("tokens_confirmacao_email", List.of("idx_tokens_confirmacao_tokenHash_unique", "idx_tokens_confirmacao_usuario", "idx_tokens_confirmacao_expiraEm")),
-                Map.entry("editais", List.of("idx_editais_status_esfera_atualizadoEm")),
-                Map.entry("trilhas", List.of("idx_trilhas_usuario_atualizadoEm", "idx_trilhas_usuario_origemEdital", "idx_trilhas_usuario_cronogramaAtivo")),
-                Map.entry("disciplinas", List.of("idx_disciplinas_usuario_trilha_ordem")),
-                Map.entry("progresso_topicos", List.of("idx_progresso_topicos_unico")),
-                Map.entry("cronogramas", List.of("idx_cronogramas_usuario_trilha_modalidade_unique", "idx_cronogramas_usuario_trilha_ativo_unique")),
-                Map.entry("blocos_cronograma", List.of("idx_blocos_usuario_trilha_cronograma_versao_data_ordem_unique", "idx_blocos_usuario_data_concluido")),
-                Map.entry("sessoes", List.of("idx_sessoes_usuario_trilha_data_criado_id", "idx_sessoes_usuario_trilha_disciplina_data", "idx_sessoes_usuario_chaveIdempotencia_unique")),
-                Map.entry("listas_tarefas", List.of("idx_listas_tarefas_usuario_deletedAt_ordem")),
-                Map.entry("series_recorrentes", List.of("idx_series_recorrentes_usuario_deletedAt_ativa")),
-                Map.entry("tarefas", List.of("idx_tarefas_usuario_deleted_lista_concluida_ordem", "idx_tarefas_usuario_deleted_concluida_vencimento", "idx_tarefas_usuario_serie_dataOriginal_unique")),
-                Map.entry("cadernos", List.of("idx_cadernos_usuario_deletedAt_atualizadoEm", "idx_cadernos_usuario_origemTrilha_unique")),
-                Map.entry("secoes", List.of("idx_secoes_usuario_caderno_deletedAt_ordem", "idx_secoes_usuario_caderno_origemDisciplina")),
-                Map.entry("notas", List.of("idx_notas_usuario_secao_deletedAt_ordem", "idx_notas_usuario_caderno_deletedAt", "idx_notas_usuario_deletedAt_text")),
-                Map.entry("push_subscriptions", List.of("idx_push_subscriptions_usuario", "idx_push_subscriptions_endpoint_unique")),
-                Map.entry("lembretes_push", List.of("idx_lembretes_push_estado_instanteEntregaUtc", "idx_lembretes_push_usuario_tarefa"))
-        );
+        for (IndicesCanonicos.IndiceCanonico esperado : IndicesCanonicos.todos()) {
+            Document encontrado = buscarIndice(testDb, esperado.colecao().nome(), esperado.nome());
+            assertTrue(encontrado != null,
+                    "Índice ausente: " + esperado.colecao().nome() + "." + esperado.nome());
 
-        assertEquals(19, indicesEsperadosPorColecao.size(), "O sistema deve inicializar exatamente as 19 coleções especificadas");
-
-        for (Map.Entry<String, List<String>> entry : indicesEsperadosPorColecao.entrySet()) {
-            String colecao = entry.getKey();
-            List<String> esperados = entry.getValue();
-
-            Set<String> nomesExistentes = new HashSet<>();
-            for (Document docIndice : testDb.getCollection(colecao).listIndexes()) {
-                nomesExistentes.add(docIndice.getString("name"));
+            Document chaves = encontrado.get("key", Document.class);
+            if (esperado.idioma() == null) {
+                assertEquals(
+                        normalizar(esperado.chaves().toBsonDocument(org.bson.BsonDocument.class,
+                                com.mongodb.MongoClientSettings.getDefaultCodecRegistry()).toJson()),
+                        normalizar(chaves.toJson()),
+                        "Chaves divergentes em " + esperado.nome());
+            } else {
+                // Índice de texto: MongoDB guarda {_fts, _ftsx} e os campos em weights.
+                assertEquals(1, ((Number) chaves.get("usuarioId")).intValue(), esperado.nome());
+                assertEquals(1, ((Number) chaves.get("deletedAt")).intValue(), esperado.nome());
+                assertEquals("text", chaves.getString("_fts"), esperado.nome());
+                Document pesos = encontrado.get("weights", Document.class);
+                assertEquals(10, ((Number) pesos.get("titulo")).intValue(), esperado.nome());
+                assertEquals(1, ((Number) pesos.get("conteudoMarkdown")).intValue(), esperado.nome());
             }
 
-            for (String esperado : esperados) {
-                assertTrue(nomesExistentes.contains(esperado),
-                        String.format("Índice esperado '%s' ausente na coleção '%s'. Encontrados: %s", esperado, colecao, nomesExistentes));
+            boolean esperadoUnico = esperado.unico();
+            boolean encontradoUnico = Boolean.TRUE.equals(encontrado.getBoolean("unique", Boolean.FALSE));
+            assertEquals(esperadoUnico, encontradoUnico, "unique divergente em " + esperado.nome());
+
+            Integer ttlEsperado = esperado.ttlSegundos();
+            Object ttlBruto = encontrado.get("expireAfterSeconds");
+            Long ttlEncontrado = ttlBruto instanceof Number numero ? numero.longValue() : null;
+            if (ttlEsperado == null) {
+                assertTrue(ttlEncontrado == null, "TTL inesperado em " + esperado.nome());
+            } else {
+                assertEquals(ttlEsperado.longValue(), ttlEncontrado, "TTL divergente em " + esperado.nome());
+            }
+
+            Document filtroEsperado = esperado.filtroParcial() == null ? null
+                    : Document.parse(esperado.filtroParcial().toBsonDocument(org.bson.BsonDocument.class,
+                            com.mongodb.MongoClientSettings.getDefaultCodecRegistry()).toJson());
+            Document filtroEncontrado = encontrado.get("partialFilterExpression", Document.class);
+            assertEquals(normalizar(filtroEsperado), normalizar(filtroEncontrado),
+                    "partialFilterExpression divergente em " + esperado.nome());
+
+            if (esperado.idioma() != null) {
+                assertEquals(esperado.idioma(), encontrado.getString("default_language"),
+                        "default_language divergente em " + esperado.nome());
             }
         }
-
-        // Segunda execução: deve ser 100% idempotente sem gerar erros nem duplicidade
-        assertDoesNotThrow(() -> indexInitializer.inicializarIndices(testDb));
     }
 
     @Test
-    @DisplayName("Deve detectar conflito e lançar exceção se índice existente tiver chave diferente com mesmo nome")
-    void deveDetectarConflitoDeChaveComMesmoNome() {
-        // Cria previamente um índice com nome de destino mas chave diferente
-        testDb.getCollection("usuarios").createIndex(
-                Indexes.ascending("nome"),
-                new IndexOptions().name("idx_usuarios_email_unique")
-        );
+    @DisplayName("deveSerIdempotente: segunda execução não cria duplicidade nem conflito")
+    void deveSerIdempotente() {
+        DiagnosticoIndices primeira = indexInitializer.inicializarIndices(testDb);
+        assertTrue(primeira.saudavel());
 
-        IllegalStateException ex = assertThrows(
-                IllegalStateException.class,
-                () -> indexInitializer.inicializarIndices(testDb));
+        DiagnosticoIndices segunda = indexInitializer.inicializarIndices(testDb);
+        assertTrue(segunda.saudavel(), "Segunda execução deve permanecer saudável: " + segunda.conflitos());
+        assertTrue(segunda.drift().isEmpty(), "Sem drift em execução idempotente: " + segunda.drift());
 
-        assertTrue(ex.getMessage().contains("Conflito de chave") || ex.getMessage().contains("idx_usuarios_email_unique"),
-                "Deveria reportar conflito com diagnóstico claro");
+        for (IndicesCanonicos.IndiceCanonico indice : IndicesCanonicos.todos()) {
+            List<String> nomes = new ArrayList<>();
+            for (Document doc : testDb.getCollection(indice.colecao().nome()).listIndexes()) {
+                nomes.add(doc.getString("name"));
+            }
+            long ocorrencias = nomes.stream().filter(indice.nome()::equals).count();
+            assertEquals(1, ocorrencias, "Índice duplicado: " + indice.nome());
+        }
     }
 
     @Test
-    @DisplayName("Deve detectar conflito e lançar exceção se chave já indexada sob nome legado diferente")
-    void deveDetectarConflitoDeMesmaChaveComNomeDiferente() {
-        // Simula índice legado criado sem nome customizado pelo MongoDB
-        testDb.getCollection("usuarios").createIndex(
-                Indexes.ascending("email"),
-                new IndexOptions().name("email_1").unique(true)
-        );
+    @DisplayName("deveFicarDownComConflitoDeOpcoes: índice prévio com TTL diferente derruba o readiness")
+    void deveFicarDownComConflitoDeOpcoes() {
+        // Cria previamente o índice de expiração de refresh_tokens SEM TTL (opção divergente).
+        testDb.getCollection(ColecaoTrilhara.REFRESH_TOKENS.nome())
+                .createIndex(Indexes.ascending("expiraEm"),
+                        new IndexOptions().name("idx_refresh_tokens_expiraEm"));
 
-        IllegalStateException ex = assertThrows(
-                IllegalStateException.class,
-                () -> indexInitializer.inicializarIndices(testDb));
+        DiagnosticoIndices diagnostico = indexInitializer.inicializarIndices(testDb);
+        assertFalse(diagnostico.saudavel(), "Conflito de TTL deve ser reportado");
 
-        assertTrue(ex.getMessage().contains("Conflito de índice detectado") || ex.getMessage().contains("email_1"),
-                "Deveria reportar índice conflitante com mesmo conjunto de chaves");
+        boolean conflitoReportado = diagnostico.conflitos().stream()
+                .anyMatch(c -> "idx_refresh_tokens_expiraEm".equals(c.indice())
+                        && c.encontrado().contains("expireAfterSeconds"));
+        assertTrue(conflitoReportado, "Diagnóstico deve apontar o TTL divergente: " + diagnostico.conflitos());
     }
 
     @Test
-    @DisplayName("Readiness Health Check deve reportar UP quando índices inicializados")
-    void deveReportarUpNoHealthCheck() {
-        assertTrue(indexInitializer.isInicializadoSucesso());
+    @DisplayName("deveReportarDriftSemRemover: índice idx_ não declarado vira drift e permanece")
+    void deveReportarDriftSemRemover() {
+        indexInitializer.inicializarIndices(testDb);
+        testDb.getCollection(ColecaoTrilhara.USUARIOS.nome())
+                .createIndex(Indexes.ascending("nome"), new IndexOptions().name("idx_usuarios_nome_legado"));
+
+        DiagnosticoIndices diagnostico = indexInitializer.inicializarIndices(testDb);
+        assertTrue(diagnostico.drift().contains("usuarios.idx_usuarios_nome_legado"),
+                "Drift deve listar o índice não declarado: " + diagnostico.drift());
+        assertTrue(buscarIndice(testDb, ColecaoTrilhara.USUARIOS.nome(), "idx_usuarios_nome_legado") != null,
+                "Índice em drift nunca é removido automaticamente");
+    }
+
+    @Test
+    @DisplayName("inventario: 20 coleções no enum e todas com pelo menos um índice declarado")
+    void deveCobrirInventarioCompleto() {
+        assertEquals(20, ColecaoTrilhara.values().length, "20 coleções = 19 privadas + editais");
+        assertEquals(18, ColecaoTrilhara.filhasPrivadas().size(), "18 coleções filhas privadas");
+        assertFalse(ColecaoTrilhara.EDITAIS.privada(), "editais é catálogo público");
+        assertTrue(ColecaoTrilhara.USUARIOS.privada());
+
+        Set<String> colecoesComIndice = new HashSet<>();
+        IndicesCanonicos.todos().forEach(i -> colecoesComIndice.add(i.colecao().nome()));
+        for (String nome : ColecaoTrilhara.nomes()) {
+            assertTrue(colecoesComIndice.contains(nome), "Coleção sem índice declarado: " + nome);
+        }
+        assertEquals(IndicesCanonicos.todos().size(), IndicesCanonicos.nomesDeclarados().stream().distinct().count(),
+                "Nomes canônicos de índice devem ser únicos");
+    }
+
+    private static Document buscarIndice(MongoDatabase db, String colecao, String nome) {
+        for (Document doc : db.getCollection(colecao).listIndexes()) {
+            if (nome.equals(doc.getString("name"))) {
+                return doc;
+            }
+        }
+        return null;
+    }
+
+    private static String normalizar(Document doc) {
+        return doc == null ? "null" : doc.toJson();
+    }
+
+    private static String normalizar(String json) {
+        return json == null ? "null" : Document.parse(json).toJson();
     }
 }

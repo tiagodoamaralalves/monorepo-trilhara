@@ -237,11 +237,11 @@ public class SecaoRepository {
                 doc.getString("titulo"),
                 doc.getInteger("ordem", 0),
                 doc.getObjectId("origemDisciplinaId"),
-                BsonDates.toInstant(doc, "deletedAt"),
-                BsonDates.toInstant(doc, "expiresAt"),
+                BsonDates.lerInstant(doc, "deletedAt"),
+                BsonDates.lerInstant(doc, "expiresAt"),
                 doc.getString("loteExclusaoId"),
-                BsonDates.toInstant(doc, "criadoEm"),
-                BsonDates.toInstant(doc, "atualizadoEm")
+                BsonDates.lerInstant(doc, "criadoEm"),
+                BsonDates.lerInstant(doc, "atualizadoEm")
         );
     }
 }

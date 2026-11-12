@@ -8,10 +8,11 @@ import br.com.trilhara.auth.Role;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
-@Schema(name = "AlterarRolesRequest", description = "Atualização das roles de um usuário (apenas ADMIN)")
+@Schema(name = "AlterarPapeisRequest", description = "Atualização dos papéis de um usuário (apenas ADMIN)")
 public record AlterarRolesRequest(
-        @Schema(description = "Lista de roles atribuídas ao usuário", required = true)
+        @Schema(description = "Lista de papéis atribuídos ao usuário", required = true)
         @NotEmpty(message = "Pelo menos uma role deve ser informada.")
-        List<@NotNull Role> roles) {
+        List<@NotNull Role> papeis) {
 }
+
 

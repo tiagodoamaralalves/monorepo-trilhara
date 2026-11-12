@@ -98,7 +98,7 @@ public class TrilhaRepository {
                 .append(CAMPO_CARGO, dados.cargo())
                 .append(CAMPO_AREA_CARGO, dados.cargo())
                 .append(CAMPO_BANCA, dados.banca())
-                .append(CAMPO_DATA_PROVA, BsonDates.toIsoString(dados.dataProva()))
+                .append(CAMPO_DATA_PROVA, BsonDates.toIso(dados.dataProva()))
                 .append("cor", dados.cor())
                 .append("origemEditalId", dados.origemEditalId())
                 .append("origemVersao", dados.origemVersao())
@@ -231,7 +231,7 @@ public class TrilhaRepository {
                 .append(CAMPO_CARGO, meta.cargo())
                 .append(CAMPO_AREA_CARGO, meta.cargo())
                 .append(CAMPO_BANCA, meta.banca())
-                .append(CAMPO_DATA_PROVA, BsonDates.toIsoString(meta.dataProva()))
+                .append(CAMPO_DATA_PROVA, BsonDates.toIso(meta.dataProva()))
                 .append(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(agora));
 
         if (meta.cor() != null && !meta.cor().isBlank()) {
@@ -437,13 +437,13 @@ public class TrilhaRepository {
                 cronogramaAtivoId != null ? cronogramaAtivoId.toHexString() : null,
                 doc.getLong(CAMPO_VERSAO_ATIVA_CRONOGRAMA),
                 doc.getString(CAMPO_GERACAO_CRONOGRAMA_LEASE_TOKEN),
-                BsonDates.toInstant(doc, CAMPO_GERACAO_CRONOGRAMA_EM_ANDAMENTO_ATE),
+                BsonDates.lerInstant(doc, CAMPO_GERACAO_CRONOGRAMA_EM_ANDAMENTO_ATE),
                 disciplinasTrilha,
                 java.util.Map.of(),
                 ciclos,
                 cicloAtivoId,
-                BsonDates.toInstant(doc, "criadoEm"),
-                BsonDates.toInstant(doc, CAMPO_ATUALIZADO_EM));
+                BsonDates.lerInstant(doc, "criadoEm"),
+                BsonDates.lerInstant(doc, CAMPO_ATUALIZADO_EM));
     }
 
     private List<Trilha.Disciplina> converterDisciplinas(List<Disciplina> disciplinasNormalizadas) {

@@ -1,14 +1,14 @@
 package br.com.trilhara.shared.mongo;
 
-import static com.mongodb.client.model.Filters.and;
-import static com.mongodb.client.model.Filters.eq;
-import static com.mongodb.client.model.Filters.exists;
-
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import org.bson.BsonDocument;
 import org.bson.Document;
-import org.bson.conversions.Bson;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
@@ -16,8 +16,6 @@ import com.mongodb.MongoClientSettings;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
-import com.mongodb.client.model.IndexOptions;
-import com.mongodb.client.model.Indexes;
 
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -25,10 +23,14 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 /**
- * Inicializador centralizado e idempotente dos índices das 19 coleções do sistema.
- * 
- * Executa no startup da aplicação e valida compatibilidade de índices existentes antes da criação,
- * impedindo execução caso detecte conflitos de especificação sem apagar índices automaticamente.
+ * Inicializador centralizado e idempotente dos índices canônicos (D-07).
+ *
+ * <p>Única classe autorizada a criar índices. A tabela válida é a de
+ * {@link IndicesCanonicos}; conflito de chave/opções ou índice ausente <strong>não</strong>
+ * derruba o processo — é reportado em {@link DiagnosticoIndices} e exposto como
+ * {@code DOWN} por {@link MongoIndexHealthCheck}. Índices {@code idx_}/{@code uk_} não
+ * declarados são drift: aparecem em {@code WARN} e no health, jamais são removidos
+ * automaticamente.</p>
  */
 @ApplicationScoped
 public class MongoIndexInitializer {
@@ -38,8 +40,9 @@ public class MongoIndexInitializer {
     private final MongoClient mongoClient;
     private final String databaseName;
 
-    private volatile boolean inicializadoSucesso = false;
+    private volatile DiagnosticoIndices ultimoDiagnostico = DiagnosticoIndices.naoExecutado();
     private volatile Throwable erroInicializacao = null;
+    private volatile boolean inicializado = false;
 
     @Inject
     public MongoIndexInitializer(
@@ -51,293 +54,243 @@ public class MongoIndexInitializer {
 
     void onStart(@Observes StartupEvent event) {
         try {
-            MongoDatabase database = mongoClient.getDatabase(databaseName);
-            inicializarIndices(database);
-            this.inicializadoSucesso = true;
-            this.erroInicializacao = null;
-            LOG.info("Todos os índices das 19 coleções do MongoDB foram inicializados e validados com sucesso.");
+            verificarAgora();
         } catch (Throwable t) {
-            this.inicializadoSucesso = false;
             this.erroInicializacao = t;
             LOG.errorf(t, "FALHA CRÍTICA NA INICIALIZAÇÃO DE ÍNDICES DO MONGODB: %s", t.getMessage());
-            throw new IllegalStateException("Falha ao inicializar índices do MongoDB: " + t.getMessage(), t);
         }
     }
 
-    public boolean isInicializadoSucesso() {
-        return inicializadoSucesso;
+    /** Reexecuta a reconciliação contra o banco configurado (usado pelo health check). */
+    public DiagnosticoIndices verificarAgora() {
+        return inicializarIndices(mongoClient.getDatabase(databaseName));
+    }
+
+    public DiagnosticoIndices getUltimoDiagnostico() {
+        return ultimoDiagnostico;
     }
 
     public Throwable getErroInicializacao() {
         return erroInicializacao;
     }
 
+    public boolean isInicializado() {
+        return inicializado;
+    }
+
+    /** {@code true} apenas quando não há conflito, ausência nem falha de execução. */
+    public boolean isInicializadoSucesso() {
+        return inicializado && erroInicializacao == null && ultimoDiagnostico.saudavel();
+    }
+
     /**
-     * Cria e valida todos os índices das 19 coleções de forma centralizada e idempotente.
+     * Cria os índices ausentes e valida os existentes contra a tabela canônica.
+     *
+     * @return diagnóstico com ausências, conflitos e drift (nunca {@code null})
      */
-    public void inicializarIndices(MongoDatabase database) {
-        // 1. usuarios
-        garantirIndice(database, "usuarios",
-                Indexes.ascending("email"),
-                new IndexOptions().name("idx_usuarios_email_unique").unique(true));
-        garantirIndice(database, "usuarios",
-                Indexes.descending("criadoEm"),
-                new IndexOptions().name("idx_usuarios_criadoEm_desc"));
+    public DiagnosticoIndices inicializarIndices(MongoDatabase database) {
+        List<ConflitoIndice> conflitos = new ArrayList<>();
+        Map<String, Set<String>> declaradosPorColecao = new HashMap<>();
 
-        // 2. refresh_tokens
-        garantirIndice(database, "refresh_tokens",
-                Indexes.ascending("tokenHash"),
-                new IndexOptions().name("idx_refresh_tokens_tokenHash_unique").unique(true));
-        garantirIndice(database, "refresh_tokens",
-                Indexes.compoundIndex(Indexes.ascending("usuarioId"), Indexes.ascending("familiaId")),
-                new IndexOptions().name("idx_refresh_tokens_usuario_familia"));
-        garantirIndice(database, "refresh_tokens",
-                Indexes.ascending("expiraEm"),
-                new IndexOptions().name("idx_refresh_tokens_expiraEm"));
+        for (IndicesCanonicos.IndiceCanonico indice : IndicesCanonicos.todos()) {
+            String colecao = indice.colecao().nome();
+            declaradosPorColecao.computeIfAbsent(colecao, k -> new HashSet<>()).add(indice.nome());
 
-        // 3. tokens_recuperacao_senha
-        garantirIndice(database, "tokens_recuperacao_senha",
-                Indexes.ascending("tokenHash"),
-                new IndexOptions().name("idx_tokens_recuperacao_tokenHash_unique").unique(true));
-        garantirIndice(database, "tokens_recuperacao_senha",
-                Indexes.ascending("usuarioId"),
-                new IndexOptions().name("idx_tokens_recuperacao_usuario"));
-        garantirIndice(database, "tokens_recuperacao_senha",
-                Indexes.ascending("expiraEm"),
-                new IndexOptions().name("idx_tokens_recuperacao_expiraEm"));
+            MongoCollection<Document> collection = database.getCollection(colecao);
+            Document existente = buscarPorNome(collection, indice.nome());
 
-        // 4. tokens_confirmacao_email
-        garantirIndice(database, "tokens_confirmacao_email",
-                Indexes.ascending("tokenHash"),
-                new IndexOptions().name("idx_tokens_confirmacao_tokenHash_unique").unique(true));
-        garantirIndice(database, "tokens_confirmacao_email",
-                Indexes.ascending("usuarioId"),
-                new IndexOptions().name("idx_tokens_confirmacao_usuario"));
-        garantirIndice(database, "tokens_confirmacao_email",
-                Indexes.ascending("expiraEm"),
-                new IndexOptions().name("idx_tokens_confirmacao_expiraEm"));
+            if (existente == null) {
+                Document conflitante = buscarPorChaveEquivalente(collection, indice);
+                if (conflitante != null) {
+                    conflitos.add(new ConflitoIndice(colecao, indice.nome(),
+                            descreverEsperado(indice), descreverEncontrado(conflitante)));
+                    continue;
+                }
+                try {
+                    collection.createIndex(indice.chaves(), indice.opcoes());
+                    LOG.debugf("Índice '%s' criado na coleção '%s'.", indice.nome(), colecao);
+                } catch (RuntimeException ex) {
+                    conflitos.add(new ConflitoIndice(colecao, indice.nome(),
+                            descreverEsperado(indice), "falha ao criar: " + ex.getMessage()));
+                }
+                continue;
+            }
 
-        // 5. editais
-        garantirIndice(database, "editais",
-                Indexes.compoundIndex(Indexes.ascending("status"), Indexes.ascending("esfera"), Indexes.descending("atualizadoEm")),
-                new IndexOptions().name("idx_editais_status_esfera_atualizadoEm"));
+            String divergencia = comparar(indice, existente);
+            if (divergencia != null) {
+                conflitos.add(new ConflitoIndice(colecao, indice.nome(),
+                        descreverEsperado(indice), divergencia));
+            }
+        }
 
-        // 6. trilhas
-        garantirIndice(database, "trilhas",
-                Indexes.compoundIndex(Indexes.ascending("usuarioId"), Indexes.descending("atualizadoEm")),
-                new IndexOptions().name("idx_trilhas_usuario_atualizadoEm"));
-        garantirIndice(database, "trilhas",
-                Indexes.compoundIndex(Indexes.ascending("usuarioId"), Indexes.ascending("origemEditalId")),
-                new IndexOptions().name("idx_trilhas_usuario_origemEdital"));
-        garantirIndice(database, "trilhas",
-                Indexes.compoundIndex(Indexes.ascending("usuarioId"), Indexes.ascending("cronogramaAtivoId")),
-                new IndexOptions().name("idx_trilhas_usuario_cronogramaAtivo"));
+        List<String> drift = coletarDrift(database, declaradosPorColecao);
+        DiagnosticoIndices diagnostico = new DiagnosticoIndices(conflitos, drift);
 
-        // 7. disciplinas
-        garantirIndice(database, "disciplinas",
-                Indexes.compoundIndex(Indexes.ascending("usuarioId"), Indexes.ascending("trilhaId"), Indexes.ascending("ordem")),
-                new IndexOptions().name("idx_disciplinas_usuario_trilha_ordem"));
+        this.ultimoDiagnostico = diagnostico;
+        this.inicializado = true;
+        this.erroInicializacao = null;
 
-        // 8. progresso_topicos
-        garantirIndice(database, "progresso_topicos",
-                Indexes.compoundIndex(Indexes.ascending("usuarioId"), Indexes.ascending("trilhaId"), Indexes.ascending("topicoId")),
-                new IndexOptions().name("idx_progresso_topicos_unico").unique(true));
-
-        // 9. cronogramas
-        garantirIndice(database, "cronogramas",
-                Indexes.compoundIndex(Indexes.ascending("usuarioId"), Indexes.ascending("trilhaId"), Indexes.ascending("modalidade")),
-                new IndexOptions().name("idx_cronogramas_usuario_trilha_modalidade_unique").unique(true));
-        garantirIndice(database, "cronogramas",
-                Indexes.compoundIndex(Indexes.ascending("usuarioId"), Indexes.ascending("trilhaId")),
-                new IndexOptions().name("idx_cronogramas_usuario_trilha_ativo_unique").unique(true).partialFilterExpression(eq("ativo", true)));
-
-        // 10. blocos_cronograma
-        garantirIndice(database, "blocos_cronograma",
-                Indexes.compoundIndex(
-                        Indexes.ascending("usuarioId"),
-                        Indexes.ascending("trilhaId"),
-                        Indexes.ascending("cronogramaId"),
-                        Indexes.ascending("versaoGeracao"),
-                        Indexes.ascending("data"),
-                        Indexes.ascending("ordem")),
-                new IndexOptions().name("idx_blocos_usuario_trilha_cronograma_versao_data_ordem_unique").unique(true));
-        garantirIndice(database, "blocos_cronograma",
-                Indexes.compoundIndex(Indexes.ascending("usuarioId"), Indexes.ascending("data"), Indexes.ascending("concluido")),
-                new IndexOptions().name("idx_blocos_usuario_data_concluido"));
-
-        // 11. sessoes
-        garantirIndice(database, "sessoes",
-                Indexes.compoundIndex(
-                        Indexes.ascending("usuarioId"),
-                        Indexes.ascending("trilhaId"),
-                        Indexes.descending("dataSessao"),
-                        Indexes.descending("criadoEm"),
-                        Indexes.descending("_id")),
-                new IndexOptions().name("idx_sessoes_usuario_trilha_data_criado_id"));
-        garantirIndice(database, "sessoes",
-                Indexes.compoundIndex(
-                        Indexes.ascending("usuarioId"),
-                        Indexes.ascending("trilhaId"),
-                        Indexes.ascending("disciplinaId"),
-                        Indexes.descending("dataSessao")),
-                new IndexOptions().name("idx_sessoes_usuario_trilha_disciplina_data"));
-        garantirIndice(database, "sessoes",
-                Indexes.compoundIndex(Indexes.ascending("usuarioId"), Indexes.ascending("chaveIdempotencia")),
-                new IndexOptions().name("idx_sessoes_usuario_chaveIdempotencia_unique").unique(true).partialFilterExpression(exists("chaveIdempotencia", true)));
-
-        // 12. listas_tarefas
-        garantirIndice(database, "listas_tarefas",
-                Indexes.compoundIndex(Indexes.ascending("usuarioId"), Indexes.ascending("deletedAt"), Indexes.ascending("ordem")),
-                new IndexOptions().name("idx_listas_tarefas_usuario_deletedAt_ordem"));
-
-        // 13. series_recorrentes
-        garantirIndice(database, "series_recorrentes",
-                Indexes.compoundIndex(Indexes.ascending("usuarioId"), Indexes.ascending("deletedAt"), Indexes.ascending("ativa")),
-                new IndexOptions().name("idx_series_recorrentes_usuario_deletedAt_ativa"));
-
-        // 14. tarefas
-        garantirIndice(database, "tarefas",
-                Indexes.compoundIndex(
-                        Indexes.ascending("usuarioId"),
-                        Indexes.ascending("deletedAt"),
-                        Indexes.ascending("listaId"),
-                        Indexes.ascending("concluido"),
-                        Indexes.ascending("ordem")),
-                new IndexOptions().name("idx_tarefas_usuario_deleted_lista_concluida_ordem"));
-        garantirIndice(database, "tarefas",
-                Indexes.compoundIndex(
-                        Indexes.ascending("usuarioId"),
-                        Indexes.ascending("deletedAt"),
-                        Indexes.ascending("concluido"),
-                        Indexes.ascending("dataVencimento")),
-                new IndexOptions().name("idx_tarefas_usuario_deleted_concluida_vencimento"));
-        garantirIndice(database, "tarefas",
-                Indexes.compoundIndex(
-                        Indexes.ascending("usuarioId"),
-                        Indexes.ascending("serieId"),
-                        Indexes.ascending("dataOriginalOcorrencia")),
-                new IndexOptions().name("idx_tarefas_usuario_serie_dataOriginal_unique").unique(true).partialFilterExpression(exists("serieId", true)));
-
-        // 15. cadernos
-        garantirIndice(database, "cadernos",
-                Indexes.compoundIndex(Indexes.ascending("usuarioId"), Indexes.ascending("deletedAt"), Indexes.descending("atualizadoEm")),
-                new IndexOptions().name("idx_cadernos_usuario_deletedAt_atualizadoEm"));
-        garantirIndice(database, "cadernos",
-                Indexes.compoundIndex(Indexes.ascending("usuarioId"), Indexes.ascending("origemTrilhaId")),
-                new IndexOptions().name("idx_cadernos_usuario_origemTrilha_unique").unique(true)
-                        .partialFilterExpression(and(eq("deletedAt", null), exists("origemTrilhaId", true))));
-
-        // 16. secoes
-        garantirIndice(database, "secoes",
-                Indexes.compoundIndex(Indexes.ascending("usuarioId"), Indexes.ascending("cadernoId"), Indexes.ascending("deletedAt"), Indexes.ascending("ordem")),
-                new IndexOptions().name("idx_secoes_usuario_caderno_deletedAt_ordem"));
-        garantirIndice(database, "secoes",
-                Indexes.compoundIndex(Indexes.ascending("usuarioId"), Indexes.ascending("cadernoId"), Indexes.ascending("origemDisciplinaId")),
-                new IndexOptions().name("idx_secoes_usuario_caderno_origemDisciplina"));
-
-        // 17. notas
-        garantirIndice(database, "notas",
-                Indexes.compoundIndex(Indexes.ascending("usuarioId"), Indexes.ascending("secaoId"), Indexes.ascending("deletedAt"), Indexes.ascending("ordem")),
-                new IndexOptions().name("idx_notas_usuario_secao_deletedAt_ordem"));
-        garantirIndice(database, "notas",
-                Indexes.compoundIndex(Indexes.ascending("usuarioId"), Indexes.ascending("cadernoId"), Indexes.ascending("deletedAt")),
-                new IndexOptions().name("idx_notas_usuario_caderno_deletedAt"));
-        garantirIndice(database, "notas",
-                Indexes.compoundIndex(
-                        Indexes.ascending("usuarioId"),
-                        Indexes.ascending("deletedAt"),
-                        Indexes.text("titulo"),
-                        Indexes.text("conteudoMarkdown")),
-                new IndexOptions().name("idx_notas_usuario_deletedAt_text")
-                        .defaultLanguage("portuguese")
-                        .weights(new Document("titulo", 10).append("conteudoMarkdown", 1)));
-
-        // 18. push_subscriptions
-        garantirIndice(database, "push_subscriptions",
-                Indexes.ascending("usuarioId"),
-                new IndexOptions().name("idx_push_subscriptions_usuario"));
-        garantirIndice(database, "push_subscriptions",
-                Indexes.ascending("endpoint"),
-                new IndexOptions().name("idx_push_subscriptions_endpoint_unique").unique(true));
-
-        // 19. lembretes_push
-        garantirIndice(database, "lembretes_push",
-                Indexes.compoundIndex(Indexes.ascending("estado"), Indexes.ascending("instanteEntregaUtc")),
-                new IndexOptions().name("idx_lembretes_push_estado_instanteEntregaUtc"));
-        garantirIndice(database, "lembretes_push",
-                Indexes.compoundIndex(Indexes.ascending("usuarioId"), Indexes.ascending("tarefaId")),
-                new IndexOptions().name("idx_lembretes_push_usuario_tarefa"));
+        if (!drift.isEmpty()) {
+            LOG.warnf("Drift de índices não declarados (sem remoção automática): %s", drift);
+        }
+        if (!diagnostico.saudavel()) {
+            LOG.warnf("Índices canônicos divergentes: %d conflito(s).", conflitos.size());
+            conflitos.forEach(c -> LOG.warnf("  %s", c));
+        } else {
+            LOG.info("Todos os índices canônicos das 20 coleções estão presentes e compatíveis.");
+        }
+        return diagnostico;
     }
 
-    private void garantirIndice(MongoDatabase database, String nomeColecao, Bson keys, IndexOptions options) {
-        MongoCollection<Document> collection = database.getCollection(nomeColecao);
-        String nomeEsperado = options.getName();
-        org.bson.BsonDocument expectedKeysDoc = keys.toBsonDocument(org.bson.BsonDocument.class, MongoClientSettings.getDefaultCodecRegistry());
-
-        Map<String, Document> indicesExistentes = new HashMap<>();
-        for (Document docIndice : collection.listIndexes()) {
-            String nome = docIndice.getString("name");
-            indicesExistentes.put(nome, docIndice);
-
-            // Verificar se chave idêntica já existe com outro nome
-            Document rawKey = docIndice.get("key", Document.class);
-            org.bson.BsonDocument existingKey = rawKey != null ? rawKey.toBsonDocument() : null;
-            if (!nome.equals(nomeEsperado) && !nome.equals("_id_") && chavesEquivalentes(existingKey, expectedKeysDoc)) {
-                throw new IllegalStateException(String.format(
-                        "Conflito de índice detectado na coleção '%s': já existe índice '%s' com mesma chave do índice pretendido '%s'.",
-                        nomeColecao, nome, nomeEsperado));
-            }
-        }
-
-        Document existenteComMesmoNome = indicesExistentes.get(nomeEsperado);
-        if (existenteComMesmoNome != null) {
-            // Validar compatibilidade de chave
-            Document rawKey = existenteComMesmoNome.get("key", Document.class);
-            org.bson.BsonDocument existingKey = rawKey != null ? rawKey.toBsonDocument() : null;
-            if (!chavesEquivalentes(existingKey, expectedKeysDoc)) {
-                throw new IllegalStateException(String.format(
-                        "Conflito de chave no índice '%s' da coleção '%s': esperado %s, encontrado %s",
-                        nomeEsperado, nomeColecao, expectedKeysDoc.toJson(), existingKey != null ? existingKey.toJson() : "null"));
-            }
-
-            // Validar compatibilidade de unicidade
-            boolean existenteUnique = existenteComMesmoNome.getBoolean("unique", false);
-            boolean esperadoUnique = Boolean.TRUE.equals(options.isUnique());
-            if (existenteUnique != esperadoUnique) {
-                throw new IllegalStateException(String.format(
-                        "Conflito de unicidade no índice '%s' da coleção '%s': esperado unique=%b, encontrado=%b",
-                        nomeEsperado, nomeColecao, esperadoUnique, existenteUnique));
-            }
-            return;
-        }
-
-        try {
-            collection.createIndex(keys, options);
-            LOG.debugf("Índice '%s' criado com sucesso na coleção '%s'.", nomeEsperado, nomeColecao);
-        } catch (Exception ex) {
-            throw new IllegalStateException(String.format(
-                    "Falha ao criar índice '%s' na coleção '%s': %s",
-                    nomeEsperado, nomeColecao, ex.getMessage()), ex);
-        }
-    }
-
-    private boolean chavesEquivalentes(org.bson.BsonDocument existingKey, org.bson.BsonDocument expectedKey) {
-        if (existingKey == null || expectedKey == null) return false;
-        if (existingKey.equals(expectedKey)) return true;
-
-        // Caso especial: índices de texto no MongoDB utilizam internamente {"_fts": "text", "_ftsx": 1}
-        boolean esperadoTemTexto = expectedKey.values().stream().anyMatch(v -> v.isString() && "text".equals(v.asString().getValue()));
-        boolean existenteTemTexto = existingKey.containsKey("_fts");
-        if (esperadoTemTexto && existenteTemTexto) {
-            for (String k : expectedKey.keySet()) {
-                if (!expectedKey.get(k).isString() || !"text".equals(expectedKey.get(k).asString().getValue())) {
-                    if (!existingKey.containsKey(k) || !existingKey.get(k).equals(expectedKey.get(k))) {
-                        return false;
-                    }
+    private List<String> coletarDrift(MongoDatabase database, Map<String, Set<String>> declaradosPorColecao) {
+        List<String> drift = new ArrayList<>();
+        for (String colecao : ColecaoTrilhara.nomes()) {
+            Set<String> declarados = declaradosPorColecao.getOrDefault(colecao, Set.of());
+            for (Document doc : database.getCollection(colecao).listIndexes()) {
+                String nome = doc.getString("name");
+                if (nome == null || "_id_".equals(nome)) {
+                    continue;
+                }
+                boolean prefixoApp = nome.startsWith("idx_") || nome.startsWith("uk_");
+                if (prefixoApp && !declarados.contains(nome)) {
+                    drift.add(colecao + "." + nome);
                 }
             }
+        }
+        return drift;
+    }
+
+    private Document buscarPorNome(MongoCollection<Document> collection, String nome) {
+        for (Document doc : collection.listIndexes()) {
+            if (nome.equals(doc.getString("name"))) {
+                return doc;
+            }
+        }
+        return null;
+    }
+
+    private Document buscarPorChaveEquivalente(MongoCollection<Document> collection,
+            IndicesCanonicos.IndiceCanonico indice) {
+        BsonDocument esperadas = chavesBson(indice);
+        for (Document doc : collection.listIndexes()) {
+            if ("_id_".equals(doc.getString("name"))) {
+                continue;
+            }
+            if (chavesEquivalentes(chavesDoDocumento(doc), esperadas)) {
+                return doc;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Compara o índice declarado com o documento existente.
+     *
+     * @return {@code null} quando compatível; descrição da divergência caso contrário
+     */
+    private String comparar(IndicesCanonicos.IndiceCanonico indice, Document existente) {
+        if (!chavesEquivalentes(chavesDoDocumento(existente), chavesBson(indice))) {
+            return "key=" + json(chavesDoDocumento(existente));
+        }
+
+        boolean unicoExistente = Boolean.TRUE.equals(existente.getBoolean("unique", Boolean.FALSE));
+        if (unicoExistente != indice.unico()) {
+            return "unique=" + unicoExistente;
+        }
+
+        Long ttlExistente = lerTtl(existente);
+        Integer ttlEsperado = indice.ttlSegundos();
+        if (ttlEsperado == null && ttlExistente != null) {
+            return "expireAfterSeconds=" + ttlExistente;
+        }
+        if (ttlEsperado != null && (ttlExistente == null || !ttlExistente.equals(ttlEsperado.longValue()))) {
+            return "expireAfterSeconds=" + ttlExistente;
+        }
+
+        String parcialEsperadoJson = json(parcialEsperado(indice));
+        String parcialExistenteJson = json(parcialDoDocumento(existente));
+        if (!parcialEsperadoJson.equals(parcialExistenteJson)) {
+            return "partialFilterExpression=" + parcialExistenteJson;
+        }
+
+        String idiomaExistente = existente.getString("default_language");
+        if (indice.idioma() != null && !indice.idioma().equalsIgnoreCase(idiomaExistente)) {
+            return "default_language=" + idiomaExistente;
+        }
+
+        return null;
+    }
+
+    private String descreverEsperado(IndicesCanonicos.IndiceCanonico indice) {
+        return "key=" + json(chavesBson(indice))
+                + ", unique=" + indice.unico()
+                + ", expireAfterSeconds=" + indice.ttlSegundos()
+                + ", partialFilterExpression=" + json(parcialEsperado(indice));
+    }
+
+    private String descreverEncontrado(Document existente) {
+        return "key=" + json(chavesDoDocumento(existente))
+                + ", unique=" + Boolean.TRUE.equals(existente.getBoolean("unique", Boolean.FALSE))
+                + ", expireAfterSeconds=" + lerTtl(existente)
+                + ", partialFilterExpression=" + json(parcialDoDocumento(existente));
+    }
+
+    /** O driver devolve {@code expireAfterSeconds} como Integer ou Long, conforme o valor. */
+    private static Long lerTtl(Document doc) {
+        Object valor = doc.get("expireAfterSeconds");
+        return valor instanceof Number numero ? numero.longValue() : null;
+    }
+
+    private static BsonDocument chavesBson(IndicesCanonicos.IndiceCanonico indice) {
+        return indice.chaves().toBsonDocument(BsonDocument.class, MongoClientSettings.getDefaultCodecRegistry());
+    }
+
+    private static BsonDocument chavesDoDocumento(Document doc) {
+        Document raw = doc.get("key", Document.class);
+        return raw != null ? raw.toBsonDocument() : null;
+    }
+
+    private static BsonDocument parcialDoDocumento(Document doc) {
+        Document raw = doc.get("partialFilterExpression", Document.class);
+        return raw != null ? raw.toBsonDocument() : null;
+    }
+
+    private static BsonDocument parcialEsperado(IndicesCanonicos.IndiceCanonico indice) {
+        return indice.filtroParcial() == null
+                ? null
+                : indice.filtroParcial().toBsonDocument(BsonDocument.class,
+                        MongoClientSettings.getDefaultCodecRegistry());
+    }
+
+    private static String json(BsonDocument doc) {
+        return doc != null ? doc.toJson() : "null";
+    }
+
+    /**
+     * Índices de texto aparecem no MongoDB como {@code {_fts: "text", _ftsx: 1}} com os
+     * campos reais em {@code weights}; nesse caso só os campos não-texto são comparados.
+     */
+    private static boolean chavesEquivalentes(BsonDocument existente, BsonDocument esperado) {
+        if (existente == null || esperado == null) {
+            return false;
+        }
+        if (existente.equals(esperado)) {
             return true;
         }
-        return false;
+        boolean esperadoTemTexto = esperado.values().stream()
+                .anyMatch(v -> v.isString() && "text".equals(v.asString().getValue()));
+        if (!esperadoTemTexto || !existente.containsKey("_fts")) {
+            return false;
+        }
+        for (String campo : esperado.keySet()) {
+            if (esperado.get(campo).isString() && "text".equals(esperado.get(campo).asString().getValue())) {
+                continue;
+            }
+            if (!existente.containsKey(campo) || !existente.get(campo).equals(esperado.get(campo))) {
+                return false;
+            }
+        }
+        return true;
     }
 }
+

@@ -36,7 +36,7 @@ const mockAuthValue = (usuarioId: string | null = 'user-fase7'): AuthContextValu
         emailVerificado: true,
         ativo: true,
         criadoEm: '2026-11-09T00:00:00Z',
-        roles: ['USER']
+        papeis: ['USER'], preferencias: { tema: 'dark', disponibilidadeSemanalMinutos: [0,0,0,0,0,0,0], padraoLembreteMinutosAntes: 15 }
       }
     : null,
   isAuthenticated: usuarioId !== null,

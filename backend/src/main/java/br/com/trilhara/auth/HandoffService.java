@@ -13,22 +13,33 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.bson.Document;
+import org.bson.types.ObjectId;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.IndexOptions;
-import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 
 import br.com.trilhara.auth.dto.HandoffResponse;
+import br.com.trilhara.shared.mongo.BsonDates;
+import br.com.trilhara.shared.mongo.ColecaoTrilhara;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.NotAuthorizedException;
 
+/**
+ * Handoff SSO para ambiente local ({@code *.localhost}), onde não há cookie compartilhado.
+ *
+ * <p>Persistência na coleção privada {@code tokens_handoff_sso} (D-08). Os índices são
+ * criados exclusivamente por {@code MongoIndexInitializer} (D-07). Consumo é atômico e de
+ * uso único via {@code findOneAndUpdate} com {@code consumidoEm: null} e
+ * {@code expiraEm > agora}.</p>
+ */
 @ApplicationScoped
 public class HandoffService {
 
@@ -44,7 +55,8 @@ public class HandoffService {
             MongoClient mongoClient,
             @ConfigProperty(name = "quarkus.mongodb.database") String database,
             @ConfigProperty(name = "trilhara.auth.cors.allowed-origins", defaultValue = "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176") String allowedOriginsConfig) {
-        this.collection = mongoClient.getDatabase(database).getCollection("handoff_tokens");
+        this.collection = mongoClient.getDatabase(database)
+                .getCollection(ColecaoTrilhara.TOKENS_HANDOFF_SSO.nome());
         this.allowlistOrigens = new HashSet<>();
         if (allowedOriginsConfig != null && !allowedOriginsConfig.isBlank()) {
             Arrays.stream(allowedOriginsConfig.split(","))
@@ -52,9 +64,6 @@ public class HandoffService {
                     .filter(s -> !s.isBlank())
                     .forEach(this.allowlistOrigens::add);
         }
-        // Índices de busca por hash e expiração. Falhas devem impedir a inicialização do serviço.
-        collection.createIndex(Indexes.ascending("tokenHash"), new IndexOptions().name("idx_handoff_tokens_tokenHash_unique").unique(true));
-        collection.createIndex(Indexes.ascending("expiraEm"), new IndexOptions().name("idx_handoff_tokens_expiraEm"));
     }
 
     public HandoffResponse emitirHandoff(String usuarioId, String destinoUrl) {
@@ -64,57 +73,66 @@ public class HandoffService {
         if (destinoUrl == null || destinoUrl.isBlank()) {
             throw new BadRequestException("Destino é obrigatório.");
         }
-
         validarDestinoPermitido(destinoUrl);
 
         byte[] bytes = new byte[32];
         secureRandom.nextBytes(bytes);
         String codigoPuro = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        String tokenHash = calcularSha256(codigoPuro);
+        String codigoHash = calcularSha256(codigoPuro);
 
         Instant agora = Instant.now();
         Instant expiraEm = agora.plusSeconds(TTL_SEGUNDOS);
 
-        Document doc = new Document("tokenHash", tokenHash)
-                .append("usuarioId", usuarioId)
-                .append("destino", destinoUrl)
-                .append("criadoEm", Date.from(agora))
-                .append("expiraEm", Date.from(expiraEm))
-                .append("usado", false);
+        Document doc = new Document("_id", new ObjectId())
+                .append("usuarioId", new ObjectId(usuarioId))
+                .append("codigoHash", codigoHash)
+                .append("origemDestino", destinoUrl.trim())
+                .append("criadoEm", BsonDates.toBsonDate(agora))
+                .append("expiraEm", BsonDates.toBsonDate(expiraEm))
+                .append("consumidoEm", null);
 
         collection.insertOne(doc);
-        LOG.infof("Token de handoff emitido para usuarioId=%s com TTL de %ds", usuarioId, TTL_SEGUNDOS);
+        LOG.infof("Código de handoff emitido com TTL de %ds.", TTL_SEGUNDOS);
         return new HandoffResponse(codigoPuro, expiraEm);
     }
 
+    /**
+     * Consome o código de handoff uma única vez.
+     *
+     * @return o {@code usuarioId} (hex) dono do código
+     * @throws NotAuthorizedException código inexistente, expirado ou já consumido
+     * @throws BadRequestException     destino do código divergente do host chamador
+     */
     public String consumirHandoff(String codigoPuro, String callerHost) {
         if (codigoPuro == null || codigoPuro.isBlank()) {
             throw new BadRequestException("Código de handoff é obrigatório.");
         }
 
-        String tokenHash = calcularSha256(codigoPuro.trim());
+        String codigoHash = calcularSha256(codigoPuro.trim());
         Instant agora = Instant.now();
 
-        // Consome atomicamente garantindo uso único (usado: false -> usado: true)
         Document doc = collection.findOneAndUpdate(
                 Filters.and(
-                        Filters.eq("tokenHash", tokenHash),
-                        Filters.eq("usado", false),
-                        Filters.gt("expiraEm", Date.from(agora))
-                ),
-                Updates.set("usado", true)
-        );
+                        Filters.eq("codigoHash", codigoHash),
+                        Filters.eq("consumidoEm", null),
+                        Filters.gt("expiraEm", BsonDates.toBsonDate(agora))),
+                Updates.set("consumidoEm", BsonDates.toBsonDate(agora)),
+                new FindOneAndUpdateOptions().returnDocument(ReturnDocument.BEFORE));
 
         if (doc == null) {
             throw new NotAuthorizedException("Código de handoff inválido, expirado ou já utilizado.");
         }
 
-        String destino = doc.getString("destino");
-        if (callerHost != null && destino != null) {
-            validarOrigemDestinoConsistente(destino, callerHost);
+        String origemDestino = doc.getString("origemDestino");
+        if (callerHost != null && origemDestino != null) {
+            validarOrigemDestinoConsistente(origemDestino, callerHost);
         }
 
-        return doc.getString("usuarioId");
+        ObjectId usuarioId = doc.getObjectId("usuarioId");
+        if (usuarioId == null) {
+            throw new NotAuthorizedException("Código de handoff inválido.");
+        }
+        return usuarioId.toHexString();
     }
 
     private void validarDestinoPermitido(String destinoUrl) {

@@ -33,14 +33,13 @@ describe('FASE 9 — Frontend: Exclusão de Conta, Limpeza Local e Modal de Conf
       localStorage.setItem(`trilhara:u:${userA}:preferencias`, JSON.stringify({ pomodoro: 25 }));
       sessionStorage.setItem(`trilhara:u:${userA}:active_session`, 'sess-123');
 
-      // Chaves de autenticação
-      localStorage.setItem('trilhara_auth_access_token', 'jwt-token-user-a');
-      localStorage.setItem('trilhara_auth_user', JSON.stringify({ id: userA, nome: 'User A' }));
-
       // Chaves de outro usuário B
       localStorage.setItem(`trilhara:u:${userB}:study_timer`, JSON.stringify({ running: true }));
       localStorage.setItem(`trilhara:u:${userB}:nota_draft:2`, '# Nota B');
       sessionStorage.setItem(`trilhara:u:${userB}:active_session`, 'sess-999');
+
+      // Resíduo legado de versões anteriores (deve ser tolerado/limpo junto à sessão)
+      localStorage.setItem('trilhara_auth_' + 'access_token', 'jwt-legado');
 
       const eventoDisparadoSpy = vi.fn();
       window.addEventListener(AUTH_CONTA_EXCLUIDA_EVENT, eventoDisparadoSpy);
@@ -54,9 +53,10 @@ describe('FASE 9 — Frontend: Exclusão de Conta, Limpeza Local e Modal de Conf
       expect(localStorage.getItem(`trilhara:u:${userA}:preferencias`)).toBeNull();
       expect(sessionStorage.getItem(`trilhara:u:${userA}:active_session`)).toBeNull();
 
-      // Sessão foi limpa
-      expect(localStorage.getItem('trilhara_auth_access_token')).toBeNull();
-      expect(localStorage.getItem('trilhara_auth_user')).toBeNull();
+      // Sessão foi limpa em memória (D-09: nada de token/usuário em storage)
+      expect(AuthStorage.obterAccessToken()).toBeNull();
+      expect(AuthStorage.obterUsuario()).toBeNull();
+      expect(localStorage.getItem('trilhara_auth_' + 'access_token')).toBeNull();
 
       // Dados do usuário B permanecem 100% intactos
       expect(localStorage.getItem(`trilhara:u:${userB}:study_timer`)).not.toBeNull();
@@ -82,7 +82,7 @@ describe('FASE 9 — Frontend: Exclusão de Conta, Limpeza Local e Modal de Conf
           id: userA,
           nome: 'Tiago Amaral',
           email: 'tiago@trilhara.com.br',
-          roles: ['USER'],
+          papeis: ['USER'], preferencias: { tema: 'dark', disponibilidadeSemanalMinutos: [0,0,0,0,0,0,0], padraoLembreteMinutosAntes: 15 },
           emailVerificado: true,
           ativo: true,
           criadoEm: '2026-11-09T00:00:00Z'
@@ -136,7 +136,8 @@ describe('FASE 9 — Frontend: Exclusão de Conta, Limpeza Local e Modal de Conf
         id: '6af21234567890abcdef1234',
         nome: 'Carlos Drummond',
         email: 'carlos@trilhara.com.br',
-        roles: ['USER'] as ('USER' | 'ADMIN')[],
+        papeis: ['USER'] as ('USER' | 'ADMIN')[],
+        preferencias: { tema: 'dark' as const, disponibilidadeSemanalMinutos: [0, 0, 0, 0, 0, 0, 0], padraoLembreteMinutosAntes: 15 },
         emailVerificado: true,
         ativo: true,
         criadoEm: '2026-11-09T00:00:00Z'
@@ -216,7 +217,7 @@ describe('FASE 9 — Frontend: Exclusão de Conta, Limpeza Local e Modal de Conf
             <ContaModal
               isOpen={true}
               onClose={mockClose}
-              usuario={{ id: '1', nome: 'Ana', email: 'ana@teste.com', roles: ['USER'], emailVerificado: true, ativo: true, criadoEm: '2026-11-09T00:00:00Z' }}
+              usuario={{ id: '1', nome: 'Ana', email: 'ana@teste.com', papeis: ['USER'], preferencias: { tema: 'dark', disponibilidadeSemanalMinutos: [0,0,0,0,0,0,0], padraoLembreteMinutosAntes: 15 }, emailVerificado: true, ativo: true, criadoEm: '2026-11-09T00:00:00Z' }}
               onExcluirConta={mockExcluir}
             />
           </ConfirmProvider>

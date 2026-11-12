@@ -6,10 +6,39 @@ import {
   CadastroPayload,
   LoginPayload,
   MensagemResponse,
+  PreferenciasUsuario,
   RecuperarSenhaPayload,
   ResetarSenhaPayload,
+  TemaPreferencia,
   UsuarioAutenticado
 } from './types';
+
+/**
+ * Persiste o tema no servidor (D-10) com rollback em caso de falha.
+ *
+ * O `localStorage` continua sendo apenas cache de primeiro paint; a fonte da verdade é
+ * `PUT /api/usuarios/me/preferencias/tema`.
+ */
+export async function salvarTemaPreferencia(
+  tema: TemaPreferencia,
+  usuario: UsuarioAutenticado,
+  setUsuario: (usuario: UsuarioAutenticado | null) => void
+): Promise<void> {
+  try {
+    const preferencias = await request<PreferenciasUsuario>('/usuarios/me/preferencias/tema', {
+      method: 'PUT',
+      body: JSON.stringify({ tema })
+    });
+    const atualizado: UsuarioAutenticado = { ...usuario, preferencias };
+    AuthStorage.atualizarUsuario(atualizado);
+    setUsuario(atualizado);
+  } catch (err) {
+    registrarFalha('tema.persistir', err);
+    // Rollback: restaura a preferência conhecida do servidor.
+    setUsuario(usuario);
+    throw err;
+  }
+}
 
 export const AuthService = {
   async cadastrar(payload: CadastroPayload): Promise<AuthResponse> {
@@ -39,7 +68,6 @@ export const AuthService = {
     AuthStorage.atualizarUsuario(usuario);
     return usuario;
   },
-
   async logout(): Promise<void> {
     try {
       await request('/auth/logout', { method: 'POST', body: '{}' });
@@ -93,15 +121,16 @@ export const AuthService = {
   },
 
   /**
-   * Verifica a sessão existente no boot ou executa o Silent SSO via Cookie HttpOnly.
-   * Se o usuário estiver logado em outro app do mesmo domínio, o cookie é aproveitado
-   * e a sessão é restaurada automaticamente sem intervenção manual.
+   * Restaura a sessão no boot **sem** token persistido (D-09).
+   *
+   * 1. Se já houver access token em memória (outra aba do mesmo bundle), valida com `/auth/me`.
+   * 2. Caso contrário, `POST /api/auth/refresh` (cookie HttpOnly, single-flight em `api.ts`)
+   *    e então confirma o perfil com `GET /api/auth/me`.
    */
   async verificarSessaoSilenciosa(): Promise<UsuarioAutenticado | null> {
-    // 1. Caso haja token no storage local, valida o perfil
-    const tokenSalvo = AuthStorage.obterAccessToken();
+    const tokenEmMemoria = AuthStorage.obterAccessToken();
 
-    if (tokenSalvo) {
+    if (tokenEmMemoria) {
       try {
         return await AuthService.obterMeuPerfil();
       } catch (err) {
@@ -115,18 +144,17 @@ export const AuthService = {
       }
     }
 
-    // 2. Caso não haja token local (ex: app vizinho em outra porta/aba),
-    // tenta restaurar a sessão via cookie HttpOnly enviando chamada silenciosa
     try {
       const sessaoRenovada = await tentarRenovarToken();
-      if (sessaoRenovada?.usuario) {
-        return sessaoRenovada.usuario;
+      if (!sessaoRenovada?.accessToken) {
+        return null;
       }
+      const perfil = await AuthService.obterMeuPerfil();
+      return perfil ?? sessaoRenovada.usuario ?? null;
     } catch {
-      // Não há cookie ou já expirou; segue deslogado normalmente
+      // Sem cookie válido ou já expirado: segue deslogado normalmente.
+      return null;
     }
-
-    return null;
   },
 
   async excluirConta(payload: { senha: string; confirmacao?: string; idempotencyKey?: string }): Promise<{ operationId: string; estado: string }> {

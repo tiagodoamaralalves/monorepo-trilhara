@@ -173,17 +173,8 @@ export interface RegistroPlanejamentoPendente {
   proximoIndiceRastreador?: number;
 }
 
-type RoleUsuario = 'USER' | 'ADMIN';
-
-export interface UsuarioAutenticado {
-  id: string;
-  nome: string;
-  email: string;
-  roles: RoleUsuario[];
-  ativo: boolean;
-  emailVerificado: boolean;
-  criadoEm: string;
-}
+/** Reexporta o contrato único de perfil (D-09/D-10), evitando duplicata de tipo. */
+export type { UsuarioAutenticado } from '@shared/auth/types';
 
 export type PaginaAtiva =
   | 'landing'

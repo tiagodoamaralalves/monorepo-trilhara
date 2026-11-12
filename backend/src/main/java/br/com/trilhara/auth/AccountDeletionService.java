@@ -24,6 +24,7 @@ import com.mongodb.client.model.Updates;
 import br.com.trilhara.auth.dto.AccountDeletionResponse;
 import br.com.trilhara.auth.dto.ExcluirContaRequest;
 import br.com.trilhara.shared.mongo.BsonDates;
+import br.com.trilhara.shared.mongo.ColecaoTrilhara;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.BadRequestException;
@@ -45,28 +46,11 @@ public class AccountDeletionService {
     public static final String TEXTO_CONFIRMACAO_OBRIGATORIO = "EXCLUIR MINHA CONTA";
 
     /**
-     * Lista ordenada nominalmente das 17 coleções filhas privadas do sistema.
-     * A 18ª coleção privada (usuarios) é purgada por último após a limpeza das filhas.
+     * Lista ordenada nominalmente das 18 coleções filhas privadas do sistema (D-08).
+     * A 19ª coleção privada ({@code usuarios}) é purgada por último após a limpeza das filhas.
+     * Fonte única: {@link ColecaoTrilhara#filhasPrivadas()}.
      */
-    public static final List<String> COLECOES_FILHAS = List.of(
-            "refresh_tokens",
-            "tokens_recuperacao_senha",
-            "tokens_confirmacao_email",
-            "lembretes_push",
-            "push_subscriptions",
-            "blocos_cronograma",
-            "cronogramas",
-            "progresso_topicos",
-            "disciplinas",
-            "sessoes",
-            "trilhas",
-            "tarefas",
-            "series_recorrentes",
-            "listas_tarefas",
-            "notas",
-            "secoes",
-            "cadernos"
-    );
+    public static final List<String> COLECOES_FILHAS = ColecaoTrilhara.nomesFilhasPrivadas();
 
     public static final String COLECAO_USUARIOS = "usuarios";
     public static final String COLECAO_EDITAIS = "editais";

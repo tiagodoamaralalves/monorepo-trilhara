@@ -448,7 +448,7 @@ public class NotaService {
             ObjectId secaoId = doc.getObjectId("secaoId");
             String titulo = doc.getString("titulo");
             String markdown = doc.getString("conteudoMarkdown");
-            Instant atualizadoEm = BsonDates.toInstant(doc, "atualizadoEm");
+            Instant atualizadoEm = BsonDates.lerInstant(doc, "atualizadoEm");
 
             String cadTitulo = cadernoTitulos.computeIfAbsent(cadernoId, cid -> {
                 Optional<Caderno> c = cadernoRepository.buscarQualquerStatus(usuarioId, cid);

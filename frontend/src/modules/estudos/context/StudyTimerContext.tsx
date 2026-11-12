@@ -92,14 +92,21 @@ const EMPTY_PERSISTED_STATE: PersistedStudyTimerState = {
 
 const BROADCAST_CHANNEL_NAME = 'trilhara_study_timer';
 
-export function getStudyTimerStorageKey(usuarioId?: string | null): string {
-  return `trilhara:u:${usuarioId || 'anon'}:study_timer`;
+/**
+ * Chave de persistência do cronômetro de Estudos (D-21).
+ *
+ * O cronômetro de Estudos **exige autenticação**: sem `usuarioId` não existe chave e nada é
+ * persistido (o namespace anônimo é exclusivo do Pomodoro, D-21).
+ */
+export function getStudyTimerStorageKey(usuarioId?: string | null): string | null {
+  return usuarioId ? `trilhara:u:${usuarioId}:study_timer` : null;
 }
 
 function carregarEstadoPersistido(usuarioId?: string | null): PersistedStudyTimerState {
   if (typeof window === 'undefined') return { ...EMPTY_PERSISTED_STATE };
   try {
     const key = getStudyTimerStorageKey(usuarioId);
+    if (!key) return { ...EMPTY_PERSISTED_STATE };
     const raw = window.localStorage.getItem(key);
     if (!raw) return { ...EMPTY_PERSISTED_STATE };
     const parsed = JSON.parse(raw) as PersistedStudyTimerState;
@@ -120,8 +127,10 @@ function carregarEstadoPersistido(usuarioId?: string | null): PersistedStudyTime
 
 function salvarEstadoPersistido(usuarioId: string | null | undefined, state: PersistedStudyTimerState): void {
   if (typeof window === 'undefined') return;
+  const key = getStudyTimerStorageKey(usuarioId);
+  // Sem autenticação não há cronômetro de Estudos persistido (D-21).
+  if (!key) return;
   try {
-    const key = getStudyTimerStorageKey(usuarioId);
     window.localStorage.setItem(key, JSON.stringify(state));
   } catch {
     // Ignora erro em ambientes restritos de storage
@@ -153,7 +162,7 @@ export const StudyTimerProvider: React.FC<React.PropsWithChildren> = ({ children
       channel.onmessage = (event) => {
         const data = event.data;
         if (!data || data.senderId === instanceIdRef.current) return;
-        if (data.usuarioId !== (usuarioIdRef.current || 'anon')) return;
+        if (data.usuarioId !== usuarioIdRef.current) return;
 
         if (data.type === 'SYNC_STATE' && data.state) {
           setState(data.state);
@@ -176,7 +185,7 @@ export const StudyTimerProvider: React.FC<React.PropsWithChildren> = ({ children
         broadcastChannelRef.current.postMessage({
           type: 'SYNC_STATE',
           senderId: instanceIdRef.current,
-          usuarioId: usuarioIdRef.current || 'anon',
+          usuarioId: usuarioIdRef.current,
           state: novoEstado
         });
       } catch {

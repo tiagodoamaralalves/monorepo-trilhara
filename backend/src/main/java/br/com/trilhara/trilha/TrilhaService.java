@@ -128,8 +128,8 @@ public class TrilhaService {
                     topicosConcluidos,
                     pct,
                     cronoResumo,
-                    BsonDates.toInstant(doc, "criadoEm"),
-                    BsonDates.toInstant(doc, "atualizadoEm")
+                    BsonDates.lerInstant(doc, "criadoEm"),
+                    BsonDates.lerInstant(doc, "atualizadoEm")
             ));
         }
         return resumos;
@@ -213,8 +213,8 @@ public class TrilhaService {
                 disciplinasDTO,
                 concluidosTrilha,
                 progressoMap,
-                BsonDates.toInstant(doc, "criadoEm"),
-                BsonDates.toInstant(doc, "atualizadoEm")
+                BsonDates.lerInstant(doc, "criadoEm"),
+                BsonDates.lerInstant(doc, "atualizadoEm")
         );
     }
 

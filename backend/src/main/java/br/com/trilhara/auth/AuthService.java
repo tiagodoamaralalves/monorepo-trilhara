@@ -171,7 +171,7 @@ public class AuthService {
                     rotacionado.tokenPuro(),
                     "Bearer",
                     tokenService.getAccessExpirationSeconds(),
-                    UsuarioResponse.de(usuario));
+                    UsuarioResponse.de(usuario, userService.preferenciasDe(usuario.id())));
         } catch (TokenInvalidoException exception) {
             throw criarExcecaoNaoAutorizado(exception.getMessage());
         }
@@ -354,7 +354,7 @@ public class AuthService {
                 parRefresh.tokenPuro(),
                 "Bearer",
                 tokenService.getAccessExpirationSeconds(),
-                UsuarioResponse.de(usuario));
+                UsuarioResponse.de(usuario, userService.preferenciasDe(usuario.id())));
     }
 
     private static NotAuthorizedException criarExcecaoNaoAutorizado(String detalhe) {

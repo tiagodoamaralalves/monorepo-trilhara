@@ -80,26 +80,26 @@ class BsonRoundTripTest {
         assertNull(BsonDates.toInstant((Date) null));
 
         Document doc = new Document("criadoEm", bsonDate);
-        assertEquals(agora, BsonDates.toInstant(doc, "criadoEm"));
-        assertNull(BsonDates.toInstant(doc, "campoInexistente"));
+        assertEquals(agora, BsonDates.lerInstant(doc, "criadoEm"));
+        assertNull(BsonDates.lerInstant(doc, "campoInexistente"));
     }
 
     @Test
     @DisplayName("BsonDates: LocalDate ↔ String ISO 'yyyy-MM-dd' sem deslocamento de fuso")
     void deveFazerRoundTripDeLocalDateComoStringIso() {
         LocalDate hoje = LocalDate.of(2026, 11, 9);
-        String iso = BsonDates.toIsoString(hoje);
+        String iso = BsonDates.toIso(hoje);
         assertEquals("2026-11-09", iso);
 
         LocalDate recuperado = BsonDates.toLocalDate(iso);
         assertEquals(hoje, recuperado);
 
-        assertNull(BsonDates.toIsoString(null));
+        assertNull(BsonDates.toIso(null));
         assertNull(BsonDates.toLocalDate((String) null));
 
         Document doc = new Document("dataVencimento", "2026-11-09");
-        assertEquals(hoje, BsonDates.toLocalDate(doc, "dataVencimento"));
-        assertNull(BsonDates.toLocalDate(doc, "campoInexistente"));
+        assertEquals(hoje, BsonDates.lerLocalDate(doc, "dataVencimento"));
+        assertNull(BsonDates.lerLocalDate(doc, "campoInexistente"));
 
         assertThrows(IllegalArgumentException.class, () -> BsonDates.toLocalDate("data-invalida"));
     }
@@ -114,13 +114,13 @@ class BsonRoundTripTest {
         Document doc = new Document("_id", docId)
                 .append("usuarioId", new ObjectId("654321654321654321654321"))
                 .append("criadoEm", BsonDates.toBsonDate(agora))
-                .append("dataEvento", BsonDates.toIsoString(dataEvento))
+                .append("dataEvento", BsonDates.toIso(dataEvento))
                 .append("concluido", true);
 
         assertEquals(docId, doc.getObjectId("_id"));
         assertEquals("654321654321654321654321", doc.getObjectId("usuarioId").toHexString());
-        assertEquals(agora, BsonDates.toInstant(doc, "criadoEm"));
-        assertEquals(dataEvento, BsonDates.toLocalDate(doc, "dataEvento"));
+        assertEquals(agora, BsonDates.lerInstant(doc, "criadoEm"));
+        assertEquals(dataEvento, BsonDates.lerLocalDate(doc, "dataEvento"));
         assertTrue(doc.getBoolean("concluido"));
     }
 }

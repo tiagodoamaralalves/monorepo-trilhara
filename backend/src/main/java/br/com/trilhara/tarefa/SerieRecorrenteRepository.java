@@ -191,15 +191,15 @@ public class SerieRecorrenteRepository {
             doc.put("diaSemanaOrdinal", s.diaSemanaOrdinal());
         }
         doc.put("tipoTermino", s.tipoTermino());
-        doc.put("dataInicio", BsonDates.toIsoString(s.dataInicio()));
+        doc.put("dataInicio", BsonDates.toIso(s.dataInicio()));
         if (s.dataFim() != null) {
-            doc.put("dataFim", BsonDates.toIsoString(s.dataFim()));
+            doc.put("dataFim", BsonDates.toIso(s.dataFim()));
         }
         if (s.maxOcorrencias() != null) {
             doc.put("maxOcorrencias", s.maxOcorrencias());
         }
         if (s.geradoAte() != null) {
-            doc.put("geradoAte", BsonDates.toIsoString(s.geradoAte()));
+            doc.put("geradoAte", BsonDates.toIso(s.geradoAte()));
         }
         doc.put("totalGeradas", s.totalGeradas());
         doc.put("ativa", s.ativa());
@@ -261,21 +261,21 @@ public class SerieRecorrenteRepository {
                 doc.getInteger("ordinalSemana"),
                 doc.getInteger("diaSemanaOrdinal"),
                 doc.getString("tipoTermino"),
-                BsonDates.toLocalDate(doc, "dataInicio"),
-                BsonDates.toLocalDate(doc, "dataFim"),
+                BsonDates.lerLocalDate(doc, "dataInicio"),
+                BsonDates.lerLocalDate(doc, "dataFim"),
                 doc.getInteger("maxOcorrencias"),
-                BsonDates.toLocalDate(doc, "geradoAte"),
+                BsonDates.lerLocalDate(doc, "geradoAte"),
                 doc.getInteger("totalGeradas", 0),
                 Boolean.TRUE.equals(doc.getBoolean("ativa", true)),
                 doc.getInteger("lembreteMinutosAntes"),
                 Boolean.TRUE.equals(doc.getBoolean("usaPadraoGlobalLembrete", false)),
                 doc.getString("fusoAgendamento"),
                 doc.getString("operationId"),
-                BsonDates.toInstant(doc, "deletedAt"),
-                BsonDates.toInstant(doc, "expiresAt"),
+                BsonDates.lerInstant(doc, "deletedAt"),
+                BsonDates.lerInstant(doc, "expiresAt"),
                 doc.getString("loteExclusaoId"),
-                BsonDates.toInstant(doc, "criadoEm"),
-                BsonDates.toInstant(doc, "atualizadoEm")
+                BsonDates.lerInstant(doc, "criadoEm"),
+                BsonDates.lerInstant(doc, "atualizadoEm")
         );
     }
 }

@@ -20,7 +20,7 @@ import {
 import { EstudosService } from './services/estudosService';
 import {
   AuthStorage,
-  gerarUrlComTokenHandoff,
+  iniciarHandoffParaApp,
   sanitizarReturnUrl,
   useAuth
 } from '@shared/auth';
@@ -201,15 +201,11 @@ export default function EstudosApp() {
     if (isAuthenticated && (paginaAtiva === 'landing' || paginaAtiva === 'login' || paginaAtiva === 'cadastro')) {
       const returnUrl = sanitizarReturnUrl(new URLSearchParams(window.location.search).get('returnUrl'));
       if (returnUrl && usuario) {
-        const accessToken = AuthStorage.obterAccessToken();
-        if (accessToken) {
-          const urlComToken = gerarUrlComTokenHandoff(returnUrl, {
-            accessToken,
-            usuario
-          });
-          window.location.href = urlComToken;
-          return;
-        }
+        // D-09/D-12: navegação por handoff opaco; token nunca vai na URL.
+        void iniciarHandoffParaApp(returnUrl).then((destino) => {
+          window.location.href = destino;
+        });
+        return;
       }
       navegar('hub');
     }
@@ -472,15 +468,9 @@ export default function EstudosApp() {
 
     const returnUrl = sanitizarReturnUrl(new URLSearchParams(window.location.search).get('returnUrl'));
     if (returnUrl) {
-      const accessToken = AuthStorage.obterAccessToken();
-      if (accessToken) {
-        const urlComToken = gerarUrlComTokenHandoff(returnUrl, {
-          accessToken,
-          usuario: usuarioLogado
-        });
-        window.location.href = urlComToken;
-        return;
-      }
+      const destino = await iniciarHandoffParaApp(returnUrl);
+      window.location.href = destino;
+      return;
     }
 
     let editalParaImportar: EditalResumo | null = pendingEdital;

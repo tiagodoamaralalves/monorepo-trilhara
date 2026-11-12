@@ -266,7 +266,7 @@ public class MongoExplainBenchmarkTest {
     }
 
     @Test
-    @DisplayName("Benchmark 1: Consulta de Blocos por data e status com 8.784 blocos utiliza IXSCAN idx_blocos_usuario_data_concluido")
+    @DisplayName("Benchmark 1: Consulta de Blocos por data e status com 8.784 blocos utiliza IXSCAN idx_blocos_cronograma_usuarioId_data_concluido")
     void benchmarkBlocosCronogramaPorDataEConcluido() {
         Document filtro = new Document("usuarioId", benchmarkUserId)
                 .append("data", "2026-06-15")
@@ -284,17 +284,17 @@ public class MongoExplainBenchmarkTest {
         LOG.infof("[BENCHMARK-BLOCOS] docs=%d, keys=%d, returned=%d, time=%dms",
                 totalDocsExamined, totalKeysExamined, nReturned, executionTimeMillis);
 
-        // Deve usar IXSCAN no índice idx_blocos_usuario_data_concluido
+        // Deve usar IXSCAN no índice idx_blocos_cronograma_usuarioId_data_concluido
         assertTrue(contemStageOuIndice(explain, "IXSCAN"), "Plano de consulta deve utilizar IXSCAN");
-        assertTrue(contemStageOuIndice(explain, "idx_blocos_usuario_data_concluido"),
-                "Deve utilizar o índice idx_blocos_usuario_data_concluido");
+        assertTrue(contemStageOuIndice(explain, "idx_blocos_cronograma_usuarioId_data_concluido"),
+                "Deve utilizar o índice idx_blocos_cronograma_usuarioId_data_concluido");
 
         // docs examined não pode exceder as 24 ocorrências retornadas (alta seletividade)
         assertTrue(totalDocsExamined <= 24, "Docs examinados deve ser altamente seletivo (<= 24)");
     }
 
     @Test
-    @DisplayName("Benchmark 2: Paginação de Sessões em massa de 2.190 registros utiliza IXSCAN ordenado idx_sessoes_usuario_trilha_data_criado_id")
+    @DisplayName("Benchmark 2: Paginação de Sessões em massa de 2.190 registros utiliza IXSCAN ordenado idx_sessoes_usuarioId_trilhaId_dataSessao_criadoEm_id")
     void benchmarkPaginacaoSessoes() {
         Document filtro = new Document("usuarioId", benchmarkUserId)
                 .append("trilhaId", trilhaId);
@@ -313,7 +313,7 @@ public class MongoExplainBenchmarkTest {
         LOG.infof("[BENCHMARK-SESSOES] docs=%d, keys=%d, returned=%d", totalDocsExamined, totalKeysExamined, nReturned);
 
         assertTrue(contemStageOuIndice(explain, "IXSCAN"), "Paginação de sessões deve usar IXSCAN");
-        assertTrue(contemStageOuIndice(explain, "idx_sessoes_usuario_trilha_data_criado_id"),
+        assertTrue(contemStageOuIndice(explain, "idx_sessoes_usuarioId_trilhaId_dataSessao_criadoEm_id"),
                 "Deve usar o índice de ordenação estável das sessões");
 
         // O índice composto cobre a ordenação: docs examinados deve ser exatamente igual ao limit solicitado (20)
@@ -321,7 +321,7 @@ public class MongoExplainBenchmarkTest {
     }
 
     @Test
-    @DisplayName("Benchmark 3: Listagem de disciplinas ordenadas utiliza IXSCAN idx_disciplinas_usuario_trilha_ordem")
+    @DisplayName("Benchmark 3: Listagem de disciplinas ordenadas utiliza IXSCAN idx_disciplinas_usuarioId_trilhaId_ordem")
     void benchmarkDisciplinasOrdenadas() {
         Document filtro = new Document("usuarioId", benchmarkUserId)
                 .append("trilhaId", trilhaId);
@@ -337,8 +337,8 @@ public class MongoExplainBenchmarkTest {
         LOG.infof("[BENCHMARK-DISCIPLINAS] docs=%d, returned=%d", totalDocsExamined, nReturned);
 
         assertTrue(contemStageOuIndice(explain, "IXSCAN"), "Listagem de disciplinas deve usar IXSCAN");
-        assertTrue(contemStageOuIndice(explain, "idx_disciplinas_usuario_trilha_ordem"),
-                "Deve utilizar idx_disciplinas_usuario_trilha_ordem");
+        assertTrue(contemStageOuIndice(explain, "idx_disciplinas_usuarioId_trilhaId_ordem"),
+                "Deve utilizar idx_disciplinas_usuarioId_trilhaId_ordem");
         assertEquals(20, totalDocsExamined, "Docs examinados deve conferir com as 20 disciplinas da trilha");
     }
 
@@ -360,7 +360,7 @@ public class MongoExplainBenchmarkTest {
 
         // Conforme requisito da Fase 11: verificar estágio ou índice de texto suportado pelo MongoDB 7 (TEXT, TEXT_MATCH ou nome do índice)
         boolean usaIndiceTexto = contemStageOuIndice(explain, "TEXT")
-                || contemStageOuIndice(explain, "idx_notas_usuario_deleted_text")
+                || contemStageOuIndice(explain, "idx_notas_usuarioId_deletedAt_text")
                 || contemStageOuIndice(explain, "TEXT_MATCH")
                 || contemStageOuIndice(explain, "TEXT_OR");
 
@@ -368,7 +368,7 @@ public class MongoExplainBenchmarkTest {
     }
 
     @Test
-    @DisplayName("Benchmark 5: Consulta de Tarefas de Hoje utiliza índice composto idx_tarefas_usuario_deleted_concluida_vencimento")
+    @DisplayName("Benchmark 5: Consulta de Tarefas de Hoje utiliza índice composto idx_tarefas_usuarioId_deletedAt_concluida_dataVencimento")
     void benchmarkTarefasHoje() {
         Document filtro = new Document("usuarioId", benchmarkUserId)
                 .append("concluido", false)
@@ -384,7 +384,7 @@ public class MongoExplainBenchmarkTest {
         LOG.infof("[BENCHMARK-TAREFAS] docs=%d, returned=%d", totalDocsExamined, nReturned);
 
         assertTrue(contemStageOuIndice(explain, "IXSCAN"), "Consulta de tarefas hoje deve utilizar IXSCAN");
-        assertTrue(contemStageOuIndice(explain, "idx_tarefas_usuario_deleted_concluida_vencimento"),
-                "Deve utilizar idx_tarefas_usuario_deleted_concluida_vencimento");
+        assertTrue(contemStageOuIndice(explain, "idx_tarefas_usuarioId_deletedAt_concluida_dataVencimento"),
+                "Deve utilizar idx_tarefas_usuarioId_deletedAt_concluida_dataVencimento");
     }
 }

@@ -215,8 +215,14 @@ function alertarAbaNavegador(mensagem: string): void {
   window.addEventListener('focus', limparAoFocar);
 }
 
+/**
+ * Chave de persistência do Pomodoro (D-21).
+ *
+ * Autenticado: `trilhara:u:{id}:pomodoro_timer`. Visitante: `trilhara:anon:pomodoro_timer`
+ * (namespace separado; ao autenticar, o estado anônimo **não** é migrado).
+ */
 export function getPomodoroTimerStorageKey(usuarioId?: string | null): string {
-  return `trilhara:u:${usuarioId || 'anon'}:pomodoro_timer`;
+  return usuarioId ? `trilhara:u:${usuarioId}:pomodoro_timer` : 'trilhara:anon:pomodoro_timer';
 }
 
 export default function PomodoroApp() {
@@ -455,7 +461,7 @@ export default function PomodoroApp() {
       channel.onmessage = (event) => {
         const data = event.data;
         if (!data || data.senderId === instanceIdRef.current) return;
-        if (data.usuarioId !== (usuarioIdRef.current || 'anon')) return;
+        if (data.usuarioId !== usuarioIdRef.current) return;
 
         if (data.type === 'SYNC_POMODORO' && data.state) {
           const s = data.state;
@@ -613,7 +619,7 @@ export default function PomodoroApp() {
         broadcastChannelRef.current.postMessage({
           type: 'SYNC_POMODORO',
           senderId: instanceIdRef.current,
-          usuarioId: usuarioIdRef.current || 'anon',
+          usuarioId: usuarioIdRef.current,
           state: estadoSalvar
         });
       } catch (e) {

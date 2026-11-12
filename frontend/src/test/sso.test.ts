@@ -50,7 +50,7 @@ describe('SSO e Handoff Local (FASE 1)', () => {
       accessToken: 'token-jwt-teste',
       tokenType: 'Bearer',
       expiresIn: 900,
-      usuario: { id: 'u1', nome: 'Tester', email: 'test@trilhara.com.br', roles: ['USER'], emailVerificado: true, ativo: true, criadoEm: '2026-01-01T00:00:00Z' }
+      usuario: { id: 'u1', nome: 'Tester', email: 'test@trilhara.com.br', papeis: ['USER'], preferencias: { tema: 'dark', disponibilidadeSemanalMinutos: [0,0,0,0,0,0,0], padraoLembreteMinutosAntes: 15 }, emailVerificado: true, ativo: true, criadoEm: '2026-01-01T00:00:00Z' }
     });
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
@@ -77,7 +77,7 @@ describe('SSO e Handoff Local (FASE 1)', () => {
         accessToken: 'novo-access-token',
         tokenType: 'Bearer',
         expiresIn: 900,
-        usuario: { id: 'u2', nome: 'Consumidor', email: 'consumo@trilhara.com.br', roles: ['USER'], emailVerificado: true }
+        usuario: { id: 'u2', nome: 'Consumidor', email: 'consumo@trilhara.com.br', papeis: ['USER'], preferencias: { tema: 'dark', disponibilidadeSemanalMinutos: [0,0,0,0,0,0,0], padraoLembreteMinutosAntes: 15 }, emailVerificado: true }
       })
     } as Response);
 

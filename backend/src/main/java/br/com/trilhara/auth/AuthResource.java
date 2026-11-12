@@ -267,7 +267,7 @@ public class AuthResource {
     @APIResponse(responseCode = "401", description = "Não autenticado")
     public UsuarioResponse meuPerfil() {
         Usuario usuario = userService.buscarPorIdObrigatorio(authContext.usuarioId());
-        return UsuarioResponse.de(usuario);
+        return UsuarioResponse.de(usuario, userService.preferenciasDe(usuario.id()));
     }
 
     @PUT
@@ -374,7 +374,8 @@ public class AuthResource {
         String tokenPuro = tokenQuery != null && !tokenQuery.isBlank()
                 ? tokenQuery
                 : (body != null ? body.token() : null);
-        return UsuarioResponse.de(authService.confirmarEmail(tokenPuro));
+        Usuario usuario = authService.confirmarEmail(tokenPuro);
+        return UsuarioResponse.de(usuario, userService.preferenciasDe(usuario.id()));
     }
 
     @POST
@@ -404,18 +405,19 @@ public class AuthResource {
     }
 
     @PATCH
-    @Path("/admin/usuarios/{id}/roles")
+    @Path("/admin/usuarios/{id}/papeis")
     @Autenticado(roles = Role.ADMIN)
-    @Operation(summary = "Atualiza as roles de um usuário (restrito a ADMIN)")
-    @APIResponse(responseCode = "200", description = "Roles atualizadas com sucesso")
+    @Operation(summary = "Atualiza os papéis de um usuário (restrito a ADMIN)")
+    @APIResponse(responseCode = "200", description = "Papéis atualizados com sucesso")
     @APIResponse(responseCode = "403", description = "Acesso negado para usuários sem role ADMIN")
     public UsuarioResponse atualizarRolesUsuario(
             @PathParam("id") String id,
             @Valid @NotNull AlterarRolesRequest request) {
-        if (id.equals(authContext.usuarioId()) && !request.roles().contains(Role.ADMIN)) {
+        if (id.equals(authContext.usuarioId()) && !request.papeis().contains(Role.ADMIN)) {
             throw new BadRequestException("Você não pode remover seu próprio perfil de administrador.");
         }
-        return UsuarioResponse.de(userService.atualizarRoles(id, request.roles()));
+        Usuario atualizado = userService.atualizarRoles(id, request.papeis());
+        return UsuarioResponse.de(atualizado, userService.preferenciasDe(atualizado.id()));
     }
 
     private String extrairRefreshToken(String tokenDoBody, HttpHeaders headers) {

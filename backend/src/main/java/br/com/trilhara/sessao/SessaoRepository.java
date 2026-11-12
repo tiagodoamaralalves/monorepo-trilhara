@@ -260,8 +260,8 @@ public class SessaoRepository {
                             percentual,
                             editavel,
                             doc.getString(CAMPO_CHAVE_IDEMPOTENCIA),
-                            BsonDates.toInstant(doc, CAMPO_CRIADO_EM),
-                            BsonDates.toInstant(doc, CAMPO_ATUALIZADO_EM)
+                            BsonDates.lerInstant(doc, CAMPO_CRIADO_EM),
+                            BsonDates.lerInstant(doc, CAMPO_ATUALIZADO_EM)
                     ));
                 });
 
@@ -509,9 +509,9 @@ public class SessaoRepository {
         int acertos = (a != null) ? a : 0;
         String chave = doc.getString(CAMPO_CHAVE_IDEMPOTENCIA);
         String hash = doc.getString("requestHash");
-        Instant deletedAt = BsonDates.toInstant(doc, CAMPO_DELETED_AT);
-        Instant criadoEm = BsonDates.toInstant(doc, CAMPO_CRIADO_EM);
-        Instant atualizadoEm = BsonDates.toInstant(doc, CAMPO_ATUALIZADO_EM);
+        Instant deletedAt = BsonDates.lerInstant(doc, CAMPO_DELETED_AT);
+        Instant criadoEm = BsonDates.lerInstant(doc, CAMPO_CRIADO_EM);
+        Instant atualizadoEm = BsonDates.lerInstant(doc, CAMPO_ATUALIZADO_EM);
 
         return new Sessao(
                 id,

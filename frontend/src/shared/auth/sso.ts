@@ -1,5 +1,5 @@
 import { AuthStorage } from './authStorage';
-import { AuthResponse, UsuarioAutenticado } from './types';
+import { AuthResponse } from './types';
 import { obterTimezoneNavegador } from './api';
 
 export type ModuloApp = 'estudos' | 'tarefas' | 'pomodoro' | 'notas';
@@ -198,8 +198,7 @@ export async function consumirHandoffSsoDaUrl(): Promise<boolean> {
     }
   }
 
-  // Fallback para handoff legado se houver
-  return consumirTokenHandoffDaUrl();
+  return false;
 }
 
 /**
@@ -249,46 +248,5 @@ export function sanitizarReturnUrl(returnUrl: string | null): string | null {
     return null;
   } catch {
     return null;
-  }
-}
-
-/**
- * Legado / fallback silencioso
- */
-export function gerarUrlComTokenHandoff(
-  targetUrl: string,
-  sessao: { accessToken: string; usuario: UsuarioAutenticado }
-): string {
-  const url = new URL(targetUrl, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
-  const params = new URLSearchParams();
-  params.set('auth_token', sessao.accessToken);
-  params.set('auth_user', JSON.stringify(sessao.usuario));
-  url.hash = params.toString();
-  return url.toString();
-}
-
-export function consumirTokenHandoffDaUrl(): boolean {
-  if (typeof window === 'undefined') return false;
-
-  const url = new URL(window.location.href);
-  const params = new URLSearchParams(url.hash.replace(/^#/, ''));
-  const authToken = params.get('auth_token');
-  const authUserRaw = params.get('auth_user');
-  if (!authToken || !authUserRaw || typeof authToken !== 'string' || !authToken.trim()) return false;
-
-  window.history.replaceState(null, '', `${url.pathname}${url.search}`);
-
-  try {
-    const usuario = JSON.parse(authUserRaw) as UsuarioAutenticado;
-    if (!usuario || typeof usuario !== 'object' || !usuario.id || !usuario.email) return false;
-    AuthStorage.salvarSessao({
-      accessToken: authToken.trim(),
-      tokenType: 'Bearer',
-      expiresIn: 0,
-      usuario
-    });
-    return true;
-  } catch {
-    return false;
   }
 }

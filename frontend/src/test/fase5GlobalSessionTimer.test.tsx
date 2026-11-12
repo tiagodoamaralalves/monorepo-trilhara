@@ -28,7 +28,7 @@ const mockAuthValue = (usuarioId: string | null = 'user-1'): AuthContextValue =>
         emailVerificado: true,
         ativo: true,
         criadoEm: '2026-11-09T00:00:00Z',
-        roles: ['USER']
+        papeis: ['USER'], preferencias: { tema: 'dark', disponibilidadeSemanalMinutos: [0,0,0,0,0,0,0], padraoLembreteMinutosAntes: 15 }
       }
     : null,
   isAuthenticated: usuarioId !== null,
@@ -344,7 +344,9 @@ describe('FASE 5 - Frontend Shared & Timers', () => {
   describe('C. PomodoroApp Timer Isolado', () => {
     it('deve isolar a chave de storage por usuário e anon', () => {
       expect(getPomodoroTimerStorageKey('user-1')).toBe('trilhara:u:user-1:pomodoro_timer');
-      expect(getPomodoroTimerStorageKey(null)).toBe('trilhara:u:anon:pomodoro_timer');
+      // D-21: visitante usa namespace anônimo separado (`trilhara:anon:`), fora do escopo por usuário.
+      expect(getPomodoroTimerStorageKey(null)).toBe('trilhara:anon:pomodoro_timer');
+      expect(getPomodoroTimerStorageKey(undefined)).toBe('trilhara:anon:pomodoro_timer');
     });
   });
 

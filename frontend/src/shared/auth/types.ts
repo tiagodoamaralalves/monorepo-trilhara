@@ -1,12 +1,26 @@
 export type RoleUsuario = 'USER' | 'ADMIN';
 
+export type TemaPreferencia = 'dark' | 'light' | 'system';
+
+/** Preferências persistidas no servidor (D-10). */
+export interface PreferenciasUsuario {
+  tema: TemaPreferencia;
+  disponibilidadeSemanalMinutos: number[];
+  padraoLembreteMinutosAntes: number;
+}
+
+/**
+ * Perfil autenticado — contrato único de login, cadastro, refresh, handoff e `/auth/me`
+ * (D-09/D-10). Vive somente em memória.
+ */
 export interface UsuarioAutenticado {
   id: string;
   nome: string;
   email: string;
-  roles: RoleUsuario[];
-  ativo: boolean;
   emailVerificado: boolean;
+  papeis: RoleUsuario[];
+  preferencias: PreferenciasUsuario;
+  ativo: boolean;
   criadoEm: string;
 }
 

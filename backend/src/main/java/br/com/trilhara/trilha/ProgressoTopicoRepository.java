@@ -133,6 +133,6 @@ public class ProgressoTopicoRepository {
                 doc.getObjectId("trilhaId"),
                 doc.getObjectId("disciplinaId"),
                 doc.getString("topicoId"),
-                BsonDates.toInstant(doc, "concluidoEm"));
+                BsonDates.lerInstant(doc, "concluidoEm"));
     }
 }

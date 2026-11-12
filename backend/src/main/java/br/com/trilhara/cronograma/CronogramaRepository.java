@@ -233,8 +233,8 @@ public class CronogramaRepository {
 
         Document configuracaoAtiva = doc.get("configuracaoAtiva", Document.class);
         Document configuracaoPreparada = doc.get("configuracaoPreparada", Document.class);
-        Instant criadoEm = BsonDates.toInstant(doc, "criadoEm");
-        Instant atualizadoEm = BsonDates.toInstant(doc, "atualizadoEm");
+        Instant criadoEm = BsonDates.lerInstant(doc, "criadoEm");
+        Instant atualizadoEm = BsonDates.lerInstant(doc, "atualizadoEm");
 
         return new Cronograma(
                 id,

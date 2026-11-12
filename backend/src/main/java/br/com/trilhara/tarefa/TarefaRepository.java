@@ -62,7 +62,7 @@ public class TarefaRepository {
         Document doc = collection.find(and(
                 eq("usuarioId", usuarioId),
                 eq("serieId", serieId),
-                eq("dataOriginalOcorrencia", BsonDates.toIsoString(dataOriginalOcorrencia))
+                eq("dataOriginalOcorrencia", BsonDates.toIso(dataOriginalOcorrencia))
         )).first();
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
@@ -88,14 +88,14 @@ public class TarefaRepository {
         }
 
         if (dataVencimento != null) {
-            filtros.add(eq("dataVencimento", BsonDates.toIsoString(dataVencimento)));
+            filtros.add(eq("dataVencimento", BsonDates.toIso(dataVencimento)));
         } else if (dataInicio != null && dataFim != null) {
-            filtros.add(gte("dataVencimento", BsonDates.toIsoString(dataInicio)));
-            filtros.add(lte("dataVencimento", BsonDates.toIsoString(dataFim)));
+            filtros.add(gte("dataVencimento", BsonDates.toIso(dataInicio)));
+            filtros.add(lte("dataVencimento", BsonDates.toIso(dataFim)));
         } else if (dataInicio != null) {
-            filtros.add(gte("dataVencimento", BsonDates.toIsoString(dataInicio)));
+            filtros.add(gte("dataVencimento", BsonDates.toIso(dataInicio)));
         } else if (dataFim != null) {
-            filtros.add(lte("dataVencimento", BsonDates.toIsoString(dataFim)));
+            filtros.add(lte("dataVencimento", BsonDates.toIso(dataFim)));
         }
 
         if (concluida != null) {
@@ -128,7 +128,7 @@ public class TarefaRepository {
                 eq("deletedAt", null),
                 eq("estado", "PENDENTE"),
                 ne("dataVencimento", null),
-                lt("dataVencimento", BsonDates.toIsoString(hojeLocal))
+                lt("dataVencimento", BsonDates.toIso(hojeLocal))
         )).forEach(doc -> resultado.add(paraEntidade(doc)));
         return resultado;
     }
@@ -139,7 +139,7 @@ public class TarefaRepository {
                 eq("usuarioId", usuarioId),
                 eq("deletedAt", null),
                 eq("estado", "PENDENTE"),
-                eq("dataVencimento", BsonDates.toIsoString(hojeLocal))
+                eq("dataVencimento", BsonDates.toIso(hojeLocal))
         )).forEach(doc -> resultado.add(paraEntidade(doc)));
         return resultado;
     }
@@ -238,7 +238,7 @@ public class TarefaRepository {
         return collection.deleteMany(and(
                 eq("usuarioId", usuarioId),
                 eq("serieId", serieId),
-                gte("dataOriginalOcorrencia", BsonDates.toIsoString(aPartirDe)),
+                gte("dataOriginalOcorrencia", BsonDates.toIso(aPartirDe)),
                 ne("estado", "CONCLUIDA")
         )).getDeletedCount();
     }
@@ -320,7 +320,7 @@ public class TarefaRepository {
             doc.put("serieId", t.serieId());
         }
         if (t.dataOriginalOcorrencia() != null) {
-            doc.put("dataOriginalOcorrencia", BsonDates.toIsoString(t.dataOriginalOcorrencia()));
+            doc.put("dataOriginalOcorrencia", BsonDates.toIso(t.dataOriginalOcorrencia()));
         }
         doc.put("desvinculadaDaSerie", t.desvinculadaDaSerie());
         doc.put("titulo", t.titulo());
@@ -329,7 +329,7 @@ public class TarefaRepository {
         }
         doc.put("prioridade", t.prioridade().getValor());
         if (t.dataVencimento() != null) {
-            doc.put("dataVencimento", BsonDates.toIsoString(t.dataVencimento()));
+            doc.put("dataVencimento", BsonDates.toIso(t.dataVencimento()));
         }
         if (t.horario() != null) {
             doc.put("horario", t.horario());
@@ -402,26 +402,26 @@ public class TarefaRepository {
                 doc.getObjectId("usuarioId"),
                 doc.getObjectId("listaId"),
                 doc.getObjectId("serieId"),
-                BsonDates.toLocalDate(doc, "dataOriginalOcorrencia"),
+                BsonDates.lerLocalDate(doc, "dataOriginalOcorrencia"),
                 Boolean.TRUE.equals(doc.getBoolean("desvinculadaDaSerie", false)),
                 doc.getString("titulo"),
                 doc.getString("descricao") != null ? doc.getString("descricao") : doc.getString("observacoes"),
                 PrioridadeTarefa.fromString(doc.getString("prioridade")),
-                BsonDates.toLocalDate(doc, "dataVencimento"),
+                BsonDates.lerLocalDate(doc, "dataVencimento"),
                 doc.getString("horario"),
                 estado,
                 concluida,
-                BsonDates.toInstant(doc, "concluidaEm"),
+                BsonDates.lerInstant(doc, "concluidaEm"),
                 doc.getInteger("ordem", 0),
                 subtarefas,
                 doc.getInteger("lembreteMinutosAntes"),
                 Boolean.TRUE.equals(doc.getBoolean("usaPadraoGlobalLembrete", false)),
                 doc.getString("fusoAgendamento"),
-                BsonDates.toInstant(doc, "deletedAt"),
-                BsonDates.toInstant(doc, "expiresAt"),
+                BsonDates.lerInstant(doc, "deletedAt"),
+                BsonDates.lerInstant(doc, "expiresAt"),
                 doc.getString("loteExclusaoId"),
-                BsonDates.toInstant(doc, "criadoEm"),
-                BsonDates.toInstant(doc, "atualizadoEm")
+                BsonDates.lerInstant(doc, "criadoEm"),
+                BsonDates.lerInstant(doc, "atualizadoEm")
         );
     }
 }

@@ -277,9 +277,9 @@ public class BlocoCronogramaRepository {
                 doc.getString("disciplinaCorSnapshot"),
                 doc.getInteger("duracaoMinutos", 60),
                 doc.getBoolean("concluido", false),
-                BsonDates.toInstant(doc, "concluidoEm"),
-                BsonDates.toInstant(doc, "criadoEm"),
-                BsonDates.toInstant(doc, "atualizadoEm")
+                BsonDates.lerInstant(doc, "concluidoEm"),
+                BsonDates.lerInstant(doc, "criadoEm"),
+                BsonDates.lerInstant(doc, "atualizadoEm")
         );
     }
 

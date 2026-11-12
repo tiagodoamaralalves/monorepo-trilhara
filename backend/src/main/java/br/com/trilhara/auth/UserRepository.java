@@ -163,6 +163,29 @@ public class UserRepository {
         );
     }
 
+    /** Tema persistido em {@code usuarios.preferencias.tema} (D-10). */
+    public java.util.Optional<String> obterTema(ObjectId usuarioId) {
+        Document doc = usuarios.find(eq("_id", usuarioId)).first();
+        if (doc == null) {
+            return java.util.Optional.empty();
+        }
+        Document pref = doc.get("preferencias", Document.class);
+        if (pref == null) {
+            return java.util.Optional.empty();
+        }
+        return java.util.Optional.ofNullable(pref.getString("tema"));
+    }
+
+    public void salvarTema(ObjectId usuarioId, String tema) {
+        usuarios.updateOne(
+                eq("_id", usuarioId),
+                Updates.combine(
+                        Updates.set("preferencias.tema", tema),
+                        Updates.set("atualizadoEm", Date.from(Instant.now()))
+                )
+        );
+    }
+
     public boolean excluir(String id) {
         return id != null
                 && ObjectId.isValid(id)

@@ -65,16 +65,18 @@
 
 ## C. Lacunas prioritárias reveladas pela R0 (insumo para R1+)
 
+> **Atualizado na R2 (2026-11-12).** Itens resolvidos marcados; os demais mantêm o dono original.
+
 > **Atualizado na R1 (2026-11-12).** Itens resolvidos marcados; os demais mantêm o dono original.
 
 | Lacuna | Fase dona | Evidência |
 |---|---|---|
 | `tamanho` máximo de paginação = 200 nos blocos (norma: 100, com 400) | R5 | REVISAO §6 |
 | ~~`toObjectIdOrNotFound` retornava 404 para ID malformado~~ → **resolvido na R1** | — | `shared/InvalidIdentifierTest`; `BsonIds.parse` |
-| 3 coleções fora do inventário de 19 + não purgadas na exclusão de conta | R2/R5/R9 | REVISAO §5 I-2/I-3 |
-| `HandoffService` cria índices fora do `MongoIndexInitializer` | R2 | REVISAO §5 I-1 |
-| `MongoIndexInitializerTest` valida só nomes | R2 | REVISAO §5 I-4 |
-| `scripts/mongo/reset-dev.sh` inexistente | R2 | REVISAO §5 I-5 |
+| ~~3 coleções fora do inventário~~ → **resolvido na R2** para `tokens_handoff_sso`; `operacoes_concluir_atrasados`/`planejamento_ciclo` seguem em allowlist de R5 | R5/R9 | `InventarioColecoesTest.ALLOWLIST_LEGADO_R5` |
+| ~~`HandoffService` cria índices fora do `MongoIndexInitializer`~~ → **resolvido na R2** | — | `IndicesCanonicos`; `grep createIndex backend/src/main` → 1 |
+| ~~`MongoIndexInitializerTest` valida só nomes~~ → **resolvido na R2** | — | `#deveCriarExatamenteIndicesCanonicos` |
+| ~~`scripts/mongo/reset-dev.sh` inexistente~~ → **criado na R2** | — | `scripts/mongo/reset-dev.sh` |
 | Resíduo `Ciclo`/`planejamento_ciclo` em `trilha/` + refs `ciclo` no frontend | R5/R7 | REVISAO §3 |
 | ~~`tarefaStorage.ts` referenciava campos inexistentes~~ → **resolvido na R1** (arquivo removido) | — | `knip` exit 0 |
 | Anexo C precisa de decisão sobre `usaPadraoGlobalLembrete` e `OperacaoConcluirAtrasados` | D-02/R8 | REVISAO §8 |
@@ -102,3 +104,34 @@
 
 
 | A17 | Performance medida em ambiente representativo; estimativas não são garantias | `benchmark/MongoExplainBenchmarkTest` (5) | Parcial — opt-in (`-Dbenchmark=true`), skipped no gate padrão |
+
+## E. Critérios específicos da R2 (F1: BSON, índices, inventário, SSO, AppSwitcher, tema)
+
+> Inventário canônico a partir da R2: **20 coleções = 19 privadas + `editais`** (18 filhas privadas
+> + `usuarios`). As tabelas de R10/R12/R13 devem usar esta contagem nas revisões delas.
+
+| Critério | Teste / comando | Status |
+|---|---|---|
+| Tabela canônica única com nome + chaves + todas as opções | `shared/mongo/MongoIndexInitializerTest#deveCriarExatamenteIndicesCanonicos` | Coberto |
+| Inicializador idempotente, sem duplicidade e sem drift | `#deveSerIdempotente` | Coberto |
+| Conflito de opções de índice ⇒ readiness `DOWN` | `#deveFicarDownComConflitoDeOpcoes`; `MongoIndexHealthCheckTest#deveFicarDownComConflito` | Coberto |
+| Drift `idx_`/`uk_` reportado em `WARN` e no health sem remoção | `#deveReportarDriftSemRemover`; `#deveFicarUpComDrift` | Coberto |
+| TTL real sobre `expiraEm` em `refresh_tokens` e `tokens_*` | `#deveCriarExatamenteIndicesCanonicos`; `HandoffConsumoAtomicoTest#deveTerIndicesCanonicos` | Coberto |
+| Uma única `MongoIndexInitializer` com todos os índices | `rg -l "class MongoIndexInitializer" backend/src/main` → 1; `IndicesCanonicos` | Coberto |
+| `tokens_handoff_sso` no inventário, `usuarioId` ObjectId, consumo atômico | `HandoffConsumoAtomicoTest` (4) | Coberto |
+| 20 coleções no enum; exclusão cobre 18 filhas + `usuarios` | `InventarioColecoesTest` (5); `AccountDeletionIntegrationTest` | Coberto |
+| Nenhuma coleção da aplicação fora do enum (allowlist R5 documentada) | `InventarioColecoesTest#naoDeveExistirColecaoForaDoInventario` | Parcial — allowlist de `operacoes_concluir_atrasados`/`planejamento_ciclo` (R5) |
+| `BsonDates` estrito (tipo inesperado ⇒ `IllegalStateException`) | `BsonDatesStrictTest` (5) | Coberto |
+| `scripts/mongo/reset-dev.sh` recria o banco dev/test | script + `--help`; execução manual | Coberto |
+| Access token/perfil só em memória; nada em storage | `src/test/authStorage.test.ts` (4) | Coberto |
+| Boot restaura sessão por refresh single-flight + `/auth/me` | `src/test/bootRefresh.test.tsx` (3) | Coberto |
+| Token nunca viaja na URL | `sso.ts` sem `gerarUrlComTokenHandoff`; `rg` = 0 | Coberto |
+| `GET /api/auth/me` com `papeis` + `preferencias` | `TemaPreferenciaTest`; `AuthResourceTest` (`papeis`) | Coberto |
+| Tema persistido no servidor e aplicado antes do paint | `TemaPreferenciaTest` (3); `src/test/tema.test.ts` (5) | Coberto |
+| Cache de tema por usuário e namespace anônimo separado | `src/test/tema.test.ts` | Coberto |
+| `AppSwitcher` APG (setas, Home/End, Escape devolve foco, Tab, `aria-current`) | `src/test/appSwitcher.test.tsx` (6) | Coberto |
+| Guarda de alterações não salvas + `beforeunload` + flush antes de navegar | `src/test/appSwitcher.test.tsx` (4); `unsavedChangesRegistry` | Coberto |
+| Estudos sem namespace anônimo; Pomodoro visitante em `trilhara:anon:` | `src/test/fase5GlobalSessionTimer.test.tsx` | Coberto |
+| Regras ArchUnit de pacotes legados habilitadas | `TenantIsolationArchTest.pacotesLegadosProibidos` | Coberto |
+| `rg "trilhara_auth_token|trilhara_user|trilhara:u:anon" frontend/src` → 0 | comando executado no gate | Coberto |
+| Gate comum verde (backend/frontend/raiz) | `docs/REVISAO-IMPLEMENTADA-R2.md` §8 | Coberto |

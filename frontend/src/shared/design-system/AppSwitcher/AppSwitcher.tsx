@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   LayoutGrid,
   ChevronDown,
@@ -17,6 +17,8 @@ import {
   obterUrlAppNotas,
   iniciarHandoffParaApp
 } from '../../auth/sso';
+import { unsavedChangesRegistry } from '../../state/unsavedChangesRegistry';
+import { ConfirmContext } from '../ConfirmDialog/ConfirmDialog';
 import styles from './AppSwitcher.module.css';
 
 export interface AppConfig {
@@ -65,6 +67,13 @@ export interface AppSwitcherProps {
   onTrocarApp?: (modulo: ModuloApp, urlDestino: string) => void;
 }
 
+/**
+ * Alternador de módulos (D-12) no padrão WAI-ARIA APG *Menu Button*.
+ *
+ * Teclado: Enter/Espaço/↓ abre e foca o primeiro item; ↑/↓ circulam; Home/End vão aos
+ * extremos; Escape fecha e devolve o foco ao botão; Tab fecha. Antes de navegar consulta o
+ * `unsavedChangesRegistry` (D-41) e pede confirmação quando há alterações não salvas.
+ */
 export const AppSwitcher: React.FC<AppSwitcherProps> = ({
   moduloAtual,
   compacto = false,
@@ -72,13 +81,35 @@ export const AppSwitcher: React.FC<AppSwitcherProps> = ({
   onTrocarApp
 }) => {
   const [aberto, setAberto] = useState<boolean>(false);
+  const [indiceAtivo, setIndiceAtivo] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const itensRef = useRef<Array<HTMLAnchorElement | null>>([]);
+
+  const confirmContext = React.useContext(ConfirmContext);
 
   const moduloAtivo = moduloAtual || obterModuloAtual();
   const appAtualConfig = APPS_TRILHARA.find((a) => a.id === moduloAtivo) || APPS_TRILHARA[0];
   const IconeAtual = appAtualConfig.icone;
 
-  // Fecha o dropdown ao clicar fora
+  const fecharComFoco = useCallback(() => {
+    setAberto(false);
+    triggerRef.current?.focus();
+  }, []);
+
+  const abrir = useCallback(() => {
+    const indiceAtual = APPS_TRILHARA.findIndex((a) => a.id === moduloAtivo);
+    setIndiceAtivo(indiceAtual >= 0 ? indiceAtual : 0);
+    setAberto(true);
+  }, [moduloAtivo]);
+
+  // Foco programático no item ativo após abrir (roving tabindex).
+  useLayoutEffect(() => {
+    if (!aberto) return;
+    itensRef.current[indiceAtivo]?.focus();
+  }, [aberto, indiceAtivo]);
+
+  // Clique fora fecha sem mover o foco.
   useEffect(() => {
     if (!aberto) return;
 
@@ -88,49 +119,122 @@ export const AppSwitcher: React.FC<AppSwitcherProps> = ({
       }
     };
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setAberto(false);
-      }
-    };
-
     document.addEventListener('mousedown', handleClickFora);
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickFora);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => document.removeEventListener('mousedown', handleClickFora);
   }, [aberto]);
 
-  const handleSelecionarModulo = async (app: AppConfig, event: React.MouseEvent) => {
-    event.preventDefault();
-    setAberto(false);
+  const solicitarTroca = useCallback(
+    async (app: AppConfig, urlBase: string) => {
+      const mesmoModulo = app.id === moduloAtivo;
 
-    if (app.id === moduloAtivo) {
-      return;
+      if (mesmoModulo && !onTrocarApp) {
+        fecharComFoco();
+        return;
+      }
+
+      // D-12/D-41: grava rascunhos e confirma antes de destruir o estado em memória.
+      unsavedChangesRegistry.flushTodos();
+
+      if (unsavedChangesRegistry.temAlteracoes() && confirmContext) {
+        const sair = await confirmContext.confirm({
+          title: 'Você tem alterações não salvas',
+          description:
+            'Ao trocar de módulo o estado não salvo deste formulário será perdido. Deseja sair mesmo assim?',
+          confirmText: 'Sair mesmo assim',
+          cancelText: 'Ficar',
+          variant: 'warning'
+        });
+        if (!sair) {
+          triggerRef.current?.focus();
+          return;
+        }
+        unsavedChangesRegistry.limpar();
+      }
+
+      setAberto(false);
+
+      if (onTrocarApp) {
+        onTrocarApp(app.id, urlBase);
+        return;
+      }
+
+      const urlFinal = await iniciarHandoffParaApp(urlBase);
+      window.location.href = urlFinal;
+    },
+    [moduloAtivo, onTrocarApp, confirmContext, fecharComFoco]
+  );
+
+  const handleKeyDownTrigger = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    switch (event.key) {
+      case 'Enter':
+      case ' ':
+      case 'Spacebar':
+      case 'ArrowDown':
+      case 'Down':
+        event.preventDefault();
+        abrir();
+        break;
+      case 'ArrowUp':
+      case 'Up':
+        event.preventDefault();
+        setIndiceAtivo(APPS_TRILHARA.length - 1);
+        setAberto(true);
+        break;
+      default:
+        break;
     }
+  };
 
-    const urlBase = app.obterUrl();
-    if (onTrocarApp) {
-      onTrocarApp(app.id, urlBase);
-      return;
+  const handleKeyDownItem = (event: React.KeyboardEvent<HTMLAnchorElement>, indice: number) => {
+    const ultimo = APPS_TRILHARA.length - 1;
+    switch (event.key) {
+      case 'ArrowDown':
+      case 'Down':
+        event.preventDefault();
+        setIndiceAtivo(indice >= ultimo ? 0 : indice + 1);
+        break;
+      case 'ArrowUp':
+      case 'Up':
+        event.preventDefault();
+        setIndiceAtivo(indice <= 0 ? ultimo : indice - 1);
+        break;
+      case 'Home':
+        event.preventDefault();
+        setIndiceAtivo(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        setIndiceAtivo(ultimo);
+        break;
+      case 'Escape':
+      case 'Esc':
+        event.preventDefault();
+        fecharComFoco();
+        break;
+      case 'Tab':
+        setAberto(false);
+        break;
+      case 'Enter':
+      case ' ':
+      case 'Spacebar': {
+        event.preventDefault();
+        const app = APPS_TRILHARA[indice];
+        void solicitarTroca(app, app.obterUrl());
+        break;
+      }
+      default:
+        break;
     }
-
-    // Executa SSO handoff quando necessário
-    const urlFinal = await iniciarHandoffParaApp(urlBase);
-    window.location.href = urlFinal;
   };
 
   return (
-    <div
-      ref={containerRef}
-      className={`${styles.appSwitcherContainer} ${className}`.trim()}
-    >
+    <div ref={containerRef} className={`${styles.appSwitcherContainer} ${className}`.trim()}>
       <button
+        ref={triggerRef}
         type="button"
         className={`${styles.switcherTrigger} ${compacto ? styles.switcherTriggerCompact : ''}`}
-        onClick={() => setAberto((prev) => !prev)}
+        onClick={() => (aberto ? setAberto(false) : abrir())}
+        onKeyDown={handleKeyDownTrigger}
         aria-haspopup="menu"
         aria-expanded={aberto}
         aria-label={`Alternar aplicativo Trilhara (ativo: ${appAtualConfig.nome})`}
@@ -150,34 +254,39 @@ export const AppSwitcher: React.FC<AppSwitcherProps> = ({
         {!compacto && (
           <ChevronDown
             size={14}
+            aria-hidden="true"
             className={`${styles.chevronIcon} ${aberto ? styles.chevronOpen : ''}`}
           />
         )}
       </button>
 
       {aberto && (
-        <div
-          className={styles.switcherDropdown}
-          role="menu"
-          aria-label="Aplicativos do Ecossistema Trilhara"
-        >
+        <div className={styles.switcherDropdown} role="menu" aria-label="Aplicativos do Ecossistema Trilhara">
           <div className={styles.switcherHeader}>Módulos Trilhara</div>
-          {APPS_TRILHARA.map((app) => {
+          {APPS_TRILHARA.map((app, indice) => {
             const AppIcon = app.icone;
             const ativo = app.id === moduloAtivo;
 
             return (
               <a
                 key={app.id}
+                ref={(elemento) => {
+                  itensRef.current[indice] = elemento;
+                }}
                 href={app.obterUrl()}
                 className={`${styles.appItem} ${ativo ? styles.appItemActive : ''}`}
                 role="menuitem"
+                tabIndex={indice === indiceAtivo ? 0 : -1}
                 aria-current={ativo ? 'page' : undefined}
-                onClick={(e) => handleSelecionarModulo(app, e)}
+                onKeyDown={(event) => handleKeyDownItem(event, indice)}
+                onClick={(event) => {
+                  event.preventDefault();
+                  void solicitarTroca(app, app.obterUrl());
+                }}
               >
                 <div className={styles.appItemContent}>
                   <div className={styles.appIconWrap}>
-                    <AppIcon size={16} />
+                    <AppIcon size={16} aria-hidden="true" />
                   </div>
                   <div className={styles.appMeta}>
                     <span className={styles.appName}>{app.nome}</span>
@@ -193,3 +302,4 @@ export const AppSwitcher: React.FC<AppSwitcherProps> = ({
     </div>
   );
 };
+
