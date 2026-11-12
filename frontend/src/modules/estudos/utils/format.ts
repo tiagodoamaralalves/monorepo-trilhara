@@ -30,14 +30,3 @@ export function provaEmAndamento(dataISO?: string | null): boolean {
   return Boolean(dataISO) && (dataISO as string) > hojeISOBase();
 }
 
-/** Data local (yyyy-MM-dd) a partir de um timestamp ISO completo. */
-export function paraDataLocalISO(isoTimestamp: string): string {
-  if (!isoTimestamp) return '';
-  const d = new Date(isoTimestamp);
-  if (Number.isNaN(d.getTime())) return isoTimestamp.slice(0, 10);
-  const ano = d.getFullYear();
-  const mes = String(d.getMonth() + 1).padStart(2, '0');
-  const dia = String(d.getDate()).padStart(2, '0');
-  return `${ano}-${mes}-${dia}`;
-}
-

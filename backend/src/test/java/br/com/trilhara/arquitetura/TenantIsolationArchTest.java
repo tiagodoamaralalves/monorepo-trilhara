@@ -40,7 +40,23 @@ class TenantIsolationArchTest {
      * helpers internos de conversão BSON — não se aplica a regra do primeiro parâmetro.
      */
     private static final Set<String> EXCECOES_POR_ENTIDADE = Set.of(
-            "inserir", "inserirEmLote", "atualizar", "atualizarOrdem", "paraDocumento", "paraEntidade");
+            "inserir", "inserirEmLote", "atualizar", "atualizarOrdem", "paraDocumento", "paraEntidade",
+            "paraSessao");
+
+    /**
+     * Operações explicitamente multi-tenant de classes {@code @SystemScope} (D-06b): recebem
+     * apenas o limite temporal e nunca um {@code usuarioId}.
+     */
+    private static final Set<String> EXCECOES_SISTEMA = Set.of(
+            "purgarTombstonesAnteriores");
+
+    /**
+     * Operações cujo {@code usuarioId} chega dentro de um filtro composto tipado — o filtro
+     * continua começando por {@code usuarioId} e o aplica em {@code Filters.eq}, mas a assinatura
+     * recebe o record em vez do {@code ObjectId} solto.
+     */
+    private static final Set<String> EXCECOES_POR_FILTRO = Set.of(
+            "listarPaginado");
 
     /**
      * Ativa em R0: nenhum recurso HTTP acessa o MongoDB diretamente. Vale hoje
@@ -102,6 +118,40 @@ class TenantIsolationArchTest {
                         }
                     })
                     .because("D-06(a): toda leitura/escrita de coleção privada começa por ObjectId usuarioId.");
+
+    /**
+     * Habilitada na R4 (D-06a, escopo de sessões): todo método público dos repositórios de
+     * {@code ..sessao..} recebe {@code ObjectId usuarioId} como primeiro parâmetro, exceto
+     * {@code inserir}/{@code paraDocumento}/{@code paraSessao} (recebem a entidade, que já
+     * carrega o {@code usuarioId}) e {@code purgarTombstonesAnteriores} (operação multi-tenant de
+     * {@code SessaoPurgaService}, anotada com {@code @SystemScope}, sem exposição HTTP).
+     */
+    @ArchTest
+    static final ArchRule repositoriosDeSessaoExigemUsuarioId =
+            methods()
+                    .that().arePublic()
+                    .and().areDeclaredInClassesThat().resideInAPackage("..sessao..")
+                    .and().areDeclaredInClassesThat().haveSimpleNameEndingWith("Repository")
+                    .should(new ArchCondition<JavaMethod>("ter ObjectId usuarioId como primeiro parâmetro") {
+                        @Override
+                        public void check(JavaMethod metodo, ConditionEvents eventos) {
+                            String nome = metodo.getName();
+                            if (EXCECOES_POR_ENTIDADE.contains(nome)
+                                    || EXCECOES_SISTEMA.contains(nome)
+                                    || EXCECOES_POR_FILTRO.contains(nome)) {
+                                return;
+                            }
+                            List<JavaParameter> parametros = metodo.getParameters();
+                            boolean valido = !parametros.isEmpty()
+                                    && parametros.get(0).getRawType().isAssignableTo(ObjectId.class);
+                            if (!valido) {
+                                eventos.add(SimpleConditionEvent.violated(metodo,
+                                        metodo.getFullName() + " não recebe ObjectId usuarioId como primeiro parâmetro"));
+                            }
+                        }
+                    })
+                    .because("D-06(a): o repositório de sessoes só consulta por usuarioId, "
+                            + "exceto a purga de tombstones em @SystemScope.");
 
     /**
      * Habilita em R2 (D-06b): acesso multi-tenant apenas em classes

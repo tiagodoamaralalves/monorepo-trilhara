@@ -90,6 +90,17 @@ public final class IndicesCanonicos {
         return new IndiceCanonico(colecao, nome, chaves, false, TTL_IMEDIATO, null, null, null);
     }
 
+    /**
+     * Índice não-único com {@code partialFilterExpression}.
+     *
+     * <p>Usado quando só um subconjunto de documentos precisa ser indexado — por exemplo os
+     * tombstones de sessão ({@code deletedAt} presente), que são consultados apenas pela purga
+     * horária e não devem pesar na maioria dos documentos vivos.</p>
+     */
+    private static IndiceCanonico parcial(ColecaoTrilhara colecao, String nome, Bson chaves, Bson filtro) {
+        return new IndiceCanonico(colecao, nome, chaves, false, null, filtro, null, null);
+    }
+
     private static Bson composto(Bson... partes) {
         return Indexes.compoundIndex(partes);
     }
@@ -191,6 +202,9 @@ public final class IndicesCanonicos {
                 unicoParcial(ColecaoTrilhara.SESSOES, "uk_sessoes_usuarioId_chaveIdempotencia",
                         composto(asc("usuarioId"), asc("chaveIdempotencia")),
                         exists("chaveIdempotencia", true)),
+                // Consulta exclusiva da purga de tombstones (D-15): só documentos com deletedAt.
+                parcial(ColecaoTrilhara.SESSOES, "idx_sessoes_deletedAt", asc("deletedAt"),
+                        exists("deletedAt", true)),
 
                 // 13. listas_tarefas
                 simples(ColecaoTrilhara.LISTAS_TAREFAS,

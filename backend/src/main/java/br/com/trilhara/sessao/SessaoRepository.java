@@ -3,10 +3,13 @@ package br.com.trilhara.sessao;
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
 import static com.mongodb.client.model.Filters.gte;
+import static com.mongodb.client.model.Filters.lt;
 import static com.mongodb.client.model.Filters.lte;
+import static com.mongodb.client.model.Filters.ne;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -14,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -31,7 +35,7 @@ import br.com.trilhara.sessao.dto.EstatisticaDisciplinaDTO;
 import br.com.trilhara.sessao.dto.EstatisticasTrilhaDTO;
 import br.com.trilhara.sessao.dto.PaginaSessoesDTO;
 import br.com.trilhara.sessao.dto.RemocaoSessoesDisciplinaResponse;
-import br.com.trilhara.sessao.dto.SerieTemporalDiaDTO;
+import br.com.trilhara.sessao.dto.SerieTemporalPontoDTO;
 import br.com.trilhara.sessao.dto.SessaoDTO;
 import br.com.trilhara.shared.mongo.BsonDates;
 import br.com.trilhara.shared.mongo.BsonIds;
@@ -126,6 +130,14 @@ public class SessaoRepository {
         return sessoes.updateOne(filtro, updates).getModifiedCount() > 0;
     }
 
+    /**
+     * Converte a sessão em tombstone mínimo por 24h (D-15).
+     *
+     * <p>Após a operação sobram apenas {@code _id, usuarioId, trilhaId, chaveIdempotencia,
+     * requestHash, deletedAt}; todo o conteúdo pessoal e de métricas é removido com
+     * {@code $unset}. Por isso um tombstone nunca aparece em listagem, agregação ou no cálculo
+     * da sessão nº 1 — todas essas consultas filtram {@code deletedAt: null}.</p>
+     */
     public boolean marcarTombstone(ObjectId usuarioId, ObjectId trilhaId, ObjectId sessaoId, Instant agora) {
         Bson filtro = and(
                 eq("_id", sessaoId),
@@ -135,16 +147,34 @@ public class SessaoRepository {
         );
         Bson updates = Updates.combine(
                 Updates.set(CAMPO_DELETED_AT, BsonDates.toBsonDate(agora)),
-                Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(agora)),
-                Updates.unset(CAMPO_DURACAO_SEGUNDOS),
-                Updates.unset(CAMPO_QUESTOES),
-                Updates.unset(CAMPO_ACERTOS),
+                Updates.unset(CAMPO_DISCIPLINA_ID),
                 Updates.unset(CAMPO_TRILHA_NOME_SNAPSHOT),
                 Updates.unset(CAMPO_DISCIPLINA_NOME_SNAPSHOT),
                 Updates.unset(CAMPO_DISCIPLINA_COR_SNAPSHOT),
-                Updates.unset(CAMPO_DATA_SESSAO)
+                Updates.unset(CAMPO_DATA_SESSAO),
+                Updates.unset(CAMPO_DURACAO_SEGUNDOS),
+                Updates.unset(CAMPO_QUESTOES),
+                Updates.unset(CAMPO_ACERTOS),
+                Updates.unset(CAMPO_CRIADO_EM),
+                Updates.unset(CAMPO_ATUALIZADO_EM)
         );
         return sessoes.updateOne(filtro, updates).getModifiedCount() > 0;
+    }
+
+    /**
+     * Remove definitivamente tombstones cujo {@code deletedAt} é anterior ao limite (D-15).
+     *
+     * <p>Operação de escopo de sistema (sem {@code usuarioId}), executada apenas pelo
+     * {@code PurgaTombstonesSessaoJob} anotado com {@code @SystemScope}. O filtro é explícito:
+     * {@code deletedAt} existe e é anterior a {@code limite}. Sessões vivas nunca são tocadas.</p>
+     *
+     * @return quantidade de tombstones apagados
+     */
+    public long purgarTombstonesAnteriores(Instant limite) {
+        return sessoes.deleteMany(and(
+                ne(CAMPO_DELETED_AT, null),
+                lt(CAMPO_DELETED_AT, BsonDates.toBsonDate(limite))
+        )).getDeletedCount();
     }
 
     public RemocaoSessoesDisciplinaResponse excluirSessoesDaDisciplina(
@@ -196,7 +226,8 @@ public class SessaoRepository {
     public long contarPorTrilha(ObjectId usuarioId, ObjectId trilhaId) {
         return sessoes.countDocuments(and(
                 eq(CAMPO_USUARIO_ID, usuarioId),
-                eq(CAMPO_TRILHA_ID, trilhaId)
+                eq(CAMPO_TRILHA_ID, trilhaId),
+                eq(CAMPO_DELETED_AT, null)
         ));
     }
 
@@ -388,7 +419,14 @@ public class SessaoRepository {
         });
     }
 
-    private List<SerieTemporalDiaDTO> calcularSerieTemporal(Bson matchFiltro) {
+    /**
+     * Série temporal agregada por dia no Mongo e rebucketizada em Java conforme a granularidade
+     * (RI-09). Rebucketizar em Java — em vez de agrupar por data truncada no pipeline — mantém
+     * os totais idênticos em {@code DIA}, {@code SEMANA} e {@code MES}, porque
+     * {@code dataSessao} é data de calendário ({@code yyyy-MM-dd}) e o bucket é aritmética de
+     * calendário, sem depender de fuso ou {@code $dateFromString}.
+     */
+    private List<SerieTemporalPontoDTO> calcularSerieTemporal(Bson matchFiltro, Granularidade granularidade) {
         List<Bson> pipelineSerie = List.of(
                 Aggregates.match(matchFiltro),
                 Aggregates.group("$dataSessao",
@@ -398,21 +436,45 @@ public class SessaoRepository {
                 Aggregates.sort(Sorts.ascending("_id"))
         );
 
-        List<SerieTemporalDiaDTO> serieTemporal = new ArrayList<>();
+        // TreeMap mantém a ordenação ascendente estável da série por chave de bucket.
+        Map<String, long[]> buckets = new TreeMap<>();
         for (Document doc : sessoes.aggregate(pipelineSerie)) {
             String dataStr = doc.getString("_id");
-            if (dataStr != null) {
-                long stSegundos = ((Number) doc.get(CAMPO_TOTAL_SEGUNDOS)).longValue();
-                int stQuestoes = ((Number) doc.get(CAMPO_TOTAL_QUESTOES)).intValue();
-                int stAcertos = ((Number) doc.get(CAMPO_TOTAL_ACERTOS)).intValue();
-                serieTemporal.add(new SerieTemporalDiaDTO(dataStr, stSegundos, stQuestoes, stAcertos));
+            if (dataStr == null) {
+                continue;
             }
+            LocalDate data;
+            try {
+                data = LocalDate.parse(dataStr);
+            } catch (DateTimeParseException _) {
+                // ignora datas corrompidas, assim como o cálculo de streak
+                continue;
+            }
+            long stSegundos = ((Number) doc.get(CAMPO_TOTAL_SEGUNDOS)).longValue();
+            long stQuestoes = ((Number) doc.get(CAMPO_TOTAL_QUESTOES)).longValue();
+            long stAcertos = ((Number) doc.get(CAMPO_TOTAL_ACERTOS)).longValue();
+
+            long[] acumulado = buckets.computeIfAbsent(granularidade.chave(data), _ -> new long[3]);
+            acumulado[0] += stSegundos;
+            acumulado[1] += stQuestoes;
+            acumulado[2] += stAcertos;
         }
+
+        List<SerieTemporalPontoDTO> serieTemporal = new ArrayList<>(buckets.size());
+        buckets.forEach((chave, acumulado) -> serieTemporal.add(new SerieTemporalPontoDTO(
+                chave,
+                acumulado[0],
+                (int) acumulado[1],
+                (int) acumulado[2])));
         return serieTemporal;
     }
 
-    private int calcularStreakDias(ObjectId usuarioId, ObjectId trilhaId, LocalDate hojeLocal) {
-        Set<LocalDate> diasComEstudo = new HashSet<>();
+    /**
+     * Dias distintos com ao menos uma sessão válida da trilha, usados pelo streak (D-14).
+     * Ignora o filtro de período: o streak é sempre global da trilha.
+     */
+    private Set<LocalDate> diasComEstudo(ObjectId usuarioId, ObjectId trilhaId) {
+        Set<LocalDate> dias = new HashSet<>();
         sessoes.distinct(CAMPO_DATA_SESSAO, and(
                 eq(CAMPO_USUARIO_ID, usuarioId),
                 eq(CAMPO_TRILHA_ID, trilhaId),
@@ -420,26 +482,13 @@ public class SessaoRepository {
         ), String.class).forEach(dStr -> {
             try {
                 if (dStr != null) {
-                    diasComEstudo.add(LocalDate.parse(dStr));
+                    dias.add(LocalDate.parse(dStr));
                 }
-            } catch (Exception _) {
+            } catch (DateTimeParseException _) {
                 // ignora datas corrompidas no cálculo de streak
             }
         });
-
-        int streakDias = 0;
-        if (!diasComEstudo.isEmpty() && hojeLocal != null) {
-            LocalDate cursor = hojeLocal;
-            if (!diasComEstudo.contains(cursor)) {
-                LocalDate ontem = hojeLocal.minusDays(1);
-                cursor = diasComEstudo.contains(ontem) ? ontem : null;
-            }
-            while (cursor != null && diasComEstudo.contains(cursor)) {
-                streakDias++;
-                cursor = cursor.minusDays(1);
-            }
-        }
-        return streakDias;
+        return dias;
     }
 
     public EstatisticasTrilhaDTO obterEstatisticas(
@@ -462,11 +511,12 @@ public class SessaoRepository {
         }
 
         Bson matchFiltro = and(filtros);
+        Granularidade granularidade = Granularidade.para(dataInicio, dataFim);
 
         TotaisGlobais totais = calcularTotaisGlobais(matchFiltro);
         List<EstatisticaDisciplinaDTO> porDisciplina = calcularEstatisticasPorDisciplina(matchFiltro, disciplinasTrilha);
-        List<SerieTemporalDiaDTO> serieTemporal = calcularSerieTemporal(matchFiltro);
-        int streakDias = calcularStreakDias(usuarioId, trilhaId, hojeLocal);
+        List<SerieTemporalPontoDTO> serieTemporal = calcularSerieTemporal(matchFiltro, granularidade);
+        int streakDias = StreakCalculator.calcular(diasComEstudo(usuarioId, trilhaId), hojeLocal);
 
         return new EstatisticasTrilhaDTO(
                 totais.totalSegundos(),
@@ -477,7 +527,8 @@ public class SessaoRepository {
                 totais.percentualAcertoGlobal(),
                 porDisciplina,
                 serieTemporal,
-                streakDias
+                streakDias,
+                granularidade
         );
     }
 

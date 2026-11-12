@@ -2,6 +2,8 @@ package br.com.trilhara.sessao.dto;
 
 import java.util.List;
 
+import br.com.trilhara.sessao.Granularidade;
+
 public record EstatisticasTrilhaDTO(
         long totalSegundos,
         long totalSessoes,
@@ -10,7 +12,9 @@ public record EstatisticasTrilhaDTO(
         int totalErros,
         double percentualAcertoGlobal,
         List<EstatisticaDisciplinaDTO> porDisciplina,
-        List<SerieTemporalDiaDTO> serieTemporal,
-        int streakDias
+        List<SerieTemporalPontoDTO> serieTemporal,
+        int streakDias,
+        Granularidade granularidade
 ) {
 }
+

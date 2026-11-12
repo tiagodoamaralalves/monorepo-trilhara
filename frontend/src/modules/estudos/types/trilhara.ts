@@ -7,7 +7,6 @@ import {
   AtualizarDisciplinaRequest,
   CriarTrilhaRequest,
   TrilhaImpactoExclusaoDTO,
-  RegistrarSessaoPayload,
   SessaoRegistradaDTO,
   EstatisticaDisciplinaDTO,
   EstatisticasTrilhaDTO,
@@ -23,7 +22,6 @@ export type {
   AtualizarDisciplinaRequest,
   CriarTrilhaRequest,
   TrilhaImpactoExclusaoDTO,
-  RegistrarSessaoPayload,
   SessaoRegistradaDTO,
   EstatisticaDisciplinaDTO,
   EstatisticasTrilhaDTO,
@@ -90,6 +88,12 @@ export interface PaginaEditais {
   total: number;
 }
 
+/**
+ * Projeção de sessão usada pela UI.
+ *
+ * Derivados (`erros`, `percentualAcerto`) vêm calculados na leitura; `minutos`, `inicio` e `tipo`
+ * não existem mais — a fonte de verdade é `duracaoSegundos` e `dataSessao` (F3/R4).
+ */
 export interface Sessao {
   id: string;
   trilhaId: string;
@@ -99,15 +103,12 @@ export interface Sessao {
   disciplinaRemovida?: boolean;
   dataSessao?: string;
   duracaoSegundos?: number;
-  inicio?: string;
-  minutos?: number;
   questoes: number;
   acertos: number;
   erros: number;
   percentualAcerto?: number;
   editavel?: boolean;
   chaveIdempotencia?: string;
-  tipo?: 'ESTUDO' | 'QUESTOES' | 'ESTUDO_E_QUESTOES' | 'AJUSTE_MANUAL';
   criadoEm?: string;
   atualizadoEm?: string;
 }

@@ -689,4 +689,449 @@ class SessaoNormalizadaIntegrationTest {
                 .then()
                 .statusCode(404);
     }
+
+    // =========================================================================
+    // R4 — Cobertura obrigatória da revisão de sessões (nomes normativos)
+    // =========================================================================
+
+    /** Setup padrão da R4: trilha com 2 disciplinas para um usuário novo. */
+    private record SetupR4(String token, TrilhaEDisciplinas trilhas) {}
+
+    private SetupR4 setupR4() {
+        ObjectId usuarioId = new ObjectId();
+        String token = gerarTokenParaUsuario(usuarioId);
+        return new SetupR4(token, criarTrilhaComDisciplinas(token));
+    }
+
+    private String postarSessao(
+            String token, String trilhaId, String disciplinaId, String dataSessao,
+            int duracao, int questoes, int acertos, String chave) {
+        return given()
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", chave)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"disciplinaId":"%s","dataSessao":"%s","duracaoSegundos":%d,"questoes":%d,"acertos":%d}
+                        """.formatted(disciplinaId, dataSessao, duracao, questoes, acertos))
+                .when()
+                .post(API_TRILHAS + "/" + trilhaId + "/sessoes")
+                .then()
+                .statusCode(201)
+                .extract().path("id");
+    }
+
+    @Test
+    @DisplayName("R4-1: Idempotency-Key ausente retorna 400 IDEMPOTENCY_KEY_REQUIRED sem criar sessão")
+    void deveExigirIdempotencyKey() {
+        SetupR4 ctx = setupR4();
+        String hoje = LocalDate.now(FUSO_TESTES).toString();
+
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"disciplinaId":"%s","dataSessao":"%s","duracaoSegundos":120,"questoes":0,"acertos":0}
+                        """.formatted(ctx.trilhas().disciplina1Id(), hoje))
+                .when()
+                .post(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes")
+                .then()
+                .statusCode(400)
+                .body("code", equalTo("IDEMPOTENCY_KEY_REQUIRED"));
+
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .when()
+                .get(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes")
+                .then()
+                .statusCode(200)
+                .body("totalItens", equalTo(0));
+    }
+
+    @Test
+    @DisplayName("R4-2: concorrência da mesma chave produz 1 documento e respostas 201 + 200")
+    void deveTratarConcorrenciaDaMesmaChave() throws Exception {
+        SetupR4 ctx = setupR4();
+        String hoje = LocalDate.now(FUSO_TESTES).toString();
+        String chave = UUID.randomUUID().toString();
+        String payload = """
+                {"disciplinaId":"%s","dataSessao":"%s","duracaoSegundos":300,"questoes":10,"acertos":7}
+                """.formatted(ctx.trilhas().disciplina1Id(), hoje);
+
+        java.util.concurrent.Callable<Integer> requisicao = () -> given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .header("Idempotency-Key", chave)
+                .contentType(ContentType.JSON)
+                .body(payload)
+                .when()
+                .post(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes")
+                .then()
+                .extract().statusCode();
+
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        java.util.List<Integer> status = new java.util.ArrayList<>();
+        try {
+            java.util.List<java.util.concurrent.Future<Integer>> futuros = new java.util.ArrayList<>();
+            futuros.add(pool.submit(requisicao));
+            futuros.add(pool.submit(requisicao));
+            for (java.util.concurrent.Future<Integer> f : futuros) {
+                status.add(f.get(30, java.util.concurrent.TimeUnit.SECONDS));
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        java.util.Collections.sort(status);
+        org.junit.jupiter.api.Assertions.assertEquals(java.util.List.of(200, 201), status,
+                "a corrida do E11000 deve resolver em uma criação e um replay");
+
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .when()
+                .get(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes")
+                .then()
+                .statusCode(200)
+                .body("totalItens", equalTo(1));
+    }
+
+    @Test
+    @DisplayName("R4-3: retry após editar retorna a sessão já atualizada (mesma chave, mesmo hash)")
+    void retryAposEditarRetornaSessaoAtual() {
+        SetupR4 ctx = setupR4();
+        String hoje = LocalDate.now(FUSO_TESTES).toString();
+        String chave = UUID.randomUUID().toString();
+        String payload = """
+                {"disciplinaId":"%s","dataSessao":"%s","duracaoSegundos":120,"questoes":5,"acertos":4}
+                """.formatted(ctx.trilhas().disciplina1Id(), hoje);
+
+        String sessaoId = postarSessao(ctx.token(), ctx.trilhas().trilhaId(),
+                ctx.trilhas().disciplina1Id(), hoje, 120, 5, 4, chave);
+
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"duracaoSegundos":240,"questoes":5,"acertos":5}
+                        """)
+                .when()
+                .patch(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes/" + sessaoId)
+                .then()
+                .statusCode(200)
+                .body("duracaoSegundos", equalTo(240));
+
+        // Retry do POST original: devolve o estado atual, não um 409.
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .header("Idempotency-Key", chave)
+                .contentType(ContentType.JSON)
+                .body(payload)
+                .when()
+                .post(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes")
+                .then()
+                .statusCode(200)
+                .body("id", equalTo(sessaoId))
+                .body("duracaoSegundos", equalTo(240));
+    }
+
+    @Test
+    @DisplayName("R4-4: retry após excluir retorna 409 IDEMPOTENCY_RESULT_REMOVED")
+    void retryAposExcluirRetorna409ResultRemoved() {
+        SetupR4 ctx = setupR4();
+        String hoje = LocalDate.now(FUSO_TESTES).toString();
+        String chave = UUID.randomUUID().toString();
+        String payload = """
+                {"disciplinaId":"%s","dataSessao":"%s","duracaoSegundos":150,"questoes":3,"acertos":2}
+                """.formatted(ctx.trilhas().disciplina1Id(), hoje);
+
+        String sessaoId = postarSessao(ctx.token(), ctx.trilhas().trilhaId(),
+                ctx.trilhas().disciplina1Id(), hoje, 150, 3, 2, chave);
+
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .when()
+                .delete(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes/" + sessaoId)
+                .then()
+                .statusCode(204);
+
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .header("Idempotency-Key", chave)
+                .contentType(ContentType.JSON)
+                .body(payload)
+                .when()
+                .post(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes")
+                .then()
+                .statusCode(409)
+                .body("code", equalTo("IDEMPOTENCY_RESULT_REMOVED"));
+    }
+
+    @Test
+    @DisplayName("R4-5: editavel é global mesmo com filtro de disciplina que exclui a sessão nº 1")
+    void editavelEhGlobalMesmoComFiltroDeDisciplina() {
+        SetupR4 ctx = setupR4();
+        LocalDate hoje = LocalDate.now(FUSO_TESTES);
+
+        postarSessao(ctx.token(), ctx.trilhas().trilhaId(), ctx.trilhas().disciplina1Id(),
+                hoje.minusDays(2).toString(), 100, 0, 0, UUID.randomUUID().toString());
+        String maisRecente = postarSessao(ctx.token(), ctx.trilhas().trilhaId(),
+                ctx.trilhas().disciplina2Id(), hoje.toString(), 200, 0, 0,
+                UUID.randomUUID().toString());
+
+        // Filtrando pela disciplina 1, a sessão nº 1 global (da disciplina 2) não aparece:
+        // a sessão listada NÃO pode ser marcada como editável.
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .when()
+                .get(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes?disciplinaId="
+                        + ctx.trilhas().disciplina1Id())
+                .then()
+                .statusCode(200)
+                .body("totalItens", equalTo(1))
+                .body("itens[0].editavel", equalTo(false));
+
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .when()
+                .get(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes")
+                .then()
+                .statusCode(200)
+                .body("itens[0].id", equalTo(maisRecente))
+                .body("itens[0].editavel", equalTo(true))
+                .body("itens[1].editavel", equalTo(false));
+    }
+
+    @Test
+    @DisplayName("R4-6: editavel é falso em todas as sessões da página 2")
+    void editavelFalsoNaPagina2() {
+        SetupR4 ctx = setupR4();
+        LocalDate hoje = LocalDate.now(FUSO_TESTES);
+
+        for (int i = 0; i < 3; i++) {
+            postarSessao(ctx.token(), ctx.trilhas().trilhaId(), ctx.trilhas().disciplina1Id(),
+                    hoje.minusDays(i).toString(), 100, 0, 0, UUID.randomUUID().toString());
+        }
+
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .when()
+                .get(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes?pagina=2&tamanho=1")
+                .then()
+                .statusCode(200)
+                .body("itens", hasSize(1))
+                .body("itens[0].editavel", equalTo(false));
+    }
+
+    @Test
+    @DisplayName("R4-7: tombstone não aparece na listagem nem nas estatísticas")
+    void tombstoneNaoApareceEmListagemNemEstatistica() {
+        SetupR4 ctx = setupR4();
+        LocalDate hoje = LocalDate.now(FUSO_TESTES);
+
+        postarSessao(ctx.token(), ctx.trilhas().trilhaId(), ctx.trilhas().disciplina1Id(),
+                hoje.minusDays(1).toString(), 100, 2, 2, UUID.randomUUID().toString());
+        String removida = postarSessao(ctx.token(), ctx.trilhas().trilhaId(),
+                ctx.trilhas().disciplina1Id(), hoje.toString(), 500, 10, 10,
+                UUID.randomUUID().toString());
+
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .when()
+                .delete(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes/" + removida)
+                .then()
+                .statusCode(204);
+
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .when()
+                .get(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes")
+                .then()
+                .statusCode(200)
+                .body("totalItens", equalTo(1));
+
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .when()
+                .get(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/estatisticas?periodo=tudo")
+                .then()
+                .statusCode(200)
+                .body("totalSegundos", equalTo(100))
+                .body("totalSessoes", equalTo(1))
+                .body("totalQuestoes", equalTo(2));
+    }
+
+    @Test
+    @DisplayName("R4-8: período invertido no histórico e nas estatísticas retorna 400")
+    void periodoInvertidoRetorna400() {
+        SetupR4 ctx = setupR4();
+        String filtro = "?dataInicio=2026-11-10&dataFim=2026-11-01";
+
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .when()
+                .get(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes" + filtro)
+                .then()
+                .statusCode(400)
+                .body("code", equalTo("VALIDATION_ERROR"));
+
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .when()
+                .get(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/estatisticas" + filtro)
+                .then()
+                .statusCode(400)
+                .body("code", equalTo("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("R4-9: estatística vazia retorna zeros, percentual 0 e streak 0")
+    void estatisticaVaziaRetornaZerosEPercentual0() {
+        SetupR4 ctx = setupR4();
+
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .when()
+                .get(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/estatisticas?periodo=7d")
+                .then()
+                .statusCode(200)
+                .body("totalSegundos", equalTo(0))
+                .body("totalSessoes", equalTo(0))
+                .body("percentualAcertoGlobal", equalTo(0.0f))
+                .body("porDisciplina", hasSize(0))
+                .body("serieTemporal", hasSize(0))
+                .body("streakDias", equalTo(0))
+                .body("granularidade", equalTo("DIA"));
+    }
+
+    @Test
+    @DisplayName("R4-11: disciplina de outra trilha do mesmo usuário retorna 400 em errors.disciplinaId")
+    void disciplinaDeOutraTrilhaRetorna400() {
+        SetupR4 ctx = setupR4();
+        TrilhaEDisciplinas outra = criarTrilhaComDisciplinas(ctx.token());
+        String hoje = LocalDate.now(FUSO_TESTES).toString();
+
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .header("Idempotency-Key", UUID.randomUUID().toString())
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"disciplinaId":"%s","dataSessao":"%s","duracaoSegundos":120,"questoes":0,"acertos":0}
+                        """.formatted(outra.disciplina1Id(), hoje))
+                .when()
+                .post(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes")
+                .then()
+                .statusCode(400)
+                .body("code", equalTo("VALIDATION_ERROR"))
+                .body("errors.disciplinaId", hasSize(1));
+    }
+
+    @Test
+    @DisplayName("R4-12: dataSessao futura retorna 400 em errors.dataSessao")
+    void dataSessaoFuturaRetorna400NoCampoDataSessao() {
+        SetupR4 ctx = setupR4();
+        String amanha = LocalDate.now(FUSO_TESTES).plusDays(1).toString();
+
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .header("Idempotency-Key", UUID.randomUUID().toString())
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"disciplinaId":"%s","dataSessao":"%s","duracaoSegundos":120,"questoes":0,"acertos":0}
+                        """.formatted(ctx.trilhas().disciplina1Id(), amanha))
+                .when()
+                .post(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes")
+                .then()
+                .statusCode(400)
+                .body("code", equalTo("VALIDATION_ERROR"))
+                .body("errors.dataSessao", hasSize(1));
+    }
+
+    @Test
+    @DisplayName("R4-10: granularidade semanal/mensal preserva os totais das estatísticas")
+    void granularidadeSemanalPreservaTotais() {
+        SetupR4 ctx = setupR4();
+        LocalDate hoje = LocalDate.now(FUSO_TESTES);
+
+        postarSessao(ctx.token(), ctx.trilhas().trilhaId(), ctx.trilhas().disciplina1Id(),
+                hoje.minusDays(70).toString(), 600, 10, 8, UUID.randomUUID().toString());
+        postarSessao(ctx.token(), ctx.trilhas().trilhaId(), ctx.trilhas().disciplina1Id(),
+                hoje.minusDays(69).toString(), 400, 5, 5, UUID.randomUUID().toString());
+        postarSessao(ctx.token(), ctx.trilhas().trilhaId(), ctx.trilhas().disciplina2Id(),
+                hoje.minusDays(3).toString(), 200, 0, 0, UUID.randomUUID().toString());
+
+        // 90 dias → SEMANA, com os totais completos.
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .when()
+                .get(API_TRILHAS + "/" + ctx.trilhas().trilhaId()
+                        + "/estatisticas?dataInicio=" + hoje.minusDays(89) + "&dataFim=" + hoje)
+                .then()
+                .statusCode(200)
+                .body("granularidade", equalTo("SEMANA"))
+                .body("totalSegundos", equalTo(1200))
+                .body("totalSessoes", equalTo(3))
+                .body("totalQuestoes", equalTo(15))
+                .body("totalAcertos", equalTo(13));
+
+        // 31 dias → DIA, ignorando as sessões antigas.
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .when()
+                .get(API_TRILHAS + "/" + ctx.trilhas().trilhaId()
+                        + "/estatisticas?dataInicio=" + hoje.minusDays(30) + "&dataFim=" + hoje)
+                .then()
+                .statusCode(200)
+                .body("granularidade", equalTo("DIA"))
+                .body("totalSegundos", equalTo(200));
+
+        // "tudo" → MES, com o total completo.
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .when()
+                .get(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/estatisticas?periodo=tudo")
+                .then()
+                .statusCode(200)
+                .body("granularidade", equalTo("MES"))
+                .body("totalSegundos", equalTo(1200));
+    }
+
+    @Test
+    @DisplayName("R4-13: streak considera ontem quando não há sessão hoje")
+    void streakConsideraOntemQuandoSemSessaoHoje() {
+        SetupR4 ctx = setupR4();
+        LocalDate hoje = LocalDate.now(FUSO_TESTES);
+
+        postarSessao(ctx.token(), ctx.trilhas().trilhaId(), ctx.trilhas().disciplina1Id(),
+                hoje.minusDays(1).toString(), 100, 0, 0, UUID.randomUUID().toString());
+        postarSessao(ctx.token(), ctx.trilhas().trilhaId(), ctx.trilhas().disciplina1Id(),
+                hoje.minusDays(2).toString(), 100, 0, 0, UUID.randomUUID().toString());
+
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .when()
+                .get(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/estatisticas?periodo=7d")
+                .then()
+                .statusCode(200)
+                .body("streakDias", equalTo(2));
+    }
+
+    @Test
+    @DisplayName("R4-14: streak independe do filtro de período (calculado sobre a trilha inteira)")
+    void streakIndependeDoFiltroDePeriodo() {
+        SetupR4 ctx = setupR4();
+        LocalDate hoje = LocalDate.now(FUSO_TESTES);
+
+        postarSessao(ctx.token(), ctx.trilhas().trilhaId(), ctx.trilhas().disciplina1Id(),
+                hoje.toString(), 100, 0, 0, UUID.randomUUID().toString());
+        postarSessao(ctx.token(), ctx.trilhas().trilhaId(), ctx.trilhas().disciplina1Id(),
+                hoje.minusDays(1).toString(), 100, 0, 0, UUID.randomUUID().toString());
+        postarSessao(ctx.token(), ctx.trilhas().trilhaId(), ctx.trilhas().disciplina1Id(),
+                hoje.minusDays(120).toString(), 100, 0, 0, UUID.randomUUID().toString());
+
+        given()
+                .header("Authorization", "Bearer " + ctx.token())
+                .when()
+                .get(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/estatisticas?periodo=7d")
+                .then()
+                .statusCode(200)
+                .body("streakDias", equalTo(2))
+                .body("totalSessoes", equalTo(2));
+    }
 }

@@ -23,7 +23,6 @@ import {
   AtualizarDisciplinaRequest,
   CriarTrilhaRequest,
   TrilhaImpactoExclusaoDTO,
-  RegistrarSessaoPayload,
   SessaoRegistradaDTO,
   EstatisticasTrilhaDTO,
   RemocaoSessoesDisciplinaResponse
@@ -32,16 +31,6 @@ import {
 /** Deriva o conjunto de tópicos concluídos usado pela UI a partir do detalhe da trilha. */
 export function topicosConcluidosDe(detalhe: TrilhaDetalheDTO): ReadonlySet<string> {
   return new Set(detalhe.topicosConcluidosIds ?? []);
-}
-
-export interface ResumoEstatisticas {
-  totalMinutos: number;
-  totalQuestoes: number;
-  taxaAcerto: number;
-  streakDiasAtual: number;
-  melhorStreakDias: number;
-  totalSessoes: number;
-  diasComEstudo: number;
 }
 
 export interface PaginaSessoes {
@@ -225,59 +214,6 @@ export const EstudosService = {
   },
 
   // ── SESSÕES & HISTÓRICO ──
-  async registrarSessao(
-    trilhaId: string,
-    payload: {
-      disciplinaId?: string;
-      dataSessao?: string;
-      duracaoSegundos?: number;
-      inicio?: string;
-      minutos?: number;
-      questoes?: number;
-      acertos?: number;
-      erros?: number;
-      tipo?: 'ESTUDO' | 'QUESTOES' | 'ESTUDO_E_QUESTOES' | 'AJUSTE_MANUAL';
-      chaveIdempotencia?: string;
-    },
-    idempotencyKey?: string
-  ): Promise<SessaoRegistradaDTO> {
-    const key = idempotencyKey || payload.chaveIdempotencia || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `sessao-${Date.now()}`);
-    const headers: Record<string, string> = {
-      'Idempotency-Key': key
-    };
-
-    let duracaoSegundos = payload.duracaoSegundos;
-    if (duracaoSegundos === undefined || duracaoSegundos === null) {
-      duracaoSegundos = (payload.minutos != null && payload.minutos > 0) ? payload.minutos * 60 : 60;
-    }
-    duracaoSegundos = Math.max(60, Math.min(86400, duracaoSegundos));
-
-    let dataSessao = payload.dataSessao;
-    if (!dataSessao) {
-      if (payload.inicio) {
-        dataSessao = payload.inicio.split('T')[0];
-      } else {
-        const d = new Date();
-        dataSessao = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      }
-    }
-
-    const body: RegistrarSessaoPayload = {
-      disciplinaId: payload.disciplinaId || '',
-      dataSessao,
-      duracaoSegundos,
-      questoes: payload.questoes ?? 0,
-      acertos: payload.acertos ?? 0,
-      chaveIdempotencia: key
-    };
-
-    return await request<SessaoRegistradaDTO>(`/trilhas/${encodeURIComponent(trilhaId)}/sessoes`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body)
-    });
-  },
-
   async atualizarSessao(
     trilhaId: string,
     sessaoId: string,
@@ -316,18 +252,6 @@ export const EstudosService = {
     );
   },
 
-  async listarSessoes(
-    trilhaId: string,
-    filtro?: { de?: string; ate?: string; disciplinaId?: string; dataInicio?: string; dataFim?: string }
-  ): Promise<Sessao[]> {
-    const pag = await this.listarSessoesPaginado(trilhaId, {
-      ...filtro,
-      pagina: 1,
-      tamanho: 100
-    });
-    return pag.itens;
-  },
-
   async listarSessoesPaginado(
     trilhaId: string,
     filtro?: {
@@ -363,15 +287,12 @@ export const EstudosService = {
         disciplinaRemovida: dto.disciplinaRemovida,
         dataSessao: dto.dataSessao,
         duracaoSegundos: dto.duracaoSegundos,
-        minutos: Math.round(dto.duracaoSegundos / 60),
-        inicio: dto.dataSessao ? `${dto.dataSessao}T12:00:00Z` : dto.criadoEm,
         questoes: dto.questoes ?? 0,
         acertos: dto.acertos ?? 0,
         erros: dto.erros ?? Math.max(0, (dto.questoes ?? 0) - (dto.acertos ?? 0)),
         percentualAcerto: dto.percentualAcerto,
         editavel: dto.editavel,
         chaveIdempotencia: dto.chaveIdempotencia,
-        tipo: 'ESTUDO',
         criadoEm: dto.criadoEm,
         atualizadoEm: dto.atualizadoEm
       })),
@@ -379,22 +300,6 @@ export const EstudosService = {
       tamanho: res.tamanho,
       total: res.totalItens,
       totalPaginas: res.totalPaginas
-    };
-  },
-
-  async obterResumoEstatisticas(
-    trilhaId: string,
-    filtro?: { de?: string; ate?: string; dataInicio?: string; dataFim?: string }
-  ): Promise<ResumoEstatisticas> {
-    const stats = await this.obterEstatisticas(trilhaId, filtro);
-    return {
-      totalMinutos: Math.round(stats.totalSegundos / 60),
-      totalQuestoes: stats.totalQuestoes,
-      taxaAcerto: stats.percentualAcertoGlobal,
-      streakDiasAtual: stats.streakDias,
-      melhorStreakDias: stats.streakDias,
-      totalSessoes: Number(stats.totalSessoes),
-      diasComEstudo: stats.serieTemporal.length
     };
   },
 

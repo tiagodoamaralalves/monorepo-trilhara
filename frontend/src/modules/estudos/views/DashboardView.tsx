@@ -8,15 +8,20 @@ import {
   Trash2
 } from 'lucide-react';
 import {
+  Badge,
   Button,
   DatePicker,
   DisciplineLabel,
+  EmptyState,
+  FormModal,
   Input,
-  Modal,
   Pagination,
   PageBanner,
   ProgressBar,
+  SectionErrorCard,
+  Skeleton,
   useConfirm,
+  useGlobalSessionModal,
   useToast
 } from '@shared/design-system';
 import {
@@ -29,11 +34,11 @@ import {
 } from '../types/trilhara';
 import { EstudosService, PaginaSessoes } from '../services/estudosService';
 import { PlanejamentoStorage } from '../services/planejamentoStorage';
+import { useUnsavedChanges } from '@shared/hooks';
 import {
   formatarDataBR,
   formatarDuracao,
-  hojeISO,
-  paraDataLocalISO
+  hojeISO
 } from '../utils/format';
 import styles from './DashboardView.module.css';
 
@@ -106,6 +111,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   const toast = useToast();
   const { confirm } = useConfirm();
+  const { abrirModal } = useGlobalSessionModal();
 
   const [periodo, setPeriodo] = useState<Periodo>('14');
   const [customDe, setCustomDe] = useState<string>(() => subtrairDias(hojeISO(), 29));
@@ -133,6 +139,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [editQuestoes, setEditQuestoes] = useState(0);
   const [editAcertos, setEditAcertos] = useState(0);
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
+
+  /**
+   * Guarda de alterações do formulário de edição (D-38/D-41): o botão de salvar só habilita
+   * quando algum campo muda em relação ao valor carregado da sessão.
+   */
+  const edicaoSuja = useMemo(() => {
+    if (!sessaoEditando) return false;
+    const segundosOriginal = sessaoEditando.duracaoSegundos ?? 60;
+    const horasOriginal = Math.floor(segundosOriginal / 3600);
+    const minutosOriginal = Math.floor((segundosOriginal % 3600) / 60);
+    return editHoras !== horasOriginal
+      || editMinutos !== minutosOriginal
+      || editQuestoes !== (sessaoEditando.questoes ?? 0)
+      || editAcertos !== (sessaoEditando.acertos ?? 0);
+  }, [editAcertos, editHoras, editMinutos, editQuestoes, sessaoEditando]);
+
+  useUnsavedChanges(`sessao:${sessaoEditando?.id ?? 'nenhuma'}`, Boolean(sessaoEditando) && edicaoSuja);
 
   const ciclo = useMemo(() => cicloAtual(trilha), [trilha]);
   const hoje = hojeISO();
@@ -423,7 +446,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // Ações de FASE 3
   function abrirEdicao(sessao: Sessao) {
     setSessaoEditando(sessao);
-    const segundos = sessao.duracaoSegundos || (sessao.minutos ? sessao.minutos * 60 : 60);
+    const segundos = sessao.duracaoSegundos ?? 60;
     setEditHoras(Math.floor(segundos / 3600));
     setEditMinutos(Math.floor((segundos % 3600) / 60));
     setEditQuestoes(sessao.questoes || 0);
@@ -457,18 +480,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       setSessaoEditando(null);
       setTentativa((t) => t + 1);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Erro ao atualizar a sessão.');
+      // 409 LATEST_SESSION_ONLY: outra sessão passou a ser a nº 1 canônica da trilha.
+      // A UI avisa e recarrega o histórico para refletir a nova sessão editável.
+      const codigo = (err as { code?: string } | null)?.code;
+      if (codigo === 'LATEST_SESSION_ONLY') {
+        toast.error('Apenas a sessão mais recente pode ser editada. O histórico será atualizado.');
+        setSessaoEditando(null);
+        setTentativa((t) => t + 1);
+      } else {
+        toast.error(err instanceof Error ? err.message : 'Erro ao atualizar a sessão.');
+      }
     } finally {
       setSalvandoEdicao(false);
     }
   }
 
   async function handleExcluirSessao(sessao: Sessao) {
-    const duracao = formatarDuracao(sessao.duracaoSegundos || (sessao.minutos ? sessao.minutos * 60 : 0));
-    const data = formatarDataBR(sessao.dataSessao || (sessao.inicio ? paraDataLocalISO(sessao.inicio) : ''));
+    const duracao = formatarDuracao(sessao.duracaoSegundos ?? 0);
+    const data = formatarDataBR(sessao.dataSessao ?? '');
     const confirmou = await confirm({
       title: 'Excluir sessão de estudo?',
-      description: `Deseja realmente excluir esta sessão de estudo (${duracao}) realizada em ${data}? Esta ação é permanente e não poderá ser desfeita.`,
+      description: `Deseja realmente excluir esta sessão de estudo (${duracao}) realizada em ${data}? Esta ação não pode ser desfeita.`,
       confirmText: 'Excluir sessão',
       cancelText: 'Cancelar',
       variant: 'danger'
@@ -572,14 +604,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {carregando ? (
-        <div className={styles.emptyState}>Carregando métricas e histórico de sessões...</div>
-      ) : erro ? (
-        <div className={styles.emptyState}>
-          <p>{erro}</p>
-          <Button type="button" variant="secondary" size="sm" onClick={() => setTentativa((t) => t + 1)}>
-            Tentar novamente
-          </Button>
+        <div className={styles.dashboardSkeleton} data-testid="dashboard-skeleton">
+          <Skeleton variant="chart" />
+          <Skeleton variant="row" linhas={5} />
         </div>
+      ) : erro ? (
+        <SectionErrorCard
+          titulo="Não foi possível carregar"
+          descricao="Verifique sua conexão e tente novamente."
+          onRetry={() => setTentativa((t) => t + 1)}
+        />
+      ) : totalSessoesTabela === 0 && porDisciplinaStats.length === 0 ? (
+        <EmptyState
+          icone={<Clock size={44} aria-hidden="true" />}
+          titulo="Nenhuma sessão neste período"
+          descricao="Registre uma sessão de estudo para começar a acompanhar seu rendimento."
+          acaoPrimaria={
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={() => abrirModal({ modo: 'MANUAL', trilhaId: trilha.id })}
+            >
+              Registrar sessão manual
+            </Button>
+          }
+        />
       ) : (
         <>
           {/* KPI Cards */}
@@ -691,7 +741,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             className={styles.discName}
                           />
                           {item.disciplinaRemovida && (
-                            <span className={styles.badgeRemovida}>Disciplina removida</span>
+                            <Badge variant="warning" size="sm">Disciplina removida</Badge>
                           )}
                         </div>
                         <div className={styles.barCol}>
@@ -708,11 +758,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </span>
                       </div>
 
-                      {/* Grupo / Alerta amarelo para disciplina removida */}
+                      {/* Grupo de disciplina removida: badge amarelo + ação destrutiva explícita */}
                       {item.disciplinaRemovida && (
                         <div className={styles.removidaBanner}>
                           <span className={styles.removidaBannerText}>
-                            ⚠️ Esta disciplina foi excluída da trilha, mas suas sessões históricas foram preservadas ({item.totalSessoes} sessões).
+                            <Badge variant="warning" size="sm">Disciplina removida</Badge>
+                            {' '}As sessões foram preservadas ({item.totalSessoes} sessões · {formatarDuracao(item.totalSegundos)}).
                           </span>
                           <Button
                             type="button"
@@ -843,12 +894,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </thead>
                     <tbody>
                       {sessoesTabela.map((sessao) => {
-                        const duracaoFormatada = formatarDuracao(
-                          sessao.duracaoSegundos || (sessao.minutos ? sessao.minutos * 60 : 0)
-                        );
+                        const duracaoFormatada = formatarDuracao(sessao.duracaoSegundos ?? 0);
                         return (
                           <tr key={sessao.id}>
-                            <td>{formatarDataBR(sessao.dataSessao || (sessao.inicio ? paraDataLocalISO(sessao.inicio) : ''))}</td>
+                            <td>{formatarDataBR(sessao.dataSessao ?? '')}</td>
                             <td>
                               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                                 <DisciplineLabel
@@ -856,9 +905,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                   color={sessao.disciplinaCor || 'var(--primary)'}
                                 />
                                 {sessao.disciplinaRemovida && (
-                                  <span className={styles.badgeRemovida} title="Disciplina excluída da trilha">
+                                  <Badge variant="warning" size="sm" title="Disciplina excluída da trilha">
                                     Removida
-                                  </span>
+                                  </Badge>
                                 )}
                                 {sessao.editavel && (
                                   <span className={styles.badgeRecente} title="Sessão mais recente da trilha (editável)">
@@ -917,84 +966,69 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 />
               </>
             ) : (
-              <div className={styles.emptyState}>Nenhuma sessão registrada neste período.</div>
+              <div className={styles.emptyState}>Nenhuma sessão neste período.</div>
             )}
           </section>
         </>
       )}
 
-      {/* Modal para Edição da Sessão Mais Recente */}
+      {/* Modal de edição da sessão mais recente (D-38: FormModal com guarda de alterações) */}
       {sessaoEditando && (
-        <Modal
+        <FormModal
           isOpen={true}
           onClose={() => setSessaoEditando(null)}
-          title="Editar Sessão Mais Recente"
+          title="Editar sessão mais recente"
           subtitle={`Disciplina: ${sessaoEditando.disciplinaNome || 'Estudo'}`}
           icon={<Edit2 size={20} />}
-          footer={
-            <div className={styles.editModalFooter}>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={salvandoEdicao}
-                onClick={() => setSessaoEditando(null)}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                disabled={salvandoEdicao}
-                onClick={handleSalvarEdicao}
-              >
-                {salvandoEdicao ? 'Salvando...' : 'Salvar alterações'}
-              </Button>
-            </div>
-          }
+          submitText="Salvar alterações"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleSalvarEdicao();
+          }}
+          loading={salvandoEdicao}
+          submitDisabled={!edicaoSuja}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <p className={styles.sectionDescription}>
-              Apenas a sessão mais recente da trilha pode ter sua duração e questões ajustadas.
-            </p>
+          <p className={styles.sectionDescription}>
+            Apenas a sessão mais recente da trilha pode ter duração e questões ajustadas.
+          </p>
 
-            <div className={styles.editModalGrid}>
-              <Input
-                label="Horas de estudo"
-                type="number"
-                min={0}
-                max={24}
-                value={String(editHoras)}
-                onChange={(e) => setEditHoras(Math.max(0, Number.parseInt(e.target.value, 10) || 0))}
-              />
-              <Input
-                label="Minutos de estudo"
-                type="number"
-                min={0}
-                max={59}
-                value={String(editMinutos)}
-                onChange={(e) => setEditMinutos(Math.max(0, Math.min(59, Number.parseInt(e.target.value, 10) || 0)))}
-              />
-            </div>
-
-            <div className={styles.editModalGrid}>
-              <Input
-                label="Total de questões"
-                type="number"
-                min={0}
-                value={String(editQuestoes)}
-                onChange={(e) => setEditQuestoes(Math.max(0, Number.parseInt(e.target.value, 10) || 0))}
-              />
-              <Input
-                label="Acertos"
-                type="number"
-                min={0}
-                max={editQuestoes}
-                value={String(editAcertos)}
-                onChange={(e) => setEditAcertos(Math.max(0, Number.parseInt(e.target.value, 10) || 0))}
-              />
-            </div>
+          <div className={styles.editModalGrid}>
+            <Input
+              label="Horas de estudo"
+              type="number"
+              min={0}
+              max={24}
+              value={String(editHoras)}
+              onChange={(e) => setEditHoras(Math.max(0, Number.parseInt(e.target.value, 10) || 0))}
+            />
+            <Input
+              label="Minutos de estudo"
+              type="number"
+              min={0}
+              max={59}
+              value={String(editMinutos)}
+              onChange={(e) => setEditMinutos(Math.max(0, Math.min(59, Number.parseInt(e.target.value, 10) || 0)))}
+            />
           </div>
-        </Modal>
+
+          <div className={styles.editModalGrid}>
+            <Input
+              label="Total de questões"
+              type="number"
+              min={0}
+              value={String(editQuestoes)}
+              onChange={(e) => setEditQuestoes(Math.max(0, Number.parseInt(e.target.value, 10) || 0))}
+            />
+            <Input
+              label="Acertos"
+              type="number"
+              min={0}
+              max={editQuestoes}
+              value={String(editAcertos)}
+              onChange={(e) => setEditAcertos(Math.max(0, Number.parseInt(e.target.value, 10) || 0))}
+            />
+          </div>
+        </FormModal>
       )}
     </div>
   );

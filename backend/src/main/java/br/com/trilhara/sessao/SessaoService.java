@@ -6,6 +6,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -89,34 +90,59 @@ public class SessaoService {
                 .orElseThrow(() -> new NotFoundException("Trilha não encontrada"));
 
         ObjectId disciplinaId = BsonIds.parse(request.disciplinaId(), "disciplinaId");
+        // Referência de corpo (D-06d): disciplina de outra trilha ou de outro usuário é
+        // 400 VALIDATION_ERROR em errors.disciplinaId, nunca 404 — o 404 revelaria existência.
         Disciplina disciplina = disciplinaRepository.buscarPorId(usuarioId, trilhaId, disciplinaId)
-                .orElseThrow(() -> new NotFoundException("Disciplina não encontrada na trilha"));
+                .orElseThrow(() -> badRequestCampo(
+                        "disciplinaId",
+                        "A disciplina informada não pertence a esta trilha.",
+                        "A disciplina informada não pertence a esta trilha.",
+                        path));
 
         // 3. Validação dos campos funcionais
         if (request.duracaoSegundos() < 60 || request.duracaoSegundos() > 86400) {
-            throw badRequest("INVALID_DURATION",
-                    "A duração deve ser de no mínimo 60 segundos e no máximo 86400 segundos (24 horas).", path);
+            throw badRequestCampo(
+                    "duracaoSegundos",
+                    "A duração deve estar entre 60 e 86400 segundos.",
+                    "A duração deve ser de no mínimo 60 segundos e no máximo 86400 segundos (24 horas).",
+                    path);
         }
 
         int questoes = request.questoesEfetivas();
         int acertos = request.acertosEfetivos();
         if (questoes < 0) {
-            throw badRequest("INVALID_QUESTIONS", "O total de questões deve ser maior ou igual a zero.", path);
+            throw badRequestCampo(
+                    "questoes",
+                    "O total de questões deve ser maior ou igual a zero.",
+                    "O total de questões deve ser maior ou igual a zero.",
+                    path);
         }
         if (acertos < 0 || acertos > questoes) {
-            throw badRequest("INVALID_QUESTIONS", "O total de acertos deve ser entre 0 e o total de questões.", path);
+            throw badRequestCampo(
+                    "acertos",
+                    "O total de acertos deve estar entre 0 e o total de questões.",
+                    "O total de acertos deve ser entre 0 e o total de questões.",
+                    path);
         }
 
         LocalDate dataSessao;
         try {
             dataSessao = LocalDate.parse(request.dataSessao());
         } catch (DateTimeParseException e) {
-            throw badRequest("INVALID_DATE", "Formato de data inválido. Use o padrão ISO yyyy-MM-dd.", path);
+            throw badRequestCampo(
+                    "dataSessao",
+                    "Use o formato ISO yyyy-MM-dd.",
+                    "Formato de data inválido. Use o padrão ISO yyyy-MM-dd.",
+                    path);
         }
 
         LocalDate hojeLocal = timezoneContext.hojeLocal();
         if (dataSessao.isAfter(hojeLocal)) {
-            throw badRequest("INVALID_DATE", "A data da sessão não pode ser futura em relação ao fuso horário local.", path);
+            throw badRequestCampo(
+                    "dataSessao",
+                    "A data da sessão não pode ser futura.",
+                    "A data da sessão não pode ser futura em relação ao fuso horário local.",
+                    path);
         }
 
         // 4. Cálculo do hash dos parâmetros funcionais
@@ -229,17 +255,28 @@ public class SessaoService {
         Sessao sessaoAlvo = primeiraOpt.get();
 
         if (request.duracaoSegundos() < 60 || request.duracaoSegundos() > 86400) {
-            throw badRequest("INVALID_DURATION",
-                    "A duração deve ser de no mínimo 60 segundos e no máximo 86400 segundos (24 horas).", path);
+            throw badRequestCampo(
+                    "duracaoSegundos",
+                    "A duração deve estar entre 60 e 86400 segundos.",
+                    "A duração deve ser de no mínimo 60 segundos e no máximo 86400 segundos (24 horas).",
+                    path);
         }
 
         int questoes = request.questoesEfetivas();
         int acertos = request.acertosEfetivos();
         if (questoes < 0) {
-            throw badRequest("INVALID_QUESTIONS", "O total de questões deve ser maior ou igual a zero.", path);
+            throw badRequestCampo(
+                    "questoes",
+                    "O total de questões deve ser maior ou igual a zero.",
+                    "O total de questões deve ser maior ou igual a zero.",
+                    path);
         }
         if (acertos < 0 || acertos > questoes) {
-            throw badRequest("INVALID_QUESTIONS", "O total de acertos deve ser entre 0 e o total de questões.", path);
+            throw badRequestCampo(
+                    "acertos",
+                    "O total de acertos deve estar entre 0 e o total de questões.",
+                    "O total de acertos deve ser entre 0 e o total de questões.",
+                    path);
         }
 
         Instant agora = Instant.now();
@@ -426,6 +463,15 @@ public class SessaoService {
         return repository.obterEstatisticas(usuarioId, trilhaId, dataInicio, dataFim, timezoneContext.hojeLocal(), disciplinasTrilha);
     }
 
+    /**
+     * Hash funcional do payload de criação (SHA-256 sobre JSON canônico com chaves ordenadas).
+     *
+     * <p>O JSON canônico é montado em {@link java.util.LinkedHashMap} com a ordem fixa
+     * {@code trilhaId, disciplinaId, dataSessao, duracaoSegundos, questoes, acertos}. A ordem de
+     * inserção não depende de reflexão, {@code ObjectMapper} ou configuração de ambiente, então o
+     * mesmo payload funcional sempre produz o mesmo hash — condição para reconhecer replay
+     * idempotente e distinguir de conflito de chave.</p>
+     */
     public static String calcularRequestHash(
             ObjectId trilhaId,
             ObjectId disciplinaId,
@@ -433,21 +479,77 @@ public class SessaoService {
             int duracaoSegundos,
             int questoes,
             int acertos) {
-        String input = trilhaId.toHexString() + "|" + disciplinaId.toHexString() + "|"
-                + dataSessao + "|" + duracaoSegundos + "|" + questoes + "|" + acertos;
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("trilhaId", trilhaId.toHexString());
+        payload.put("disciplinaId", disciplinaId.toHexString());
+        payload.put("dataSessao", dataSessao);
+        payload.put("duracaoSegundos", duracaoSegundos);
+        payload.put("questoes", questoes);
+        payload.put("acertos", acertos);
+        String canonical = jsonCanonico(payload);
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hexString = new StringBuilder();
+            byte[] hash = digest.digest(canonical.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder(64);
             for (byte b : hash) {
                 String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
                 hexString.append(hex);
             }
             return hexString.toString();
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 não disponível", e);
         }
+    }
+
+    /**
+     * Serializa o payload em JSON canônico: chaves na ordem de inserção do
+     * {@link LinkedHashMap} e valores escalares sem espaço. {@code null} vira {@code null} JSON
+     * (não string vazia), para que payloads distintos nunca colidam.
+     */
+    private static String jsonCanonico(Map<String, Object> payload) {
+        StringBuilder sb = new StringBuilder(128).append('{');
+        boolean primeiro = true;
+        for (Map.Entry<String, Object> entrada : payload.entrySet()) {
+            if (!primeiro) {
+                sb.append(',');
+            }
+            primeiro = false;
+            sb.append('"').append(entrada.getKey()).append("\":");
+            Object valor = entrada.getValue();
+            if (valor == null) {
+                sb.append("null");
+            } else if (valor instanceof Number) {
+                sb.append(valor);
+            } else {
+                sb.append('"').append(escaparJson(String.valueOf(valor))).append('"');
+            }
+        }
+        return sb.append('}').toString();
+    }
+
+    private static String escaparJson(String valor) {
+        StringBuilder sb = new StringBuilder(valor.length() + 8);
+        for (int i = 0; i < valor.length(); i++) {
+            char c = valor.charAt(i);
+            switch (c) {
+                case '"' -> sb.append("\\\"");
+                case '\\' -> sb.append("\\\\");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                default -> {
+                    if (c < 0x20) {
+                        sb.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+                }
+            }
+        }
+        return sb.toString();
     }
 
     private SessaoDTO paraDTO(
@@ -478,6 +580,25 @@ public class SessaoService {
 
     private WebApplicationException badRequest(String code, String detail, String instance) {
         ProblemDetails problem = ProblemDetailsFactory.criar(codigoDoErro(code), detail, instance);
+        return new WebApplicationException(
+                Response.status(problem.status())
+                        .type(ProblemDetails.MEDIA_TYPE)
+                        .entity(problem)
+                        .build()
+        );
+    }
+
+    /**
+     * Erro de payload com extensão {@code errors} preenchida (D-04).
+     *
+     * <p>Toda referência inválida vinda no corpo ou todo campo funcional fora de faixa responde
+     * {@code 400 VALIDATION_ERROR} com a chave do campo, para que o cliente destaque o input. A
+     * referência cruzada ({@code disciplinaId} de outra trilha ou de outro usuário) segue a mesma
+     * regra: não é recurso do path, então não vira {@code 404}.</p>
+     */
+    private WebApplicationException badRequestCampo(String campo, String mensagem, String detail, String instance) {
+        ProblemDetails problem = ProblemDetailsFactory.criarCampo(
+                CodigoErro.VALIDATION_ERROR, detail, instance, campo, mensagem);
         return new WebApplicationException(
                 Response.status(problem.status())
                         .type(ProblemDetails.MEDIA_TYPE)

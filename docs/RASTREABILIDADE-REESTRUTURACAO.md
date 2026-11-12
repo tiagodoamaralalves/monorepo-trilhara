@@ -156,3 +156,35 @@
 | Exclusão de trilha com nome exato e impacto em números (D-38) | `src/test/excluirTrilha.test.tsx` (3) | Coberto |
 | Regra ArchUnit de `usuarioId` habilitada para o pacote `trilha` | `TenantIsolationArchTest#repositoriosDeTrilhaExigemUsuarioId` | Coberto |
 | Gate comum verde | `docs/REVISAO-IMPLEMENTADA-R3.md` §5 (190 backend / 177 frontend) | Coberto |
+
+---
+
+## E. Critérios específicos da R4 (F3: sessões, histórico e estatísticas)
+
+| Critério | Teste / evidência | Status |
+|---|---|---|
+| `Idempotency-Key` obrigatória (ausente → 400) | `SessaoNormalizadaIntegrationTest#deveExigirIdempotencyKey` | Coberto |
+| Concorrência da mesma chave (1 documento, 201+200) | `#deveTratarConcorrenciaDaMesmaChave` | Coberto |
+| Retry após editar devolve sessão atual | `#retryAposEditarRetornaSessaoAtual` | Coberto |
+| Retry após excluir → 409 `IDEMPOTENCY_RESULT_REMOVED` | `#retryAposExcluirRetorna409ResultRemoved` | Coberto |
+| `editavel` global (D-13), independente de filtro | `#editavelEhGlobalMesmoComFiltroDeDisciplina` | Coberto |
+| Página 2 nunca editável | `#editavelFalsoNaPagina2` | Coberto |
+| Tombstone fora de listagem e agregação (D-15) | `#tombstoneNaoApareceEmListagemNemEstatistica` | Coberto |
+| Período invertido → 400 | `#periodoInvertidoRetorna400` | Coberto |
+| Estatística vazia → zeros e percentual 0 | `#estatisticaVaziaRetornaZerosEPercentual0` | Coberto |
+| Granularidade DIA/SEMANA/MES preserva totais (RI-09) | `#granularidadeSemanalPreservaTotais`; `SessaoServiceHashTest#deveDerivarGranularidade`; `#deveCalcularChaveDoBucket` | Coberto |
+| `disciplinaId` de outra trilha → 400 em `errors.disciplinaId` | `#disciplinaDeOutraTrilhaRetorna400` | Coberto |
+| `dataSessao` futura → 400 em `errors.dataSessao` | `#dataSessaoFuturaRetorna400NoCampoDataSessao` | Coberto |
+| `requestHash` = SHA-256 de JSON canônico ordenado | `SessaoServiceHashTest#deveSerDeterministicoParaMesmoPayload`; `#deveProduzirHashDoJsonCanonico`; `#naoDeveColidirEntreDuracaoEQuestoes` | Coberto |
+| Streak D-14 considera ontem quando não há sessão hoje | `#streakConsideraOntemQuandoSemSessaoHoje`; `StreakCalculatorTest#deveTerminarOntemSemSessaoHoje` | Coberto |
+| Streak independe do filtro de período | `#streakIndependeDoFiltroDePeriodo` | Coberto |
+| Borda 23h30 em `America/Sao_Paulo` | `StreakCalculatorTest#deveContarDiaLocalAs23h30EmSaoPaulo`; `#deveManterStreakQuandoUltimaSessaoFoiAs23h30` | Coberto |
+| `PurgaTombstonesSessaoJob` (`@SystemScope`, 24h) | `PurgaTombstonesSessaoJobTest` (4 testes) | Coberto |
+| Nenhum `POST .../sessoes` fora de `sessaoGlobalService` | `rg "/sessoes" frontend/src --glob '!**/sessaoGlobalService.ts'` → apenas GET/PATCH/DELETE | Coberto |
+| Tipos sem `minutos`/`erros`/`tipo` persistidos | `sessaoNormalizada.test.ts` (`not.toHaveProperty`); `verificar-legado.sh` `simbolos-legado` 31 → 29 | Coberto |
+| Dashboard com D-37 (Skeleton/EmptyState/SectionErrorCard) | `src/test/dashboard.test.tsx` (5) | Coberto |
+| Grupo removido + confirmação com contagem/tempo (D-38) | `dashboard.test.tsx` | Coberto |
+| Edição com guarda e 409 `LATEST_SESSION_ONLY` → toast + refetch | `src/test/editarSessao.test.tsx` (2) | Coberto |
+| Regra ArchUnit do pacote `sessao` habilitada | `TenantIsolationArchTest#repositoriosDeSessaoExigemUsuarioId` | Coberto |
+| Contagem de testes ≥ baseline R0 (144 backend / 109 frontend) | 221 backend / 183 frontend | Coberto |
+| Gate comum verde | `docs/REVISAO-IMPLEMENTADA-R4.md` §5 | Coberto |

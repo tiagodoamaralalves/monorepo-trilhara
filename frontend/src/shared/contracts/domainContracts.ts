@@ -89,12 +89,22 @@ export interface EstatisticaDisciplinaDTO {
   percentualAcerto: number;
 }
 
-interface SerieTemporalDiaDTO {
-  data: string; // yyyy-MM-dd
+/**
+ * Ponto da série temporal de estatísticas.
+ *
+ * A chave (`data`) segue a `granularidade` da resposta: `yyyy-MM-dd` em DIA, a segunda-feira
+ * da semana ISO em SEMANA e `yyyy-MM-01` em MES. A soma dos pontos é igual em qualquer
+ * granularidade.
+ */
+interface SerieTemporalPontoDTO {
+  data: string;
   totalSegundos: number;
   totalQuestoes: number;
   totalAcertos: number;
 }
+
+/** Granularidade do agrupamento da série temporal (RI-09). */
+type GranularidadeSerie = 'DIA' | 'SEMANA' | 'MES';
 
 export interface EstatisticasTrilhaDTO {
   totalSegundos: number;
@@ -104,8 +114,9 @@ export interface EstatisticasTrilhaDTO {
   totalErros: number;
   percentualAcertoGlobal: number;
   porDisciplina: EstatisticaDisciplinaDTO[];
-  serieTemporal: SerieTemporalDiaDTO[];
+  serieTemporal: SerieTemporalPontoDTO[];
   streakDias: number;
+  granularidade: GranularidadeSerie;
 }
 
 export interface RemocaoSessoesDisciplinaResponse {

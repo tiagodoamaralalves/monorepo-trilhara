@@ -7,59 +7,6 @@ describe('FASE 3 - Frontend: Sessões Normalizadas e Estatísticas', () => {
     vi.restoreAllMocks();
   });
 
-  it('deve registrar sessão enviando duracaoSegundos, dataSessao e Idempotency-Key', async () => {
-    const requestSpy = vi.spyOn(apiModule, 'request').mockResolvedValueOnce({
-      id: 'sessao-1',
-      trilhaId: 'trilha-123',
-      disciplinaId: 'disc-456',
-      disciplinaNome: 'Português',
-      disciplinaCor: '#4A6B82',
-      disciplinaRemovida: false,
-      dataSessao: '2026-11-09',
-      duracaoSegundos: 95,
-      questoes: 10,
-      acertos: 8,
-      erros: 2,
-      percentualAcerto: 80,
-      editavel: true,
-      chaveIdempotencia: 'idemp-key-1',
-      criadoEm: '2026-11-09T12:00:00Z',
-      atualizadoEm: '2026-11-09T12:00:00Z'
-    });
-
-    const resposta = await EstudosService.registrarSessao(
-      'trilha-123',
-      {
-        disciplinaId: 'disc-456',
-        dataSessao: '2026-11-09',
-        duracaoSegundos: 95,
-        questoes: 10,
-        acertos: 8
-      },
-      'idemp-key-1'
-    );
-
-    expect(requestSpy).toHaveBeenCalledWith('/trilhas/trilha-123/sessoes', {
-      method: 'POST',
-      headers: {
-        'Idempotency-Key': 'idemp-key-1'
-      },
-      body: JSON.stringify({
-        disciplinaId: 'disc-456',
-        dataSessao: '2026-11-09',
-        duracaoSegundos: 95,
-        questoes: 10,
-        acertos: 8,
-        chaveIdempotencia: 'idemp-key-1'
-      })
-    });
-
-    expect(resposta.id).toBe('sessao-1');
-    expect(resposta.duracaoSegundos).toBe(95);
-    expect(resposta.percentualAcerto).toBe(80);
-    expect(resposta.editavel).toBe(true);
-  });
-
   it('deve chamar PATCH para atualizar a sessão mais recente', async () => {
     const requestSpy = vi.spyOn(apiModule, 'request').mockResolvedValueOnce({
       id: 'sessao-1',
@@ -152,8 +99,11 @@ describe('FASE 3 - Frontend: Sessões Normalizadas e Estatísticas', () => {
     expect(pag.total).toBe(1);
     expect(pag.itens[0].id).toBe('sessao-1');
     expect(pag.itens[0].duracaoSegundos).toBe(120);
-    expect(pag.itens[0].minutos).toBe(2);
     expect(pag.itens[0].editavel).toBe(true);
+    // R4: `minutos`, `inicio` e `tipo` não existem mais no contrato do cliente.
+    expect(pag.itens[0]).not.toHaveProperty('minutos');
+    expect(pag.itens[0]).not.toHaveProperty('inicio');
+    expect(pag.itens[0]).not.toHaveProperty('tipo');
   });
 
   it('deve consultar estatísticas com período e retornar totais agregados e streak', async () => {
@@ -186,7 +136,8 @@ describe('FASE 3 - Frontend: Sessões Normalizadas e Estatísticas', () => {
           totalAcertos: 40
         }
       ],
-      streakDias: 5
+      streakDias: 5,
+      granularidade: 'DIA'
     };
 
     const requestSpy = vi.spyOn(apiModule, 'request').mockResolvedValueOnce(mockStats);
@@ -196,6 +147,7 @@ describe('FASE 3 - Frontend: Sessões Normalizadas e Estatísticas', () => {
     expect(requestSpy).toHaveBeenCalledWith('/trilhas/trilha-123/estatisticas?periodo=7d');
     expect(stats.totalSegundos).toBe(3600);
     expect(stats.streakDias).toBe(5);
+    expect(stats.granularidade).toBe('DIA');
     expect(stats.percentualAcertoGlobal).toBe(80);
     expect(stats.porDisciplina[0].disciplinaRemovida).toBe(false);
   });
