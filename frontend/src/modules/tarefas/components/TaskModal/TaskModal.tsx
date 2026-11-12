@@ -5,7 +5,6 @@ import {
   Trash2,
   Repeat,
   AlertCircle,
-  Bell,
   Smartphone
 } from 'lucide-react';
 import {

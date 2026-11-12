@@ -10,7 +10,6 @@ import { CatalogoView } from './views/CatalogoView';
 import { AuthView, AuthMode } from './views/AuthView';
 import { TrilhaModal } from './components/TrilhaModal/TrilhaModal';
 import {
-  Disciplina,
   EditalResumo,
   RegistroPlanejamentoPendente,
   Trilha,

@@ -4,7 +4,6 @@ import {
   Secao,
   Nota,
   NotaMetadata,
-  ResultadoBuscaNota,
   BuscaNotasResponse,
   ItemLixeira,
   RascunhoNotaLocal,

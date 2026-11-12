@@ -1,11 +1,8 @@
-import React, { act } from 'react';
+import { act } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import {
-  sessaoGlobalService,
-  SessaoGlobalService
-} from '../shared/services/sessaoGlobalService';
+import { sessaoGlobalService } from '../shared/services/sessaoGlobalService';
 import {
   StudyTimerProvider,
   useStudyTimer,
@@ -20,7 +17,6 @@ import { ToastProvider } from '../shared/design-system/Toast/Toast';
 import { AuthContext, AuthContextValue } from '../shared/auth/AuthContext';
 import { getPomodoroTimerStorageKey } from '../modules/pomodoro/PomodoroApp';
 import * as apiModule from '../shared/auth/api';
-import { AlarmService } from '../modules/estudos/services/alarmService';
 
 const mockAuthValue = (usuarioId: string | null = 'user-1'): AuthContextValue => ({
   usuario: usuarioId

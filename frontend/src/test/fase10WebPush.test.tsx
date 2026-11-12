@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import fs from 'fs';
@@ -15,7 +14,6 @@ import { ConfiguracaoLembreteModal } from '../modules/tarefas/components/Configu
 
 describe('FASE 10 — Web Push e Notificações de Tarefas', () => {
   const originalNotification = window.Notification;
-  const originalNavigator = window.navigator;
 
   beforeEach(() => {
     vi.restoreAllMocks();

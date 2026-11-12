@@ -12,8 +12,6 @@ import {
 import {
   Trilha,
   AtualizacaoMetadadosTrilha,
-  EditalResumo,
-  EstatisticaDisciplina,
   Sessao,
   DisciplinaProgramada,
   PlanejamentoCiclo,
@@ -28,7 +26,6 @@ import {
   SessaoRegistradaDTO,
   PaginaSessoesDTO,
   EstatisticasTrilhaDTO,
-  EstatisticaDisciplinaDTO,
   RemocaoSessoesDisciplinaResponse,
   ItemProgresso,
   Ciclo

@@ -5,7 +5,6 @@ import {
   Badge,
   Checkbox,
   ColorPicker,
-  DISCIPLINE_COLORS,
   DisciplineRow,
   Input,
   Modal,

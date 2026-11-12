@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Smartphone, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Bell, Smartphone } from 'lucide-react';
 import { Modal, Select, Button } from '@shared/design-system';
 import {
   pushService,

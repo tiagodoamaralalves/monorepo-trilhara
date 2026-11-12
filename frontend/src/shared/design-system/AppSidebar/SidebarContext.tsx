@@ -1,4 +1,4 @@
-import React, { createContext, useContext } from 'react';
+import { createContext, useContext } from 'react';
 import { SidebarContextValue } from './types';
 
 export const SidebarContext = createContext<SidebarContextValue | undefined>(undefined);

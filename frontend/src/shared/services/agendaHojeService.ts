@@ -119,7 +119,6 @@ class AgendaHojeManager {
   private canal: BroadcastChannel | null = null;
   private ultimoCarregamentoTimestamp = 0;
   private carregamentoEmAndamento: Promise<AgendaHojeData> | null = null;
-  private inicializado = false;
 
   constructor() {
     this.iniciarListenersGlobais();
@@ -181,7 +180,6 @@ class AgendaHojeManager {
 
   public resetarParaTestes() {
     this.cacheDados = null;
-    this.inicializado = false;
     this.ultimoCarregamentoTimestamp = 0;
     this.carregamentoEmAndamento = null;
     this.ouvintes.clear();
@@ -220,7 +218,6 @@ class AgendaHojeManager {
     try {
       const res = await this.carregamentoEmAndamento;
       this.ultimoCarregamentoTimestamp = Date.now();
-      this.inicializado = true;
       this.notificarOuvintes(res);
       return res;
     } finally {

@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useAuth } from '@shared/auth';
 import { useGlobalSessionModal } from '@shared/design-system';
 import { sessaoGlobalService } from '@shared/services/sessaoGlobalService';
 import {
@@ -35,12 +34,9 @@ export interface PlanejamentoProps {
 export function PlanejamentoView({
   trilha: trilhaProp,
   onTrilhaAtualizada,
-  onRegistrarBloco,
-  registroPlanejamentoRevision,
   onIniciarEstudo,
   onIrParaDisciplinas,
 }: PlanejamentoProps = {}) {
-  const { usuario } = useAuth();
   const { abrirModal } = useGlobalSessionModal();
   const [trilhas, setTrilhas] = useState<Trilha[]>(trilhaProp ? [trilhaProp] : []);
   const [selectedTrilhaId, setSelectedTrilhaId] = useState<string>(trilhaProp ? trilhaProp.id : '');

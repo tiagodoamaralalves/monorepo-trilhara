@@ -1,12 +1,9 @@
 import React from 'react';
 import {
   ArrowRight,
-  BookMarked,
   Code2,
   FileText,
   FolderTree,
-  Sparkles,
-  Table,
   Zap
 } from 'lucide-react';
 import { Button, ThemeToggle } from '@shared/design-system';

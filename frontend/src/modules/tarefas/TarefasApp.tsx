@@ -36,7 +36,7 @@ import {
 } from '@shared/design-system';
 import { useAuth, AuthView, AuthMode } from '@shared/auth';
 import { request } from '@shared/auth/api';
-import { useAgendaHoje, agendaHojeService } from '@shared/services/agendaHojeService';
+import { useAgendaHoje } from '@shared/services/agendaHojeService';
 import {
   BlocoCronogramaItemDTO,
   PaginaBlocosDTO,
@@ -59,7 +59,6 @@ import {
   TarefaDTO,
   ListaTarefas,
   FiltroVisualizacao,
-  Prioridade,
   EscopoRecorrencia,
   TarefasHojeDTO,
   LixeiraTarefasDTO
@@ -116,7 +115,7 @@ export function TarefasApp() {
   const [mostrarConcluidas, setMostrarConcluidas] = useState(true);
 
   // Visão Hoje
-  const [dadosHoje, setDadosHoje] = useState<TarefasHojeDTO | null>(null);
+  const [, setDadosHoje] = useState<TarefasHojeDTO | null>(null);
   const [expansoresAtrasadas, setExpansoresAtrasadas] = useState<Record<string, boolean>>({});
 
   // FASE 7: Trilhas de Estudo com cronograma ativo e Listas Virtuais
@@ -143,7 +142,7 @@ export function TarefasApp() {
   const [tarefaParaExcluirRecorrente, setTarefaParaExcluirRecorrente] = useState<Tarefa | null>(null);
   const [escopoExclusao, setEscopoExclusao] = useState<EscopoRecorrencia>('ESTA');
 
-  const [carregandoDados, setCarregandoDados] = useState(false);
+  const [, setCarregandoDados] = useState(false);
   const hoje = hojeISO();
 
   // ── CARREGAMENTO DE DADOS ──
@@ -675,43 +674,6 @@ export function TarefasApp() {
     }
     return map;
   }, [tarefasManuais]);
-
-  // Agrupamento de atrasadas da mesma série na visão Hoje
-  const atrasadasAgrupadas = useMemo(() => {
-    if (!dadosHoje?.atrasadas) return [];
-    const atrasadas = dadosHoje.atrasadas;
-
-    // Agrupa por serieId
-    const porSerie: Record<string, Tarefa[]> = {};
-    const avulsas: Tarefa[] = [];
-
-    for (const t of atrasadas) {
-      if (t.serieId && !t.desvinculadaDaSerie) {
-        if (!porSerie[t.serieId]) porSerie[t.serieId] = [];
-        porSerie[t.serieId].push(t);
-      } else {
-        avulsas.push(t);
-      }
-    }
-
-    const resultado: Array<{ principal: Tarefa; anteriores: Tarefa[] }> = [];
-
-    for (const serieId of Object.keys(porSerie)) {
-      const grupo = porSerie[serieId];
-      // Ordena decrescente por data para a mais recente ser a principal
-      grupo.sort((a, b) => (b.dataVencimento || '').localeCompare(a.dataVencimento || ''));
-      resultado.push({
-        principal: grupo[0],
-        anteriores: grupo.slice(1)
-      });
-    }
-
-    for (const t of avulsas) {
-      resultado.push({ principal: t, anteriores: [] });
-    }
-
-    return resultado;
-  }, [dadosHoje]);
 
   // ── AUTENTICAÇÃO E ROTEAMENTO ──
 

@@ -1,16 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertTriangle,
   Award,
-  BarChart2,
-  BookOpen,
   Clock,
   Edit2,
-  ExternalLink,
   Flame,
   Target,
-  Trash2,
-  TrendingUp
+  Trash2
 } from 'lucide-react';
 import {
   Button,
@@ -37,12 +32,9 @@ import { PlanejamentoStorage } from '../services/planejamentoStorage';
 import {
   formatarDataBR,
   formatarDuracaoSegundos,
-  formatarMinutos,
-  formatarSegundos,
   hojeISO,
   paraDataLocalISO
 } from '../utils/format';
-import { EmptyJourneyState } from '../components/EmptyJourneyState/EmptyJourneyState';
 import styles from './DashboardView.module.css';
 
 type Periodo = '7' | '14' | '30' | '180' | '0' | 'custom';
@@ -81,10 +73,6 @@ function diferencaEmDias(inicioISO: string, fimISO: string): number {
   return Math.floor((fim - inicio) / 86_400_000);
 }
 
-function formatarHoras(horas: number): string {
-  return `${horas.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}h`;
-}
-
 function nivelAcerto(percentual: number): string {
   if (percentual >= 80) return styles.tierGood;
   if (percentual >= 60) return styles.tierWarn;
@@ -109,8 +97,7 @@ export interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
-  trilha,
-  onIrParaDisciplinas
+  trilha
 }) => {
   const toast = useToast();
   const { confirm } = useConfirm();

@@ -38,7 +38,7 @@ import {
 } from '@shared/design-system';
 import { useAuth } from '@shared/auth';
 import { useAgendaHoje } from '@shared/services/agendaHojeService';
-import { BlocoHojeDTO, TarefaDTO } from '@shared/contracts/domainContracts';
+import { BlocoHojeDTO } from '@shared/contracts/domainContracts';
 import { TarefaService } from '../tarefas/services/tarefaService';
 import logoMark from '@shared/assets/logo-mark.svg';
 import styles from './App.module.css';

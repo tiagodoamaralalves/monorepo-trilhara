@@ -1,12 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Search,
-  ArrowLeft,
-  ArrowRight,
   LayoutGrid,
   List,
   RotateCcw,
-  Plus,
   ChevronRight
 } from 'lucide-react';
 import {
@@ -22,7 +19,6 @@ import { ApiError } from '../services/api';
 import { EstudosService } from '../services/estudosService';
 import { EstudosStorage } from '../services/estudosStorage';
 import { diasAte, formatarDataBR, provaEmAndamento } from '../utils/format';
-import logoMark from '@shared/assets/logo-mark.svg';
 import { VerTrilhaModal } from '../components/CatalogoTrilhas/VerTrilhaModal';
 import {
   ESFERAS_DISPONIVEIS,

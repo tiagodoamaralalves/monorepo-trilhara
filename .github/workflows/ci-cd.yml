@@ -34,6 +34,12 @@ jobs:
       - name: Typecheck (tsc -b) e Build de Produção (Vite)
         run: npm --prefix frontend run build
 
+      - name: Testes automatizados do Frontend (Vitest + RTL + jsdom)
+        run: npm --prefix frontend test -- --run
+
+      - name: Gate anti-legado (R0) — modo report
+        run: bash scripts/verificar-legado.sh --report
+
       - name: Validar sintaxe do Caddyfile
         run: |
           docker run --rm \
@@ -72,4 +78,10 @@ jobs:
         env:
           MONGODB_URL: mongodb://localhost:27017
           QUARKUS_MONGODB_DEVSERVICES_ENABLED: "false"
-        run: bash backend/mvnw -f backend/pom.xml test -B
+          # trilhara.email.resend-api-key não possui default: sem valor o Quarkus
+          # aborta no startup (ConfigRecorder) e a suíte falha com 106 skips.
+          RESEND_API_KEY: chave-dummy-ci
+          EMAIL_FROM: nao-responda@trilhara.test
+          AUTH_JWT_SECRET: ci-jwt-secret-com-pelo-menos-32-bytes-ok
+          AUTH_PASSWORD_PEPPER: ci-pepper
+        run: bash backend/mvnw -f backend/pom.xml verify -B

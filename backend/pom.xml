@@ -17,6 +17,11 @@
         <quarkus.platform.version>3.40.1</quarkus.platform.version>
         <compiler-plugin.version>3.14.1</compiler-plugin.version>
         <surefire-plugin.version>3.5.4</surefire-plugin.version>
+        <!-- R0/D-44: versões usadas pelo gate (archunit 1.5.1 suporta class
+             files até Java 27; jacoco 0.8.16 tem suporte oficial a Java 27 e
+             cobre Java 25 desde 0.8.14). -->
+        <archunit.version>1.5.1</archunit.version>
+        <jacoco-plugin.version>0.8.16</jacoco-plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -66,6 +71,13 @@
             <artifactId>rest-assured</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- R0/D-44: ArchUnit para as regras arquiteturais (TenantIsolationArchTest). -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>${archunit.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -107,6 +119,28 @@
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                     </systemPropertyVariables>
                 </configuration>
+            </plugin>
+            <!-- R0/D-44: JaCoCo em modo report-only. Não há `check` nesta fase:
+                 os thresholds passam a ser enforce apenas em R13. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

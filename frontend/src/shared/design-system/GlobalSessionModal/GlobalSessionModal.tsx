@@ -8,7 +8,6 @@ import { useToast } from '../Toast/Toast';
 import { useGlobalSessionModal } from './GlobalSessionModalContext';
 import { sessaoGlobalService } from '../../services/sessaoGlobalService';
 import {
-  GlobalSessionModalOpenParams,
   SessaoRegistradaDTO,
   TrilhaResumoDTO,
   TrilhaDetalheDTO

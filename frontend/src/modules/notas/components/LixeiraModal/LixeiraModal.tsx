@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Trash2, RotateCcw, AlertCircle } from 'lucide-react';
+import { Trash2, RotateCcw } from 'lucide-react';
 import { Modal, Button, EmptyState, useConfirm, useToast } from '@shared/design-system';
 import { ItemLixeira } from '../../types/nota';
 import { NotaService } from '../../services/notaService';

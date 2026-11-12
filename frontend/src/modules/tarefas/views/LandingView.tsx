@@ -4,8 +4,6 @@ import {
   Calendar,
   Check,
   CheckCircle2,
-  Clock,
-  Sparkles,
   Zap
 } from 'lucide-react';
 import { Button, ThemeToggle } from '@shared/design-system';

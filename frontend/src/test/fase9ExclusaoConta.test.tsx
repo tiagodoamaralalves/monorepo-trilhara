@@ -1,6 +1,5 @@
-import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AuthStorage, limparDadosLocaisDoUsuario, AUTH_CONTA_EXCLUIDA_EVENT } from '../shared/auth/authStorage';
 import { AuthService } from '../shared/auth/authService';

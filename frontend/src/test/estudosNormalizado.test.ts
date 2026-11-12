@@ -159,7 +159,7 @@ describe('EstudosService e Contratos Normalizados (FASE 2)', () => {
     let chamadaMetodo = '';
     let bodyEnviado: unknown = null;
 
-    globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+    globalThis.fetch = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
       chamadaMetodo = init?.method || '';
       bodyEnviado = JSON.parse(init?.body as string);
       return new Response(
@@ -238,7 +238,7 @@ describe('EstudosService e Contratos Normalizados (FASE 2)', () => {
     let chamadaMetodo = '';
     let bodyEnviado: unknown = null;
 
-    globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+    globalThis.fetch = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
       chamadaMetodo = init?.method || '';
       bodyEnviado = JSON.parse(init?.body as string);
       return new Response(null, { status: 204 });

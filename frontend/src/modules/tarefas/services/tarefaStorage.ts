@@ -1,5 +1,4 @@
 import { Tarefa, Prioridade } from '../types/tarefa';
-import { DisciplinaProgramada } from '../types/ciclo';
 import { hojeISO } from '../utils/date';
 import { TrilhaService } from './trilhaService';
 
