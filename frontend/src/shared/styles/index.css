@@ -88,7 +88,7 @@
   --neutral-hover: var(--surface-3);
   --neutral-border: var(--border-strong);
 
-  /* Semântica Purple (Pesos & Ciclos Ponderados) */
+  /* Semântica Purple (Pesos & Cronogramas Ponderados) */
   --purple: #a855f7;
   --purple-bg: rgba(168, 85, 247, 0.14);
   --purple-bg-subtle: rgba(168, 85, 247, 0.1);
@@ -258,7 +258,7 @@
   --red-bg: rgba(225, 29, 72, 0.09);
   --red-border: rgba(225, 29, 72, 0.25);
 
-  /* Semântica Purple Calibrada (Pesos & Ciclos Ponderados) */
+  /* Semântica Purple Calibrada (Pesos & Cronogramas Ponderados) */
   --purple: #7e22ce;
   --purple-bg: rgba(126, 34, 206, 0.10);
   --purple-bg-subtle: rgba(126, 34, 206, 0.08);

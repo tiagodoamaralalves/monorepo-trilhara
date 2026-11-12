@@ -2,7 +2,6 @@ import { request } from './api';
 import {
   Tarefa,
   ListaTarefas,
-  CicloAtivoInfo,
   SerieRecorrenteDTO,
   EscopoRecorrencia,
   TarefasHojeDTO,
@@ -288,13 +287,6 @@ export const TarefaService = {
     });
   },
 
-  // ── CICLOS DE ESTUDO (LEGADO / PRESERVADO) ──
-
-  async obterCiclosDisponiveis(): Promise<CicloAtivoInfo[]> {
-    try {
-      return await request<CicloAtivoInfo[]>('/tarefas/ciclo/disponiveis');
-    } catch {
-      return [];
-    }
-  }
+  // Os blocos de cronograma não são tarefas: a lista virtual usa
+  // `GET /api/trilhas/{trilhaId}/cronogramas/{cronogramaId}/blocos` (Estudos).
 };

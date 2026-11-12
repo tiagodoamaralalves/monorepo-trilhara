@@ -68,6 +68,26 @@ public class CronogramaRepository {
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
 
+    /** Lista cronogramas em um estado de publicação em qualquer tenant (reconciliador, D-18b). */
+    public List<Cronograma> listarPorEstadoPublicacao(String estadoPublicacao) {
+        List<Cronograma> resultado = new ArrayList<>();
+        for (Document doc : collection.find(eq("estadoPublicacao", estadoPublicacao))) {
+            resultado.add(paraEntidade(doc));
+        }
+        return Collections.unmodifiableList(resultado);
+    }
+
+    /** Atualiza somente o estado de publicação, preservando o restante do documento. */
+    public boolean atualizarEstadoPublicacao(
+            ObjectId usuarioId, ObjectId cronogramaId, String estadoPublicacao) {
+        return collection.updateOne(
+                and(eq("_id", cronogramaId), eq("usuarioId", usuarioId)),
+                Updates.combine(
+                        Updates.set("estadoPublicacao", estadoPublicacao),
+                        Updates.set("atualizadoEm", BsonDates.toBsonDate(Instant.now())))
+        ).getMatchedCount() > 0;
+    }
+
     public Optional<Cronograma> buscarAtivoPorTrilha(ObjectId usuarioId, ObjectId trilhaId) {
         Document doc = collection.find(and(
                 eq("trilhaId", trilhaId),

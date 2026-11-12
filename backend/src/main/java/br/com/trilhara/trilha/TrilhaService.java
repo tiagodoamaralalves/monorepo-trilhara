@@ -14,6 +14,7 @@ import org.bson.types.ObjectId;
 import org.eclipse.microprofile.config.ConfigProvider;
 
 import br.com.trilhara.cronograma.BlocoCronogramaRepository;
+import br.com.trilhara.cronograma.Cronograma;
 import br.com.trilhara.cronograma.CronogramaRepository;
 import br.com.trilhara.edital.Edital;
 import br.com.trilhara.edital.EditalRepository;
@@ -217,7 +218,6 @@ public class TrilhaService {
                 obterCronogramaAtivoResumo(doc, usuarioId),
                 disciplinasDTO,
                 concluidosTrilha,
-                doc.getList("ciclos", Object.class),
                 BsonDates.lerInstant(doc, "criadoEm"),
                 BsonDates.lerInstant(doc, "atualizadoEm"));
     }
@@ -470,6 +470,8 @@ public class TrilhaService {
 
             disciplinaRepository.excluirTodasDaTrilha(usuarioId, trilhaId);
             sessaoRepository.excluirPorTrilha(usuarioId, trilhaId);
+            blocoCronogramaRepository.excluirPorTrilha(usuarioId, trilhaId);
+            cronogramaRepository.excluirPorTrilha(usuarioId, trilhaId);
             repository.desvincularDadosTrilhaENotas(usuarioId, trilhaId, discIds, topicoIds);
             repository.excluir(usuarioId, trilhaId);
         });
@@ -549,8 +551,15 @@ public class TrilhaService {
                 Instant.now());
 
         disciplinaRepository.atualizar(atualizada);
+        // Regra normativa §5.3: renomear/alterar cor atualiza o snapshot apenas nos cronogramas
+        // ATIVOS da trilha, sem tocar disciplinaId.
+        List<ObjectId> cronogramasAtivosIds = cronogramaRepository.listarPorTrilha(usuarioId, trilhaId)
+                .stream()
+                .filter(Cronograma::ativo)
+                .map(Cronograma::id)
+                .toList();
         blocoCronogramaRepository.atualizarSnapshotsDisciplina(
-                usuarioId, trilhaId, disciplinaId, atualizada.nome(), atualizada.cor());
+                usuarioId, trilhaId, disciplinaId, atualizada.nome(), atualizada.cor(), cronogramasAtivosIds);
 
         Set<String> concluidosTrilha = progressoRepository.listarTopicosConcluidosIds(usuarioId, trilhaId);
         int dConcluidos = 0;

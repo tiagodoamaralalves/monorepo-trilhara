@@ -40,8 +40,8 @@ class TenantIsolationArchTest {
      * helpers internos de conversão BSON — não se aplica a regra do primeiro parâmetro.
      */
     private static final Set<String> EXCECOES_POR_ENTIDADE = Set.of(
-            "inserir", "inserirEmLote", "atualizar", "atualizarOrdem", "paraDocumento", "paraEntidade",
-            "paraSessao");
+            "inserir", "inserirEmLote", "inserirLote", "atualizar", "atualizarOrdem",
+            "paraDocumento", "paraEntidade", "paraSessao");
 
     /**
      * Operações explicitamente multi-tenant de classes {@code @SystemScope} (D-06b): recebem
@@ -57,6 +57,13 @@ class TenantIsolationArchTest {
      */
     private static final Set<String> EXCECOES_POR_FILTRO = Set.of(
             "listarPaginado");
+
+    /**
+     * Varreduras multi-tenant do reconciliador de cronogramas ({@code @SystemScope}, D-18b):
+     * recebem apenas o estado de publicação, nunca um {@code usuarioId}.
+     */
+    private static final Set<String> EXCECOES_DE_SISTEMA_CRONOGRAMA = Set.of(
+            "listarPorEstadoPublicacao");
 
     /**
      * Ativa em R0: nenhum recurso HTTP acessa o MongoDB diretamente. Vale hoje
@@ -164,6 +171,39 @@ class TenantIsolationArchTest {
             .that().resideInAPackage("..job..")
             .should().bePublic()
             .because("D-06(b): purgas/scheduler/exclusão de conta vivem em ..job.. sem HTTP.");
+
+    /**
+     * Ativa em R5 (D-06a): todo {@code *Repository} do pacote {@code cronograma} recebe
+     * {@code ObjectId usuarioId} como primeiro parâmetro. Exceções: métodos de conversão
+     * ({@code paraDocumento}/{@code paraEntidade}), inserção/atualização da própria entidade
+     * (que já carrega {@code usuarioId}) e as operações do reconciliador {@code @SystemScope}
+     * ({@code listarPorEstadoPublicacao}, que é multi-tenant por definição).
+     */
+    @ArchTest
+    static final ArchRule repositoriosDeCronogramaExigemUsuarioId =
+            methods()
+                    .that().arePublic()
+                    .and().areDeclaredInClassesThat().resideInAPackage("..cronograma..")
+                    .and().areDeclaredInClassesThat().haveSimpleNameEndingWith("Repository")
+                    .should(new ArchCondition<JavaMethod>("ter ObjectId usuarioId como primeiro parâmetro") {
+                        @Override
+                        public void check(JavaMethod metodo, ConditionEvents eventos) {
+                            String nome = metodo.getName();
+                            if (EXCECOES_POR_ENTIDADE.contains(nome)
+                                    || EXCECOES_DE_SISTEMA_CRONOGRAMA.contains(nome)) {
+                                return;
+                            }
+                            List<JavaParameter> parametros = metodo.getParameters();
+                            boolean valido = !parametros.isEmpty()
+                                    && parametros.get(0).getRawType().isAssignableTo(ObjectId.class);
+                            if (!valido) {
+                                eventos.add(SimpleConditionEvent.violated(metodo,
+                                        metodo.getFullName() + " não recebe ObjectId usuarioId como primeiro parâmetro"));
+                            }
+                        }
+                    })
+                    .because("D-06(a): repositórios de cronograma e blocos só consultam por usuarioId, "
+                            + "exceto as varreduras do reconciliador em @SystemScope.");
 
     /**
      * Habilitada em R2: guarda anti-regressão dos pacotes legados (Anexo C / DC-01).

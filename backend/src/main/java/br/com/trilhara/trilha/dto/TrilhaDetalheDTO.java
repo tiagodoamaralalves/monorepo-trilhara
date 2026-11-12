@@ -13,9 +13,8 @@ import java.util.Set;
  * {@code progresso: { topicoId: { done, doneAt } }} foi removido (D-11). Identificadores de
  * usuário são omitidos do contrato público (D-06).</p>
  *
- * <p>{@code ciclos} permanece apenas como passagem da estrutura herdada de planejamento,
- * cuja remoção pertence às revisões de cronograma/planejamento; nenhuma regra desta revisão
- * depende dele.</p>
+ * <p>A agenda de estudo é exposta por {@code cronogramaAtivoResumo} e pelos endpoints de
+ * cronograma/blocos; o array legado de agendas foi removido (R5/DC-15).</p>
  */
 public record TrilhaDetalheDTO(
         String id,
@@ -32,13 +31,11 @@ public record TrilhaDetalheDTO(
         CronogramaAtivoResumoDTO cronogramaAtivoResumo,
         List<DisciplinaDTO> disciplinas,
         Set<String> topicosConcluidosIds,
-        List<Object> ciclos,
         Instant criadoEm,
         Instant atualizadoEm) {
 
     public TrilhaDetalheDTO {
         disciplinas = disciplinas == null ? List.of() : List.copyOf(disciplinas);
         topicosConcluidosIds = topicosConcluidosIds == null ? Set.of() : Set.copyOf(topicosConcluidosIds);
-        ciclos = ciclos == null ? List.of() : List.copyOf(ciclos);
     }
 }

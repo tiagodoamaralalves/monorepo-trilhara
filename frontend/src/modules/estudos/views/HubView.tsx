@@ -172,7 +172,7 @@ export const HubView: React.FC<HubViewProps> = ({
     <div className={styles.container}>
       <PageBanner
         title="Minhas trilhas de estudo"
-        description="Trilhe seu caminho até a aprovação: acompanhe seu progresso, gerencie disciplinas e mantenha a constância no ciclo."
+        description="Trilhe seu caminho até a aprovação: acompanhe seu progresso, gerencie disciplinas e mantenha a constância nos estudos."
         icon={<Route size={26} />}
         actions={
           <div className={styles.bannerActions}>

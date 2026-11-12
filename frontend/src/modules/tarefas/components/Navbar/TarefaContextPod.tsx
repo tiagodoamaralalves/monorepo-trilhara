@@ -122,7 +122,7 @@ export const TarefaContextPod: React.FC<TarefaContextPodProps> = ({
         Nova Tarefa
       </Button>
 
-      {/* ── CARD "TAREFAS DO DIA" (solicitado no lugar do ciclo antigo) ── */}
+      {/* ── CARD "TAREFAS DO DIA" (cartão de tarefas do dia) ── */}
       <div
         role="button"
         tabIndex={0}

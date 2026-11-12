@@ -134,7 +134,7 @@
   border-radius: var(--radius-pill);
 }
 
-/* ── AVISO DISCRETO DE CICLO ATIVO NO TOPO ── */
+/* ── AVISO DISCRETO DE CRONOGRAMA ATIVO NO TOPO ── */
 .cicloBannerDiscreto {
   display: flex;
   align-items: center;

@@ -355,7 +355,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                 Catálogo de Trilhas
               </h1>
               <p className={styles.pageSubtitle}>
-                Inspecione a grade verticalizada de cada concurso e importe para o seu ciclo em 1 clique.
+                Inspecione a grade verticalizada de cada concurso e importe para a sua trilha em 1 clique.
               </p>
             </div>
 

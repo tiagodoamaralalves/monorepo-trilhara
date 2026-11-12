@@ -81,6 +81,7 @@ public class CronogramaResource {
             @PathParam("trilhaId") String trilhaId,
             @PathParam("cronogramaId") String cronogramaId,
             @QueryParam("concluido") Boolean concluido,
+            @QueryParam("statusData") String statusData,
             @QueryParam("dataInicio") String dataInicio,
             @QueryParam("dataFim") String dataFim,
             @QueryParam("pagina") @DefaultValue("1") int pagina,
@@ -89,7 +90,8 @@ public class CronogramaResource {
         LocalDate dInicio = dataInicio != null && !dataInicio.isBlank() ? LocalDate.parse(dataInicio) : null;
         LocalDate dFim = dataFim != null && !dataFim.isBlank() ? LocalDate.parse(dataFim) : null;
 
-        return service.listarBlocosPaginado(trilhaId, cronogramaId, concluido, dInicio, dFim, pagina, tamanho);
+        return service.listarBlocosPaginado(
+                trilhaId, cronogramaId, concluido, statusData, dInicio, dFim, pagina, tamanho);
     }
 
     @POST

@@ -92,7 +92,7 @@ const DemoAppMock: React.FC<{ onExplorarCatalogo?: () => void }> = ({ onExplorar
   const abas: { id: DemoTabId; label: string; icon: React.ReactNode }[] = [
     { id: 'trilha', label: 'Visão da Trilha', icon: <Route size={14} /> },
     { id: 'disciplinas', label: 'Disciplinas & Pesos', icon: <BookOpen size={14} /> },
-    { id: 'planejamento', label: 'Ciclo do Dia', icon: <Calendar size={14} /> },
+    { id: 'planejamento', label: 'Cronograma do Dia', icon: <Calendar size={14} /> },
     { id: 'dashboard', label: 'Desempenho', icon: <BarChart2 size={14} /> }
   ];
 
@@ -138,7 +138,7 @@ const DemoAppMock: React.FC<{ onExplorarCatalogo?: () => void }> = ({ onExplorar
           <span className={styles.mockActiveTrackLabel}>
             TCU — Auditor Federal de Controle Externo · FGV
           </span>
-          <span className={styles.mockWindowStatus}>Ciclo ativo</span>
+          <span className={styles.mockWindowStatus}>Cronograma ativo</span>
         </div>
 
         <div className={styles.mockContentArea}>
@@ -285,7 +285,7 @@ const DemoAppMock: React.FC<{ onExplorarCatalogo?: () => void }> = ({ onExplorar
                 <span className={styles.mockKpiTrend}>84,6% de acerto médio</span>
               </div>
               <div className={styles.mockKpiBox}>
-                <span className={styles.mockKpiLabel}>ADERÊNCIA AO CICLO</span>
+                <span className={styles.mockKpiLabel}>ADERÊNCIA AO CRONOGRAMA</span>
                 <span className={styles.mockKpiValue}>94%</span>
                 <span className={styles.mockKpiTrend}>22 de 23 blocos cumpridos</span>
               </div>
@@ -419,7 +419,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
               <div className={styles.heroCopy}>
                 <span className={styles.heroEyebrow}>
                   <span className={styles.pulseDot} aria-hidden="true" />
-                  <span>Ciclos inteligentes · Editais verticalizados</span>
+                  <span>Cronogramas inteligentes · Editais verticalizados</span>
                 </span>
 
                 <h1 id="hero-headline" className={styles.heroTitle}>
@@ -430,7 +430,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
                 </h1>
 
                 <p className={styles.heroSubtitle}>
-                  Transforme editais densos em ciclos diários ponderados por peso, com cronômetro integrado e progresso real assunto por assunto.
+                  Transforme editais densos em cronogramas diários ponderados por peso, com cronômetro integrado e progresso real assunto por assunto.
                 </p>
 
                 <div className={styles.heroCtaRow}>
@@ -461,7 +461,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
                 <div className={styles.heroMockCard}>
                   <div className={styles.heroMockHeader}>
                     <div>
-                      <span className={styles.mockKicker}>CICLO DE HOJE · FGV</span>
+                      <span className={styles.mockKicker}>CRONOGRAMA DE HOJE · FGV</span>
                       <h2 className={styles.heroMockTitle}>
                         TCU — Auditor Federal de Controle Externo
                       </h2>
@@ -542,7 +542,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
               />
               <PillarCard
                 icon={<Calendar size={18} />}
-                title="Ciclo ponderado"
+                title="Cronograma ponderado"
                 description="Distribua seus blocos de estudo automaticamente conforme o peso e a relevância de cada disciplina na prova."
               />
               <PillarCard
@@ -613,7 +613,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
               id="demo-heading"
               eyebrow="Ambiente de Execução"
               title="Silencioso, rápido e desenhado para foco profundo"
-              subtitle="Alterne entre os módulos reais da plataforma para ver como trilha, ciclo e métricas operam em conjunto."
+              subtitle="Alterne entre os módulos reais da plataforma para ver como trilha, cronograma e métricas operam em conjunto."
             />
 
             <DemoAppMock onExplorarCatalogo={onAbrirCatalogo} />
@@ -646,13 +646,13 @@ export const LandingView: React.FC<LandingViewProps> = ({
                 <span className={styles.stepNumber}>02</span>
                 <h3 className={styles.stepTitle}>Calibre pesos e metas</h3>
                 <p className={styles.stepDesc}>
-                  Ajuste o peso de cada disciplina de 1 a 5 para que o ciclo priorize o que mais pontua na sua prova.
+                  Ajuste o peso de cada disciplina de 1 a 5 para que o cronograma priorize o que mais pontua na sua prova.
                 </p>
               </li>
 
               <li className={styles.stepItem}>
                 <span className={styles.stepNumber}>03</span>
-                <h3 className={styles.stepTitle}>Execute o ciclo diário</h3>
+                <h3 className={styles.stepTitle}>Execute o cronograma do dia</h3>
                 <p className={styles.stepDesc}>
                   Acione o cronômetro no bloco do dia, marque tópicos vencidos e acompanhe sua evolução líquida.
                 </p>
@@ -665,7 +665,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
                   Pronto para colocar seu estudo em ritmo de aprovação?
                 </h2>
                 <p className={styles.ctaBannerSub}>
-                  Comece gratuitamente importando uma trilha oficial ou configurando seu próprio ciclo.
+                  Comece gratuitamente importando uma trilha oficial ou configurando seu próprio cronograma.
                 </p>
               </div>
               <div className={styles.ctaBannerActions}>
@@ -702,7 +702,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
               </span>
               <strong>Trilhara</strong>
               <span className={styles.footerCopy}>
-                Gestão de estudos, ciclos e editais verticalizados.
+                Gestão de estudos, cronogramas e editais verticalizados.
               </span>
             </div>
           </div>

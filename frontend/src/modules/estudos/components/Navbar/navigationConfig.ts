@@ -22,7 +22,7 @@ export const NAV_ITEMS: readonly NavItemConfig[] = [
     id: 'planejamento',
     label: 'Planejamento',
     mobileLabel: 'Planejar',
-    title: 'Ciclos e Planejamento',
+    title: 'Cronogramas e Planejamento',
     icon: Calendar
   },
   {

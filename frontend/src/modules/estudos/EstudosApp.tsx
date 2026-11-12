@@ -12,7 +12,7 @@ import { AuthView, AuthMode } from './views/AuthView';
 import { TrilhaModal } from './components/TrilhaModal/TrilhaModal';
 import {
   EditalResumo,
-  RegistroPlanejamentoPendente,
+  RegistroBlocoPendente,
   TrilhaDetalheDTO,
   TrilhaResumoDTO,
   PaginaAtiva,
@@ -27,10 +27,6 @@ import {
 } from '@shared/auth';
 import { ApiError } from './services/api';
 import { EstudosStorage } from './services/estudosStorage';
-import {
-  avancarSobreBlocosConcluidos,
-  PlanejamentoStorage
-} from './services/planejamentoStorage';
 import {
   EDITAIS_VITRINE_FALLBACK,
   importarOuClonarEdital
@@ -121,11 +117,8 @@ export default function EstudosApp() {
   const [carregandoDetalhe, setCarregandoDetalhe] = useState(false);
   const [paginaAtiva, setPaginaAtiva] = useState<PaginaAtiva>(paginaNaUrl);
   const [disciplinaInicialId, setDisciplinaInicialId] = useState('');
-  const [registroPlanejamento, setRegistroPlanejamento] =
-    useState<RegistroPlanejamentoPendente | null>(null);
   const [blocoPlanejamentoNoCronometro, setBlocoPlanejamentoNoCronometro] =
-    useState<RegistroPlanejamentoPendente | null>(null);
-  const [registroPlanejamentoRevision, setRegistroPlanejamentoRevision] = useState(0);
+    useState<RegistroBlocoPendente | null>(null);
   const [statusLista, setStatusLista] = useState<StatusCarregamento>('carregando');
 
   // Modais globais
@@ -327,119 +320,20 @@ export default function EstudosApp() {
     );
   };
 
-  const iniciarRegistroPlanejado = (registro: RegistroPlanejamentoPendente) => {
-    setRegistroPlanejamento(registro);
-  };
-
+  /**
+   * R5/D-19: "Estudar este bloco" inicia o timer global com o `blocoId` do cronograma.
+   * A conclusão do bloco deixa de passar por estado local de planejamento — quem conclui é o
+   * `GlobalSessionModal` (PATCH idempotente), então não há mais revisão/rollback local.
+   */
   const iniciarCronometroPlanejado = (
     disciplinaId: string,
-    registro: RegistroPlanejamentoPendente
+    registro: RegistroBlocoPendente
   ) => {
     setDisciplinaInicialId(disciplinaId);
     setBlocoPlanejamentoNoCronometro(registro);
     navegar('estudar');
   };
 
-  const finalizarRegistroPlanejado = async (registro: RegistroPlanejamentoPendente) => {
-    const salvarComRevisao = async (tentativa = 1): Promise<void> => {
-      const estado = await PlanejamentoStorage.carregar(registro.trilhaId, registro.cicloId);
-      const blocosConcluidos = registro.ocorrenciaId
-        ? [...new Set([...estado.blocosConcluidos, registro.ocorrenciaId])]
-        : estado.blocosConcluidos;
-      const indiceAtual = avancarSobreBlocosConcluidos(
-        estado,
-        estado.indiceRastreador
-      );
-      const proximoIndiceRastreador = registro.proximoIndiceRastreador
-        ?? (registro.indiceRotacao === indiceAtual
-          ? indiceAtual + 1
-          : indiceAtual);
-      const estadoComConclusao = {
-        ...estado,
-        blocosConcluidos,
-        indiceRastreador: avancarSobreBlocosConcluidos(
-          { ...estado, blocosConcluidos },
-          Math.max(indiceAtual, proximoIndiceRastreador)
-        )
-      };
-
-      try {
-        const salvo = await EstudosService.salvarPlanejamentoCiclo(
-          registro.trilhaId,
-          registro.cicloId,
-          {
-            revisaoEsperada: estado.revisao ?? 0,
-            indiceRastreador: estadoComConclusao.indiceRastreador,
-            blocosConcluidos: estadoComConclusao.blocosConcluidos,
-            cronograma: estadoComConclusao.cronograma,
-            cronogramaConfigurado: estadoComConclusao.cronogramaConfigurado ?? false
-          }
-        );
-        try {
-          PlanejamentoStorage.salvar(registro.trilhaId, registro.cicloId, {
-            indiceRastreador: salvo.indiceRastreador,
-            blocosConcluidos: salvo.blocosConcluidos,
-            cronograma: salvo.cronograma,
-            cronogramaConfigurado: salvo.cronogramaConfigurado,
-            revisao: salvo.revisao,
-            desatualizado: salvo.desatualizado
-          });
-        } catch (erroCache) {
-          toast.error(
-            erroCache instanceof Error
-              ? `Bloco atualizado no servidor, mas o cache local falhou: ${erroCache.message}`
-              : 'Bloco atualizado no servidor, mas o cache local falhou.'
-          );
-        }
-        setRegistroPlanejamentoRevision((revision) => revision + 1);
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 409 && tentativa < 3) {
-          // Recarrega silenciosamente a revisão mais recente e reexecuta o patch do bloco concluído sem perder a sessão
-          await salvarComRevisao(tentativa + 1);
-          return;
-        }
-        throw err;
-      }
-    };
-
-    try {
-      await salvarComRevisao();
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
-        try {
-          await PlanejamentoStorage.carregar(registro.trilhaId, registro.cicloId);
-          setRegistroPlanejamentoRevision((revision) => revision + 1);
-          toast.error('A sessão foi salva, mas o planejamento mudou em outro dispositivo. Os dados mais recentes foram recarregados.');
-        } catch (erroRemoto) {
-          toast.error(
-            erroRemoto instanceof Error
-              ? `Sessão salva, mas o bloco não pôde ser atualizado: ${erroRemoto.message}`
-              : 'Sessão salva, mas o bloco não pôde ser atualizado.'
-          );
-        }
-      } else {
-        toast.error(
-          err instanceof Error
-            ? `Sessão salva, mas o bloco não pôde ser atualizado: ${err.message}`
-            : 'Sessão salva, mas o bloco não pôde ser atualizado.'
-        );
-      }
-    } finally {
-      setRegistroPlanejamento((atual) =>
-        atual?.requestId === registro.requestId ? null : atual
-      );
-      setBlocoPlanejamentoNoCronometro((atual) =>
-        atual?.requestId === registro.requestId ? null : atual
-      );
-    }
-  };
-
-  const cancelarRegistroPlanejado = (requestId: string) => {
-    setRegistroPlanejamento((atual) => atual?.requestId === requestId ? null : atual);
-    setBlocoPlanejamentoNoCronometro((atual) =>
-      atual?.requestId === requestId ? null : atual
-    );
-  };
 
   const handleExcluirTrilha = async (id: string): Promise<boolean> => {
     try {
@@ -678,33 +572,11 @@ export default function EstudosApp() {
                 key={trilhaAtiva.id}
                 trilha={trilhaAtiva}
                 onTrilhaAtualizada={handleTrilhaAtualizada}
-                onRegistrarBloco={iniciarRegistroPlanejado}
-                registroPlanejamentoRevision={registroPlanejamentoRevision}
                 onIniciarEstudo={iniciarCronometroPlanejado}
                 onIrParaDisciplinas={() => navegar('disciplinas')}
               />
             )}
 
-            {paginaAtiva === 'planejamento' && registroPlanejamento && (
-              <EstudarView
-                key={`registro-${registroPlanejamento.requestId}`}
-                trilha={trilhaAtiva}
-                disciplinaInicialId={registroPlanejamento.disciplinaId}
-                registroPlanejamento={registroPlanejamento}
-                onRegistroPlanejamentoConcluido={finalizarRegistroPlanejado}
-                onCancelarRegistroPlanejamento={cancelarRegistroPlanejado}
-                somenteModalRegistro
-                onTrilhaCriada={(nova) => {
-                  setTrilhaAtivaDetalhe(nova);
-                  setTrilhas((prev) => [resumoDe(nova), ...prev]);
-                  handleSelecionarTrilha(nova.id);
-                }}
-                onTrilhaAtualizada={handleTrilhaAtualizada}
-                onSessaoRegistrada={() => {
-                  // Pode recarregar dados se necessário
-                }}
-              />
-            )}
 
             {paginaAtiva === 'disciplinas' && trilhaAtiva && (
               <DisciplinasView
@@ -719,10 +591,7 @@ export default function EstudosApp() {
                 key="estudar-view"
                 trilha={trilhaAtiva}
                 disciplinaInicialId={disciplinaInicialId}
-                registroPlanejamento={registroPlanejamento}
                 contextoBlocoPlanejamento={blocoPlanejamentoNoCronometro}
-                onRegistroPlanejamentoConcluido={finalizarRegistroPlanejado}
-                onCancelarRegistroPlanejamento={cancelarRegistroPlanejado}
                 onTrilhaCriada={(nova) => {
                   setTrilhaAtivaDetalhe(nova);
                   setTrilhas((prev) => [resumoDe(nova), ...prev]);
@@ -748,8 +617,8 @@ export default function EstudosApp() {
               <div className={styles.emptyPageContainer}>
                 {paginaAtiva === 'planejamento' && (
                   <PageBanner
-                    title="Planejamento & Ciclos de Estudo"
-                    description="Configure seus ciclos, acompanhe a rotação e organize seus blocos no calendário."
+                    title="Planejamento de Cronogramas"
+                    description="Gere cronogramas por modalidade e acompanhe os blocos gerados."
                     icon={<Calendar size={26} />}
                   />
                 )}

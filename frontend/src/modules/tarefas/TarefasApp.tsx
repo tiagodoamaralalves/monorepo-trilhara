@@ -765,9 +765,6 @@ function TarefasApp() {
           setModalListaAberto(true);
         }}
         onExcluirLista={handleExcluirLista}
-        ciclosAtivos={[]}
-        mostrarCicloEstudos={false}
-        onToggleMostrarCiclo={() => {}}
         trilhasComCronograma={trilhasComCronograma}
         trilhaSelecionadaId={trilhaAtivaId}
         onSelecionarTrilha={(id) => {

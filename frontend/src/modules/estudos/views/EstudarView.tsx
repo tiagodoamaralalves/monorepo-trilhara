@@ -21,7 +21,7 @@ import {
 } from '@shared/design-system';
 import {
   TrilhaDetalheDTO,
-  RegistroPlanejamentoPendente
+  RegistroBlocoPendente
 } from '../types/trilhara';
 import { useStudyTimer } from '../context/StudyTimerContext';
 import { formatarSegundos } from '../utils/format';
@@ -44,11 +44,8 @@ export interface EstudarViewProps {
   onTrilhaCriada: (trilha: TrilhaDetalheDTO) => void;
   onTrilhaAtualizada: (trilha: TrilhaDetalheDTO) => void;
   onSessaoRegistrada: () => void;
-  registroPlanejamento?: RegistroPlanejamentoPendente | null;
-  onRegistroPlanejamentoConcluido?: (registro: RegistroPlanejamentoPendente) => void;
-  onCancelarRegistroPlanejamento?: (requestId: string) => void;
-  contextoBlocoPlanejamento?: RegistroPlanejamentoPendente | null;
-  somenteModalRegistro?: boolean;
+  /** Bloco escolhido em "Estudar este bloco" (Planejamento). */
+  contextoBlocoPlanejamento?: RegistroBlocoPendente | null;
 }
 
 function lerDuracaoPausa(chave: string, padrao: number, maximo: number): number {
@@ -60,11 +57,7 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
   trilha,
   disciplinaInicialId,
   onSessaoRegistrada,
-  registroPlanejamento,
-  onRegistroPlanejamentoConcluido,
-  onCancelarRegistroPlanejamento,
-  contextoBlocoPlanejamento,
-  somenteModalRegistro = false
+  contextoBlocoPlanejamento
 }) => {
   const toast = useToast();
   const { abrirModal } = useGlobalSessionModal();
@@ -76,9 +69,7 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
   const [pausas, setPausas] = useState<PauseConfig>({ short: 5, long: 15 });
   const [configPausas, setConfigPausas] = useState<PauseConfig>({ short: 5, long: 15 });
 
-  const duracaoMinutos = contextoBlocoPlanejamento?.duracaoMinutos
-    || registroPlanejamento?.duracaoMinutos
-    || 0;
+  const duracaoMinutos = contextoBlocoPlanejamento?.duracaoMinutos || 0;
 
   const alarmeCicloDisparadoRef = useRef(false);
   const [alarmeSomAtivo, setAlarmeSomAtivo] = useState(() => AlarmService.isSomAtivado());
@@ -91,8 +82,8 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
     const metaSegundos = duracaoMinutos * 60;
     if (timer.seconds >= metaSegundos && !alarmeCicloDisparadoRef.current) {
       alarmeCicloDisparadoRef.current = true;
-      AlarmService.dispararAlarmeFimCiclo(duracaoMinutos);
-      toast.success(`Meta do ciclo concluída! (${duracaoMinutos} min)`);
+      AlarmService.dispararAlarmeFimMeta(duracaoMinutos);
+      toast.success(`Meta de estudo concluída! (${duracaoMinutos} min)`);
     }
   }, [duracaoMinutos, timer.running, timer.seconds, toast]);
 
@@ -120,7 +111,7 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
       timer.setTimerContext(
         contextoBlocoPlanejamento.trilhaId,
         contextoBlocoPlanejamento.disciplinaId,
-        contextoBlocoPlanejamento.ocorrenciaId,
+        contextoBlocoPlanejamento.blocoId,
         'regressivo',
         contextoBlocoPlanejamento.duracaoMinutos * 60
       );
@@ -154,16 +145,13 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
   const encerrarESalvar = () => {
     if (timer.seconds < 60) {
       timer.reset(timerId);
-      if (registroPlanejamento && onCancelarRegistroPlanejamento) {
-        onCancelarRegistroPlanejamento(registroPlanejamento.requestId);
-      }
       toast.info('Sessões com menos de 1 minuto não são salvas. O cronômetro foi encerrado.');
       return;
     }
 
     if (timer.running) timer.pause();
 
-    const blocoId = timer.blocoId || contextoBlocoPlanejamento?.ocorrenciaId || registroPlanejamento?.ocorrenciaId;
+    const blocoId = timer.blocoId || contextoBlocoPlanejamento?.blocoId;
 
     abrirModal({
       modo: blocoId ? 'BLOCO_TIMER' : 'ESTUDOS_TIMER',
@@ -177,9 +165,6 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
       onSuccess: () => {
         timer.reset(timerId);
         onSessaoRegistrada();
-        if (registroPlanejamento && onRegistroPlanejamentoConcluido) {
-          onRegistroPlanejamentoConcluido(registroPlanejamento);
-        }
       }
     });
   };
@@ -199,26 +184,6 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
       }
     });
   };
-
-  // Suporte a chamada direta somenteModalRegistro (legado)
-  useEffect(() => {
-    if (somenteModalRegistro && registroPlanejamento) {
-      abrirModal({
-        modo: 'BLOCO_DIRETO',
-        trilhaId: registroPlanejamento.trilhaId,
-        disciplinaId: registroPlanejamento.disciplinaId,
-        blocoId: registroPlanejamento.ocorrenciaId,
-        duracaoInicialSegundos: (registroPlanejamento.duracaoMinutos || 0) * 60,
-        trilhaNome: trilha?.nome,
-        onSuccess: () => {
-          if (onRegistroPlanejamentoConcluido) {
-            onRegistroPlanejamentoConcluido(registroPlanejamento);
-          }
-          onSessaoRegistrada();
-        }
-      });
-    }
-  }, [somenteModalRegistro, registroPlanejamento, abrirModal, onRegistroPlanejamentoConcluido, onSessaoRegistrada, trilha?.nome]);
 
   const salvarConfiguracaoPausas = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -246,10 +211,6 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
     : timer.seconds > 0 || timer.startedAt
       ? 'Foco pausado. O tempo não está sendo contado'
       : 'Inicie o foco quando estiver pronto';
-
-  if (somenteModalRegistro) {
-    return null;
-  }
 
   return (
     <div className={styles.page}>
@@ -433,7 +394,7 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
           <div className={styles.alarmsList}>
             <Checkbox
               label="Alarme sonoro"
-              description="Toca sinal sonoro harmonioso ao fim das pausas e do ciclo"
+              description="Toca sinal sonoro harmonioso ao fim das pausas e do bloco"
               checked={alarmeSomAtivo}
               onChange={(e) => {
                 const checked = e.target.checked;
@@ -468,7 +429,7 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
               <li>Ao fim da pausa curta ({pausas.short} min)</li>
               <li>Ao fim da pausa longa ({pausas.long} min)</li>
               <li>
-                Ao fim do tempo predefinido no ciclo atual
+                Ao fim do tempo predefinido do bloco atual
                 {duracaoMinutos > 0 ? ` (${duracaoMinutos} min)` : ''}
               </li>
             </ul>

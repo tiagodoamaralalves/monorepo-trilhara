@@ -1,16 +1,21 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { registrarFalha } from '@shared/diagnostico';
-import { useGlobalSessionModal } from '@shared/design-system';
-import { sessaoGlobalService } from '@shared/services/sessaoGlobalService';
 import {
-  EstudosService,
-  CronogramaDTO,
-  BlocoCronogramaItemDTO,
-  Pagina,
-  DisponibilidadeSemanalDTO,
-} from '../services/estudosService';
-import { TrilhaDetalheDTO, TrilhaResumoDTO, RegistroPlanejamentoPendente } from '../types/trilhara';
+  useGlobalSessionModal,
+  Tabs,
+  Button,
+  Badge,
+  Skeleton,
+  SectionErrorCard,
+  useConfirm,
+} from '@shared/design-system';
+import { useToast } from '@shared/design-system';
+import { sessaoGlobalService } from '@shared/services/sessaoGlobalService';
+import { EstudosService } from '../services/estudosService';
+import { TrilhaDetalheDTO, TrilhaResumoDTO, RegistroBlocoPendente } from '../types/trilhara';
 import { ModalidadeCronograma, CriarCronogramaPayload } from '@shared/contracts';
+import type { CronogramaDTO, BlocoCronogramaItemDTO, DisponibilidadeSemanalDTO } from '@shared/contracts';
+import type { Pagina } from '@shared/contracts';
 import styles from './PlanejamentoView.module.css';
 
 const DIAS_SEMANA = [
@@ -23,14 +28,59 @@ const DIAS_SEMANA = [
   { id: 7, label: 'Domingo' },
 ];
 
+const TAMANHO_PAGINA_BLOCOS = 20;
+const MAX_DIAS_HORIZONTE = 366;
+
+const ROTULO_MODALIDADE: Record<ModalidadeCronograma, string> = {
+  SEQUENCIAL: 'Sequencial',
+  PONDERADO: 'Ponderado',
+  MANUAL: 'Manual',
+};
+
+const ROTULO_PERIODO: Record<string, string> = {
+  UMA_SEMANA: '1 semana (7 dias)',
+  UM_MES: '1 mês (30 dias)',
+  TRES_MESES: '3 meses (90 dias)',
+  ATE_PROVA: 'Até a data da prova',
+};
+
+/** Dias (1..7) representados com carga acima da disponibilidade futura restante. */
+function diasEmSobrecarga(
+  disponibilidade: DisponibilidadeSemanalDTO | null,
+  novosMinutosPorDia: number[]
+): string[] {
+  if (!disponibilidade) return [];
+  const rotulos: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const disponivel = disponibilidade.disponibilidadeSemanalMinutos[i] ?? 0;
+    const carga = (disponibilidade.cargaAtivaMinutosPorDia[i] ?? 0) + (novosMinutosPorDia[i] ?? 0);
+    if (disponivel > 0 && carga > disponivel) {
+      rotulos.push(DIAS_SEMANA[i].label);
+    }
+  }
+  return rotulos;
+}
+
+function diasEntre(inicioISO: string, fimISO: string): number {
+  const inicio = new Date(`${inicioISO}T00:00:00`);
+  const fim = new Date(`${fimISO}T00:00:00`);
+  if (Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime())) return 0;
+  return Math.round((fim.getTime() - inicio.getTime()) / 86_400_000) + 1;
+}
+
+function hojeISO(): string {
+  const hoje = new Date();
+  return hoje.toISOString().split('T')[0];
+}
+
 export interface PlanejamentoProps {
   trilha?: TrilhaDetalheDTO;
   onTrilhaAtualizada?: (atualizada: TrilhaDetalheDTO) => void;
-  onRegistrarBloco?: (registro: RegistroPlanejamentoPendente) => void;
-  registroPlanejamentoRevision?: number;
-  onIniciarEstudo?: (disciplinaId: string, registro: RegistroPlanejamentoPendente) => void;
+  onIniciarEstudo?: (disciplinaId: string, registro: RegistroBlocoPendente) => void;
   onIrParaDisciplinas?: () => void;
 }
+
+type FiltroBlocos = 'PENDENTES' | 'CONCLUIDOS';
 
 export function PlanejamentoView({
   trilha: trilhaProp,
@@ -39,12 +89,15 @@ export function PlanejamentoView({
   onIrParaDisciplinas,
 }: PlanejamentoProps = {}) {
   const { abrirModal } = useGlobalSessionModal();
+  const { confirm } = useConfirm();
+  const toast = useToast();
+
   const [trilhas, setTrilhas] = useState<TrilhaResumoDTO[]>([]);
   const [selectedTrilhaId, setSelectedTrilhaId] = useState<string>(trilhaProp ? trilhaProp.id : '');
   const [selectedTrilhaDetalhe, setSelectedTrilhaDetalhe] = useState<TrilhaDetalheDTO | null>(trilhaProp || null);
   const [loadingTrilhas, setLoadingTrilhas] = useState(!trilhaProp);
 
-  // Cronogramas
+  // Cronogramas + aba selecionada
   const [cronogramas, setCronogramas] = useState<CronogramaDTO[]>([]);
   const [selectedCronogramaId, setSelectedCronogramaId] = useState<string>('');
   const [loadingCronogramas, setLoadingCronogramas] = useState(false);
@@ -52,45 +105,73 @@ export function PlanejamentoView({
   // Blocos paginados
   const [paginaBlocos, setPaginaBlocos] = useState<Pagina<BlocoCronogramaItemDTO> | null>(null);
   const [page, setPage] = useState(1);
-  const [concluidoFiltro, setConcluidoFiltro] = useState<string>('');
+  const [filtroBlocos, setFiltroBlocos] = useState<FiltroBlocos>('PENDENTES');
   const [loadingBlocos, setLoadingBlocos] = useState(false);
+  const [erroBlocos, setErroBlocos] = useState<Error | null>(null);
+  const [totalAtrasados, setTotalAtrasados] = useState(0);
 
-  // Form novo cronograma
-  const [showNovoForm, setShowNovoForm] = useState(false);
+  // Formulário (criação e edição pelo lápis)
+  const [showForm, setShowForm] = useState(false);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
   const [modalidade, setModalidade] = useState<ModalidadeCronograma>('SEQUENCIAL');
   const [tipoPeriodo, setTipoPeriodo] = useState<string>('UM_MES');
   const [diasAtivosSemana, setDiasAtivosSemana] = useState<number[]>([1, 2, 3, 4, 5]);
   const [blocosPorDia, setBlocosPorDia] = useState<number>(4);
   const [duracaoBlocoMinutos, setDuracaoBlocoMinutos] = useState<number>(50);
-  const [dataInicio, setDataInicio] = useState<string>(() => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  });
-  const [dataFim, setDataFim] = useState<string>(() => {
-    const future = new Date();
-    future.setDate(future.getDate() + 30);
-    return future.toISOString().split('T')[0];
-  });
+  const [dataInicio, setDataInicio] = useState<string>(() => hojeISO());
   const [savingCronograma, setSavingCronograma] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Disponibilidade semanal & Sobrecarga
   const [disponibilidade, setDisponibilidade] = useState<DisponibilidadeSemanalDTO | null>(null);
 
-  // Atualizar quando trilhaProp mudar
-  useEffect(() => {
-    if (trilhaProp) {
-      setSelectedTrilhaId(trilhaProp.id);
-      setSelectedTrilhaDetalhe(trilhaProp);
-    }
-  }, [trilhaProp]);
+  // ── D-20: "Até a data da prova" só é oferecido com dataProva > dataInicio ──
+  const dataProvaFutura = useMemo(() => {
+    const dataProva = selectedTrilhaDetalhe?.dataProva;
+    if (!dataProva || !dataInicio) return false;
+    return diasEntre(dataInicio, dataProva) > 1;
+  }, [selectedTrilhaDetalhe?.dataProva, dataInicio]);
 
-  // Carregar lista de trilhas se não fornecida por prop
+  const avisoHorizonte = useMemo(() => {
+    const dataProva = selectedTrilhaDetalhe?.dataProva;
+    if (!dataProva || !dataInicio) return null;
+    const dias = diasEntre(dataInicio, dataProva);
+    return dias > MAX_DIAS_HORIZONTE
+      ? `Serão gerados os primeiros ${MAX_DIAS_HORIZONTE} dias. Você poderá atualizar o cronograma depois.`
+      : null;
+  }, [selectedTrilhaDetalhe?.dataProva, dataInicio]);
+
+  const modalidadesUsadas = useMemo(
+    () => new Set(cronogramas.map((c) => c.modalidade)),
+    [cronogramas]
+  );
+
+  const minutosNovosPorDia = useMemo(() => {
+    const porDia = new Array<number>(7).fill(0);
+    for (const dia of diasAtivosSemana) {
+      const indice = Math.min(6, Math.max(0, dia - 1));
+      porDia[indice] += blocosPorDia * duracaoBlocoMinutos;
+    }
+    return porDia;
+  }, [diasAtivosSemana, blocosPorDia, duracaoBlocoMinutos]);
+
+  const sobrecarga = useMemo(
+    () => diasEmSobrecarga(disponibilidade, minutosNovosPorDia),
+    [disponibilidade, minutosNovosPorDia]
+  );
+
+  const cronogramaSelecionado = useMemo(
+    () => cronogramas.find((c) => c.id === selectedCronogramaId) ?? null,
+    [cronogramas, selectedCronogramaId]
+  );
+
+  // ── Carregamento de trilhas ──
   useEffect(() => {
     async function carregarTrilhas() {
+      if (trilhaProp) {
+        setLoadingTrilhas(false);
+        return;
+      }
       try {
-        setLoadingTrilhas(true);
         const lista = await EstudosService.listarTrilhas();
         setTrilhas(lista);
         if (!selectedTrilhaId && lista.length > 0) {
@@ -103,12 +184,10 @@ export function PlanejamentoView({
         setLoadingTrilhas(false);
       }
     }
-    if (!trilhaProp) {
-      void carregarTrilhas();
-    }
+    void carregarTrilhas();
   }, [trilhaProp, selectedTrilhaId]);
 
-  // Carregar detalhe da trilha selecionada (para ter disciplinas atualizadas)
+  // ── Detalhe da trilha (disciplinas e dataProva) ──
   useEffect(() => {
     async function carregarDetalhe() {
       if (!selectedTrilhaId) {
@@ -120,8 +199,7 @@ export function PlanejamentoView({
         return;
       }
       try {
-        const detalhe = await EstudosService.buscarTrilha(selectedTrilhaId);
-        setSelectedTrilhaDetalhe(detalhe);
+        setSelectedTrilhaDetalhe(await EstudosService.buscarTrilha(selectedTrilhaId));
       } catch (err) {
         registrarFalha('planejamento.detalheTrilha', err);
       }
@@ -129,12 +207,11 @@ export function PlanejamentoView({
     void carregarDetalhe();
   }, [selectedTrilhaId, trilhaProp]);
 
-  // Carregar disponibilidade semanal do usuário
+  // ── Disponibilidade semanal (aviso não bloqueante de sobrecarga) ──
   useEffect(() => {
     async function carregarDisponibilidade() {
       try {
-        const disp = await EstudosService.obterDisponibilidadeSemanal();
-        setDisponibilidade(disp);
+        setDisponibilidade(await EstudosService.obterDisponibilidadeSemanal());
       } catch (err) {
         registrarFalha('planejamento.disponibilidade', err);
       }
@@ -142,7 +219,15 @@ export function PlanejamentoView({
     void carregarDisponibilidade();
   }, []);
 
-  // Carregar cronogramas quando a trilha selecionada mudar
+  // ── D-20: período padrão depende da data da prova ──
+  useEffect(() => {
+    setTipoPeriodo((atual) => {
+      if (atual === 'ATE_PROVA' && !dataProvaFutura) return 'UM_MES';
+      if (!showForm) return dataProvaFutura ? 'ATE_PROVA' : 'UM_MES';
+      return atual;
+    });
+  }, [dataProvaFutura, showForm]);
+
   const carregarCronogramas = useCallback(async (trilhaId: string) => {
     if (!trilhaId) {
       setCronogramas([]);
@@ -153,12 +238,11 @@ export function PlanejamentoView({
       setLoadingCronogramas(true);
       const lista = await EstudosService.listarCronogramas(trilhaId);
       setCronogramas(lista);
-      if (lista.length > 0) {
-        const ativo = lista.find(c => c.ativo);
-        setSelectedCronogramaId(ativo ? ativo.id : lista[0].id);
-      } else {
-        setSelectedCronogramaId('');
-      }
+      setSelectedCronogramaId((atual) => {
+        if (atual && lista.some((c) => c.id === atual)) return atual;
+        const ativo = lista.find((c) => c.ativo);
+        return ativo ? ativo.id : (lista[0]?.id ?? '');
+      });
     } catch (err) {
       registrarFalha('planejamento.cronogramas', err);
       setErrorMessage('Erro ao buscar cronogramas da trilha.');
@@ -168,36 +252,28 @@ export function PlanejamentoView({
   }, []);
 
   useEffect(() => {
-    if (selectedTrilhaId) {
-      carregarCronogramas(selectedTrilhaId);
-    }
+    void carregarCronogramas(selectedTrilhaId);
   }, [selectedTrilhaId, carregarCronogramas]);
 
-  // Carregar blocos quando o cronograma selecionado ou página/filtro mudar
+
   const carregarBlocos = useCallback(
-    async (trilhaId: string, cronogramaId: string, p: number, filtroConcluido?: string) => {
+    async (trilhaId: string, cronogramaId: string, p: number, filtro: FiltroBlocos) => {
       if (!trilhaId || !cronogramaId) {
         setPaginaBlocos(null);
         return;
       }
       try {
         setLoadingBlocos(true);
-        const params: {
-          pagina: number;
-          tamanho: number;
-          concluido?: boolean;
-        } = {
+        setErroBlocos(null);
+        const res = await EstudosService.listarBlocosCronograma(trilhaId, cronogramaId, {
           pagina: p,
-          tamanho: 20,
-        };
-        if (filtroConcluido === 'true') params.concluido = true;
-        if (filtroConcluido === 'false') params.concluido = false;
-
-        const res = await EstudosService.listarBlocosCronograma(trilhaId, cronogramaId, params);
+          tamanho: TAMANHO_PAGINA_BLOCOS,
+          concluido: filtro === 'CONCLUIDOS'
+        });
         setPaginaBlocos(res);
       } catch (err) {
         registrarFalha('planejamento.blocos', err);
-        setErrorMessage('Erro ao listar blocos do cronograma.');
+        setErroBlocos(err instanceof Error ? err : new Error('Erro ao listar blocos do cronograma.'));
       } finally {
         setLoadingBlocos(false);
       }
@@ -207,110 +283,143 @@ export function PlanejamentoView({
 
   useEffect(() => {
     if (selectedTrilhaId && selectedCronogramaId) {
-      carregarBlocos(selectedTrilhaId, selectedCronogramaId, page, concluidoFiltro);
+      void carregarBlocos(selectedTrilhaId, selectedCronogramaId, page, filtroBlocos);
     } else {
       setPaginaBlocos(null);
     }
-  }, [selectedTrilhaId, selectedCronogramaId, page, concluidoFiltro, carregarBlocos]);
+  }, [selectedTrilhaId, selectedCronogramaId, page, filtroBlocos, carregarBlocos]);
 
-  // Modalidades já utilizadas na trilha
-  const modalidadesUsadas = useMemo(() => {
-    return new Set(cronogramas.map(c => c.modalidade));
-  }, [cronogramas]);
-
-  // Verificação de sobrecarga não-bloqueante
-  const alertaSobrecarga = useMemo(() => {
-    if (!disponibilidade || !showNovoForm) return null;
-    const blocosSemanaisNovos = diasAtivosSemana.length * blocosPorDia;
-    const minutosSemanaisNovos = blocosSemanaisNovos * duracaoBlocoMinutos;
-
-    const totalDisponivel = disponibilidade.disponibilidadeSemanalMinutos.reduce((a, b) => a + b, 0);
-    const totalCargaAtiva = disponibilidade.cargaAtivaMinutosPorDia.reduce((a, b) => a + b, 0);
-
-    if (totalCargaAtiva + minutosSemanaisNovos > totalDisponivel) {
-      const horasNovas = (minutosSemanaisNovos / 60).toFixed(1);
-      const horasAtivas = (totalCargaAtiva / 60).toFixed(1);
-      const horasDisp = (totalDisponivel / 60).toFixed(1);
-      return `Aviso de Capacidade: Este planejamento demandará ~${horasNovas}h/semana. Somado aos cronogramas ativos (~${horasAtivas}h), o total excede sua disponibilidade semanal configurada (${horasDisp}h). Você ainda pode prosseguir.`;
+  // ── D-17f: contagem exata de atrasados via totalItens (statusData=ATRASADO&tamanho=1) ──
+  const carregarTotalAtrasados = useCallback(async () => {
+    if (!selectedTrilhaId || !selectedCronogramaId) {
+      setTotalAtrasados(0);
+      return;
     }
-    return null;
-  }, [disponibilidade, showNovoForm, diasAtivosSemana, blocosPorDia, duracaoBlocoMinutos]);
+    try {
+      setTotalAtrasados(await EstudosService.contarBlocosAtrasados(selectedTrilhaId, selectedCronogramaId));
+    } catch (err) {
+      registrarFalha('planejamento.contagemAtrasados', err);
+      setTotalAtrasados(0);
+    }
+  }, [selectedTrilhaId, selectedCronogramaId]);
+
+  useEffect(() => {
+    void carregarTotalAtrasados();
+  }, [carregarTotalAtrasados]);
+
+  const recarregarTudo = useCallback(async () => {
+    if (!selectedTrilhaId || !selectedCronogramaId) return;
+    await carregarBlocos(selectedTrilhaId, selectedCronogramaId, page, filtroBlocos);
+    await carregarTotalAtrasados();
+  }, [selectedTrilhaId, selectedCronogramaId, page, filtroBlocos, carregarBlocos, carregarTotalAtrasados]);
 
   const handleToggleDia = (diaId: number) => {
-    setDiasAtivosSemana(prev =>
-      prev.includes(diaId) ? prev.filter(d => d !== diaId) : [...prev, diaId]
+    setDiasAtivosSemana((prev) =>
+      prev.includes(diaId) ? prev.filter((d) => d !== diaId) : [...prev, diaId].sort((a, b) => a - b)
     );
   };
 
-  const handleCriarCronograma = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const abrirCriacao = () => {
+    setEditandoId(null);
+    setModalidade(
+      (['SEQUENCIAL', 'PONDERADO', 'MANUAL'] as ModalidadeCronograma[]).find((m) => !modalidadesUsadas.has(m))
+        ?? 'SEQUENCIAL'
+    );
+    setTipoPeriodo(dataProvaFutura ? 'ATE_PROVA' : 'UM_MES');
+    setDataInicio(hojeISO());
     setErrorMessage(null);
-    setSuccessMessage(null);
+    setShowForm(true);
+  };
 
-    if (cronogramas.length >= 3) {
-      setErrorMessage('Limite de 3 cronogramas por trilha atingido. Exclua um para criar outro.');
+  const abrirEdicao = (cronograma: CronogramaDTO) => {
+    setEditandoId(cronograma.id);
+    setModalidade(cronograma.modalidade);
+    setTipoPeriodo(cronograma.tipoPeriodo);
+    setDiasAtivosSemana(cronograma.diasAtivosSemana ?? [1, 2, 3, 4, 5]);
+    setBlocosPorDia(cronograma.blocosPorDia ?? 4);
+    setDuracaoBlocoMinutos(cronograma.duracaoBlocoMinutos);
+    setDataInicio(cronograma.dataInicio);
+    setErrorMessage(null);
+    setShowForm(true);
+  };
+
+  const montarPayload = (): CriarCronogramaPayload => ({
+    modalidade,
+    duracaoBlocoMinutos,
+    tipoPeriodo,
+    dataInicio,
+    diasAtivosSemana,
+    blocosPorDia,
+    disciplinasParticipantesIds: (selectedTrilhaDetalhe?.disciplinas ?? []).map((d) => d.id)
+  });
+
+  const tratarErro = (err: unknown, padrao: string) => {
+    const mensagem = err instanceof Error ? err.message : '';
+    if (mensagem.includes('DUPLICATE_MODALITY')) {
+      toast.error('Esta trilha já possui um cronograma com a modalidade selecionada.');
       return;
     }
-
-    if (modalidadesUsadas.has(modalidade)) {
-      setErrorMessage(`A modalidade ${modalidade} já está em uso nesta trilha.`);
+    if (mensagem.includes('SCHEDULE_GENERATION_IN_PROGRESS')) {
+      toast.error('Existe outra operação em andamento para esta trilha. Tente novamente em alguns segundos.');
       return;
     }
+    toast.error(mensagem || padrao);
+  };
 
+
+  const handleSalvarCronograma = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setErrorMessage(null);
+
+    if (!selectedTrilhaDetalhe?.disciplinas?.length) {
+      setErrorMessage('Esta trilha não possui disciplinas cadastradas para compor o cronograma.');
+      return;
+    }
     if (diasAtivosSemana.length === 0) {
       setErrorMessage('Selecione ao menos um dia da semana.');
       return;
     }
-
-    if (blocosPorDia <= 0 || blocosPorDia > 24) {
+    if (blocosPorDia < 1 || blocosPorDia > 24) {
       setErrorMessage('A quantidade de blocos por dia deve ser entre 1 e 24.');
       return;
     }
-
-    if (!dataInicio || !dataFim || dataFim < dataInicio) {
-      setErrorMessage('Intervalo de datas inválido.');
+    if (duracaoBlocoMinutos < 30 || duracaoBlocoMinutos > 240) {
+      setErrorMessage('A duração do bloco deve estar entre 30 e 240 minutos.');
       return;
     }
-
-    const disciplinasIds = selectedTrilhaDetalhe?.disciplinas?.map(d => d.id) || [];
-    if (disciplinasIds.length === 0) {
-      setErrorMessage('Esta trilha não possui disciplinas cadastradas para compor o cronograma.');
-      return;
-    }
-
-    const payload: CriarCronogramaPayload = {
-      modalidade,
-      duracaoBlocoMinutos,
-      tipoPeriodo,
-      dataInicio,
-      dataFim,
-      diasAtivosSemana,
-      blocosPorDia,
-      disciplinasParticipantesIds: disciplinasIds,
-    };
 
     try {
       setSavingCronograma(true);
-      const novo = await EstudosService.criarCronograma(selectedTrilhaId, payload);
-      setSuccessMessage('Cronograma gerado com sucesso e ativado!');
-      setShowNovoForm(false);
-      await carregarCronogramas(selectedTrilhaId);
-      setSelectedCronogramaId(novo.id);
+      if (editandoId) {
+        const confirmado = await confirm({
+          title: 'Gerar blocos novamente?',
+          description:
+            'Os blocos atuais e suas conclusões serão substituídos. Sessões e progresso de tópicos são mantidos.',
+          confirmText: 'Salvar e gerar blocos',
+          cancelText: 'Cancelar'
+        });
+        if (!confirmado) return;
+        const atualizado = await EstudosService.atualizarCronograma(selectedTrilhaId, editandoId, montarPayload());
+        setShowForm(false);
+        setEditandoId(null);
+        await carregarCronogramas(selectedTrilhaId);
+        setSelectedCronogramaId(atualizado.id);
+        toast.success('Cronograma atualizado e blocos gerados.');
+      } else {
+        const criado = await EstudosService.criarCronograma(selectedTrilhaId, montarPayload());
+        setShowForm(false);
+        await carregarCronogramas(selectedTrilhaId);
+        setSelectedCronogramaId(criado.id);
+        toast.success('Cronograma criado e ativado.');
+      }
       setPage(1);
-
-      if (onTrilhaAtualizada && selectedTrilhaDetalhe) {
-        const atualizada = await EstudosService.buscarTrilha(selectedTrilhaId);
-        onTrilhaAtualizada(atualizada);
+      await recarregarTudo();
+      if (onTrilhaAtualizada) {
+        onTrilhaAtualizada(await EstudosService.buscarTrilha(selectedTrilhaId));
       }
     } catch (err) {
-      registrarFalha('planejamento.gerar', err);
-      if (err instanceof Error && err.message.includes('DUPLICATE_MODALITY')) {
-        setErrorMessage('Esta trilha já possui um cronograma com a modalidade selecionada.');
-      } else if (err instanceof Error && err.message.includes('SCHEDULE_GENERATION_IN_PROGRESS')) {
-        setErrorMessage('Existe outra geração de cronograma em andamento para esta trilha. Tente novamente em alguns segundos.');
-      } else {
-        setErrorMessage(err.message || 'Erro ao gerar cronograma.');
-      }
+      registrarFalha('planejamento.salvar', err);
+      tratarErro(err, 'Erro ao salvar o cronograma.');
     } finally {
       setSavingCronograma(false);
     }
@@ -319,92 +428,100 @@ export function PlanejamentoView({
   const handleAtivarCronograma = async (cronogramaId: string) => {
     try {
       await EstudosService.ativarCronograma(selectedTrilhaId, cronogramaId);
-      setSuccessMessage('Cronograma definido como ativo!');
       await carregarCronogramas(selectedTrilhaId);
-      if (onTrilhaAtualizada && selectedTrilhaDetalhe) {
-        const atualizada = await EstudosService.buscarTrilha(selectedTrilhaId);
-        onTrilhaAtualizada(atualizada);
+      toast.success('Cronograma ativado.');
+      if (onTrilhaAtualizada) {
+        onTrilhaAtualizada(await EstudosService.buscarTrilha(selectedTrilhaId));
       }
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'Erro ao ativar cronograma.');
+      tratarErro(err, 'Erro ao ativar cronograma.');
     }
   };
 
-  const handleExcluirCronograma = async (cronogramaId: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir este cronograma e todos os seus blocos?')) {
-      return;
-    }
+  const handleExcluirCronograma = async (cronograma: CronogramaDTO) => {
+    const confirmado = await confirm({
+      title: 'Excluir cronograma?',
+      description: `Todos os blocos do cronograma ${ROTULO_MODALIDADE[cronograma.modalidade]} serão removidos. Sessões já registradas permanecem.`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'danger'
+    });
+    if (!confirmado) return;
     try {
-      await EstudosService.excluirCronograma(selectedTrilhaId, cronogramaId);
-      setSuccessMessage('Cronograma excluído.');
+      await EstudosService.excluirCronograma(selectedTrilhaId, cronograma.id);
       await carregarCronogramas(selectedTrilhaId);
-      if (onTrilhaAtualizada && selectedTrilhaDetalhe) {
-        const atualizada = await EstudosService.buscarTrilha(selectedTrilhaId);
-        onTrilhaAtualizada(atualizada);
+      toast.success('Cronograma excluído.');
+      if (onTrilhaAtualizada) {
+        onTrilhaAtualizada(await EstudosService.buscarTrilha(selectedTrilhaId));
       }
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'Erro ao excluir cronograma.');
+      tratarErro(err, 'Erro ao excluir cronograma.');
     }
   };
 
-  const handleToggleConclusaoBloco = async (bloco: BlocoCronogramaItemDTO) => {
-    if (bloco.concluido) {
-      try {
-        await sessaoGlobalService.concluirBloco(bloco.id, false);
-        if (selectedTrilhaId && selectedCronogramaId) {
-          carregarBlocos(selectedTrilhaId, selectedCronogramaId, page, concluidoFiltro);
-        }
-      } catch (err) {
-        setErrorMessage(err instanceof Error ? err.message : 'Erro ao atualizar status do bloco.');
+  /** D-19: concluir SEMPRE abre o modal global; reabrir é direto, sem modal e sem apagar sessões. */
+  const handleConcluirBloco = (bloco: BlocoCronogramaItemDTO) => {
+    abrirModal({
+      modo: 'BLOCO_DIRETO',
+      trilhaId: bloco.trilhaId,
+      disciplinaId: bloco.disciplinaId,
+      blocoId: bloco.id,
+      duracaoInicialSegundos: bloco.duracaoMinutos * 60,
+      disciplinaNome: bloco.disciplinaNome,
+      disciplinaCor: bloco.disciplinaCor,
+      trilhaNome: selectedTrilhaDetalhe?.nome,
+      onSuccess: () => {
+        void recarregarTudo();
       }
-    } else {
-      abrirModal({
-        modo: 'BLOCO_DIRETO',
-        trilhaId: bloco.trilhaId,
-        disciplinaId: bloco.disciplinaId,
-        blocoId: bloco.id,
-        duracaoInicialSegundos: bloco.duracaoMinutos * 60,
-        disciplinaNome: bloco.disciplinaNome,
-        disciplinaCor: bloco.disciplinaCor,
-        trilhaNome: selectedTrilhaDetalhe?.nome,
-        onSuccess: () => {
-          if (selectedTrilhaId && selectedCronogramaId) {
-            carregarBlocos(selectedTrilhaId, selectedCronogramaId, page, concluidoFiltro);
-          }
-        }
-      });
+    });
+  };
+
+  const handleReabrirBloco = async (bloco: BlocoCronogramaItemDTO) => {
+    try {
+      await sessaoGlobalService.concluirBloco(bloco.id, false);
+      await recarregarTudo();
+    } catch (err) {
+      tratarErro(err, 'Erro ao reabrir o bloco.');
     }
   };
 
   const handleConcluirAtrasados = async () => {
-    if (!selectedCronogramaId) return;
-    if (!window.confirm('Deseja marcar como concluídos todos os blocos pendentes com data até hoje?')) {
-      return;
-    }
+    if (!selectedCronogramaId || totalAtrasados === 0) return;
+    const confirmado = await confirm({
+      title: 'Concluir blocos atrasados',
+      description: `Concluir ${totalAtrasados} blocos atrasados sem registrar sessão de estudo?`,
+      confirmText: 'Concluir sem sessão',
+      cancelText: 'Cancelar'
+    });
+    if (!confirmado) return;
     try {
       const res = await EstudosService.concluirBlocosAtrasados(selectedTrilhaId, selectedCronogramaId);
-      setSuccessMessage(`${res.totalConcluidos} blocos atrasados foram concluídos com sucesso!`);
-      if (selectedTrilhaId && selectedCronogramaId) {
-        carregarBlocos(selectedTrilhaId, selectedCronogramaId, page, concluidoFiltro);
+      if (res.falhas.length > 0) {
+        toast.error(
+          `Foram concluídos ${res.totalConcluidos} de ${res.totalProcessados} blocos. ${res.falhas.length} falharam.`
+        );
+      } else {
+        toast.success(`${res.totalConcluidos} blocos atrasados concluídos.`);
       }
+      await recarregarTudo();
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'Erro ao concluir blocos atrasados.');
+      tratarErro(err, 'Erro ao concluir blocos atrasados.');
     }
   };
 
   const handleIniciarEstudoBloco = (bloco: BlocoCronogramaItemDTO) => {
-    if (onIniciarEstudo) {
-      const reg: RegistroPlanejamentoPendente = {
-        requestId: `bloco-${bloco.id}-${Date.now()}`,
-        trilhaId: bloco.trilhaId,
-        cicloId: bloco.cronogramaId,
-        ocorrenciaId: bloco.id,
-        disciplinaId: bloco.disciplinaId,
-        duracaoMinutos: bloco.duracaoMinutos,
-      };
-      onIniciarEstudo(bloco.disciplinaId, reg);
-    }
+    if (!onIniciarEstudo) return;
+    const registro: RegistroBlocoPendente = {
+      requestId: `bloco-${bloco.id}-${Date.now()}`,
+      trilhaId: bloco.trilhaId,
+      cronogramaId: bloco.cronogramaId,
+      blocoId: bloco.id,
+      disciplinaId: bloco.disciplinaId,
+      duracaoMinutos: bloco.duracaoMinutos
+    };
+    onIniciarEstudo(bloco.disciplinaId, registro);
   };
+
 
   return (
     <div className={styles.container}>
@@ -416,77 +533,75 @@ export function PlanejamentoView({
           </p>
         </div>
         <div className={styles.headerActions}>
-          <button
+          <Button
             type="button"
-            className={styles.secondaryButton}
+            variant="secondary"
+            size="sm"
             onClick={handleConcluirAtrasados}
-            disabled={!selectedCronogramaId}
-            title="Conclui em lote todos os blocos com data até hoje que estejam pendentes"
+            disabled={!selectedCronogramaId || totalAtrasados === 0}
+            loading={savingCronograma}
           >
-            Concluir Blocos Atrasados
-          </button>
-          <button
+            Concluir atrasados sem sessão ({totalAtrasados})
+          </Button>
+          <Button
             type="button"
-            className={styles.primaryButton}
-            onClick={() => {
-              setShowNovoForm(prev => !prev);
-              setErrorMessage(null);
-              setSuccessMessage(null);
-            }}
-            disabled={cronogramas.length >= 3}
+            variant="primary"
+            size="sm"
+            onClick={showForm ? () => setShowForm(false) : abrirCriacao}
+            disabled={!showForm && cronogramas.length >= 3}
           >
-            {showNovoForm ? 'Cancelar' : '+ Novo Cronograma'}
-          </button>
+            {showForm ? 'Cancelar' : 'Novo cronograma'}
+          </Button>
         </div>
       </header>
 
-      {errorMessage && <div className={styles.errorMessage}>{errorMessage}</div>}
-      {successMessage && <div className={styles.successMessage}>{successMessage}</div>}
+      {errorMessage && <div className={styles.errorMessage} role="alert">{errorMessage}</div>}
 
-      {/* Seletor de Trilha (exibido apenas se houver mais de uma trilha cadastrada) */}
       <section className={styles.sectionCard}>
         <div className={styles.filterRow}>
-          <label htmlFor="trilhaSelect" className={styles.label}>
-            Trilha:
-          </label>
+          <label htmlFor="trilhaSelect" className={styles.label}>Trilha:</label>
           <select
             id="trilhaSelect"
             className={styles.select}
             value={selectedTrilhaId}
-            onChange={e => setSelectedTrilhaId(e.target.value)}
+            onChange={(e) => setSelectedTrilhaId(e.target.value)}
             disabled={loadingTrilhas}
           >
-            {trilhas.map(t => (
-              <option key={t.id} value={t.id}>
-                {t.nome} ({t.totalDisciplinas} disciplinas)
-              </option>
+            {trilhas.map((t) => (
+              <option key={t.id} value={t.id}>{t.nome} ({t.totalDisciplinas} disciplinas)</option>
             ))}
           </select>
           {selectedTrilhaDetalhe && (
-            <span className={styles.badgeMuted}>
-              {cronogramas.length} de 3 cronogramas cadastrados
-            </span>
+            <span className={styles.badgeMuted}>{cronogramas.length} de 3 cronogramas</span>
           )}
           {onIrParaDisciplinas && (
-            <button
+            <Button
               type="button"
-              className={styles.secondaryButton}
-              style={{ marginLeft: 'auto', fontSize: '13px', padding: '6px 12px' }}
+              variant="secondary"
+              size="sm"
               onClick={onIrParaDisciplinas}
             >
-              Gerenciar Disciplinas &rarr;
-            </button>
+              Gerenciar disciplinas
+            </Button>
           )}
         </div>
       </section>
 
-      {/* Formulário de Novo Cronograma */}
-      {showNovoForm && (
+
+      {/* Formulário de criação/edição — D-20 */}
+      {showForm && (
         <section className={styles.formCard}>
-          <h2 className={styles.formTitle}>Novo Cronograma</h2>
-          <form onSubmit={handleCriarCronograma}>
-            {alertaSobrecarga && (
-              <div className={styles.overloadAlert}>{alertaSobrecarga}</div>
+          <h2 className={styles.formTitle}>
+            {editandoId ? 'Editar cronograma' : 'Novo cronograma'}
+          </h2>
+          <form onSubmit={handleSalvarCronograma} className={styles.assistantForm}>
+            {sobrecarga.length > 0 && (
+              <div className={styles.overloadAlert} role="status">
+                Sobrecarga de carga futura em: {sobrecarga.join(', ')}. Você pode salvar mesmo assim.
+              </div>
+            )}
+            {avisoHorizonte && (
+              <div className={styles.overloadAlertContent} role="status">{avisoHorizonte}</div>
             )}
 
             <div className={styles.formGrid}>
@@ -496,18 +611,27 @@ export function PlanejamentoView({
                   className={styles.select}
                   id="cronograma-modalidade"
                   value={modalidade}
-                  onChange={e => setModalidade(e.target.value as ModalidadeCronograma)}
+                  onChange={(e) => setModalidade(e.target.value as ModalidadeCronograma)}
                 >
-                  <option value="SEQUENCIAL" disabled={modalidadesUsadas.has('SEQUENCIAL')}>
-                    Sequencial {modalidadesUsadas.has('SEQUENCIAL') ? '(Já utilizado)' : ''}
-                  </option>
-                  <option value="PONDERADO" disabled={modalidadesUsadas.has('PONDERADO')}>
-                    Ponderado por Peso {modalidadesUsadas.has('PONDERADO') ? '(Já utilizado)' : ''}
-                  </option>
-                  <option value="MANUAL" disabled={modalidadesUsadas.has('MANUAL')}>
-                    Manual {modalidadesUsadas.has('MANUAL') ? '(Já utilizado)' : ''}
-                  </option>
+                  {(['SEQUENCIAL', 'PONDERADO', 'MANUAL'] as ModalidadeCronograma[]).map((m) => {
+                    const usada = modalidadesUsadas.has(m) && editandoId !== cronogramas.find((c) => c.modalidade === m)?.id;
+                    return (
+                      <option
+                        key={m}
+                        value={m}
+                        disabled={usada}
+                        title={usada ? `Esta trilha já possui um cronograma ${ROTULO_MODALIDADE[m]}` : undefined}
+                      >
+                        {ROTULO_MODALIDADE[m]}
+                      </option>
+                    );
+                  })}
                 </select>
+                {modalidadesUsadas.has(modalidade) && (
+                  <p className={styles.fieldLabel}>
+                    Esta trilha já possui um cronograma {ROTULO_MODALIDADE[modalidade]}
+                  </p>
+                )}
               </div>
 
               <div className={styles.formGroup}>
@@ -516,17 +640,19 @@ export function PlanejamentoView({
                   className={styles.select}
                   id="cronograma-periodo"
                   value={tipoPeriodo}
-                  onChange={e => setTipoPeriodo(e.target.value)}
+                  onChange={(e) => setTipoPeriodo(e.target.value)}
                 >
-                  <option value="UMA_SEMANA">Uma Semana</option>
-                  <option value="UM_MES">Um Mês</option>
-                  <option value="TRES_MESES">Três Meses</option>
-                  <option value="ATE_PROVA">Até a Prova</option>
+                  <option value="ATE_PROVA" disabled={!dataProvaFutura}>
+                    {ROTULO_PERIODO.ATE_PROVA}
+                  </option>
+                  <option value="UMA_SEMANA">{ROTULO_PERIODO.UMA_SEMANA}</option>
+                  <option value="UM_MES">{ROTULO_PERIODO.UM_MES}</option>
+                  <option value="TRES_MESES">{ROTULO_PERIODO.TRES_MESES}</option>
                 </select>
               </div>
 
               <div className={styles.formGroup}>
-                <label className={styles.label} htmlFor="cronograma-blocos-dia">Blocos por Dia (máx 24)</label>
+                <label className={styles.label} htmlFor="cronograma-blocos-dia">Blocos por dia (máx 24)</label>
                 <input
                   type="number"
                   className={styles.input}
@@ -534,51 +660,40 @@ export function PlanejamentoView({
                   max={24}
                   id="cronograma-blocos-dia"
                   value={blocosPorDia}
-                  onChange={e => setBlocosPorDia(Number.parseInt(e.target.value, 10) || 1)}
+                  onChange={(e) => setBlocosPorDia(Number.parseInt(e.target.value, 10) || 1)}
                 />
               </div>
 
               <div className={styles.formGroup}>
-                <label className={styles.label} htmlFor="cronograma-duracao-bloco">Duração do Bloco (minutos)</label>
+                <label className={styles.label} htmlFor="cronograma-duracao-bloco">Duração do bloco (minutos)</label>
                 <input
                   type="number"
                   className={styles.input}
-                  min={10}
+                  min={30}
                   max={240}
                   step={5}
                   id="cronograma-duracao-bloco"
                   value={duracaoBlocoMinutos}
-                  onChange={e => setDuracaoBlocoMinutos(Number.parseInt(e.target.value, 10) || 50)}
+                  onChange={(e) => setDuracaoBlocoMinutos(Number.parseInt(e.target.value, 10) || 30)}
                 />
               </div>
 
               <div className={styles.formGroup}>
-                <label className={styles.label} htmlFor="cronograma-data-inicio">Data Início</label>
+                <label className={styles.label} htmlFor="cronograma-data-inicio">Data de início</label>
                 <input
                   type="date"
                   className={styles.input}
                   id="cronograma-data-inicio"
                   value={dataInicio}
-                  onChange={e => setDataInicio(e.target.value)}
-                />
-              </div>
-
-              <div className={styles.formGroup}>
-                <label className={styles.label} htmlFor="cronograma-data-fim">Data Término (máx 366 dias)</label>
-                <input
-                  type="date"
-                  className={styles.input}
-                  id="cronograma-data-fim"
-                  value={dataFim}
-                  onChange={e => setDataFim(e.target.value)}
+                  onChange={(e) => setDataInicio(e.target.value)}
                 />
               </div>
             </div>
 
-            <fieldset className={styles.formGroup} style={{ marginTop: '1rem', border: 0, padding: 0 }}>
-              <legend className={styles.label}>Dias da Semana para Estudo:</legend>
+            <fieldset className={styles.formGroup}>
+              <legend className={styles.label}>Dias da semana para estudo</legend>
               <div className={styles.diasCheckboxGroup}>
-                {DIAS_SEMANA.map(dia => (
+                {DIAS_SEMANA.map((dia) => (
                   <label key={dia.id} className={styles.diaCheckboxLabel}>
                     <input
                       type="checkbox"
@@ -592,225 +707,237 @@ export function PlanejamentoView({
             </fieldset>
 
             <div className={styles.formActions}>
-              <button
+              <Button
                 type="button"
-                className={styles.secondaryButton}
-                onClick={() => setShowNovoForm(false)}
+                variant="secondary"
+                onClick={() => setShowForm(false)}
                 disabled={savingCronograma}
               >
                 Cancelar
-              </button>
-              <button
-                type="submit"
-                className={styles.primaryButton}
-                disabled={savingCronograma}
-              >
-                {savingCronograma ? 'Gerando Blocos...' : 'Gerar Cronograma'}
-              </button>
+              </Button>
+              <Button type="submit" variant="primary" loading={savingCronograma}>
+                {editandoId ? 'Salvar e gerar blocos' : 'Criar cronograma'}
+              </Button>
             </div>
           </form>
         </section>
       )}
 
-      {/* Lista de Cronogramas */}
+
+      {/* Abas por cronograma (APG Tabs) + badge Ativo */}
       <section className={styles.sectionCard}>
-        <h2 className={styles.sectionTitle}>Cronogramas da Trilha</h2>
+        <div className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>Cronogramas da trilha</h2>
+          {cronogramaSelecionado?.ativo && <Badge variant="success" size="sm">Ativo</Badge>}
+        </div>
+
         {loadingCronogramas ? (
-          <p className={styles.loadingText}>Carregando cronogramas...</p>
+          <Skeleton variant="row" linhas={1} />
         ) : cronogramas.length === 0 ? (
           <p className={styles.emptyText}>
-            Nenhum cronograma cadastrado nesta trilha. Clique em "+ Novo Cronograma" para gerar um.
+            Nenhum cronograma cadastrado nesta trilha. Use &quot;Novo cronograma&quot; para gerar o primeiro.
           </p>
         ) : (
-          <div className={styles.cronogramasGrid}>
-            {cronogramas.map(c => {
-              const isSelected = c.id === selectedCronogramaId;
-              return (
-                <article
-                  key={c.id}
-                  className={`${styles.cronogramaCard} ${isSelected ? styles.selectedCard : ''}`}
-                >
-                  <div className={styles.cronogramaHeader}>
-                    <div className={styles.cronogramaTitleRow}>
-                      <span className={styles.cronogramaNome}>{c.modalidade}</span>
-                      {c.ativo && <span className={styles.badgeActive}>Ativo</span>}
-                    </div>
-                    <span className={styles.badgeModalidade}>{c.tipoPeriodo}</span>
-                  </div>
+          <>
+            <Tabs
+              items={cronogramas.map((c) => ({
+                id: c.id,
+                label: c.ativo ? `${ROTULO_MODALIDADE[c.modalidade]} · Ativo` : ROTULO_MODALIDADE[c.modalidade]
+              }))}
+              activeId={selectedCronogramaId}
+              onChange={(id) => {
+                setSelectedCronogramaId(id);
+                setPage(1);
+              }}
+            />
 
-                  <button
-                    type="button"
-                    className={styles.selectCronogramaButton}
-                    aria-pressed={isSelected}
-                    onClick={() => {
-                      setSelectedCronogramaId(c.id);
-                      setPage(1);
-                    }}
-                  >
-                    {isSelected ? 'Cronograma selecionado' : 'Selecionar cronograma'}
-                  </button>
-
-                  <div className={styles.cronogramaMeta}>
-                    <div>
-                      <strong>Período:</strong> {c.dataInicio} até {c.dataFim}
-                    </div>
-                    <div>
-                      <strong>Blocos/dia:</strong> {c.blocosPorDia || '—'} ({c.duracaoBlocoMinutos} min cada)
-                    </div>
-                    <div>
-                      <strong>Versão:</strong> v{c.versaoAtiva} | {c.quantidadeBlocos} blocos gerados
-                    </div>
-                  </div>
-
-                  <div className={styles.cronogramaActions} onClickCapture={(e) => e.stopPropagation()}>
-                    {!c.ativo && (
-                      <button
-                        type="button"
-                        className={styles.actionButtonSmall}
-                        onClick={() => handleAtivarCronograma(c.id)}
-                      >
-                        Tornar Ativo
-                      </button>
-                    )}
-                    <button
+            {cronogramaSelecionado && (
+              <div className={styles.cronogramaMeta}>
+                <span>{ROTULO_PERIODO[cronogramaSelecionado.tipoPeriodo] ?? cronogramaSelecionado.tipoPeriodo}</span>
+                <span>{cronogramaSelecionado.dataInicio} → {cronogramaSelecionado.dataFim}</span>
+                <span>{cronogramaSelecionado.quantidadeBlocos} blocos</span>
+                <span>{cronogramaSelecionado.duracaoBlocoMinutos} min por bloco</span>
+                <div className={styles.cronogramaActions}>
+                  {!cronogramaSelecionado.ativo && (
+                    <Button
                       type="button"
-                      className={styles.actionDangerSmall}
-                      onClick={() => handleExcluirCronograma(c.id)}
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => void handleAtivarCronograma(cronogramaSelecionado.id)}
                     >
-                      Excluir
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+                      Ativar
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => abrirEdicao(cronogramaSelecionado)}
+                    aria-label="Editar cronograma"
+                  >
+                    ✏️
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    size="sm"
+                    onClick={() => void handleExcluirCronograma(cronogramaSelecionado)}
+                  >
+                    Excluir
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </section>
 
-      {/* Visualização de Blocos do Cronograma Selecionado */}
+
+      {/* Blocos do cronograma selecionado */}
       {selectedCronogramaId && (
-        <section className={styles.sectionCard}>
-          <div className={styles.blocosHeader}>
-            <div>
-              <h2 className={styles.sectionTitle}>Blocos do Cronograma Selecionado</h2>
-              <p className={styles.subtitle}>
-                {paginaBlocos?.totalItens ?? 0} blocos no total ({paginaBlocos?.totalPaginas ?? 0} páginas)
-              </p>
-            </div>
-            <div className={styles.blocosFiltros}>
-              <select
-                className={styles.select}
-                value={concluidoFiltro}
-                onChange={e => {
-                  setConcluidoFiltro(e.target.value);
-                  setPage(1);
-                }}
+        <section className={styles.blocosSection}>
+          <div className={styles.blocosToolbar}>
+            <div className={styles.blocosFiltros} role="group" aria-label="Filtrar blocos">
+              <Button
+                type="button"
+                size="sm"
+                variant={filtroBlocos === 'PENDENTES' ? 'primary' : 'secondary'}
+                aria-pressed={filtroBlocos === 'PENDENTES'}
+                onClick={() => { setFiltroBlocos('PENDENTES'); setPage(1); }}
               >
-                <option value="">Todos os status</option>
-                <option value="false">Pendentes</option>
-                <option value="true">Concluídos</option>
-              </select>
+                Pendentes
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={filtroBlocos === 'CONCLUIDOS' ? 'primary' : 'secondary'}
+                aria-pressed={filtroBlocos === 'CONCLUIDOS'}
+                onClick={() => { setFiltroBlocos('CONCLUIDOS'); setPage(1); }}
+              >
+                Concluídos
+              </Button>
             </div>
           </div>
 
           {loadingBlocos ? (
-            <p className={styles.loadingText}>Carregando blocos...</p>
+            <div className={styles.blocosTableWrapper}>
+              <Skeleton variant="row" linhas={1} />
+              <Skeleton variant="row" linhas={1} />
+              <Skeleton variant="row" linhas={1} />
+            </div>
+          ) : erroBlocos ? (
+            <SectionErrorCard
+              titulo="Não foi possível carregar"
+              descricao="Verifique sua conexão e tente novamente."
+              onRetry={() => void recarregarTudo()}
+              recarregando={loadingBlocos}
+            />
           ) : !paginaBlocos || paginaBlocos.itens.length === 0 ? (
-            <p className={styles.emptyText}>Nenhum bloco encontrado para os filtros selecionados.</p>
+            <p className={styles.emptyText}>
+              {filtroBlocos === 'CONCLUIDOS'
+                ? 'Nenhum bloco concluído neste cronograma.'
+                : 'Nenhum bloco pendente neste cronograma.'}
+            </p>
           ) : (
-            <div className={styles.tableResponsive}>
+            <div className={styles.blocosTableWrapper}>
               <table className={styles.blocosTable}>
                 <thead>
                   <tr>
-                    <th>Data</th>
-                    <th>Ordem</th>
-                    <th>Disciplina</th>
-                    <th>Duração</th>
-                    <th>Status</th>
-                    <th>Ações</th>
+                    <th scope="col">Data</th>
+                    <th scope="col">#</th>
+                    <th scope="col">Disciplina</th>
+                    <th scope="col">Duração</th>
+                    <th scope="col">Situação</th>
+                    <th scope="col">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {paginaBlocos.itens.map(bloco => {
-                    return (
-                      <tr key={bloco.id} className={bloco.concluido ? styles.blocoConcluidoRow : ''}>
-                        <td>{bloco.data}</td>
-                        <td>#{bloco.ordem}</td>
-                        <td>
-                          <span
-                            style={{
-                              display: 'inline-block',
-                              width: 10,
-                              height: 10,
-                              borderRadius: '50%',
-                              backgroundColor: bloco.disciplinaCor || '#6366f1',
-                              marginRight: 6,
+                  {paginaBlocos.itens.map((bloco) => (
+                    <tr key={bloco.id} className={bloco.concluido ? styles.blocoConcluidoRow : undefined}>
+                      <td>{bloco.data}</td>
+                      <td>{bloco.ordem}</td>
+                      <td className={styles.blocoDisciplinaCell}>
+                        <span
+                          className={styles.blocoColorDot}
+                          style={{ backgroundColor: bloco.disciplinaCor || '#6366f1' }}
+                          aria-hidden="true"
+                        />
+                        <strong>{bloco.disciplinaNome}</strong>
+                      </td>
+                      <td>{bloco.duracaoMinutos} min</td>
+                      <td>
+                        <span className={bloco.concluido ? styles.statusBadgeConcluido : styles.statusBadgePendente}>
+                          {bloco.concluido ? 'CONCLUÍDO' : bloco.statusData}
+                        </span>
+                      </td>
+                      <td>
+                        <div className={styles.blockActions}>
+                          <input
+                            type="checkbox"
+                            aria-label={`Concluir bloco ${bloco.ordem} de ${bloco.data}`}
+                            checked={bloco.concluido}
+                            onChange={() => {
+                              if (bloco.concluido) {
+                                void handleReabrirBloco(bloco);
+                              } else {
+                                handleConcluirBloco(bloco);
+                              }
                             }}
                           />
-                          <strong>{bloco.disciplinaNome}</strong>
-                        </td>
-                        <td>{bloco.duracaoMinutos} min</td>
-                        <td>
-                          <span
-                            className={
-                              bloco.concluido
-                                ? styles.statusBadgeConcluido
-                                : styles.statusBadgePendente
-                            }
-                          >
-                            {bloco.concluido ? 'CONCLUÍDO' : bloco.statusData}
-                          </span>
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', gap: '6px' }}>
-                            <button
+                          {!bloco.concluido && filtroBlocos === 'PENDENTES' && (
+                            <Button
                               type="button"
-                              className={
-                                bloco.concluido ? styles.actionUndoButton : styles.actionCheckButton
-                              }
-                              onClick={() => handleToggleConclusaoBloco(bloco)}
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleIniciarEstudoBloco(bloco)}
+                              disabled={!onIniciarEstudo}
                             >
-                              {bloco.concluido ? 'Desmarcar' : 'Concluir'}
-                            </button>
-                            {onIniciarEstudo && !bloco.concluido && (
-                              <button
-                                type="button"
-                                className={styles.actionButtonSmall}
-                                onClick={() => handleIniciarEstudoBloco(bloco)}
-                              >
-                                Estudar
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                              Estudar este bloco
+                            </Button>
+                          )}
+                          {bloco.concluido && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => void handleReabrirBloco(bloco)}
+                            >
+                              Reabrir
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
+            </div>
+          )}
 
-              {/* Paginação */}
-              <div className={styles.paginationBar}>
-                <button
-                  type="button"
-                  className={styles.paginationButton}
-                  disabled={page <= 1}
-                  onClick={() => setPage(prev => Math.max(1, prev - 1))}
-                >
-                  &larr; Anterior
-                </button>
-                <span className={styles.paginationLabel}>
-                  Página {page} de {paginaBlocos.totalPaginas || 1}
-                </span>
-                <button
-                  type="button"
-                  className={styles.paginationButton}
-                  disabled={page >= (paginaBlocos.totalPaginas || 1)}
-                  onClick={() => setPage(prev => prev + 1)}
-                >
-                  Próxima &rarr;
-                </button>
-              </div>
+
+          {paginaBlocos && paginaBlocos.totalPaginas > 1 && (
+            <div className={styles.paginationBar}>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={page <= 1}
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              >
+                Anterior
+              </Button>
+              <span className={styles.paginationLabel}>
+                Página {page} de {paginaBlocos.totalPaginas}
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={page >= paginaBlocos.totalPaginas}
+                onClick={() => setPage((prev) => prev + 1)}
+              >
+                Próxima
+              </Button>
             </div>
           )}
         </section>

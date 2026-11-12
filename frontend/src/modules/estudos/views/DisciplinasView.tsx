@@ -932,7 +932,7 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
             </p>
             <div style={{ padding: '12px', background: 'var(--surface-2)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
               <p style={{ margin: '0 0 8px 0' }}>
-                <strong>• Manter histórico:</strong> Preserva todas as sessões, horas estudadas e questões acumuladas. O nome é atualizado no ciclo e planejamento.
+                <strong>• Manter histórico:</strong> Preserva todas as sessões, horas estudadas e questões acumuladas. O nome é atualizado nos cronogramas ativos e no planejamento.
               </p>
               <p style={{ margin: 0, color: 'var(--danger-text, #ef4444)' }}>
                 <strong>• Zerar histórico:</strong> Trata como uma nova disciplina iniciada do zero. Todo o histórico anterior de sessões, horas e questões será excluído permanentemente.

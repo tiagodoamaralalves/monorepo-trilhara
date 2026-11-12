@@ -18,7 +18,7 @@
 | A2 | Datas de calendário não mudam entre navegador/backend; 21h–23h59 em `America/Sao_Paulo` usam a data local via `X-Timezone`; instantes em BSON Date | `shared/TimezoneContextTest` (6); `shared/mongo/BsonRoundTripTest` (7); `test/sessaoNormalizada.test.ts` | Coberto |
 | A3 | Trilha grande não exige transferir disciplinas/tópicos ao listar Hub | `trilha/TrilhaNormalizadaIntegrationTest` (17, inclui `deveCriarTrilhaERetornarResumoSemArrayDeTopicosNoHub`) | Parcial — falta assert de payload/`explain` em trilha de 2.000 tópicos; `MongoExplainBenchmarkTest` é opt-in. **R3:** o resumo não tem mais `disciplinas`/`progresso` no contrato |
 | A4 | Marcar/desmarcar tópico afeta somente aquele progresso e agregados | `trilha/TrilhaNormalizadaIntegrationTest#deveRetornar404AoMarcarProgressoDeTopicoDeOutraTrilha`; `test/topicoOtimista.test.tsx` | **Coberto na R3** — inclui isolamento por trilha no path e rollback otimista |
-| A5 | Regenerar cronograma substitui blocos via `versaoGeracao`/`versaoAtiva`, mantém sessões/progresso; concorrência nunca deixa dois ativos | `cronograma/CronogramaNormalizadoIntegrationTest` (8, inclui `deveCoordenarConcorrenciaComLockAtomicoNaTrilha`) + índice parcial único `idx_cronogramas_usuario_trilha_ativo_unique` | Coberto |
+| A5 | Regenerar cronograma substitui blocos via `versaoGeracao`/`versaoAtiva`, mantém sessões/progresso; concorrência nunca deixa dois ativos | `cronograma/CronogramaNormalizadoIntegrationTest` (8, inclui `deveCoordenarConcorrenciaComLockAtomicoNaTrilha`) + índice parcial único `idx_cronogramas_usuario_trilha_ativo_unique` | **Coberto na R5** — contador atômico `trilha.proximaVersaoCronograma`, fencing no ponteiro e `duplicateModalityNaoAlteraBlocos` |
 | A6 | Tarefas/Pomodoro mostram as mesmas tarefas manuais Hoje + blocos do dia; nenhum bloco é gravado como tarefa | `test/fase7IntegracaoDiaria.test.tsx` (9); `tarefa/Fase6TarefaResourceTest` (4) | Coberto |
 | A7 | Concluir manual nunca cria sessão; concluir bloco abre o modal global; cancelar não conclui | `test/fase5GlobalSessionTimer.test.tsx` (13); `fase7IntegracaoDiaria.test.tsx` | Coberto |
 | A8 | Retry após timeout não duplica sessão nem conclusão | `sessao/SessaoNormalizadaIntegrationTest` (9) + índice único `idx_sessoes_usuario_chaveIdempotencia_unique` | Parcial — falta retry concorrente com `operationId` repetido em `concluir-atrasados` |
@@ -30,9 +30,9 @@
 | A14 | Logout/troca de conta sincronizam via `storage`/`BroadcastChannel`; entre subdomínios validação server-side ao focar; timers só na mesma origem | `test/sso.test.ts` (6); `fase5GlobalSessionTimer.test.tsx`; `appSwitcher.test.tsx` (6) | Parcial — sem teste de `BroadcastChannel` entre subdomínios |
 | A15 | Falha de serviço aparece como erro recuperável (`SectionErrorCard`/`SyncStatusBadge`), nunca como "sem dados" | `test/fase7IntegracaoDiaria.test.tsx`; `fase8Notas.test.tsx` | Parcial — `SyncStatusBadge` sem teste dedicado |
 | A16 | WCAG 2.2 AA (focus trap, `aria-live`, alvos mínimos, `scroll-padding-bottom`) nos 4 módulos | `test/fase11Accessibility.test.tsx` (9) | Coberto |
-| A18 | Listas paginadas com ordenação estável (`_id` desempate) e filtro de tenant; erro de uma fonte não remove dados da outra | `AuthorizationByOwnerTest`; `CronogramaNormalizadoIntegrationTest`; `test/fase7IntegracaoDiaria.test.tsx` | Parcial — `tamanho` máx. de blocos é **200** (norma: 100) |
-| A19 | Alternar cronograma ativo mostra versão anterior ou nova completa, nunca staging incompleto | `CronogramaNormalizadoIntegrationTest` | Parcial — falta teste de leitura concorrente durante a troca |
-| A20 | Geração de cronograma com falha injetada em cada etapa; lease expirado não publica | `CronogramaNormalizadoIntegrationTest` (lease/lock) | Parcial — falta injeção de falha por etapa |
+| A18 | Listas paginadas com ordenação estável (`_id` desempate) e filtro de tenant; erro de uma fonte não remove dados da outra | `AuthorizationByOwnerTest`; `CronogramaNormalizadoIntegrationTest`; `test/fase7IntegracaoDiaria.test.tsx` | **Coberto na R5** — `tamanho` máx. de blocos agora é 100 com `400 INVALID_PAGINATION` |
+| A19 | Alternar cronograma ativo mostra versão anterior ou nova completa, nunca staging incompleto | `PublicacaoCronogramaFaultInjectionTest#falhaNaEtapa1..6_leitorVeVersaoAnteriorOuNovaCompleta` | **Coberto na R5** |
+| A20 | Geração de cronograma com falha injetada em cada etapa; lease expirado não publica | `PublicacaoCronogramaFaultInjectionTest` (7: 6 etapas + `leaseExpiradoNaoPublica`) | **Coberto na R5** — `FaultInjector` só no classpath de teste |
 | A21 | Materialização recorrente idempotente sob concorrência; casos diário/semanal/mensal em virada de ano/ISO/meses curtos | `tarefa/Fase6RecorrenciaEngineTest` (5) | Parcial — falta caso virada de ano/semana ISO |
 | A22 | Exclusão/restauração de lista/caderno/seção respeitam lotes e descendentes já purgados | `tarefa/ListaTarefasResourceTest` (1) | **Sem teste** — R7 |
 | A23 | Scheduler push não processa o mesmo item em paralelo; expirados não enviados; backoff | `push/PushDeliverySchedulerTest` (3); `push/LembretePushLifecycleTest` (4); `push/LembretePushCalculatorTest` (3) | Coberto |
@@ -71,13 +71,13 @@
 
 | Lacuna | Fase dona | Evidência |
 |---|---|---|
-| `tamanho` máximo de paginação = 200 nos blocos (norma: 100, com 400) | R5 | REVISAO §6 |
+| ~~`tamanho` máximo de paginação = 200 nos blocos~~ → **resolvido na R5** (`tamanho` ≤ 100 com `400 INVALID_PAGINATION`) | — | `BlocoCronogramaRepository.TAMANHO_MAXIMO_PAGINA` |
 | ~~`toObjectIdOrNotFound` retornava 404 para ID malformado~~ → **resolvido na R1** | — | `shared/InvalidIdentifierTest`; `BsonIds.parse` |
-| ~~3 coleções fora do inventário~~ → **resolvido na R2** para `tokens_handoff_sso`; `operacoes_concluir_atrasados`/`planejamento_ciclo` seguem em allowlist de R5 | R5/R9 | `InventarioColecoesTest.ALLOWLIST_LEGADO_R5` |
+| ~~3 coleções fora do inventário~~ → **resolvido na R5** (allowlist zerada: `operacoes_concluir_atrasados` removida e `planejamento_ciclo` não é mais escrita) | — | `InventarioColecoesTest.ALLOWLIST_LEGADO` vazio |
 | ~~`HandoffService` cria índices fora do `MongoIndexInitializer`~~ → **resolvido na R2** | — | `IndicesCanonicos`; `grep createIndex backend/src/main` → 1 |
 | ~~`MongoIndexInitializerTest` valida só nomes~~ → **resolvido na R2** | — | `#deveCriarExatamenteIndicesCanonicos` |
 | ~~`scripts/mongo/reset-dev.sh` inexistente~~ → **criado na R2** | — | `scripts/mongo/reset-dev.sh` |
-| Resíduo `Ciclo`/`planejamento_ciclo` em `trilha/` + refs `ciclo` no frontend | R5/R7 | REVISAO §3 |
+| ~~Resíduo `Ciclo`/`planejamento_ciclo` em `trilha/` + refs `ciclo` no frontend~~ → **resolvido na R5**: `termo-ciclo-backend` 0 e frontend só mantém "ciclo Pomodoro" (preservado pelo guia) | — | `verificar-legado.sh --quiet` |
 | ~~`tarefaStorage.ts` referenciava campos inexistentes~~ → **resolvido na R1** (arquivo removido) | — | `knip` exit 0 |
 | Anexo C precisa de decisão sobre `usaPadraoGlobalLembrete` e `OperacaoConcluirAtrasados` | D-02/R8 | REVISAO §8 |
 | ~~163 problemas ESLint / 73 achados knip~~ → **zerados na R1** | — | `npm run lint -- --max-warnings 0` + `npx knip` |
@@ -120,7 +120,7 @@
 | Uma única `MongoIndexInitializer` com todos os índices | `rg -l "class MongoIndexInitializer" backend/src/main` → 1; `IndicesCanonicos` | Coberto |
 | `tokens_handoff_sso` no inventário, `usuarioId` ObjectId, consumo atômico | `HandoffConsumoAtomicoTest` (4) | Coberto |
 | 20 coleções no enum; exclusão cobre 18 filhas + `usuarios` | `InventarioColecoesTest` (5); `AccountDeletionIntegrationTest` | Coberto |
-| Nenhuma coleção da aplicação fora do enum (allowlist R5 documentada) | `InventarioColecoesTest#naoDeveExistirColecaoForaDoInventario` | Parcial — allowlist de `operacoes_concluir_atrasados`/`planejamento_ciclo` (R5) |
+| Nenhuma coleção da aplicação fora do enum | `InventarioColecoesTest#naoDeveExistirColecaoForaDoInventario` | **Coberto na R5** — allowlist vazia |
 | `BsonDates` estrito (tipo inesperado ⇒ `IllegalStateException`) | `BsonDatesStrictTest` (5) | Coberto |
 | `scripts/mongo/reset-dev.sh` recria o banco dev/test | script + `--help`; execução manual | Coberto |
 | Access token/perfil só em memória; nada em storage | `src/test/authStorage.test.ts` (4) | Coberto |

@@ -25,15 +25,13 @@ import {
   useToast
 } from '@shared/design-system';
 import {
-  Ciclo,
-  DisciplinaProgramada,
   EstatisticaDisciplinaDTO,
   EstatisticasTrilhaDTO,
   Sessao,
   TrilhaDetalheDTO
 } from '../types/trilhara';
+import type { BlocoCronogramaItemDTO } from '@shared/contracts';
 import { EstudosService, PaginaSessoes } from '../services/estudosService';
-import { PlanejamentoStorage } from '../services/planejamentoStorage';
 import { useUnsavedChanges } from '@shared/hooks';
 import {
   formatarDataBR,
@@ -92,13 +90,11 @@ function corNivelAcerto(percentual: number): string {
 }
 
 /**
- * Estrutura herdada de planejamento: `ciclos` chega no detalhe como passagem da F2 e a
- * remoção pertence às revisões de cronograma. Sem `ciclos`, não há ciclo atual.
+ * Blocos planejados para a meta do período vêm do cronograma ATIVO publicado no ponteiro da
+ * trilha (R5/D-18d). Sem cronograma ativo, não há meta.
  */
-function cicloAtual(trilha: TrilhaDetalheDTO): Ciclo | undefined {
-  const ciclos = (trilha.ciclos ?? []) as Ciclo[];
-  return ciclos.find((ciclo) => ciclo.id === (trilha as { cicloAtivoId?: string }).cicloAtivoId)
-    || ciclos.at(-1);
+function cronogramaAtivoId(trilha: TrilhaDetalheDTO): string | undefined {
+  return trilha.cronogramaAtivoResumo?.cronogramaAtivoId;
 }
 
 export interface DashboardViewProps {
@@ -126,7 +122,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [estatisticas, setEstatisticas] = useState<EstatisticasTrilhaDTO | null>(null);
   const [paginaSessoes, setPaginaSessoes] = useState<PaginaSessoes | null>(null);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
-  const [cronograma, setCronograma] = useState<DisciplinaProgramada[]>([]);
+  const [blocosCronograma, setBlocosCronograma] = useState<BlocoCronogramaItemDTO[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [paginaHistorico, setPaginaHistorico] = useState(1);
@@ -157,7 +153,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   useUnsavedChanges(`sessao:${sessaoEditando?.id ?? 'nenhuma'}`, Boolean(sessaoEditando) && edicaoSuja);
 
-  const ciclo = useMemo(() => cicloAtual(trilha), [trilha]);
+  const cronogramaId = useMemo(() => cronogramaAtivoId(trilha), [trilha]);
   const hoje = hojeISO();
 
   const dataFinalPeriodo = periodo === 'custom' ? customAte : hoje;
@@ -252,26 +248,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }
 
   useEffect(() => {
-    if (!ciclo) {
-      setCronograma([]);
+    if (!cronogramaId) {
+      setBlocosCronograma([]);
       return;
     }
     let ativa = true;
-    const carregarPlanejamento = async () => {
+    const carregarBlocos = async () => {
       try {
-        const estado = await PlanejamentoStorage.carregar(trilha.id, ciclo.id);
-        if (ativa) setCronograma(estado.cronograma);
+        // Percorre todas as páginas do cronograma ativo (máx. 100 por página) para a meta do período.
+        const acumulado: BlocoCronogramaItemDTO[] = [];
+        let pagina = 1;
+        let totalPaginas = 1;
+        do {
+          const res = await EstudosService.listarBlocosCronograma(trilha.id, cronogramaId, {
+            pagina,
+            tamanho: 100
+          });
+          acumulado.push(...res.itens);
+          totalPaginas = res.totalPaginas || 1;
+          pagina += 1;
+        } while (pagina <= totalPaginas);
+        if (ativa) setBlocosCronograma(acumulado);
       } catch (err) {
         if (!ativa) return;
-        setCronograma([]);
-        toast.error(err instanceof Error ? err : 'Não foi possível carregar o planejamento do ciclo.');
+        setBlocosCronograma([]);
+        toast.error(err instanceof Error ? err : 'Não foi possível carregar os blocos do cronograma.');
       }
     };
-    void carregarPlanejamento();
+    void carregarBlocos();
     return () => {
       ativa = false;
     };
-  }, [ciclo, toast, trilha.id]);
+  }, [cronogramaId, toast, trilha.id]);
 
   const porDisciplinaStats = useMemo(() => {
     return estatisticas?.porDisciplina ?? [];
@@ -325,32 +333,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }, [cobertura, hoje, trilha.dataProva]);
 
   const periodoResumo = useMemo(() => {
-    const dataInicial = dataInicialPeriodo || ciclo?.dataInicio;
+    const dataInicial = dataInicialPeriodo || undefined;
     const dataFinal = dataFinalPeriodo || hoje;
-    const blocosPlanejados = cronograma.filter((bloco) =>
-      bloco.data <= dataFinal
-      && (!dataInicial || bloco.data >= dataInicial)
+    const blocosPlanejados = blocosCronograma.filter(
+      (bloco) => bloco.data <= dataFinal && (!dataInicial || bloco.data >= dataInicial)
     );
 
-    let metaMinutos = 0;
-    let totalBlocos = 0;
-    if (cronograma.length > 0) {
-      totalBlocos = blocosPlanejados.length;
-      metaMinutos = blocosPlanejados.reduce(
-        (total, bloco) => total + bloco.duracaoMinutos,
-        0
-      );
-    } else if (ciclo) {
-      const blocosPorSemana = (ciclo.blocosSemana || [])
-        .reduce((total, blocos) => total + blocos, 0);
-      const inicioMeta = dataInicial
-        ? (dataInicial > (ciclo.dataInicio || dataInicial) ? dataInicial : ciclo.dataInicio || dataInicial)
-        : ciclo.dataInicio || dataFinal;
-      const diasConsiderados = Math.max(0, diferencaEmDias(inicioMeta, dataFinal) + 1);
-      const minutosPorSemana = blocosPorSemana * (ciclo.duracaoBlocoMin || 0);
-      metaMinutos = (minutosPorSemana * diasConsiderados) / 7;
-      totalBlocos = Math.round((blocosPorSemana * diasConsiderados) / 7);
-    }
+    const totalBlocos = blocosPlanejados.length;
+    const metaMinutos = blocosPlanejados.reduce(
+      (total, bloco) => total + bloco.duracaoMinutos,
+      0
+    );
 
     const realizadoMinutos = totalMinutos;
     const cumprimento = metaMinutos > 0
@@ -366,8 +359,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       diasComEstudo: estatisticas?.serieTemporal.length ?? 0
     };
   }, [
-    ciclo,
-    cronograma,
+    blocosCronograma,
     dataFinalPeriodo,
     dataInicialPeriodo,
     estatisticas?.serieTemporal.length,

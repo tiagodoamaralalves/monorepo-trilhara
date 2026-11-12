@@ -6,10 +6,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import org.bson.Document;
@@ -28,24 +32,38 @@ import br.com.trilhara.cronograma.dto.PaginaBlocosDTO;
 import br.com.trilhara.shared.TimezoneContext;
 import br.com.trilhara.shared.erro.CodigoErro;
 import br.com.trilhara.shared.erro.DomainConflictException;
+import br.com.trilhara.shared.erro.ProblemDetails;
+import br.com.trilhara.shared.erro.ProblemDetailsFactory;
 import br.com.trilhara.shared.erro.ResourceLimitExceededException;
+import br.com.trilhara.shared.erro.ValidationException;
 import br.com.trilhara.shared.mongo.BsonDates;
 import br.com.trilhara.shared.mongo.BsonIds;
 import br.com.trilhara.trilha.Disciplina;
 import br.com.trilhara.trilha.DisciplinaRepository;
+import br.com.trilhara.trilha.LeaseHeartbeat;
 import br.com.trilhara.trilha.LeaseTrilhaService;
 import br.com.trilhara.trilha.TrilhaRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response;
 
 @ApplicationScoped
 public class CronogramaService {
 
+    private static final Logger LOG = Logger.getLogger(CronogramaService.class.getName());
+
     private static final String VALOR_ATIVO = "ATIVO";
+    private static final String VALOR_PREPARANDO = "PREPARANDO";
+    private static final String VALOR_RECUPERACAO = "RECUPERACAO_NECESSARIA";
     private static final String ERRO_CRONOGRAMA_NAO_ENCONTRADO = "Cronograma não encontrado";
     private static final String ERRO_TRILHA_NAO_ENCONTRADA = "Trilha não encontrada";
+    private static final String ERRO_BLOCO_NAO_ENCONTRADO = "Bloco não encontrado";
+    private static final int MAX_CRONOGRAMAS_POR_TRILHA = 3;
+    private static final int MAX_DIAS_HORIZONTE = 366;
+    private static final List<String> PERIODOS_SUPORTADOS =
+            List.of("ATE_PROVA", "UMA_SEMANA", "UM_MES", "TRES_MESES");
 
     public record DadosConfiguracao(
             ModalidadeCronograma modalidade,
@@ -61,31 +79,31 @@ public class CronogramaService {
 
     private final CronogramaRepository cronogramaRepository;
     private final BlocoCronogramaRepository blocoCronogramaRepository;
-    private final OperacaoConcluirAtrasadosRepository operacaoConcluirAtrasadosRepository;
     private final TrilhaRepository trilhaRepository;
     private final DisciplinaRepository disciplinaRepository;
     private final UserRepository userRepository;
     private final LeaseTrilhaService leaseTrilhaService;
     private final TimezoneContext timezoneContext;
+    private final FaultInjector faultInjector;
 
     @Inject
     public CronogramaService(
             CronogramaRepository cronogramaRepository,
             BlocoCronogramaRepository blocoCronogramaRepository,
-            OperacaoConcluirAtrasadosRepository operacaoConcluirAtrasadosRepository,
             TrilhaRepository trilhaRepository,
             DisciplinaRepository disciplinaRepository,
             UserRepository userRepository,
             LeaseTrilhaService leaseTrilhaService,
-            TimezoneContext timezoneContext) {
+            TimezoneContext timezoneContext,
+            FaultInjector faultInjector) {
         this.cronogramaRepository = cronogramaRepository;
         this.blocoCronogramaRepository = blocoCronogramaRepository;
-        this.operacaoConcluirAtrasadosRepository = operacaoConcluirAtrasadosRepository;
         this.trilhaRepository = trilhaRepository;
         this.disciplinaRepository = disciplinaRepository;
         this.userRepository = userRepository;
         this.leaseTrilhaService = leaseTrilhaService;
         this.timezoneContext = timezoneContext;
+        this.faultInjector = faultInjector;
     }
 
     public CronogramaDTO criar(String trilhaIdStr, CriarCronogramaRequest request) {
@@ -95,18 +113,14 @@ public class CronogramaService {
         String leaseToken = UUID.randomUUID().toString();
         adquirirLeaseOuFalhar(usuarioId, trilhaId, leaseToken);
 
-        try {
+        try (LeaseHeartbeat heartbeat = LeaseHeartbeat.iniciar(leaseTrilhaService, usuarioId, trilhaId, leaseToken)) {
             // 1. Limite de 3 cronogramas por trilha
-            if (cronogramaRepository.contarPorTrilha(usuarioId, trilhaId) >= 3) {
+            if (cronogramaRepository.contarPorTrilha(usuarioId, trilhaId) >= MAX_CRONOGRAMAS_POR_TRILHA) {
                 throw new ResourceLimitExceededException("A trilha já possui o limite máximo de 3 cronogramas.");
             }
 
-            // 2. Conflito de modalidade duplicada na mesma trilha (409 DUPLICATE_MODALITY)
-            if (cronogramaRepository.buscarPorModalidade(usuarioId, trilhaId, request.modalidade()).isPresent()) {
-                throw new DomainConflictException(
-                        CodigoErro.DUPLICATE_MODALITY,
-                        "Esta trilha já possui um cronograma na modalidade selecionada.");
-            }
+            // 2. Conflito de modalidade duplicada na mesma trilha, antes de qualquer escrita
+            exigirModalidadeLivre(usuarioId, trilhaId, request.modalidade(), null);
 
             Document trilhaDoc = trilhaRepository.buscarEntidade(usuarioId, trilhaId)
                     .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
@@ -116,17 +130,12 @@ public class CronogramaService {
 
             List<Disciplina> participantes = validarDisciplinasParticipantes(
                     usuarioId, trilhaId, request.disciplinasParticipantesIds());
+            validarConfiguracao(request.tipoPeriodo(), request.diasAtivosSemana(), request.blocosPorDia(),
+                    request.duracaoBlocoMinutos(), request.semanaModeloManual(), participantes);
 
             ObjectId cronogramaId = new ObjectId();
-            long versaoNova = 1L;
-
-            // Gerar blocos
-            List<BlocoCronograma> blocos = GeradorBlocosCronograma.gerar(
-                    new GeradorBlocosCronograma.ParametrosGeracao(
-                            usuarioId, trilhaId, cronogramaId, versaoNova,
-                            request.modalidade(), request.duracaoBlocoMinutos(),
-                            dataInicio, dataFim, request.diasAtivosSemana(),
-                            request.blocosPorDia(), participantes, request.semanaModeloManual()));
+            long versaoNova = trilhaRepository.proximaVersaoCronograma(usuarioId, trilhaId)
+                    .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
 
             Instant agora = Instant.now();
             Document configDoc = montarConfiguracaoDocumento(new DadosConfiguracao(
@@ -134,40 +143,23 @@ public class CronogramaService {
                     dataInicio, dataFim, request.diasAtivosSemana(), request.blocosPorDia(),
                     participantes.stream().map(Disciplina::id).toList(), request.semanaModeloManual()));
 
-            // Novo cronograma começa inativo durante o staging para respeitar o índice único parcial
+            // ETAPA 1 — documento em PREPARANDO e inativo (respeita o índice parcial único)
+            heartbeat.verificarVivo();
+            faultInjector.antesDe(EtapaPublicacao.STAGING_DOCUMENTO);
             Cronograma novo = new Cronograma(
                     cronogramaId, usuarioId, trilhaId, request.modalidade(),
-                    false, versaoNova, null, "PREPARANDO",
+                    false, versaoNova, null, VALOR_PREPARANDO,
                     request.duracaoBlocoMinutos(), request.tipoPeriodo(),
                     dataInicio, dataFim, request.diasAtivosSemana(),
                     request.blocosPorDia(), participantes.stream().map(Disciplina::id).toList(),
-                    request.semanaModeloManual(), configDoc, null, agora, agora);
-
-            // Staging e inserção em lotes
+                    request.semanaModeloManual(), null, configDoc, agora, agora);
             cronogramaRepository.inserir(novo);
-            blocoCronogramaRepository.inserirLote(blocos);
 
-            long contagem = blocoCronogramaRepository.contarPorVersao(usuarioId, trilhaId, cronogramaId, versaoNova);
-            if (contagem != blocos.size()) {
-                throw new IllegalStateException("Falha na geração: quantidade de blocos inseridos difere do esperado.");
-            }
-
-            // Atualização atômica do ponteiro na trilha pai
-            trilhaRepository.atualizarPonteiroCronogramaAtivo(usuarioId, trilhaId, cronogramaId, versaoNova);
-
-            // Reconcilia flags ativos: desativa anteriores ANTES de marcar o novo ativo para respeitar o índice parcial único
-            cronogramaRepository.desativarOutros(usuarioId, trilhaId, cronogramaId);
-
-            Cronograma ativo = new Cronograma(
-                    cronogramaId, usuarioId, trilhaId, request.modalidade(),
-                    true, versaoNova, null, VALOR_ATIVO,
-                    request.duracaoBlocoMinutos(), request.tipoPeriodo(),
-                    dataInicio, dataFim, request.diasAtivosSemana(),
-                    request.blocosPorDia(), participantes.stream().map(Disciplina::id).toList(),
-                    request.semanaModeloManual(), configDoc, null, agora, Instant.now());
-            cronogramaRepository.atualizar(ativo);
-
-            return paraDTO(ativo, blocos.size());
+            return publicar(heartbeat, usuarioId, trilhaId, cronogramaId, versaoNova,
+                    request.modalidade(), request.duracaoBlocoMinutos(), request.tipoPeriodo(),
+                    dataInicio, dataFim, request.diasAtivosSemana(), request.blocosPorDia(),
+                    participantes, request.semanaModeloManual(), configDoc,
+                    agora, novo.criadoEm());
         } finally {
             trilhaRepository.liberarLease(usuarioId, trilhaId, leaseToken);
         }
@@ -181,17 +173,12 @@ public class CronogramaService {
         String leaseToken = UUID.randomUUID().toString();
         adquirirLeaseOuFalhar(usuarioId, trilhaId, leaseToken);
 
-        try {
+        try (LeaseHeartbeat heartbeat = LeaseHeartbeat.iniciar(leaseTrilhaService, usuarioId, trilhaId, leaseToken)) {
             Cronograma existente = cronogramaRepository.buscarPorId(usuarioId, trilhaId, cronogramaId)
                     .orElseThrow(() -> new NotFoundException(ERRO_CRONOGRAMA_NAO_ENCONTRADO));
 
-            // Conflito de modalidade ao editar pelo lápis (§4.2 B.2)
-            if (request.modalidade() != existente.modalidade()
-                    && cronogramaRepository.buscarPorModalidadeExceto(usuarioId, trilhaId, request.modalidade(), cronogramaId).isPresent()) {
-                throw new DomainConflictException(
-                        CodigoErro.DUPLICATE_MODALITY,
-                        "Esta trilha já possui um cronograma na modalidade selecionada.");
-            }
+            // Conflito de modalidade ANTES de qualquer escrita (§5.2)
+            exigirModalidadeLivre(usuarioId, trilhaId, request.modalidade(), cronogramaId);
 
             Document trilhaDoc = trilhaRepository.buscarEntidade(usuarioId, trilhaId)
                     .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
@@ -201,18 +188,23 @@ public class CronogramaService {
 
             List<Disciplina> participantes = validarDisciplinasParticipantes(
                     usuarioId, trilhaId, request.disciplinasParticipantesIds());
+            validarConfiguracao(request.tipoPeriodo(), request.diasAtivosSemana(), request.blocosPorDia(),
+                    request.duracaoBlocoMinutos(), request.semanaModeloManual(), participantes);
 
-            long versaoNova = existente.versaoAtiva() + 1L;
+            long versaoNova = trilhaRepository.proximaVersaoCronograma(usuarioId, trilhaId)
+                    .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
 
-            // Staging preparado
             Document configPreparada = montarConfiguracaoDocumento(new DadosConfiguracao(
                     request.modalidade(), request.duracaoBlocoMinutos(), request.tipoPeriodo(),
                     dataInicio, dataFim, request.diasAtivosSemana(), request.blocosPorDia(),
                     participantes.stream().map(Disciplina::id).toList(), request.semanaModeloManual()));
 
+            // ETAPA 1 — marca a versão preparada no documento (flags atuais preservadas)
+            heartbeat.verificarVivo();
+            faultInjector.antesDe(EtapaPublicacao.STAGING_DOCUMENTO);
             Cronograma preparando = new Cronograma(
                     existente.id(), usuarioId, trilhaId, request.modalidade(),
-                    existente.ativo(), existente.versaoAtiva(), versaoNova, "PREPARANDO",
+                    existente.ativo(), existente.versaoAtiva(), versaoNova, VALOR_PREPARANDO,
                     request.duracaoBlocoMinutos(), request.tipoPeriodo(),
                     dataInicio, dataFim, request.diasAtivosSemana(),
                     request.blocosPorDia(), participantes.stream().map(Disciplina::id).toList(),
@@ -220,42 +212,11 @@ public class CronogramaService {
                     existente.criadoEm(), Instant.now());
             cronogramaRepository.atualizar(preparando);
 
-            // Gerar e gravar novos blocos
-            List<BlocoCronograma> novosBlocos = GeradorBlocosCronograma.gerar(
-                    new GeradorBlocosCronograma.ParametrosGeracao(
-                            usuarioId, trilhaId, cronogramaId, versaoNova,
-                            request.modalidade(), request.duracaoBlocoMinutos(),
-                            dataInicio, dataFim, request.diasAtivosSemana(),
-                            request.blocosPorDia(), participantes, request.semanaModeloManual()));
-
-            blocoCronogramaRepository.inserirLote(novosBlocos);
-
-            long contagem = blocoCronogramaRepository.contarPorVersao(usuarioId, trilhaId, cronogramaId, versaoNova);
-            if (contagem != novosBlocos.size()) {
-                throw new IllegalStateException("Falha na geração: contagem de blocos em staging diverge.");
-            }
-
-            // Atualização atômica do ponteiro da trilha pai
-            trilhaRepository.atualizarPonteiroCronogramaAtivo(usuarioId, trilhaId, cronogramaId, versaoNova);
-
-            // Desativa outros cronogramas da mesma trilha
-            cronogramaRepository.desativarOutros(usuarioId, trilhaId, cronogramaId);
-
-            // Publica versão ativa
-            Cronograma publicado = new Cronograma(
-                    existente.id(), usuarioId, trilhaId, request.modalidade(),
-                    true, versaoNova, null, VALOR_ATIVO,
-                    request.duracaoBlocoMinutos(), request.tipoPeriodo(),
-                    dataInicio, dataFim, request.diasAtivosSemana(),
-                    request.blocosPorDia(), participantes.stream().map(Disciplina::id).toList(),
-                    request.semanaModeloManual(), configPreparada, null,
-                    existente.criadoEm(), Instant.now());
-            cronogramaRepository.atualizar(publicado);
-
-            // Limpa versões antigas de blocos deste cronograma
-            blocoCronogramaRepository.excluirVersoesDiferentes(usuarioId, trilhaId, cronogramaId, versaoNova);
-
-            return paraDTO(publicado, novosBlocos.size());
+            return publicar(heartbeat, usuarioId, trilhaId, cronogramaId, versaoNova,
+                    request.modalidade(), request.duracaoBlocoMinutos(), request.tipoPeriodo(),
+                    dataInicio, dataFim, request.diasAtivosSemana(), request.blocosPorDia(),
+                    participantes, request.semanaModeloManual(), configPreparada,
+                    Instant.now(), existente.criadoEm());
         } finally {
             trilhaRepository.liberarLease(usuarioId, trilhaId, leaseToken);
         }
@@ -269,15 +230,20 @@ public class CronogramaService {
         String leaseToken = UUID.randomUUID().toString();
         adquirirLeaseOuFalhar(usuarioId, trilhaId, leaseToken);
 
-        try {
+        try (LeaseHeartbeat heartbeat = LeaseHeartbeat.iniciar(leaseTrilhaService, usuarioId, trilhaId, leaseToken)) {
             Cronograma cronograma = cronogramaRepository.buscarPorId(usuarioId, trilhaId, cronogramaId)
                     .orElseThrow(() -> new NotFoundException(ERRO_CRONOGRAMA_NAO_ENCONTRADO));
 
-            // Troca atomicamente o ponteiro na trilha
-            trilhaRepository.atualizarPonteiroCronogramaAtivo(
-                    usuarioId, trilhaId, cronogramaId, cronograma.versaoAtiva());
+            heartbeat.verificarVivo();
+            faultInjector.antesDe(EtapaPublicacao.TROCA_PONTEIRO);
+            if (!trilhaRepository.atualizarPonteiroCronogramaAtivo(
+                    usuarioId, trilhaId, cronogramaId, cronograma.versaoAtiva(), leaseToken)) {
+                throw new DomainConflictException(
+                        CodigoErro.SCHEDULE_GENERATION_IN_PROGRESS, LeaseTrilhaService.MSG_LEASE_PERDIDO);
+            }
 
-            // Reconcilia flags ativos
+            heartbeat.verificarVivo();
+            faultInjector.antesDe(EtapaPublicacao.RECONCILIACAO_FLAGS);
             cronogramaRepository.desativarOutros(usuarioId, trilhaId, cronogramaId);
 
             Cronograma atualizado = new Cronograma(
@@ -306,7 +272,7 @@ public class CronogramaService {
         String leaseToken = UUID.randomUUID().toString();
         adquirirLeaseOuFalhar(usuarioId, trilhaId, leaseToken);
 
-        try {
+        try (LeaseHeartbeat heartbeat = LeaseHeartbeat.iniciar(leaseTrilhaService, usuarioId, trilhaId, leaseToken)) {
             Cronograma cronograma = cronogramaRepository.buscarPorId(usuarioId, trilhaId, cronogramaId)
                     .orElseThrow(() -> new NotFoundException(ERRO_CRONOGRAMA_NAO_ENCONTRADO));
 
@@ -323,8 +289,12 @@ public class CronogramaService {
                 var restanteOpt = cronogramaRepository.buscarMaisRecenteRestante(usuarioId, trilhaId);
                 if (restanteOpt.isPresent()) {
                     Cronograma restante = restanteOpt.get();
-                    trilhaRepository.atualizarPonteiroCronogramaAtivo(
-                            usuarioId, trilhaId, restante.id(), restante.versaoAtiva());
+                    heartbeat.verificarVivo();
+                    if (!trilhaRepository.atualizarPonteiroCronogramaAtivo(
+                            usuarioId, trilhaId, restante.id(), restante.versaoAtiva(), leaseToken)) {
+                        throw new DomainConflictException(
+                                CodigoErro.SCHEDULE_GENERATION_IN_PROGRESS, LeaseTrilhaService.MSG_LEASE_PERDIDO);
+                    }
                     cronogramaRepository.desativarOutros(usuarioId, trilhaId, restante.id());
                     Cronograma promovido = new Cronograma(
                             restante.id(), usuarioId, trilhaId, restante.modalidade(),
@@ -336,7 +306,9 @@ public class CronogramaService {
                             restante.criadoEm(), Instant.now());
                     cronogramaRepository.atualizar(promovido);
                 } else {
-                    trilhaRepository.atualizarPonteiroCronogramaAtivo(usuarioId, trilhaId, null, null);
+                    heartbeat.verificarVivo();
+                    trilhaRepository.atualizarPonteiroCronogramaAtivo(
+                            usuarioId, trilhaId, null, null, leaseToken);
                 }
             }
         } finally {
@@ -366,6 +338,7 @@ public class CronogramaService {
             String trilhaIdStr,
             String cronogramaIdStr,
             Boolean concluido,
+            String statusData,
             LocalDate dataInicio,
             LocalDate dataFim,
             int pagina,
@@ -375,6 +348,13 @@ public class CronogramaService {
         ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
         ObjectId cronogramaId = BsonIds.parse(cronogramaIdStr, "cronogramaId");
 
+        if (pagina < 1 || tamanho < 1 || tamanho > BlocoCronogramaRepository.TAMANHO_MAXIMO_PAGINA) {
+            throw paginacaoInvalida("'pagina' deve ser >= 1 e 'tamanho' deve estar entre 1 e "
+                    + BlocoCronogramaRepository.TAMANHO_MAXIMO_PAGINA + ".");
+        }
+
+        String statusNormalizado = normalizarStatusData(statusData);
+
         Cronograma cronograma = cronogramaRepository.buscarPorId(usuarioId, trilhaId, cronogramaId)
                 .orElseThrow(() -> new NotFoundException(ERRO_CRONOGRAMA_NAO_ENCONTRADO));
 
@@ -382,7 +362,7 @@ public class CronogramaService {
 
         var paginado = blocoCronogramaRepository.listarPaginado(
                 usuarioId, trilhaId, cronogramaId, cronograma.versaoAtiva(),
-                concluido, dataInicio, dataFim, pagina, tamanho);
+                concluido, statusNormalizado, hojeLocal, dataInicio, dataFim, pagina, tamanho);
 
         List<BlocoCronogramaItemDTO> itens = paginado.itens().stream()
                 .map(b -> paraBlocoDTO(b, hojeLocal))
@@ -407,22 +387,25 @@ public class CronogramaService {
         }
 
         Map<ObjectId, String> nomesTrilhasPorCronogramaId = new HashMap<>();
-        List<ObjectId> cronogramasAtivosIds = new ArrayList<>();
+        Map<ObjectId, Long> versoesAtivasPorCronograma = new HashMap<>();
 
         for (Document td : trilhasDocs) {
             ObjectId cronogramaAtivoId = td.getObjectId("cronogramaAtivoId");
             if (cronogramaAtivoId != null) {
-                cronogramasAtivosIds.add(cronogramaAtivoId);
+                Long versao = td.getLong("versaoAtivaCronograma");
+                versoesAtivasPorCronograma.put(cronogramaAtivoId, versao != null ? versao : 1L);
                 nomesTrilhasPorCronogramaId.put(cronogramaAtivoId, td.getString("nome"));
             }
         }
 
-        if (cronogramasAtivosIds.isEmpty()) {
+        if (versoesAtivasPorCronograma.isEmpty()) {
             return List.of();
         }
 
+        // D-18d: a leitura usa o par cronogramaId + versaoAtivaCronograma do ponteiro da trilha;
+        // o flag `ativo` nunca é usado sozinho como fonte de leitura.
         List<BlocoCronograma> blocos = blocoCronogramaRepository.listarHoje(
-                usuarioId, hojeLocal, cronogramasAtivosIds);
+                usuarioId, hojeLocal, versoesAtivasPorCronograma);
 
         List<BlocoHojeDTO> dtos = new ArrayList<>();
         for (BlocoCronograma b : blocos) {
@@ -456,9 +439,13 @@ public class CronogramaService {
         ObjectId blocoId = BsonIds.parse(blocoIdStr, "blocoId");
 
         BlocoCronograma bloco = blocoCronogramaRepository.buscarPorId(usuarioId, blocoId)
-                .orElseThrow(() -> new NotFoundException("Bloco não encontrado"));
+                .orElseThrow(() -> new NotFoundException(ERRO_BLOCO_NAO_ENCONTRADO));
 
         LocalDate hojeLocal = timezoneContext.hojeLocal();
+
+        // Bloco de versão não publicada responde 404: leitura/escrita sempre pela versão do
+        // ponteiro da trilha (D-18d), sem revelar staging órfão.
+        exigirBlocoPublicado(usuarioId, bloco);
 
         // Operação idempotente: repetição no mesmo estado não altera timestamps nem concluidoEm
         if (bloco.concluido() == concluido) {
@@ -469,11 +456,19 @@ public class CronogramaService {
         blocoCronogramaRepository.atualizarConclusao(usuarioId, blocoId, concluido, concluidoEm);
 
         BlocoCronograma atualizado = blocoCronogramaRepository.buscarPorId(usuarioId, blocoId)
-                .orElseThrow(() -> new NotFoundException("Bloco não encontrado após atualização"));
+                .orElseThrow(() -> new NotFoundException(ERRO_BLOCO_NAO_ENCONTRADO));
 
         return paraBlocoDTO(atualizado, hojeLocal);
     }
 
+    /**
+     * "Concluir atrasados sem sessão" conforme D-17.
+     *
+     * <p>Operação naturalmente idempotente: setar {@code concluido=true} onde {@code false}. Não há
+     * coleção de operações; {@code operationId} existe apenas para correlação de log. O
+     * processamento adquire o lease da trilha (mesmo mecanismo da geração) e atualiza bloco a bloco
+     * com {@code concluido:false} no filtro, de modo que um retry não reprocessa o que já concluiu.</p>
+     */
     public ConcluirAtrasadosResponse concluirAtrasados(
             String trilhaIdStr, String cronogramaIdStr, UUID operationId) {
 
@@ -481,49 +476,42 @@ public class CronogramaService {
         ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
         ObjectId cronogramaId = BsonIds.parse(cronogramaIdStr, "cronogramaId");
 
-        // 1. Idempotência por operationId
-        var cache = operacaoConcluirAtrasadosRepository.buscarPorOperationId(usuarioId, operationId);
-        if (cache.isPresent()) {
-            return cache.get();
-        }
+        String leaseToken = UUID.randomUUID().toString();
+        // Lease ocupado ⇒ 409 SCHEDULE_GENERATION_IN_PROGRESS (D-17c)
+        adquirirLeaseOuFalhar(usuarioId, trilhaId, leaseToken);
 
-        // 2. Não executa duas operações do mesmo usuário/trilha/cronograma em paralelo
-        if (operacaoConcluirAtrasadosRepository.existeOperacaoEmAndamento(usuarioId, trilhaId, cronogramaId)) {
-            throw new DomainConflictException(
-                    CodigoErro.SCHEDULE_GENERATION_IN_PROGRESS,
-                    "Uma operação de conclusão de blocos atrasados já está em andamento para este cronograma.");
-        }
+        try {
+            Cronograma cronograma = cronogramaRepository.buscarPorId(usuarioId, trilhaId, cronogramaId)
+                    .orElseThrow(() -> new NotFoundException(ERRO_CRONOGRAMA_NAO_ENCONTRADO));
 
-        Cronograma cronograma = cronogramaRepository.buscarPorId(usuarioId, trilhaId, cronogramaId)
-                .orElseThrow(() -> new NotFoundException(ERRO_CRONOGRAMA_NAO_ENCONTRADO));
+            LocalDate hojeLocal = timezoneContext.hojeLocal();
+            List<BlocoCronograma> atrasados = blocoCronogramaRepository.listarAtrasadosPendentes(
+                    usuarioId, trilhaId, cronogramaId, cronograma.versaoAtiva(), hojeLocal);
 
-        operacaoConcluirAtrasadosRepository.registrarInicio(usuarioId, trilhaId, cronogramaId, operationId);
+            int concluidos = 0;
+            List<FalhaBlocoDTO> falhas = new ArrayList<>();
+            Instant agora = Instant.now();
 
-        LocalDate hojeLocal = timezoneContext.hojeLocal();
-        List<BlocoCronograma> atrasados = blocoCronogramaRepository.listarAtrasadosPendentes(
-                usuarioId, trilhaId, cronogramaId, cronograma.versaoAtiva(), hojeLocal);
-
-        int concluidos = 0;
-        List<FalhaBlocoDTO> falhas = new ArrayList<>();
-        Instant agora = Instant.now();
-
-        for (BlocoCronograma b : atrasados) {
-            try {
-                boolean ok = blocoCronogramaRepository.atualizarConclusao(usuarioId, b.id(), true, agora);
-                if (ok) {
-                    concluidos++;
-                } else {
+            for (BlocoCronograma b : atrasados) {
+                try {
+                    if (blocoCronogramaRepository.concluirSePendente(
+                            usuarioId, trilhaId, cronogramaId, b.id(), agora)) {
+                        concluidos++;
+                    }
+                } catch (RuntimeException ex) {
                     falhas.add(new FalhaBlocoDTO(b.idHex(), "FALHA_CONCLUSAO"));
                 }
-            } catch (Exception _) {
-                falhas.add(new FalhaBlocoDTO(b.idHex(), "ERRO_INTERNO"));
             }
+
+            int totalConcluidos = concluidos;
+            LOG.info(() -> "concluir-atrasados operationId=" + operationId
+                    + " processados=" + atrasados.size() + " concluidos=" + totalConcluidos
+                    + " falhas=" + falhas.size());
+
+            return new ConcluirAtrasadosResponse(operationId, atrasados.size(), concluidos, falhas);
+        } finally {
+            trilhaRepository.liberarLease(usuarioId, trilhaId, leaseToken);
         }
-
-        operacaoConcluirAtrasadosRepository.registrarConclusao(
-                usuarioId, operationId, atrasados.size(), concluidos, falhas);
-
-        return new ConcluirAtrasadosResponse(operationId, atrasados.size(), concluidos, falhas);
     }
 
     public DisponibilidadeSemanalDTO obterDisponibilidadeSemanal() {
@@ -544,11 +532,13 @@ public class CronogramaService {
     public DisponibilidadeSemanalDTO atualizarDisponibilidadeSemanal(List<Integer> minutos) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
         if (minutos == null || minutos.size() != 7) {
-            throw new BadRequestException("disponibilidadeSemanalMinutos deve conter exatamente 7 valores.");
+            throw new ValidationException("disponibilidadeSemanalMinutos",
+                    "disponibilidadeSemanalMinutos deve conter exatamente 7 valores.");
         }
         for (Integer m : minutos) {
             if (m == null || m < 0 || m > 1440) {
-                throw new BadRequestException("Os minutos devem estar entre 0 e 1440.");
+                throw new ValidationException("disponibilidadeSemanalMinutos",
+                        "Os minutos devem estar entre 0 e 1440.");
             }
         }
 
@@ -609,45 +599,274 @@ public class CronogramaService {
     }
 
     private LocalDate calcularDataFim(String tipoPeriodo, LocalDate dataInicio, LocalDate dataFimInformada, Document trilhaDoc) {
+        LocalDate limite = dataInicio.plusDays(MAX_DIAS_HORIZONTE - 1L);
+        LocalDate calculada;
+
         if (dataFimInformada != null) {
-            return dataFimInformada;
-        }
-        if ("ATE_PROVA".equalsIgnoreCase(tipoPeriodo)) {
+            calculada = dataFimInformada;
+        } else if ("ATE_PROVA".equalsIgnoreCase(tipoPeriodo)) {
             LocalDate dataProva = BsonDates.toLocalDate(trilhaDoc.getString("dataProva"));
-            if (dataProva != null && !dataProva.isBefore(dataInicio)) {
-                return dataProva;
+            // D-20: "Até a prova" depende de dataProva ESTRITAMENTE posterior a dataInicio.
+            calculada = dataProva != null && dataProva.isAfter(dataInicio)
+                    ? dataProva
+                    : dataInicio.plusDays(29);
+        } else if ("UMA_SEMANA".equalsIgnoreCase(tipoPeriodo)) {
+            calculada = dataInicio.plusDays(6);
+        } else if ("TRES_MESES".equalsIgnoreCase(tipoPeriodo)) {
+            calculada = dataInicio.plusDays(89);
+        } else {
+            calculada = dataInicio.plusDays(29);
+        }
+
+        if (calculada.isBefore(dataInicio)) {
+            throw new ValidationException("dataFim", "A data final não pode ser anterior à data inicial.");
+        }
+        // Horizonte máximo por geração: 366 dias inclusivos (dataFim <= dataInicio + 365).
+        return calculada.isAfter(limite) ? limite : calculada;
+    }
+
+    /**
+     * Executa as etapas 2..6 da publicação versionada sob o heartbeat do lease.
+     *
+     * <p>Falha antes da troca do ponteiro deixa o cronograma em {@code PREPARANDO} com staging
+     * órfão (o reconciliador limpa). Falha depois da troca marca {@code RECUPERACAO_NECESSARIA}:
+     * o leitor pode ver a versão nova, mas flags e staging precisam ser reconciliados de forma
+     * idempotente (D-18b).</p>
+     */
+    private CronogramaDTO publicar(
+            LeaseHeartbeat heartbeat,
+            ObjectId usuarioId,
+            ObjectId trilhaId,
+            ObjectId cronogramaId,
+            long versaoNova,
+            ModalidadeCronograma modalidade,
+            int duracaoBlocoMinutos,
+            String tipoPeriodo,
+            LocalDate dataInicio,
+            LocalDate dataFim,
+            List<Integer> diasAtivosSemana,
+            Integer blocosPorDia,
+            List<Disciplina> participantes,
+            Map<Integer, List<String>> semanaModeloManual,
+            Document configuracao,
+            Instant agora,
+            Instant criadoEm) {
+
+        String leaseToken = heartbeat.token();
+        boolean ponteiroTrocado = false;
+        try {
+            // ETAPA 2 — geração e staging dos blocos da nova versão
+            heartbeat.verificarVivo();
+            faultInjector.antesDe(EtapaPublicacao.GERACAO_BLOCOS);
+            List<BlocoCronograma> blocos = GeradorBlocosCronograma.gerar(
+                    new GeradorBlocosCronograma.ParametrosGeracao(
+                            usuarioId, trilhaId, cronogramaId, versaoNova,
+                            modalidade, duracaoBlocoMinutos, dataInicio, dataFim,
+                            diasAtivosSemana, blocosPorDia, participantes, semanaModeloManual));
+            blocoCronogramaRepository.inserirLote(blocos);
+
+            // ETAPA 3 — contagem esperada antes de publicar
+            heartbeat.verificarVivo();
+            faultInjector.antesDe(EtapaPublicacao.VERIFICACAO_CONTAGEM);
+            long contagem = blocoCronogramaRepository.contarPorVersao(
+                    usuarioId, trilhaId, cronogramaId, versaoNova);
+            if (contagem != blocos.size()) {
+                throw new IllegalStateException(
+                        "Falha na geração: contagem de blocos em staging diverge do esperado.");
             }
-            return dataInicio.plusDays(30);
+
+            // ETAPA 4 — troca atômica e com fencing do ponteiro da trilha
+            heartbeat.verificarVivo();
+            faultInjector.antesDe(EtapaPublicacao.TROCA_PONTEIRO);
+            if (!trilhaRepository.atualizarPonteiroCronogramaAtivo(
+                    usuarioId, trilhaId, cronogramaId, versaoNova, leaseToken)) {
+                throw new DomainConflictException(
+                        CodigoErro.SCHEDULE_GENERATION_IN_PROGRESS, LeaseTrilhaService.MSG_LEASE_PERDIDO);
+            }
+            ponteiroTrocado = true;
+
+            // ETAPA 5 — reconciliação dos flags (no máximo um ativo por trilha)
+            heartbeat.verificarVivo();
+            faultInjector.antesDe(EtapaPublicacao.RECONCILIACAO_FLAGS);
+            cronogramaRepository.desativarOutros(usuarioId, trilhaId, cronogramaId);
+
+            Cronograma publicado = new Cronograma(
+                    cronogramaId, usuarioId, trilhaId, modalidade,
+                    true, versaoNova, null, VALOR_ATIVO,
+                    duracaoBlocoMinutos, tipoPeriodo, dataInicio, dataFim, diasAtivosSemana,
+                    blocosPorDia, participantes.stream().map(Disciplina::id).toList(),
+                    semanaModeloManual, configuracao, null,
+                    criadoEm != null ? criadoEm : agora, Instant.now());
+            cronogramaRepository.atualizar(publicado);
+
+            // ETAPA 6 — limpeza das versões anteriores deste cronograma
+            heartbeat.verificarVivo();
+            faultInjector.antesDe(EtapaPublicacao.LIMPEZA_VERSOES_ANTERIORES);
+            blocoCronogramaRepository.excluirVersoesDiferentes(usuarioId, trilhaId, cronogramaId, versaoNova);
+
+            return paraDTO(publicado, blocos.size());
+        } catch (RuntimeException ex) {
+            if (ponteiroTrocado) {
+                marcarRecuperacaoNecessaria(usuarioId, trilhaId, cronogramaId);
+            }
+            LOG.warning(() -> "Publicação de cronograma interrompida (cronogramaId="
+                    + cronogramaId.toHexString() + ", versao=" + versaoNova + "): " + ex.getMessage());
+            throw ex;
         }
-        if ("UMA_SEMANA".equalsIgnoreCase(tipoPeriodo)) {
-            return dataInicio.plusDays(6);
+    }
+
+    private void marcarRecuperacaoNecessaria(ObjectId usuarioId, ObjectId trilhaId, ObjectId cronogramaId) {
+        cronogramaRepository.buscarPorId(usuarioId, trilhaId, cronogramaId).ifPresent(c -> {
+            Cronograma emRecuperacao = new Cronograma(
+                    c.id(), c.usuarioId(), c.trilhaId(), c.modalidade(), c.ativo(),
+                    c.versaoAtiva(), c.versaoPreparada(), VALOR_RECUPERACAO,
+                    c.duracaoBlocoMinutos(), c.tipoPeriodo(), c.dataInicio(), c.dataFim(),
+                    c.diasAtivosSemana(), c.blocosPorDia(), c.disciplinasParticipantesIds(),
+                    c.semanaModeloManual(), c.configuracaoAtiva(), c.configuracaoPreparada(),
+                    c.criadoEm(), Instant.now());
+            cronogramaRepository.atualizar(emRecuperacao);
+        });
+    }
+
+    /** 409 DUPLICATE_MODALITY quando a modalidade já pertence a outro cronograma da trilha. */
+    private void exigirModalidadeLivre(
+            ObjectId usuarioId, ObjectId trilhaId, ModalidadeCronograma modalidade, ObjectId cronogramaId) {
+        Optional<Cronograma> conflitante = cronogramaId == null
+                ? cronogramaRepository.buscarPorModalidade(usuarioId, trilhaId, modalidade)
+                : cronogramaRepository.buscarPorModalidadeExceto(usuarioId, trilhaId, modalidade, cronogramaId);
+        if (conflitante.isPresent()) {
+            throw new DomainConflictException(
+                    CodigoErro.DUPLICATE_MODALITY,
+                    "Esta trilha já possui um cronograma na modalidade selecionada.");
         }
-        if ("TRES_MESES".equalsIgnoreCase(tipoPeriodo)) {
-            return dataInicio.plusDays(89);
+    }
+
+    /**
+     * Bloco fora da versão publicada no ponteiro da trilha responde {@code 404} (D-18d), sem
+     * revelar staging órfão nem versões antigas.
+     */
+    private void exigirBlocoPublicado(ObjectId usuarioId, BlocoCronograma bloco) {
+        Document trilhaDoc = trilhaRepository.buscarEntidade(usuarioId, bloco.trilhaId())
+                .orElseThrow(() -> new NotFoundException(ERRO_BLOCO_NAO_ENCONTRADO));
+        ObjectId cronogramaAtivoId = trilhaDoc.getObjectId("cronogramaAtivoId");
+        Long versaoAtiva = trilhaDoc.getLong("versaoAtivaCronograma");
+        boolean publicado = cronogramaAtivoId != null
+                && cronogramaAtivoId.equals(bloco.cronogramaId())
+                && versaoAtiva != null
+                && versaoAtiva == bloco.versaoGeracao();
+        if (!publicado) {
+            throw new NotFoundException(ERRO_BLOCO_NAO_ENCONTRADO);
         }
-        // Default: 1 mês (30 dias)
-        return dataInicio.plusDays(29);
+    }
+
+    /** {@code 400 INVALID_PAGINATION} — pagina/tamanho fora da norma do endpoint. */
+    private RuntimeException paginacaoInvalida(String detail) {
+        var problem = ProblemDetailsFactory.criar(CodigoErro.INVALID_PAGINATION, detail, null);
+        return new WebApplicationException(
+                Response.status(problem.status())
+                        .type(ProblemDetails.MEDIA_TYPE)
+                        .entity(problem)
+                        .build());
+    }
+
+    /** Valida {@code statusData} contra os três valores derivados de {@code hojeLocal} (D-17f). */
+    private String normalizarStatusData(String statusData) {
+        if (statusData == null || statusData.isBlank()) {
+            return null;
+        }
+        String normalizado = statusData.trim().toUpperCase(Locale.ROOT);
+        if (!normalizado.equals("ATRASADO") && !normalizado.equals("HOJE") && !normalizado.equals("FUTURO")) {
+            throw new ValidationException("statusData", "Valor inválido. Use ATRASADO, HOJE ou FUTURO.");
+        }
+        return normalizado;
+    }
+
+    /** Validações de entrada que o Bean Validation não alcança (dependem de estado da trilha). */
+    private void validarConfiguracao(
+            String tipoPeriodo,
+            List<Integer> diasAtivosSemana,
+            Integer blocosPorDia,
+            int duracaoBlocoMinutos,
+            Map<Integer, List<String>> semanaModeloManual,
+            List<Disciplina> participantes) {
+
+        if (tipoPeriodo != null && !tipoPeriodo.isBlank()
+                && PERIODOS_SUPORTADOS.stream().noneMatch(p -> p.equalsIgnoreCase(tipoPeriodo))) {
+            throw new ValidationException("tipoPeriodo",
+                    "Período inválido. Use ATE_PROVA, UMA_SEMANA, UM_MES ou TRES_MESES.");
+        }
+        if (duracaoBlocoMinutos < GeradorBlocosCronograma.MIN_DURACAO_MINUTOS
+                || duracaoBlocoMinutos > GeradorBlocosCronograma.MAX_DURACAO_MINUTOS) {
+            throw new ValidationException("duracaoBlocoMinutos",
+                    "A duração do bloco deve estar entre 30 e 240 minutos.");
+        }
+
+        Set<ObjectId> participantesIds = participantes.stream()
+                .map(Disciplina::id)
+                .collect(Collectors.toCollection(HashSet::new));
+
+        if (diasAtivosSemana != null) {
+            Set<Integer> vistos = new HashSet<>();
+            for (Integer dia : diasAtivosSemana) {
+                if (dia == null || dia < 1 || dia > 7) {
+                    throw new ValidationException("diasAtivosSemana",
+                            "Cada dia da semana deve estar entre 1 (segunda) e 7 (domingo).");
+                }
+                if (!vistos.add(dia)) {
+                    throw new ValidationException("diasAtivosSemana", "Não repita o mesmo dia da semana.");
+                }
+            }
+        }
+        if (blocosPorDia != null
+                && (blocosPorDia < 1 || blocosPorDia > GeradorBlocosCronograma.MAX_BLOCOS_POR_DIA)) {
+            throw new ValidationException("blocosPorDia",
+                    "A quantidade de blocos por dia deve estar entre 1 e 24.");
+        }
+        if (semanaModeloManual != null) {
+            for (Map.Entry<Integer, List<String>> entrada : semanaModeloManual.entrySet()) {
+                Integer dia = entrada.getKey();
+                List<String> ids = entrada.getValue();
+                if (dia == null || dia < 1 || dia > 7) {
+                    throw new ValidationException("semanaModeloManual",
+                            "Os dias da semana-modelo devem estar entre 1 e 7.");
+                }
+                if (ids == null || ids.isEmpty()) {
+                    throw new ValidationException("semanaModeloManual",
+                            "Cada dia da semana-modelo precisa de ao menos uma disciplina.");
+                }
+                for (String id : ids) {
+                    ObjectId disciplinaId = BsonIds.parse(id, "semanaModeloManual");
+                    if (!participantesIds.contains(disciplinaId)) {
+                        throw new ValidationException("semanaModeloManual",
+                                "A semana-modelo só pode usar disciplinas participantes desta trilha.");
+                    }
+                }
+            }
+        }
     }
 
     private List<Disciplina> validarDisciplinasParticipantes(
             ObjectId usuarioId, ObjectId trilhaId, List<String> participantesIdsStr) {
         if (participantesIdsStr == null || participantesIdsStr.isEmpty()) {
-            throw new BadRequestException("Ao menos uma disciplina participante deve ser informada.");
+            throw new ValidationException("disciplinasParticipantesIds",
+                    "Ao menos uma disciplina participante deve ser informada.");
         }
 
-        Set<ObjectId> idsDesejados = participantesIdsStr.stream()
-                .map(id -> BsonIds.parse(id, "blocoId"))
-                .collect(Collectors.toSet());
+        Set<ObjectId> idsDesejados = new HashSet<>();
+        for (String id : participantesIdsStr) {
+            idsDesejados.add(BsonIds.parse(id, "disciplinasParticipantesIds"));
+        }
 
         List<Disciplina> ativas = disciplinaRepository.listarPorTrilha(usuarioId, trilhaId);
-        List<Disciplina> filtradas = ativas.stream()
-                .filter(d -> idsDesejados.contains(d.id()))
-                .toList();
+        Set<ObjectId> idsDaTrilha = ativas.stream().map(Disciplina::id).collect(Collectors.toSet());
 
-        if (filtradas.isEmpty()) {
-            throw new BadRequestException("Nenhuma das disciplinas informadas pertence a esta trilha.");
+        // Todas as disciplinas informadas precisam pertencer à trilha do usuário (§5.2).
+        if (!idsDaTrilha.containsAll(idsDesejados)) {
+            throw new ValidationException("disciplinasParticipantesIds",
+                    "Todas as disciplinas participantes devem pertencer a esta trilha.");
         }
-        return filtradas;
+
+        return ativas.stream().filter(d -> idsDesejados.contains(d.id())).toList();
     }
 
     private Document montarConfiguracaoDocumento(DadosConfiguracao dados) {

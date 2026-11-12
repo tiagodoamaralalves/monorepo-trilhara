@@ -95,7 +95,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const getCorTarefa = (t: Tarefa): string => {
     if (t.disciplinaCor) return t.disciplinaCor;
-    if (t.origem === 'ciclo' || t.disciplinaNome) {
+    if (t.disciplinaNome) {
       return 'var(--purple)';
     }
     const p = String(t.prioridade || '').toUpperCase();
@@ -338,7 +338,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         {tarefasDoDiaSelecionado.length > 0 ? (
           <div className={styles.dayBlockList}>
             {tarefasDoDiaSelecionado.map((tarefa) => {
-              const isCiclo = tarefa.origem === 'ciclo';
+              const vinculoEstudos = Boolean(tarefa.disciplinaNome);
               const subtarefasConcluidas =
                 tarefa.subtarefas?.filter((st) => st.concluida).length || 0;
               const totalSubtarefas = tarefa.subtarefas?.length || 0;
@@ -350,9 +350,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       <Badge variant={tarefa.concluida ? 'success' : 'neutral'} size="sm">
                         {tarefa.concluida ? 'Concluída' : 'Pendente'}
                       </Badge>
-                      {isCiclo && (
+                      {vinculoEstudos && (
                         <Badge variant="secondary" size="sm">
-                          Ciclo de Estudo
+                          Bloco de cronograma
                         </Badge>
                       )}
                       {tarefa.prioridade && (
@@ -402,7 +402,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     >
                       {tarefa.concluida ? 'Desmarcar' : 'Concluir'}
                     </Button>
-                    {!isCiclo && onEditarTarefa && (
+                    {!vinculoEstudos && onEditarTarefa && (
                       <Button
                         type="button"
                         variant="secondary"

@@ -43,23 +43,6 @@ export type Disciplina = DisciplinaDTO;
 /** tópico usado pela UI: o próprio DTO do backend. */
 export type Topico = DisciplinaDTO['topicos'][number];
 
-interface DisciplinaConfigCiclo {
-  disciplinaId: string;
-  participa: boolean;
-}
-
-/** Estrutura herdada de planejamento (remoção pertence às revisões de cronograma). */
-export interface Ciclo {
-  id: string;
-  nome: string;
-  tipo: 'ponderado' | 'sequencial';
-  duracaoBlocoMin: number;
-  dataInicio: string; // YYYY-MM-DD
-  dataFim?: string; // YYYY-MM-DD
-  blocosSemana: number[]; // 7 inteiros
-  disciplinasConfig: DisciplinaConfigCiclo[];
-}
-
 /**
  * Progresso de uma trilha é o conjunto de IDs de tópicos concluídos, derivado de
  * `topicosConcluidosIds` (D-11). Nunca um mapa `{ topicoId: { done } }`.
@@ -113,37 +96,14 @@ export interface Sessao {
   atualizadoEm?: string;
 }
 
-export interface DisciplinaProgramada {
-  ocorrenciaId: string;
-  cicloId: string;
-  data: string;
-  ordem: number;
-  indiceRotacao?: number;
-  disciplinaId: string;
-  disciplinaNome: string;
-  duracaoMinutos: number;
-  concluida?: boolean;
-}
-
-export interface PlanejamentoCiclo {
-  indiceRastreador: number;
-  blocosConcluidos: string[];
-  cronograma: DisciplinaProgramada[];
-  cronogramaConfigurado: boolean;
-  revisao: number;
-  atualizadoEm: string;
-  desatualizado?: boolean;
-}
-
-export interface RegistroPlanejamentoPendente {
+export interface RegistroBlocoPendente {
   requestId: string;
   trilhaId: string;
-  cicloId: string;
-  ocorrenciaId?: string;
-  indiceRotacao?: number;
+  cronogramaId: string;
+  /** Identificador do bloco de cronograma; inicia o timer com este `blocoId`. */
+  blocoId: string;
   disciplinaId: string;
   duracaoMinutos: number;
-  proximoIndiceRastreador?: number;
 }
 
 /** Reexporta o contrato único de perfil (D-09/D-10), evitando duplicata de tipo. */

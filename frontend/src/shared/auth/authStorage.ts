@@ -10,7 +10,7 @@ import { registrarFalha } from '../diagnostico';
  * `GET /api/auth/me`.
  */
 export const AUTH_CHANGE_EVENT = 'trilhara:auth-change';
-export const AUTH_LOGOUT_EVENT = 'trilhara:auth:logout';
+const AUTH_LOGOUT_EVENT = 'trilhara:auth:logout';
 export const AUTH_CONTA_EXCLUIDA_EVENT = 'trilhara:auth:conta-excluida';
 const BROADCAST_CHANNEL_NAME = 'trilhara_auth_channel';
 

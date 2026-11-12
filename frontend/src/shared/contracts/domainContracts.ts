@@ -243,8 +243,6 @@ export interface TrilhaDetalheDTO {
   cronogramaAtivoResumo?: CronogramaAtivoResumoDTO | null;
   disciplinas: DisciplinaDTO[];
   topicosConcluidosIds: string[];
-  /** Estrutura herdada de planejamento; remoção pertence às revisões de cronograma. */
-  ciclos?: unknown[];
   criadoEm?: string;
   atualizadoEm?: string;
 }

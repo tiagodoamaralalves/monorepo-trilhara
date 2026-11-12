@@ -52,7 +52,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     <AppSidebar<PaginaAtiva>
       brand={{
         title: 'Trilhara',
-        subtitle: 'Estudos & Ciclos',
+        subtitle: 'Estudos & Cronogramas',
         logoSrc: '/favicon.svg',
         onClick: () => onNavegar('hub'),
         titleAttr: 'Ir para minhas trilhas'

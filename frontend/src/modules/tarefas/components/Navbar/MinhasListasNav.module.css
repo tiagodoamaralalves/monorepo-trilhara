@@ -241,7 +241,7 @@
   margin-right: 6px;
 }
 
-/* ── BOTÃO PARA MOSTRAR CICLO OCULTO ── */
+/* ── BOTÃO PARA MOSTRAR/OCULTAR SEÇÃO LEGADA ── */
 .mostrarCicloBtn {
   display: flex;
   align-items: center;

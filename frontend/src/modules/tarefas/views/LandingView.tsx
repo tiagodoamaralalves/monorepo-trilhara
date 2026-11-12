@@ -58,7 +58,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onLogin, onCriarConta 
 
               <p className={styles.heroSubtitle}>
                 Organize tarefas, compromissos pessoais e metas do dia a dia com agilidade.
-                Sincronize com seus ciclos de estudo do concurso quando desejar ou use como seu gerenciador de produtividade autônomo.
+                Sincronize com os blocos dos seus cronogramas de estudo quando desejar ou use como seu gerenciador de produtividade autônomo.
               </p>
 
               <div className={styles.heroActions}>
@@ -97,7 +97,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onLogin, onCriarConta 
                     <span className={styles.mockTaskTitle}>Revisar flashcards de Direito Constitucional</span>
                   </div>
                   <div className={styles.mockTaskMeta}>
-                    <span className={`${styles.mockBadge} ${styles.badgeCycle}`}>Ciclo</span>
+                    <span className={`${styles.mockBadge} ${styles.badgeCycle}`}>Cronograma</span>
                     <span className={styles.mockTime}>08:30</span>
                   </div>
                 </div>
@@ -177,7 +177,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onLogin, onCriarConta 
               </div>
               <h3 className={styles.pillarTitle}>Sincronização com Concursos</h3>
               <p className={styles.pillarDesc}>
-                Se você estuda para concursos, importe os blocos do ciclo de estudos do Trilhara para sua lista do dia com um clique.
+                Se você estuda para concursos, importe os blocos do cronograma do Trilhara para sua lista do dia com um clique.
               </p>
             </article>
           </div>

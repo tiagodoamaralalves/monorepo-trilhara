@@ -28,14 +28,11 @@ import jakarta.inject.Inject;
 class InventarioColecoesTest {
 
     /**
-     * Coleções legadas ainda criadas por código de outra revisão.
-     * Remover quando R5 (D-17: operações de concluir atrasados) e R5/R7
-     * ({@code planejamento_ciclo}) forem executados.
+     * Nenhuma coleção fora do inventário é tolerada. A allowlist temporária de resíduos de
+     * R5 foi removida junto com `operacoes_concluir_atrasados` (D-17) e `planejamento_ciclo`
+     * (D-16/DC-15); `handoff_tokens` deixou de ser criada na R2.
      */
-    private static final Set<String> ALLOWLIST_LEGADO_R5 = Set.of(
-            "operacoes_concluir_atrasados",
-            "planejamento_ciclo",
-            "handoff_tokens");
+    private static final Set<String> ALLOWLIST_LEGADO = Set.of();
 
     @Inject
     MongoClient mongoClient;
@@ -48,7 +45,7 @@ class InventarioColecoesTest {
     void naoDeveExistirColecaoForaDoInventario() {
         List<String> naoDeclaradas = new ArrayList<>();
         for (String nome : mongoClient.getDatabase(bancoDeTeste()).listCollectionNames()) {
-            if (ColecaoTrilhara.porNome(nome) == null && !ALLOWLIST_LEGADO_R5.contains(nome)) {
+            if (ColecaoTrilhara.porNome(nome) == null && !ALLOWLIST_LEGADO.contains(nome)) {
                 naoDeclaradas.add(nome);
             }
         }

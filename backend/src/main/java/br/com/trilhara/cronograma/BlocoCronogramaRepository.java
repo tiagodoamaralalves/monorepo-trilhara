@@ -2,17 +2,20 @@ package br.com.trilhara.cronograma;
 
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Filters.gt;
 import static com.mongodb.client.model.Filters.gte;
 import static com.mongodb.client.model.Filters.in;
 import static com.mongodb.client.model.Filters.lt;
 import static com.mongodb.client.model.Filters.lte;
 import static com.mongodb.client.model.Filters.ne;
+import static com.mongodb.client.model.Filters.or;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.bson.Document;
@@ -30,6 +33,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped
 public class BlocoCronogramaRepository {
+
+    /** R5/D-17f: norma de paginação — máximo de 100 itens por página. */
+    public static final int TAMANHO_MAXIMO_PAGINA = 100;
 
     private final MongoCollection<Document> collection;
 
@@ -114,6 +120,31 @@ public class BlocoCronogramaRepository {
         ).getMatchedCount() > 0;
     }
 
+    /**
+     * Conclusão condicional usada pelo lote de atrasados (D-17d): o filtro exige
+     * {@code concluido: false}, de modo que uma repetição/retry nunca reescreve
+     * {@code concluidoEm} de um bloco já concluído.
+     *
+     * @return {@code true} apenas quando este chamador efetivamente concluiu o bloco
+     */
+    public boolean concluirSePendente(
+            ObjectId usuarioId, ObjectId trilhaId, ObjectId cronogramaId, ObjectId blocoId, Instant agora) {
+        return collection.updateOne(
+                and(
+                        eq("_id", blocoId),
+                        eq("usuarioId", usuarioId),
+                        eq("trilhaId", trilhaId),
+                        eq("cronogramaId", cronogramaId),
+                        eq("concluido", false)
+                ),
+                Updates.combine(
+                        Updates.set("concluido", true),
+                        Updates.set("concluidoEm", BsonDates.toBsonDate(agora)),
+                        Updates.set("atualizadoEm", BsonDates.toBsonDate(agora))
+                )
+        ).getModifiedCount() > 0;
+    }
+
     public List<BlocoCronograma> listarHoje(ObjectId usuarioId, LocalDate hojeLocal, List<ObjectId> cronogramasAtivosIds) {
         if (cronogramasAtivosIds == null || cronogramasAtivosIds.isEmpty()) {
             return List.of();
@@ -132,12 +163,41 @@ public class BlocoCronogramaRepository {
         return Collections.unmodifiableList(resultado);
     }
 
+    /**
+     * Blocos pendentes de hoje limitados ao par {@code cronogramaId + versaoAtiva} publicado no
+     * ponteiro da trilha (D-18d). Staging órfão de uma geração que perdeu o lease nunca aparece.
+     */
+    public List<BlocoCronograma> listarHoje(
+            ObjectId usuarioId, LocalDate hojeLocal, Map<ObjectId, Long> versoesAtivasPorCronograma) {
+        if (versoesAtivasPorCronograma == null || versoesAtivasPorCronograma.isEmpty()) {
+            return List.of();
+        }
+        List<Bson> alvos = new ArrayList<>(versoesAtivasPorCronograma.size());
+        versoesAtivasPorCronograma.forEach((cronogramaId, versao) -> alvos.add(and(
+                eq("cronogramaId", cronogramaId),
+                eq("versaoGeracao", versao != null ? versao : 1L))));
+
+        Bson filtro = and(
+                eq("usuarioId", usuarioId),
+                eq("data", hojeLocal.toString()),
+                eq("concluido", false),
+                or(alvos)
+        );
+        List<BlocoCronograma> resultado = new ArrayList<>();
+        for (Document doc : collection.find(filtro).sort(Sorts.ascending("ordem", "_id"))) {
+            resultado.add(paraEntidade(doc));
+        }
+        return Collections.unmodifiableList(resultado);
+    }
+
     public ResultadoPaginado<BlocoCronograma> listarPaginado(
             ObjectId usuarioId,
             ObjectId trilhaId,
             ObjectId cronogramaId,
             long versaoGeracao,
             Boolean concluido,
+            String statusData,
+            LocalDate hojeLocal,
             LocalDate dataInicio,
             LocalDate dataFim,
             int pagina,
@@ -152,6 +212,18 @@ public class BlocoCronogramaRepository {
         if (concluido != null) {
             filtros.add(eq("concluido", concluido));
         }
+        // D-17f: statusData é derivado da relação com hojeLocal. "ATRASADO" exclui hoje por
+        // definição, o que torna a contagem exata do lote (totalItens com tamanho=1) suficiente.
+        if (statusData != null && hojeLocal != null) {
+            switch (statusData) {
+                case "ATRASADO" -> filtros.add(lt("data", hojeLocal.toString()));
+                case "HOJE" -> filtros.add(eq("data", hojeLocal.toString()));
+                case "FUTURO" -> filtros.add(gt("data", hojeLocal.toString()));
+                default -> {
+                    // valor já validado na camada de serviço
+                }
+            }
+        }
         if (dataInicio != null) {
             filtros.add(gte("data", dataInicio.toString()));
         }
@@ -163,7 +235,7 @@ public class BlocoCronogramaRepository {
         long total = collection.countDocuments(filtroComposto);
 
         int p = Math.max(1, pagina);
-        int t = Math.max(1, Math.min(200, tamanho));
+        int t = Math.max(1, Math.min(TAMANHO_MAXIMO_PAGINA, tamanho));
         int skip = (p - 1) * t;
 
         List<BlocoCronograma> itens = new ArrayList<>();
@@ -194,13 +266,27 @@ public class BlocoCronogramaRepository {
         return Collections.unmodifiableList(resultado);
     }
 
+    /**
+     * Atualiza os snapshots de nome/cor de uma disciplina <strong>apenas</strong> nos blocos dos
+     * cronogramas ativos da trilha (regra normativa §5.3). {@code disciplinaId} nunca é alterado e
+     * blocos passados/concluídos de cronogramas inativos permanecem como histórico visual.
+     */
     public long atualizarSnapshotsDisciplina(
-            ObjectId usuarioId, ObjectId trilhaId, ObjectId disciplinaId, String novoNome, String novaCor) {
+            ObjectId usuarioId,
+            ObjectId trilhaId,
+            ObjectId disciplinaId,
+            String novoNome,
+            String novaCor,
+            List<ObjectId> cronogramasAtivosIds) {
+        if (cronogramasAtivosIds == null || cronogramasAtivosIds.isEmpty()) {
+            return 0L;
+        }
         return collection.updateMany(
                 and(
                         eq("usuarioId", usuarioId),
                         eq("trilhaId", trilhaId),
-                        eq("disciplinaId", disciplinaId)
+                        eq("disciplinaId", disciplinaId),
+                        in("cronogramaId", cronogramasAtivosIds)
                 ),
                 Updates.combine(
                         Updates.set("disciplinaNomeSnapshot", novoNome),

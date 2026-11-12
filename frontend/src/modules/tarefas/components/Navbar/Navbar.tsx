@@ -1,7 +1,7 @@
 import React from 'react';
 import { AppSidebar } from '@shared/design-system';
 import { UsuarioAutenticado } from '@shared/auth';
-import { FiltroVisualizacao, ListaTarefas, CicloAtivoInfo } from '../../types/tarefa';
+import { FiltroVisualizacao, ListaTarefas } from '../../types/tarefa';
 import { TarefaContextPod } from './TarefaContextPod';
 import { MinhasListasNav, TrilhaComCronogramaInfo } from './MinhasListasNav';
 import { MobileTarefaControls } from './MobileTarefaControls';
@@ -15,9 +15,6 @@ export interface NavbarProps {
   onAbrirNovaLista: () => void;
   onAbrirEditarLista?: (lista: ListaTarefas) => void;
   onExcluirLista?: (id: string) => void;
-  ciclosAtivos?: CicloAtivoInfo[];
-  mostrarCicloEstudos?: boolean;
-  onToggleMostrarCiclo?: () => void;
   trilhasComCronograma?: TrilhaComCronogramaInfo[];
   trilhaSelecionadaId?: string;
   onSelecionarTrilha?: (id?: string) => void;
@@ -46,9 +43,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onAbrirNovaLista,
   onAbrirEditarLista,
   onExcluirLista,
-  ciclosAtivos = [],
-  mostrarCicloEstudos = false,
-  onToggleMostrarCiclo = () => {},
   trilhasComCronograma = [],
   trilhaSelecionadaId,
   onSelecionarTrilha,
@@ -104,9 +98,6 @@ export const Navbar: React.FC<NavbarProps> = ({
         onAbrirNovaLista={onAbrirNovaLista}
         onAbrirEditarLista={onAbrirEditarLista}
         onExcluirLista={onExcluirLista}
-        ciclosAtivos={ciclosAtivos}
-        mostrarCicloEstudos={mostrarCicloEstudos}
-        onToggleMostrarCiclo={onToggleMostrarCiclo}
         contadoresPorLista={contadoresPorLista}
         trilhasComCronograma={trilhasComCronograma}
         trilhaSelecionadaId={trilhaSelecionadaId}

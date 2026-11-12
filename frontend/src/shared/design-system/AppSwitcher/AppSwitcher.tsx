@@ -33,7 +33,7 @@ export const APPS_TRILHARA: readonly AppConfig[] = [
   {
     id: 'estudos',
     nome: 'Estudos',
-    descricao: 'Ciclos & Editais',
+    descricao: 'Cronogramas & Editais',
     icone: GraduationCap,
     obterUrl: obterUrlAppEstudos
   },

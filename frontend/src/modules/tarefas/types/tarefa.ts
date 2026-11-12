@@ -92,14 +92,3 @@ export interface Tarefa {
 }
 
 export type FiltroVisualizacao = 'hoje' | 'proximas' | 'concluidas' | 'todas' | 'calendario' | 'lixeira';
-
-export interface CicloAtivoInfo {
-  trilhaId: string;
-  trilhaNome: string;
-  cicloId: string;
-  cicloNome: string;
-  dataInicio?: string;
-  dataFim?: string;
-  totalBlocos: number;
-  blocosConcluidos: number;
-}

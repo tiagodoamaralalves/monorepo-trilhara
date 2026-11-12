@@ -63,8 +63,8 @@ class SoundEngine {
     }
   }
 
-  // 1. Fim do tempo predefinido no ciclo atual (Acorde triunfal ascendente C5, E5, G5, C6)
-  playCicloConcluido() {
+  // 1. Fim do tempo predefinido do bloco atual (Acorde triunfal ascendente C5, E5, G5, C6)
+  playMetaConcluida() {
     this.playChime([523.25, 659.25, 783.99, 1046.50], 0.22);
   }
 
@@ -181,16 +181,16 @@ export const AlarmService = {
   // Disparos dos 3 alarmes solicitados:
 
   /**
-   * Alarme 1: Fim do tempo predefinido no ciclo atual (duracaoMinutos)
+   * Alarme 1: Fim do tempo predefinido do bloco atual (duracaoMinutos)
    */
-  dispararAlarmeFimCiclo(duracaoMinutos: number) {
+  dispararAlarmeFimMeta(duracaoMinutos: number) {
     if (this.isSomAtivado()) {
-      soundEngine.playCicloConcluido();
+      soundEngine.playMetaConcluida();
     }
-    const titulo = 'Meta do ciclo concluída!';
+    const titulo = 'Meta de estudo concluída!';
     const corpo = `Você atingiu o tempo planejado de ${duracaoMinutos} min para este bloco. Excelente trabalho!`;
     this.enviarNotificacao(titulo, corpo);
-    alertarAbaNavegador('Meta do ciclo concluída!');
+    alertarAbaNavegador('Meta de estudo concluída!');
   },
 
   /**

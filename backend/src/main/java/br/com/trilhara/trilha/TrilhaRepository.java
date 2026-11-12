@@ -18,6 +18,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 
@@ -65,6 +67,7 @@ public class TrilhaRepository {
     private static final String CAMPO_GERACAO_CRONOGRAMA_LEASE_TOKEN = "geracaoCronogramaLeaseToken";
     private static final String CAMPO_ORIGEM_DISCIPLINA_ID = "origemDisciplinaId";
     private static final String CAMPO_ORIGEM_TRILHA_ID = "origemTrilhaId";
+    private static final String CAMPO_PROXIMA_VERSAO_CRONOGRAMA = "proximaVersaoCronograma";
     private static final String CAMPO_TRILHA_ID = "trilhaId";
     private static final String CAMPO_USER_ID = "userId";
     private static final String CAMPO_USUARIO_ID = "usuarioId";
@@ -87,7 +90,6 @@ public class TrilhaRepository {
         Instant agora = dados.agora() != null ? dados.agora() : Instant.now();
         Document doc = new Document("_id", dados.trilhaId())
                 .append(CAMPO_USUARIO_ID, dados.usuarioId())
-                .append("donoId", dados.usuarioId().toHexString()) // compatibilidade com buscas legadas
                 .append("nome", dados.nome())
                 .append(CAMPO_CARGO, dados.cargo())
                 .append(CAMPO_AREA_CARGO, dados.cargo())
@@ -97,6 +99,7 @@ public class TrilhaRepository {
                 .append("origemEditalId", dados.origemEditalId())
                 .append("origemVersao", dados.origemVersao())
                 .append(CAMPO_CRONOGRAMA_ATIVO_ID, null)
+                .append(CAMPO_PROXIMA_VERSAO_CRONOGRAMA, 0L)
                 .append("informacoesComplementares", dados.informacoesComplementares())
                 .append(CAMPO_GERACAO_CRONOGRAMA_LEASE_TOKEN, null)
                 .append(CAMPO_GERACAO_CRONOGRAMA_EM_ANDAMENTO_ATE, null)
@@ -177,12 +180,92 @@ public class TrilhaRepository {
         return trilhas.updateOne(filtro, atualizacao).getMatchedCount() > 0;
     }
 
-    public boolean atualizarPonteiroCronogramaAtivo(
-            ObjectId usuarioId, ObjectId trilhaId, ObjectId cronogramaAtivoId, Long versaoAtivaCronograma) {
+    /**
+     * Renova o lease <strong>somente</strong> se o token ainda for o dono (fencing).
+     *
+     * <p>Base do heartbeat de 30 s (D-18a): se a renovação retornar {@code false}, o token foi
+     * perdido (lease expirado e retomado por outro worker) e a publicação precisa ser abortada
+     * sem trocar o ponteiro.</p>
+     */
+    public boolean renovarLease(ObjectId usuarioId, ObjectId trilhaId, String leaseToken, Instant expiraEm) {
         Bson filtro = and(
                 eq("_id", trilhaId),
-                filtroUsuario(usuarioId)
+                filtroUsuario(usuarioId),
+                eq(CAMPO_GERACAO_CRONOGRAMA_LEASE_TOKEN, leaseToken)
         );
+        Bson atualizacao = Updates.combine(
+                Updates.set(CAMPO_GERACAO_CRONOGRAMA_EM_ANDAMENTO_ATE, BsonDates.toBsonDate(expiraEm)),
+                Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))
+        );
+        return trilhas.updateOne(filtro, atualizacao).getMatchedCount() > 0;
+    }
+
+    /** {@code true} enquanto o token informado continuar sendo o dono do lease da trilha. */
+    public boolean leaseAtivo(ObjectId usuarioId, ObjectId trilhaId, String leaseToken) {
+        return trilhas.find(and(
+                eq("_id", trilhaId),
+                filtroUsuario(usuarioId),
+                eq(CAMPO_GERACAO_CRONOGRAMA_LEASE_TOKEN, leaseToken)
+        )).first() != null;
+    }
+
+    /**
+     * Incrementa e devolve o contador atômico de versões do cronograma da trilha
+     * ({@code trilhas.proximaVersaoCronograma}).
+     *
+     * <p>Garante que duas gerações concorrentes nunca reutilizem a mesma {@code versaoGeracao},
+     * mesmo quando o lease é retomado após expiração. Retorna vazio quando a trilha não existe
+     * para o usuário.</p>
+     */
+    public Optional<Long> proximaVersaoCronograma(ObjectId usuarioId, ObjectId trilhaId) {
+        Document resultado = trilhas.findOneAndUpdate(
+                and(eq("_id", trilhaId), filtroUsuario(usuarioId)),
+                Updates.combine(
+                        Updates.inc(CAMPO_PROXIMA_VERSAO_CRONOGRAMA, 1L),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))),
+                new FindOneAndUpdateOptions().upsert(false).returnDocument(ReturnDocument.AFTER));
+        if (resultado == null) {
+            return Optional.empty();
+        }
+        Long valor = resultado.getLong(CAMPO_PROXIMA_VERSAO_CRONOGRAMA);
+        return Optional.of(valor != null ? valor : 1L);
+    }
+
+    /**
+     * Troca o ponteiro de leitura de blocos da trilha ({@code cronogramaAtivoId} +
+     * {@code versaoAtivaCronograma}) em uma única operação atômica.
+     *
+     * <p><b>Fencing (D-18):</b> o filtro exige que o {@code leaseToken} ainda seja o dono do
+     * lease. Um worker que perdeu o token não altera o ponteiro, mesmo que já tenha inserido
+     * os blocos de staging.</p>
+     */
+    public boolean atualizarPonteiroCronogramaAtivo(
+            ObjectId usuarioId,
+            ObjectId trilhaId,
+            ObjectId cronogramaAtivoId,
+            Long versaoAtivaCronograma,
+            String leaseToken) {
+        Bson filtro = and(
+                eq("_id", trilhaId),
+                filtroUsuario(usuarioId),
+                eq(CAMPO_GERACAO_CRONOGRAMA_LEASE_TOKEN, leaseToken)
+        );
+        Bson atualizacao = Updates.combine(
+                cronogramaAtivoId != null ? Updates.set(CAMPO_CRONOGRAMA_ATIVO_ID, cronogramaAtivoId) : Updates.unset(CAMPO_CRONOGRAMA_ATIVO_ID),
+                versaoAtivaCronograma != null ? Updates.set(CAMPO_VERSAO_ATIVA_CRONOGRAMA, versaoAtivaCronograma) : Updates.unset(CAMPO_VERSAO_ATIVA_CRONOGRAMA),
+                Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))
+        );
+        return trilhas.updateOne(filtro, atualizacao).getMatchedCount() > 0;
+    }
+
+    /**
+     * Variante sem fencing usada <strong>exclusivamente</strong> pelo reconciliador
+     * ({@code @SystemScope}, D-18b): após a morte de um worker, o lease já não pertence a ninguém,
+     * e a reconciliação precisa conseguir fechar a publicação.
+     */
+    public boolean atualizarPonteiroCronogramaAtivoSemFencing(
+            ObjectId usuarioId, ObjectId trilhaId, ObjectId cronogramaAtivoId, Long versaoAtivaCronograma) {
+        Bson filtro = and(eq("_id", trilhaId), filtroUsuario(usuarioId));
         Bson atualizacao = Updates.combine(
                 cronogramaAtivoId != null ? Updates.set(CAMPO_CRONOGRAMA_ATIVO_ID, cronogramaAtivoId) : Updates.unset(CAMPO_CRONOGRAMA_ATIVO_ID),
                 versaoAtivaCronograma != null ? Updates.set(CAMPO_VERSAO_ATIVA_CRONOGRAMA, versaoAtivaCronograma) : Updates.unset(CAMPO_VERSAO_ATIVA_CRONOGRAMA),
@@ -202,10 +285,8 @@ public class TrilhaRepository {
     public void desvincularDadosTrilhaENotas(ObjectId usuarioId, ObjectId trilhaId, List<ObjectId> discIds, List<String> topicoIds) {
         var db = mongoClient.getDatabase(databaseName);
 
-        // 1. Remove cronogramas e planejamentos associados
-        db.getCollection("cronogramas").deleteMany(new Document(CAMPO_USUARIO_ID, usuarioId).append(CAMPO_TRILHA_ID, trilhaId));
-        db.getCollection("blocos_cronograma").deleteMany(new Document(CAMPO_USUARIO_ID, usuarioId).append(CAMPO_TRILHA_ID, trilhaId));
-        db.getCollection("planejamento_ciclo").deleteMany(new Document(CAMPO_USUARIO_ID, usuarioId.toHexString()).append(CAMPO_TRILHA_ID, trilhaId.toHexString()));
+        // 1. Cronogramas e blocos são removidos pelos próprios repositórios sob o lease da
+        //    trilha (R5). Esta classe só desvincula referências de cadernos, seções e notas.
 
         // 2. Desvincula cadernos
         db.getCollection("cadernos").updateMany(
@@ -255,10 +336,6 @@ public class TrilhaRepository {
     }
 
     private Bson filtroUsuario(ObjectId usuarioId) {
-        return or(
-                eq(CAMPO_USUARIO_ID, usuarioId),
-                eq("donoId", usuarioId.toHexString()),
-                eq(CAMPO_USUARIO_ID, usuarioId.toHexString())
-        );
+        return eq(CAMPO_USUARIO_ID, usuarioId);
     }
 }

@@ -25,7 +25,7 @@ export function obterModuloAtual(): ModuloApp {
   return 'estudos';
 }
 
-export function isAmbienteLocal(): boolean {
+function isAmbienteLocal(): boolean {
   if (typeof window === 'undefined') return false;
   const host = window.location.hostname.toLowerCase();
   return host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost');

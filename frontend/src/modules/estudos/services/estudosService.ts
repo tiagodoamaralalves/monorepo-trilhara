@@ -12,8 +12,6 @@ import {
 import {
   AtualizacaoMetadadosTrilha,
   Sessao,
-  DisciplinaProgramada,
-  PlanejamentoCiclo,
   PaginaEditais,
   TrilhaResumoDTO,
   TrilhaDetalheDTO,
@@ -166,53 +164,7 @@ export const EstudosService = {
     });
   },
 
-  // ── CICLOS & DISCIPLINAS DO DIA ──
-  async obterDisciplinasDoDia(
-    trilhaId: string,
-    cicloId: string,
-    dataISO: string
-  ): Promise<DisciplinaProgramada[]> {
-    return await request<DisciplinaProgramada[]>(
-      `/trilhas/${encodeURIComponent(trilhaId)}/ciclos/${encodeURIComponent(cicloId)}/disciplinas-do-dia?data=${encodeURIComponent(dataISO)}`
-    );
-  },
-
-  async obterPlanejamentoCiclo(trilhaId: string, cicloId: string): Promise<PlanejamentoCiclo> {
-    return await request<PlanejamentoCiclo>(
-      `/trilhas/${encodeURIComponent(trilhaId)}/ciclos/${encodeURIComponent(cicloId)}/planejamento`
-    );
-  },
-
-  async salvarPlanejamentoCiclo(
-    trilhaId: string,
-    cicloId: string,
-    planejamento: Omit<PlanejamentoCiclo, 'revisao' | 'atualizadoEm'> & { revisaoEsperada: number }
-  ): Promise<PlanejamentoCiclo> {
-    return await request<PlanejamentoCiclo>(
-      `/trilhas/${encodeURIComponent(trilhaId)}/ciclos/${encodeURIComponent(cicloId)}/planejamento`,
-      {
-        method: 'PUT',
-        body: JSON.stringify(planejamento)
-      }
-    );
-  },
-
-  async atualizarConclusaoBloco(
-    trilhaId: string,
-    cicloId: string,
-    ocorrenciaId: string,
-    data: string,
-    concluida: boolean
-  ): Promise<PlanejamentoCiclo> {
-    return await request<PlanejamentoCiclo>(
-      `/trilhas/${encodeURIComponent(trilhaId)}/ciclos/${encodeURIComponent(cicloId)}/planejamento/blocos/${encodeURIComponent(ocorrenciaId)}?data=${encodeURIComponent(data)}`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({ concluida })
-      }
-    );
-  },
-
+  // ── DISCIPLINAS DO DIA ──
   // ── SESSÕES & HISTÓRICO ──
   async atualizarSessao(
     trilhaId: string,
@@ -368,6 +320,7 @@ export const EstudosService = {
     cronogramaId: string,
     params?: {
       concluido?: boolean;
+      statusData?: 'ATRASADO' | 'HOJE' | 'FUTURO';
       dataInicio?: string;
       dataFim?: string;
       pagina?: number;
@@ -376,6 +329,7 @@ export const EstudosService = {
   ): Promise<Pagina<BlocoCronogramaItemDTO>> {
     const search = new URLSearchParams();
     if (params?.concluido !== undefined) search.set('concluido', String(params.concluido));
+    if (params?.statusData) search.set('statusData', params.statusData);
     if (params?.dataInicio) search.set('dataInicio', params.dataInicio);
     if (params?.dataFim) search.set('dataFim', params.dataFim);
     if (params?.pagina) search.set('pagina', String(params.pagina));
@@ -385,6 +339,20 @@ export const EstudosService = {
     return await request<Pagina<BlocoCronogramaItemDTO>>(
       `/trilhas/${encodeURIComponent(trilhaId)}/cronogramas/${encodeURIComponent(cronogramaId)}/blocos${query}`
     );
+  },
+
+  /**
+   * Contagem exata de blocos atrasados (D-17f): usa `statusData=ATRASADO` com `tamanho=1` e lê
+   * `totalItens`, evitando depender da página carregada na tela.
+   */
+  async contarBlocosAtrasados(trilhaId: string, cronogramaId: string): Promise<number> {
+    const pagina = await this.listarBlocosCronograma(trilhaId, cronogramaId, {
+      statusData: 'ATRASADO',
+      concluido: false,
+      pagina: 1,
+      tamanho: 1
+    });
+    return pagina.totalItens;
   },
 
   async obterBlocosHoje(): Promise<BlocoHojeDTO[]> {

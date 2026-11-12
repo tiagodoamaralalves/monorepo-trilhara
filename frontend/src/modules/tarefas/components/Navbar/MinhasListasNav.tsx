@@ -1,7 +1,7 @@
 import React from 'react';
-import { Plus, Folder, BookOpen, MoreVertical, Check, EyeOff } from 'lucide-react';
+import { Plus, Folder, BookOpen, MoreVertical, Check } from 'lucide-react';
 import { useSidebar, DisciplineLabel } from '@shared/design-system';
-import { ListaTarefas, CicloAtivoInfo } from '../../types/tarefa';
+import { ListaTarefas } from '../../types/tarefa';
 import styles from './MinhasListasNav.module.css';
 
 export interface TrilhaComCronogramaInfo {
@@ -18,9 +18,6 @@ export interface MinhasListasNavProps {
   onAbrirNovaLista: () => void;
   onAbrirEditarLista?: (lista: ListaTarefas) => void;
   onExcluirLista?: (id: string) => void;
-  ciclosAtivos?: CicloAtivoInfo[];
-  mostrarCicloEstudos?: boolean;
-  onToggleMostrarCiclo?: () => void;
   contadoresPorLista?: Record<string, number>;
   trilhasComCronograma?: TrilhaComCronogramaInfo[];
   trilhaSelecionadaId?: string;
@@ -33,26 +30,15 @@ export const MinhasListasNav: React.FC<MinhasListasNavProps> = ({
   onSelecionarLista,
   onAbrirNovaLista,
   onAbrirEditarLista,
-  ciclosAtivos = [],
-  mostrarCicloEstudos = false,
-  onToggleMostrarCiclo = () => {},
   contadoresPorLista = {},
   trilhasComCronograma = [],
   trilhaSelecionadaId,
   onSelecionarTrilha
 }) => {
   const { collapsed } = useSidebar();
-  const cicloAtivo = ciclosAtivos.length > 0 ? ciclosAtivos[0] : null;
 
-  // Listas personalizadas do usuário
-  const listasManuais = listas.filter((l) => l.origem !== 'ciclo');
-
-  // Identificação da lista do ciclo se já existir sincronizada
-  const listaCicloBackend = listas.find(
-    (l) => l.origem === 'ciclo' || (cicloAtivo && l.cicloId === cicloAtivo.cicloId)
-  );
-  const idListaCiclo = listaCicloBackend?.id || (cicloAtivo ? `ciclo_${cicloAtivo.cicloId}` : undefined);
-  const isListaCicloAtiva = Boolean(idListaCiclo && listaSelecionadaId === idListaCiclo);
+  // R5: listas virtuais de cronograma não são listas persistidas de tarefas.
+  const listasManuais = listas.filter((l) => l.origem !== 'cronograma');
 
   if (collapsed) {
     return (
@@ -119,19 +105,6 @@ export const MinhasListasNav: React.FC<MinhasListasNavProps> = ({
             />
           </button>
         ))}
-
-        {/* Lista do Ciclo (quando visível) */}
-        {cicloAtivo && mostrarCicloEstudos && idListaCiclo && (
-          <button
-            type="button"
-            className={`${styles.collapsedItemBtn} ${isListaCicloAtiva ? styles.collapsedItemAtivo : ''}`}
-            onClick={() => onSelecionarLista(idListaCiclo)}
-            title={`Ciclo: ${cicloAtivo.cicloNome}`}
-            aria-label={`Ciclo: ${cicloAtivo.cicloNome}`}
-          >
-            <span className={styles.listaDot} style={{ backgroundColor: 'var(--purple)' }} />
-          </button>
-        )}
       </div>
     );
   }
@@ -261,64 +234,7 @@ export const MinhasListasNav: React.FC<MinhasListasNavProps> = ({
           </div>
         )}
 
-        {/* ── CICLO DE ESTUDOS COMO LISTA DE TAREFAS NORMAL (REGRA #1 e solicitação do usuário) ── */}
-        {/* Se o ciclo estiver visível, aparece como uma lista normal em Minhas Listas */}
-        {cicloAtivo && mostrarCicloEstudos && idListaCiclo && (
-          <div
-            className={`${styles.listaItemRow} ${isListaCicloAtiva ? styles.listaItemAtiva : ''}`}
-          >
-            <button
-              type="button"
-              className={styles.listaItemContent}
-              onClick={() => onSelecionarLista(idListaCiclo)}
-              title={`Ciclo: ${cicloAtivo.cicloNome} (${cicloAtivo.trilhaNome})`}
-            >
-              <DisciplineLabel
-                name={`Ciclo: ${cicloAtivo.cicloNome}`}
-                color="var(--purple)"
-                className={styles.listaDisciplineLabel}
-              />
-              <span className={styles.listaBadgeCiclo}>Estudos</span>
-              {contadoresPorLista[idListaCiclo] !== undefined &&
-                contadoresPorLista[idListaCiclo] > 0 && (
-                  <span className={styles.listaBadge}>
-                    {contadoresPorLista[idListaCiclo]}
-                  </span>
-                )}
-            </button>
-
-            {/* Ação para ocultar a lista do ciclo sob demanda */}
-            <button
-              type="button"
-              className={styles.listaOpcoesBtn}
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleMostrarCiclo();
-              }}
-              title="Ocultar lista do ciclo"
-              aria-label="Ocultar lista do ciclo"
-            >
-              <EyeOff size={13} />
-            </button>
-          </div>
-        )}
-
-        {/* ── SE O USUÁRIO TEM CICLO ATIVO, MAS AINDA ESTÁ OCULTO ── */}
-        {/* Mostra um botão elegante para aceitar e mostrar a lista do ciclo */}
-        {cicloAtivo && !mostrarCicloEstudos && (
-          <button
-            type="button"
-            className={styles.mostrarCicloBtn}
-            onClick={onToggleMostrarCiclo}
-            title="Mostrar tarefas do ciclo de estudo"
-          >
-            <span className={styles.mostrarCicloBtnText}>
-              <BookOpen size={13} />
-              <span>Lista do Ciclo ({cicloAtivo.cicloNome})</span>
-            </span>
-            <span className={styles.mostrarCicloTag}>Mostrar</span>
-          </button>
-        )}
+        {/* ── FIM DA SEÇÃO TRILHAS DE ESTUDO ── */}
       </div>
     </div>
   );

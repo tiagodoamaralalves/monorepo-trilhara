@@ -477,7 +477,8 @@ class CronogramaNormalizadoIntegrationTest {
 
         assertTrue(atrasadosResp.totalConcluidos() >= 0);
 
-        // Retry com mesmo operationId deve ser idempotente e retornar o mesmo resultado
+        // D-17(e): o retry RECALCULA — o que já foi concluído não é reprocessado, então a segunda
+        // chamada encontra zero pendentes e não reescreve concluidoEm.
         given()
                 .header("Authorization", "Bearer " + token)
                 .contentType(ContentType.JSON)
@@ -487,8 +488,8 @@ class CronogramaNormalizadoIntegrationTest {
                 .then()
                 .statusCode(200)
                 .body("operationId", equalTo(opId.toString()))
-                .body("totalProcessados", equalTo(atrasadosResp.totalProcessados()))
-                .body("totalConcluidos", equalTo(atrasadosResp.totalConcluidos()));
+                .body("totalProcessados", equalTo(0))
+                .body("totalConcluidos", equalTo(0));
     }
 
     @Test

@@ -1,4 +1,4 @@
-export type RoleUsuario = 'USER' | 'ADMIN';
+type RoleUsuario = 'USER' | 'ADMIN';
 
 export type TemaPreferencia = 'dark' | 'light' | 'system';
 

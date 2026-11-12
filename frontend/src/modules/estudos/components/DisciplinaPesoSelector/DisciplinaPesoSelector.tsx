@@ -22,11 +22,11 @@ export const DisciplinaPesoSelector: React.FC<DisciplinaPesoSelectorProps> = ({
       className={`${styles.selectorWrapper} ${compact ? styles.compact : ''} ${className}`}
       role="group"
       aria-label="Peso da disciplina"
-      title="O novo peso será aplicado na geração dos próximos ciclos de estudo"
+      title="O novo peso será aplicado na geração dos próximos cronogramas"
     >
       <div
         className={styles.labelGroup}
-        title="O novo peso será aplicado na geração dos próximos ciclos de estudo"
+        title="O novo peso será aplicado na geração dos próximos cronogramas"
       >
         <Scale size={15} aria-hidden="true" className={styles.scaleIcon} />
         <span className={styles.label}>Peso</span>
