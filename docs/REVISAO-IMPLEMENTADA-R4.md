@@ -145,6 +145,13 @@ padrão aumentou; `E1-deleteMany-com-filtro` ficou em 3 (a purga usa `deleteMany
 
 ## 6. Bloqueios herdados (não pertencem à R4)
 
+> **Nota de processo (consolidação pós-R4):** os branches por fase foram eliminados do
+> fluxo. R3 e R4 foram levadas à `main` por fast-forward e os branches `r3-revisao-f2` e
+> `r4-revisao-f3` foram removidos. A instrução "após R2, R3/R4/R5 e R7 podem avançar em
+> branches separados" foi retirada de todos os guias `docs/R0..R13-REVISAO.md`; o grafo de
+> dependências e a sequência linear permanecem inalterados. Execução passa a ser linear
+> direto na `main`.
+
 | Item | Dono | Evidência |
 |---|---|---|
 | `termo-ciclo-backend` (4) / `termo-ciclo-frontend` (86) | **R5 / R7** | `verificar-legado.sh --quiet` |
