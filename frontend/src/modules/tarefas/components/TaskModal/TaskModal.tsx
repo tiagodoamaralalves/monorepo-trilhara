@@ -178,7 +178,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
   const toggleDiaSemana = (dia: number) => {
     setDiasDaSemana((prev) =>
-      prev.includes(dia) ? prev.filter((d) => d !== dia) : [...prev, dia].sort()
+      prev.includes(dia) ? prev.filter((d) => d !== dia) : [...prev, dia].sort((a, b) => a - b)
     );
   };
 

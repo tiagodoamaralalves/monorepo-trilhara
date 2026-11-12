@@ -642,13 +642,11 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
                     name={topico.nome}
                     leading={
                       onToggleTopico ? (
-                        <span onClick={(event) => event.stopPropagation()}>
-                          <Checkbox
-                            checked={Boolean(progresso?.[topico.id]?.done)}
-                            aria-label={`Marcar assunto ${topico.nome} como concluído`}
-                            onChange={(event) => onToggleTopico(topico.id, event.target.checked)}
-                          />
-                        </span>
+                        <Checkbox
+                          checked={Boolean(progresso?.[topico.id]?.done)}
+                          aria-label={`Marcar assunto ${topico.nome} como concluído`}
+                          onChange={(event) => onToggleTopico(topico.id, event.target.checked)}
+                        />
                       ) : undefined
                     }
                     content={
@@ -673,15 +671,18 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
                           }}
                           onClick={(event) => event.stopPropagation()}
                         />
-                      ) : undefined
-                    }
-                    onClick={
-                      isEditable && !isEditing
-                        ? () => {
+                      ) : isEditable ? (
+                        <button
+                          type="button"
+                          className={styles.topicNameButton}
+                          onClick={() => {
                             setEditandoTopicoId(topico.id);
                             setNomeTopicoEditado(topico.nome);
-                          }
-                        : undefined
+                          }}
+                        >
+                          {topico.nome}
+                        </button>
+                      ) : undefined
                     }
                     actions={
                       isEditable ? (

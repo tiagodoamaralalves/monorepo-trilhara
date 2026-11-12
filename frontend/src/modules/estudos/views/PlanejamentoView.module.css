@@ -990,6 +990,22 @@
   transition: all var(--transition-fast);
 }
 
+.selectCronogramaButton {
+  align-self: flex-start;
+  padding: 4px 8px;
+  border: 1px solid var(--border-strong, #d1d5db);
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--text, #111827);
+  cursor: pointer;
+  font: inherit;
+}
+
+.selectCronogramaButton:focus-visible {
+  outline: 2px solid var(--primary, #4f46e5);
+  outline-offset: 2px;
+}
+
 .cronogramaCard:hover {
   background: var(--surface-3);
   border-color: var(--border-strong);
@@ -1327,7 +1343,6 @@
   border: 1px solid var(--border, #e5e7eb);
   border-radius: var(--radius-md, 6px);
   padding: 16px;
-  cursor: pointer;
   display: flex;
   flex-direction: column;
   justify-content: space-between;

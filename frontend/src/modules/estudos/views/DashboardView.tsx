@@ -971,7 +971,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 min={0}
                 max={24}
                 value={String(editHoras)}
-                onChange={(e) => setEditHoras(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                onChange={(e) => setEditHoras(Math.max(0, Number.parseInt(e.target.value, 10) || 0))}
               />
               <Input
                 label="Minutos de estudo"
@@ -979,7 +979,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 min={0}
                 max={59}
                 value={String(editMinutos)}
-                onChange={(e) => setEditMinutos(Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0)))}
+                onChange={(e) => setEditMinutos(Math.max(0, Math.min(59, Number.parseInt(e.target.value, 10) || 0)))}
               />
             </div>
 
@@ -989,7 +989,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 type="number"
                 min={0}
                 value={String(editQuestoes)}
-                onChange={(e) => setEditQuestoes(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                onChange={(e) => setEditQuestoes(Math.max(0, Number.parseInt(e.target.value, 10) || 0))}
               />
               <Input
                 label="Acertos"
@@ -997,7 +997,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 min={0}
                 max={editQuestoes}
                 value={String(editAcertos)}
-                onChange={(e) => setEditAcertos(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                onChange={(e) => setEditAcertos(Math.max(0, Number.parseInt(e.target.value, 10) || 0))}
               />
             </div>
           </div>

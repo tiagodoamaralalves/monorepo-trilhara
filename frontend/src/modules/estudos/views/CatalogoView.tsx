@@ -72,20 +72,7 @@ export const CatalogCard: React.FC<CatalogCardProps> = ({
     .join(' · ');
 
   return (
-    <article
-      className={styles.catalogCard}
-      onClick={() => onInspecionar(edital)}
-      onKeyDown={(e) => {
-        if (e.target !== e.currentTarget) return;
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onInspecionar(edital);
-        }
-      }}
-      tabIndex={0}
-      role="listitem"
-      aria-label={`${edital.nome} — ${edital.cargo}`}
-    >
+    <article className={styles.catalogCard}>
       <div className={styles.catalogCardTop}>
         <span className={styles.contextLabel}>{contextoMeta || 'Concurso Público'}</span>
         {emAndamento && (
@@ -144,22 +131,24 @@ export const CatalogCard: React.FC<CatalogCardProps> = ({
       </div>
 
       <div className={styles.catalogCardFooter}>
-        <span className={styles.inspectHint}>
+        <button
+          type="button"
+          className={styles.inspectHint}
+          onClick={() => onInspecionar(edital)}
+          aria-label={`Ver grade de ${edital.nome}`}
+        >
           <span>Ver grade</span>
           <ChevronRight size={14} className={styles.inspectArrow} aria-hidden="true" />
-        </span>
-
-        <div onClick={(e) => e.stopPropagation()}>
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            isLoading={importando}
-            onClick={() => onUsarTrilha(edital)}
-          >
-            Usar trilha
-          </Button>
-        </div>
+        </button>
+        <Button
+          type="button"
+          variant="primary"
+          size="sm"
+          isLoading={importando}
+          onClick={() => onUsarTrilha(edital)}
+        >
+          Usar trilha
+        </Button>
       </div>
     </article>
   );
@@ -531,7 +520,6 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                     key={edital.id}
                     className={styles.catalogListRow}
                     role="listitem"
-                    onClick={() => setEditalVisualizando(edital)}
                   >
                     <div className={styles.catalogListPrimary}>
                       <div className={styles.catalogListMeta}>
@@ -548,10 +536,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                       </p>
                     </div>
 
-                    <div
-                      className={styles.catalogListActions}
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <div className={styles.catalogListActions}>
                       <Button
                         type="button"
                         variant="ghost"

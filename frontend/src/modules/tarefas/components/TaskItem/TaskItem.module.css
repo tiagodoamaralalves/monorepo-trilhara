@@ -8,7 +8,6 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   transition: all var(--transition-fast);
-  cursor: pointer;
   text-align: left;
 }
 
@@ -16,11 +15,6 @@
   background: var(--surface-2);
   border-color: var(--border-strong);
   transform: translateY(-1px);
-}
-
-.item:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
 }
 
 .concluida {
@@ -70,6 +64,22 @@
   line-height: 1.35;
   transition: all var(--transition-fast);
   word-break: break-word;
+}
+
+.titleButton {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.titleButton:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 .titleDone {

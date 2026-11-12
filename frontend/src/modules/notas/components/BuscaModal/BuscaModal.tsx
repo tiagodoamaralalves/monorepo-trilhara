@@ -64,7 +64,7 @@ export const BuscaModal: React.FC<BuscaModalProps> = ({
     }
 
     timerRef.current = setTimeout(() => {
-      executarBusca(val);
+      void executarBusca(val);
     }, 350);
   };
 

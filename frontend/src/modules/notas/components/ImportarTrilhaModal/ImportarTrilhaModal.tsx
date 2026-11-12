@@ -109,10 +109,11 @@ export const ImportarTrilhaModal: React.FC<ImportarTrilhaModalProps> = ({
         </p>
 
         <div>
-          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
+          <label htmlFor="importar-trilha-select" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
             Selecione a trilha a ser importada
           </label>
           <Select
+            id="importar-trilha-select"
             options={opcoes}
             value={trilhaSelecionadaId || (opcoes[0]?.value ?? '')}
             onChange={(val) => setTrilhaSelecionadaId(val)}

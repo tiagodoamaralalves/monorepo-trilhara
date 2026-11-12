@@ -29,7 +29,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Instalar dependências limpas (npm ci)
-        run: npm --prefix frontend ci --prefer-offline --no-audit
+        run: npm --prefix frontend ci --ignore-scripts --prefer-offline --no-audit
 
       - name: Typecheck (tsc -b) e Build de Produção (Vite)
         run: npm --prefix frontend run build

@@ -31,6 +31,7 @@ import br.com.trilhara.cronograma.dto.PaginaBlocosDTO;
 import br.com.trilhara.trilha.Disciplina;
 import br.com.trilhara.trilha.DisciplinaRepository;
 import br.com.trilhara.trilha.TrilhaRepository;
+import br.com.trilhara.shared.TimezoneContext;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
@@ -133,7 +134,7 @@ class CronogramaNormalizadoIntegrationTest {
         String token = gerarTokenParaUsuario(uId);
         TrilhaInfo info = criarTrilhaComDisciplinas(uId, token);
 
-        LocalDate hoje = LocalDate.now();
+        LocalDate hoje = LocalDate.now(TimezoneContext.DEFAULT_ZONE);
 
         // 1. Criar cronograma SEQUENCIAL
         String payloadSeq = """
@@ -242,7 +243,7 @@ class CronogramaNormalizadoIntegrationTest {
         ObjectId uId = new ObjectId();
         String token = gerarTokenParaUsuario(uId);
         TrilhaInfo info = criarTrilhaComDisciplinas(uId, token);
-        LocalDate hoje = LocalDate.now();
+        LocalDate hoje = LocalDate.now(TimezoneContext.DEFAULT_ZONE);
 
         // 1. Criar SEQUENCIAL
         String payloadSeq = """
@@ -349,7 +350,7 @@ class CronogramaNormalizadoIntegrationTest {
                   "blocosPorDia": 1,
                   "disciplinasParticipantesIds": ["%s"]
                 }
-                """.formatted(LocalDate.now(), info.disciplina1Id());
+                """.formatted(LocalDate.now(TimezoneContext.DEFAULT_ZONE), info.disciplina1Id());
 
         // Requisição concorrente deve ser rejeitada com 409 SCHEDULE_GENERATION_IN_PROGRESS
         given()
@@ -382,7 +383,7 @@ class CronogramaNormalizadoIntegrationTest {
         ObjectId uId = new ObjectId();
         String token = gerarTokenParaUsuario(uId);
         TrilhaInfo info = criarTrilhaComDisciplinas(uId, token);
-        LocalDate hoje = LocalDate.now();
+        LocalDate hoje = LocalDate.now(TimezoneContext.DEFAULT_ZONE);
 
         // 1. Criar cronograma com dataInicio 3 dias atrás para gerar blocos atrasados e de hoje
         LocalDate inicio = hoje.minusDays(3);
@@ -496,7 +497,7 @@ class CronogramaNormalizadoIntegrationTest {
         ObjectId uId = new ObjectId();
         String token = gerarTokenParaUsuario(uId);
         TrilhaInfo info = criarTrilhaComDisciplinas(uId, token);
-        LocalDate hoje = LocalDate.now();
+        LocalDate hoje = LocalDate.now(TimezoneContext.DEFAULT_ZONE);
 
         // 1. Criar SEQUENCIAL
         String payloadSeq = """
@@ -566,7 +567,7 @@ class CronogramaNormalizadoIntegrationTest {
         ObjectId uId = new ObjectId();
         String token = gerarTokenParaUsuario(uId);
         TrilhaInfo info = criarTrilhaComDisciplinas(uId, token);
-        LocalDate hoje = LocalDate.now();
+        LocalDate hoje = LocalDate.now(TimezoneContext.DEFAULT_ZONE);
 
         // Cronograma com blocos a partir de hoje
         String payload = """
@@ -692,7 +693,7 @@ class CronogramaNormalizadoIntegrationTest {
                   "blocosPorDia": 2,
                   "disciplinasParticipantesIds": ["%s"]
                 }
-                """.formatted(LocalDate.now(), info.disciplina1Id());
+                """.formatted(LocalDate.now(TimezoneContext.DEFAULT_ZONE), info.disciplina1Id());
 
         given()
                 .header("Authorization", "Bearer " + token)
@@ -736,7 +737,7 @@ class CronogramaNormalizadoIntegrationTest {
                   "blocosPorDia": 1,
                   "disciplinasParticipantesIds": ["%s"]
                 }
-                """.formatted(LocalDate.now(), info1.disciplina1Id());
+                """.formatted(LocalDate.now(TimezoneContext.DEFAULT_ZONE), info1.disciplina1Id());
 
         String cronogramaId = given()
                 .header("Authorization", "Bearer " + token1)

@@ -17,7 +17,7 @@ export interface ListaPaginasProps {
 function formatarDataOneNote(dataIso?: string): string {
   if (!dataIso) return '';
   const d = new Date(dataIso);
-  if (isNaN(d.getTime())) return '';
+  if (Number.isNaN(d.getTime())) return '';
 
   const agora = new Date();
   const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
@@ -51,8 +51,8 @@ function extrairSnippetMarkdown(markdown?: string): string {
   return markdown
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`([^`]+)`/g, '$1')
-    .replace(/!\[.*?\]\(.*?\)/g, '')
-    .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/^#{1,6}\s+/gm, '')
     .replace(/^[\s*>-]+\s+/gm, '')
     .replace(/[*_~]/g, '')
@@ -221,7 +221,7 @@ export const ListaPaginas: React.FC<ListaPaginasProps> = ({
         </div>
       ) : (
         <div
-          role="listbox"
+          role="list"
           aria-label={`Páginas de ${secaoNome}`}
           className={styles.list}
         >
@@ -231,22 +231,32 @@ export const ListaPaginas: React.FC<ListaPaginasProps> = ({
             const dataFormatada = formatarDataOneNote(nota.atualizadoEm || nota.criadoEm);
 
             return (
-              <button
+              <article
                 key={nota.id}
-                ref={(el) => setItemRef(nota.id, el)}
-                type="button"
-                role="option"
-                aria-selected={isAtiva}
-                tabIndex={0}
                 className={`${styles.item} ${isAtiva ? styles.itemActive : ''}`}
                 style={isAtiva && secaoCor ? { borderLeftColor: secaoCor } : undefined}
-                onClick={() => onSelecionarNota(nota.id)}
-                onKeyDown={(e) => handleKeyDown(e, idx)}
               >
                 <div className={styles.itemHeader}>
-                  <span className={styles.itemTitle} title={nota.titulo}>
-                    {nota.titulo || 'Sem título'}
-                  </span>
+                  <button
+                    type="button"
+                    ref={(el) => setItemRef(nota.id, el)}
+                    className={styles.itemSelect}
+                    onClick={() => onSelecionarNota(nota.id)}
+                    onKeyDown={(e) => handleKeyDown(e, idx)}
+                    aria-current={isAtiva ? 'page' : undefined}
+                  >
+                    <span className={styles.itemTitle} title={nota.titulo}>
+                      {nota.titulo || 'Sem título'}
+                    </span>
+                    {dataFormatada && (
+                      <span className={styles.itemDate}>{dataFormatada}</span>
+                    )}
+                    {snippet ? (
+                      <span className={styles.itemSnippet}>{snippet}</span>
+                    ) : (
+                      <span className={styles.itemSnippetEmpty}>Página em branco</span>
+                    )}
+                  </button>
                   <button
                     type="button"
                     className={styles.deleteBtn}
@@ -260,17 +270,7 @@ export const ListaPaginas: React.FC<ListaPaginasProps> = ({
                     <Trash2 size={13} />
                   </button>
                 </div>
-
-                {dataFormatada && (
-                  <span className={styles.itemDate}>{dataFormatada}</span>
-                )}
-
-                {snippet ? (
-                  <span className={styles.itemSnippet}>{snippet}</span>
-                ) : (
-                  <span className={styles.itemSnippetEmpty}>Página em branco</span>
-                )}
-              </button>
+              </article>
             );
           })}
         </div>

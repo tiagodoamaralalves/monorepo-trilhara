@@ -5,6 +5,23 @@
   gap: 12px;
 }
 
+.topicNameButton {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.topicNameButton:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
 /* Seletor de cor no ícone */
 .headerColorWrapper {
   position: relative;

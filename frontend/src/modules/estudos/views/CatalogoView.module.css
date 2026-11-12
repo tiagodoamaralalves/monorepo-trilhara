@@ -485,6 +485,11 @@
 }
 
 .inspectHint {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -492,6 +497,12 @@
   font-weight: 600;
   color: var(--text-mid);
   transition: color var(--transition-fast);
+}
+
+.inspectHint:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 3px;
+  border-radius: var(--radius-xs);
 }
 
 .inspectArrow {

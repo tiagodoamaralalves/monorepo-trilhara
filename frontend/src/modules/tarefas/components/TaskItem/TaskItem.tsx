@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Clock, Trash2, Edit2, ListChecks, Repeat, SkipForward, ChevronDown, ChevronUp } from 'lucide-react';
 import { Checkbox, Badge, Button } from '@shared/design-system';
-import { Tarefa, Subtarefa } from '../../types/tarefa';
+import { Tarefa } from '../../types/tarefa';
 import { formatarDataRelativa } from '../../utils/date';
 import styles from './TaskItem.module.css';
 
@@ -48,26 +48,9 @@ export const TaskItem: React.FC<TaskItemProps> = ({
     }
   };
 
-  const handleRowClick = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('input[type="checkbox"], button, .subtaskAction')) {
-      return;
-    }
-    onEditar(tarefa);
-  };
-
   return (
     <div
-      className={`${styles.item} ${tarefa.concluida ? styles.concluida : ''}`}
-      onClick={handleRowClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onEditar(tarefa);
-        }
-      }}
-      title="Clique para ver detalhes e editar"
+      className={styles.item}
     >
       <div className={styles.left}>
         <div
@@ -83,9 +66,14 @@ export const TaskItem: React.FC<TaskItemProps> = ({
 
         <div className={styles.info}>
           <div className={styles.titleRow}>
-            <span className={`${styles.title} ${tarefa.concluida ? styles.titleDone : ''}`}>
+            <button
+              type="button"
+              className={`${styles.title} ${styles.titleButton} ${tarefa.concluida ? styles.titleDone : ''}`}
+              onClick={() => onEditar(tarefa)}
+              title="Ver detalhes e editar tarefa"
+            >
               {tarefa.titulo}
-            </span>
+            </button>
           </div>
 
           {(tarefa.observacoes || tarefa.descricao) && (
@@ -148,7 +136,6 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                 flexDirection: 'column',
                 gap: '4px'
               }}
-              onClick={(e) => e.stopPropagation()}
             >
               {subtarefas.map((sub) => (
                 <label
@@ -165,6 +152,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                 >
                   <input
                     type="checkbox"
+                    aria-label={`Marcar subtarefa ${sub.titulo} como ${sub.concluida ? 'pendente' : 'concluída'}`}
                     checked={sub.concluida}
                     onChange={() => onAlternarSubtarefa && onAlternarSubtarefa(tarefa.id, sub.id, !sub.concluida)}
                   />
@@ -176,7 +164,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
         </div>
       </div>
 
-      <div className={styles.actions} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.actions}>
         {!tarefa.concluida && onPular && (
           <Button
             type="button"

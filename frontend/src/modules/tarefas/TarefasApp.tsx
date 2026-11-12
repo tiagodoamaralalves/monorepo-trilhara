@@ -1549,6 +1549,7 @@ export function TarefasApp() {
                   type="radio"
                   name="escopoExclusao"
                   value="ESTA"
+                  aria-label="Apenas esta ocorrência"
                   checked={escopoExclusao === 'ESTA'}
                   onChange={() => setEscopoExclusao('ESTA')}
                 />
@@ -1565,6 +1566,7 @@ export function TarefasApp() {
                   type="radio"
                   name="escopoExclusao"
                   value="ESTA_E_FUTURAS"
+                  aria-label="Esta e todas as futuras"
                   checked={escopoExclusao === 'ESTA_E_FUTURAS'}
                   onChange={() => setEscopoExclusao('ESTA_E_FUTURAS')}
                 />
@@ -1581,6 +1583,7 @@ export function TarefasApp() {
                   type="radio"
                   name="escopoExclusao"
                   value="TODA_A_SERIE"
+                  aria-label="Toda a série de tarefas"
                   checked={escopoExclusao === 'TODA_A_SERIE'}
                   onChange={() => setEscopoExclusao('TODA_A_SERIE')}
                 />

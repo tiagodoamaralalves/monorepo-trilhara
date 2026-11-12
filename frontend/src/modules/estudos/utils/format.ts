@@ -9,7 +9,7 @@ export function hojeISO(): string {
 export function paraDataLocalISO(isoTimestamp: string): string {
   if (!isoTimestamp) return '';
   const d = new Date(isoTimestamp);
-  if (isNaN(d.getTime())) return isoTimestamp.slice(0, 10);
+  if (Number.isNaN(d.getTime())) return isoTimestamp.slice(0, 10);
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
@@ -81,6 +81,7 @@ export function slug(texto: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/^-+/, '')
+    .replace(/-+$/, '');
 }
 

@@ -108,6 +108,20 @@
   min-width: 0;
 }
 
+.itemSelect {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
 .itemTitle {
   font-size: 13px;
   font-weight: 600;

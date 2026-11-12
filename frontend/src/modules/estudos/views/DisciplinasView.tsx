@@ -781,23 +781,12 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
             const concluidosDisc = topicos.filter((t) => trilha.progresso?.[t.id]?.done).length;
             const pctDisc = topicos.length > 0 ? Math.round((concluidosDisc / topicos.length) * 100) : 0;
             return (
-              <div
+              <article
                 key={disc.id}
                 className={styles.disciplinaCard}
-                role="button"
-                tabIndex={0}
-                aria-label={`Abrir assuntos da disciplina ${disc.nome}`}
-                onClick={() => abrirTopicosDisciplina(disc)}
-                onKeyDown={(event) => {
-                  if (event.target !== event.currentTarget) return;
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    abrirTopicosDisciplina(disc);
-                  }
-                }}
               >
-              {/* Header da Disciplina */}
-              <div className={styles.discHeader}>
+                {/* Header da Disciplina */}
+                <div className={styles.discHeader}>
                 <div className={styles.discTitleBlock}>
                   <h3 className={styles.discNome}>
                     <DisciplineLabel name={disc.nome} color={disc.cor} />
@@ -829,7 +818,7 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
                   </div>
                 </div>
 
-                <div className={styles.discActions} onClick={(e) => e.stopPropagation()}>
+                <div className={styles.discActions}>
                   {disc.cadernoLink && (
                     <a
                       href={disc.cadernoLink}
@@ -844,8 +833,8 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
                     </a>
                   )}
                 </div>
-              </div>
-            </div>
+                </div>
+              </article>
           );
         })
       )}

@@ -291,8 +291,8 @@ export default function PomodoroApp() {
     } catch {}
     const secStr = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_POMODORO_SECONDS_KEY) : null;
     if (secStr) {
-      const val = parseInt(secStr, 10);
-      if (!isNaN(val) && val > 0) return val;
+      const val = Number.parseInt(secStr, 10);
+      if (!Number.isNaN(val) && val > 0) return val;
     }
     const mins = lerDuracaoLocalStorage(STORAGE_POMODORO_MINUTES_KEY, DEFAULT_POMODORO_MINUTES, 1, 360);
     return mins * 60;
@@ -315,8 +315,8 @@ export default function PomodoroApp() {
     if (isPomodoroActive) {
       const secStr = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_POMODORO_SECONDS_KEY) : null;
       if (secStr) {
-        const val = parseInt(secStr, 10);
-        if (!isNaN(val) && val > 0) return val;
+        const val = Number.parseInt(secStr, 10);
+        if (!Number.isNaN(val) && val > 0) return val;
       }
       const mins = lerDuracaoLocalStorage(STORAGE_POMODORO_MINUTES_KEY, DEFAULT_POMODORO_MINUTES, 1, 360);
       return mins * 60;
@@ -984,8 +984,8 @@ export default function PomodoroApp() {
   };
 
   const concluirEdicaoInline = () => {
-    const mins = Math.max(0, Math.min(360, parseInt(editMinutesStr, 10) || 0));
-    const secs = Math.max(0, Math.min(59, parseInt(editSecondsStr, 10) || 0));
+    const mins = Math.max(0, Math.min(360, Number.parseInt(editMinutesStr, 10) || 0));
+    const secs = Math.max(0, Math.min(59, Number.parseInt(editSecondsStr, 10) || 0));
     let totalSecs = mins * 60 + secs;
     if (totalSecs < 1) {
       totalSecs = 60; // Mínimo de 1 minuto se tiver zerado tudo

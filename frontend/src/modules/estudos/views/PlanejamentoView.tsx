@@ -107,7 +107,7 @@ export function PlanejamentoView({
       }
     }
     if (!trilhaProp) {
-      carregarTrilhas();
+      void carregarTrilhas();
     }
   }, [trilhaProp, selectedTrilhaId]);
 
@@ -129,7 +129,7 @@ export function PlanejamentoView({
         console.error('Erro ao buscar detalhe da trilha:', err);
       }
     }
-    carregarDetalhe();
+    void carregarDetalhe();
   }, [selectedTrilhaId, trilhaProp]);
 
   // Carregar disponibilidade semanal do usuário
@@ -142,7 +142,7 @@ export function PlanejamentoView({
         console.error('Erro ao carregar disponibilidade semanal:', err);
       }
     }
-    carregarDisponibilidade();
+    void carregarDisponibilidade();
   }, []);
 
   // Carregar cronogramas quando a trilha selecionada mudar
@@ -494,9 +494,10 @@ export function PlanejamentoView({
 
             <div className={styles.formGrid}>
               <div className={styles.formGroup}>
-                <label className={styles.label}>Modalidade</label>
+                <label className={styles.label} htmlFor="cronograma-modalidade">Modalidade</label>
                 <select
                   className={styles.select}
+                  id="cronograma-modalidade"
                   value={modalidade}
                   onChange={e => setModalidade(e.target.value as ModalidadeCronograma)}
                 >
@@ -513,9 +514,10 @@ export function PlanejamentoView({
               </div>
 
               <div className={styles.formGroup}>
-                <label className={styles.label}>Período</label>
+                <label className={styles.label} htmlFor="cronograma-periodo">Período</label>
                 <select
                   className={styles.select}
+                  id="cronograma-periodo"
                   value={tipoPeriodo}
                   onChange={e => setTipoPeriodo(e.target.value)}
                 >
@@ -527,53 +529,57 @@ export function PlanejamentoView({
               </div>
 
               <div className={styles.formGroup}>
-                <label className={styles.label}>Blocos por Dia (máx 24)</label>
+                <label className={styles.label} htmlFor="cronograma-blocos-dia">Blocos por Dia (máx 24)</label>
                 <input
                   type="number"
                   className={styles.input}
                   min={1}
                   max={24}
+                  id="cronograma-blocos-dia"
                   value={blocosPorDia}
-                  onChange={e => setBlocosPorDia(parseInt(e.target.value) || 1)}
+                  onChange={e => setBlocosPorDia(Number.parseInt(e.target.value, 10) || 1)}
                 />
               </div>
 
               <div className={styles.formGroup}>
-                <label className={styles.label}>Duração do Bloco (minutos)</label>
+                <label className={styles.label} htmlFor="cronograma-duracao-bloco">Duração do Bloco (minutos)</label>
                 <input
                   type="number"
                   className={styles.input}
                   min={10}
                   max={240}
                   step={5}
+                  id="cronograma-duracao-bloco"
                   value={duracaoBlocoMinutos}
-                  onChange={e => setDuracaoBlocoMinutos(parseInt(e.target.value) || 50)}
+                  onChange={e => setDuracaoBlocoMinutos(Number.parseInt(e.target.value, 10) || 50)}
                 />
               </div>
 
               <div className={styles.formGroup}>
-                <label className={styles.label}>Data Início</label>
+                <label className={styles.label} htmlFor="cronograma-data-inicio">Data Início</label>
                 <input
                   type="date"
                   className={styles.input}
+                  id="cronograma-data-inicio"
                   value={dataInicio}
                   onChange={e => setDataInicio(e.target.value)}
                 />
               </div>
 
               <div className={styles.formGroup}>
-                <label className={styles.label}>Data Término (máx 366 dias)</label>
+                <label className={styles.label} htmlFor="cronograma-data-fim">Data Término (máx 366 dias)</label>
                 <input
                   type="date"
                   className={styles.input}
+                  id="cronograma-data-fim"
                   value={dataFim}
                   onChange={e => setDataFim(e.target.value)}
                 />
               </div>
             </div>
 
-            <div className={styles.formGroup} style={{ marginTop: '1rem' }}>
-              <label className={styles.label}>Dias da Semana para Estudo:</label>
+            <fieldset className={styles.formGroup} style={{ marginTop: '1rem', border: 0, padding: 0 }}>
+              <legend className={styles.label}>Dias da Semana para Estudo:</legend>
               <div className={styles.diasCheckboxGroup}>
                 {DIAS_SEMANA.map(dia => (
                   <label key={dia.id} className={styles.diaCheckboxLabel}>
@@ -586,7 +592,7 @@ export function PlanejamentoView({
                   </label>
                 ))}
               </div>
-            </div>
+            </fieldset>
 
             <div className={styles.formActions}>
               <button
@@ -623,13 +629,9 @@ export function PlanejamentoView({
             {cronogramas.map(c => {
               const isSelected = c.id === selectedCronogramaId;
               return (
-                <div
+                <article
                   key={c.id}
                   className={`${styles.cronogramaCard} ${isSelected ? styles.selectedCard : ''}`}
-                  onClick={() => {
-                    setSelectedCronogramaId(c.id);
-                    setPage(1);
-                  }}
                 >
                   <div className={styles.cronogramaHeader}>
                     <div className={styles.cronogramaTitleRow}>
@@ -638,6 +640,18 @@ export function PlanejamentoView({
                     </div>
                     <span className={styles.badgeModalidade}>{c.tipoPeriodo}</span>
                   </div>
+
+                  <button
+                    type="button"
+                    className={styles.selectCronogramaButton}
+                    aria-pressed={isSelected}
+                    onClick={() => {
+                      setSelectedCronogramaId(c.id);
+                      setPage(1);
+                    }}
+                  >
+                    {isSelected ? 'Cronograma selecionado' : 'Selecionar cronograma'}
+                  </button>
 
                   <div className={styles.cronogramaMeta}>
                     <div>
@@ -669,7 +683,7 @@ export function PlanejamentoView({
                       Excluir
                     </button>
                   </div>
-                </div>
+                </article>
               );
             })}
           </div>
