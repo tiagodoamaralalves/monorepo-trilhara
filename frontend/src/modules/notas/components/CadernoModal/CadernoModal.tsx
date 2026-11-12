@@ -104,7 +104,7 @@ export const CadernoModal: React.FC<CadernoModalProps> = ({
         borderColor: 'transparent'
       }}
       submitText={cadernoParaEditar ? 'Salvar Alterações' : 'Criar Caderno'}
-      isLoading={salvando}
+      loading={salvando}
       overflowVisible={true}
     >
       <div className={`${styles.formBody} ${popoverAberto ? styles.formBodyOpen : ''}`}>
@@ -118,7 +118,6 @@ export const CadernoModal: React.FC<CadernoModalProps> = ({
           }}
           error={erroTitulo}
           required
-          autoFocus
         />
       </div>
     </FormModal>

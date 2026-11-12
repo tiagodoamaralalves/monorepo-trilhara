@@ -98,7 +98,7 @@ export const ListaModal: React.FC<ListaModalProps> = ({
         borderColor: 'transparent'
       }}
       submitText={listaParaEditar ? 'Salvar Alterações' : 'Criar Lista'}
-      isLoading={salvando}
+      loading={salvando}
       overflowVisible={true}
     >
       <div className={`${styles.formBody} ${popoverAberto ? styles.formBodyOpen : ''}`}>
@@ -112,7 +112,6 @@ export const ListaModal: React.FC<ListaModalProps> = ({
           }}
           error={erroTitulo}
           required
-          autoFocus
           disabled={salvando}
         />
       </div>

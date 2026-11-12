@@ -6,6 +6,10 @@ import jakarta.ws.rs.core.UriInfo;
 import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
+/**
+ * Argumento ilegal é bug de programação, não erro do cliente → {@code 500 INTERNAL_ERROR}
+ * com {@code detail} neutro (D-04). Exceções de domínio explícitas têm mapper próprio.
+ */
 @Provider
 public class IllegalArgumentExceptionMapper implements ExceptionMapper<IllegalArgumentException> {
 
@@ -14,23 +18,14 @@ public class IllegalArgumentExceptionMapper implements ExceptionMapper<IllegalAr
 
     @Override
     public Response toResponse(IllegalArgumentException exception) {
-        String instance = DomainConflictExceptionMapper.resolvePath(uriInfo);
-        String msg = exception.getMessage();
-        String detail = (msg != null && !msg.isBlank()) ? msg : "Requisição inválida.";
+        ProblemDetails problem = ProblemDetailsFactory.interno(
+                DomainConflictExceptionMapper.resolvePath(uriInfo));
 
-        ProblemDetails problem = new ProblemDetails(
-                "urn:trilhara:error:bad-request",
-                "Requisição inválida",
-                Response.Status.BAD_REQUEST.getStatusCode(),
-                detail,
-                instance,
-                "BAD_REQUEST",
-                null
-        );
-
-        return Response.status(Response.Status.BAD_REQUEST)
+        return Response.status(problem.status())
+                .header(ProblemDetailsFactory.HEADER_CORRELATION_ID, ProblemDetailsFactory.novoCorrelationId())
                 .type(ProblemDetails.MEDIA_TYPE)
                 .entity(problem)
                 .build();
     }
 }
+

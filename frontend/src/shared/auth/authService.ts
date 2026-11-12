@@ -1,4 +1,5 @@
 import { ApiError, request, tentarRenovarToken } from './api';
+import { registrarFalha } from '../diagnostico';
 import { AuthStorage, limparDadosLocaisDoUsuario } from './authStorage';
 import {
   AuthResponse,
@@ -44,7 +45,7 @@ export const AuthService = {
       await request('/auth/logout', { method: 'POST', body: '{}' });
     } catch (err) {
       // Falha de rede/servidor: limpa localmente, mas registra para diagnóstico
-      console.warn('Falha ao revogar sessão no servidor.', err);
+      registrarFalha('auth.revogarSessao', err);
     } finally {
       AuthStorage.limparSessao();
     }

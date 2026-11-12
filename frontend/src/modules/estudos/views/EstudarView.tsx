@@ -105,14 +105,14 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
   useEffect(() => {
     setTimerId(trilha?.id || SEM_TRILHA_TIMER_ID);
     setDisciplinaId(trilha?.disciplinas[0]?.id || '');
-  }, [trilha?.id]);
+  }, [trilha?.id, trilha?.disciplinas]);
 
   useEffect(() => {
     if (!disciplinaInicialId || !trilha?.disciplinas.some((disciplina) => disciplina.id === disciplinaInicialId)) {
       return;
     }
     setDisciplinaId(disciplinaInicialId);
-  }, [disciplinaInicialId, trilha?.id]);
+  }, [disciplinaInicialId, trilha?.id, trilha?.disciplinas]);
 
   useEffect(() => {
     if (contextoBlocoPlanejamento) {
@@ -125,7 +125,7 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
         contextoBlocoPlanejamento.duracaoMinutos * 60
       );
     }
-  }, [contextoBlocoPlanejamento]);
+  }, [contextoBlocoPlanejamento, timer]);
 
   useEffect(() => {
     try {
@@ -218,7 +218,7 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
         }
       });
     }
-  }, [somenteModalRegistro, registroPlanejamento]);
+  }, [somenteModalRegistro, registroPlanejamento, abrirModal, onRegistroPlanejamentoConcluido, onSessaoRegistrada, trilha?.nome]);
 
   const salvarConfiguracaoPausas = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

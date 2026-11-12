@@ -1,4 +1,5 @@
 import { AuthResponse, UsuarioAutenticado } from './types';
+import { registrarFalha } from '../diagnostico';
 
 export const ACCESS_TOKEN_KEY = 'trilhara_auth_access_token';
 export const USER_STORAGE_KEY = 'trilhara_auth_user';
@@ -82,7 +83,7 @@ export function limparDadosLocaisDoUsuario(usuarioId: string, emitirBroadcast: b
       }
     }
   } catch (err) {
-    console.error('Falha ao limpar dados locais do usuário:', err);
+    registrarFalha('auth.limparDadosLocais', err);
   }
 }
 

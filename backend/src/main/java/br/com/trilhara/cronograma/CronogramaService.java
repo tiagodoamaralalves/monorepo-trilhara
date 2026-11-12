@@ -26,7 +26,9 @@ import br.com.trilhara.cronograma.dto.DisponibilidadeSemanalDTO;
 import br.com.trilhara.cronograma.dto.FalhaBlocoDTO;
 import br.com.trilhara.cronograma.dto.PaginaBlocosDTO;
 import br.com.trilhara.shared.TimezoneContext;
+import br.com.trilhara.shared.erro.CodigoErro;
 import br.com.trilhara.shared.erro.DomainConflictException;
+import br.com.trilhara.shared.erro.ResourceLimitExceededException;
 import br.com.trilhara.shared.mongo.BsonDates;
 import br.com.trilhara.shared.mongo.BsonIds;
 import br.com.trilhara.trilha.Disciplina;
@@ -84,7 +86,7 @@ public class CronogramaService {
 
     public CronogramaDTO criar(String trilhaIdStr, CriarCronogramaRequest request) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
 
         String leaseToken = UUID.randomUUID().toString();
         adquirirLeaseOuFalhar(usuarioId, trilhaId, leaseToken);
@@ -92,13 +94,13 @@ public class CronogramaService {
         try {
             // 1. Limite de 3 cronogramas por trilha
             if (cronogramaRepository.contarPorTrilha(usuarioId, trilhaId) >= 3) {
-                throw new BadRequestException("A trilha já possui o limite máximo de 3 cronogramas.");
+                throw new ResourceLimitExceededException("A trilha já possui o limite máximo de 3 cronogramas.");
             }
 
             // 2. Conflito de modalidade duplicada na mesma trilha (409 DUPLICATE_MODALITY)
             if (cronogramaRepository.buscarPorModalidade(usuarioId, trilhaId, request.modalidade()).isPresent()) {
                 throw new DomainConflictException(
-                        "DUPLICATE_MODALITY",
+                        CodigoErro.DUPLICATE_MODALITY,
                         "Esta trilha já possui um cronograma na modalidade selecionada.");
             }
 
@@ -169,8 +171,8 @@ public class CronogramaService {
 
     public CronogramaDTO atualizar(String trilhaIdStr, String cronogramaIdStr, AtualizarCronogramaRequest request) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
-        ObjectId cronogramaId = BsonIds.toObjectIdOrNotFound(cronogramaIdStr);
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId cronogramaId = BsonIds.parse(cronogramaIdStr, "cronogramaId");
 
         String leaseToken = UUID.randomUUID().toString();
         adquirirLeaseOuFalhar(usuarioId, trilhaId, leaseToken);
@@ -183,7 +185,7 @@ public class CronogramaService {
             if (request.modalidade() != existente.modalidade()
                     && cronogramaRepository.buscarPorModalidadeExceto(usuarioId, trilhaId, request.modalidade(), cronogramaId).isPresent()) {
                 throw new DomainConflictException(
-                        "DUPLICATE_MODALITY",
+                        CodigoErro.DUPLICATE_MODALITY,
                         "Esta trilha já possui um cronograma na modalidade selecionada.");
             }
 
@@ -257,8 +259,8 @@ public class CronogramaService {
 
     public CronogramaDTO ativar(String trilhaIdStr, String cronogramaIdStr) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
-        ObjectId cronogramaId = BsonIds.toObjectIdOrNotFound(cronogramaIdStr);
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId cronogramaId = BsonIds.parse(cronogramaIdStr, "cronogramaId");
 
         String leaseToken = UUID.randomUUID().toString();
         adquirirLeaseOuFalhar(usuarioId, trilhaId, leaseToken);
@@ -294,8 +296,8 @@ public class CronogramaService {
 
     public void excluir(String trilhaIdStr, String cronogramaIdStr) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
-        ObjectId cronogramaId = BsonIds.toObjectIdOrNotFound(cronogramaIdStr);
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId cronogramaId = BsonIds.parse(cronogramaIdStr, "cronogramaId");
 
         String leaseToken = UUID.randomUUID().toString();
         adquirirLeaseOuFalhar(usuarioId, trilhaId, leaseToken);
@@ -340,7 +342,7 @@ public class CronogramaService {
 
     public List<CronogramaDTO> listar(String trilhaIdStr) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
 
         trilhaRepository.buscarEntidade(usuarioId, trilhaId)
                 .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
@@ -366,8 +368,8 @@ public class CronogramaService {
             int tamanho) {
 
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
-        ObjectId cronogramaId = BsonIds.toObjectIdOrNotFound(cronogramaIdStr);
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId cronogramaId = BsonIds.parse(cronogramaIdStr, "cronogramaId");
 
         Cronograma cronograma = cronogramaRepository.buscarPorId(usuarioId, trilhaId, cronogramaId)
                 .orElseThrow(() -> new NotFoundException(ERRO_CRONOGRAMA_NAO_ENCONTRADO));
@@ -447,7 +449,7 @@ public class CronogramaService {
 
     public BlocoCronogramaItemDTO atualizarConclusaoBloco(String blocoIdStr, boolean concluido) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId blocoId = BsonIds.toObjectIdOrNotFound(blocoIdStr);
+        ObjectId blocoId = BsonIds.parse(blocoIdStr, "blocoId");
 
         BlocoCronograma bloco = blocoCronogramaRepository.buscarPorId(usuarioId, blocoId)
                 .orElseThrow(() -> new NotFoundException("Bloco não encontrado"));
@@ -472,8 +474,8 @@ public class CronogramaService {
             String trilhaIdStr, String cronogramaIdStr, UUID operationId) {
 
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
-        ObjectId cronogramaId = BsonIds.toObjectIdOrNotFound(cronogramaIdStr);
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId cronogramaId = BsonIds.parse(cronogramaIdStr, "cronogramaId");
 
         // 1. Idempotência por operationId
         var cache = operacaoConcluirAtrasadosRepository.buscarPorOperationId(usuarioId, operationId);
@@ -484,7 +486,7 @@ public class CronogramaService {
         // 2. Não executa duas operações do mesmo usuário/trilha/cronograma em paralelo
         if (operacaoConcluirAtrasadosRepository.existeOperacaoEmAndamento(usuarioId, trilhaId, cronogramaId)) {
             throw new DomainConflictException(
-                    "OPERATION_IN_PROGRESS",
+                    CodigoErro.SCHEDULE_GENERATION_IN_PROGRESS,
                     "Uma operação de conclusão de blocos atrasados já está em andamento para este cronograma.");
         }
 
@@ -605,7 +607,7 @@ public class CronogramaService {
             trilhaRepository.buscarEntidade(usuarioId, trilhaId)
                     .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
             throw new DomainConflictException(
-                    "SCHEDULE_GENERATION_IN_PROGRESS",
+                    CodigoErro.SCHEDULE_GENERATION_IN_PROGRESS,
                     "Uma geração ou alteração de cronograma já está em andamento para esta trilha.");
         }
     }
@@ -638,7 +640,7 @@ public class CronogramaService {
         }
 
         Set<ObjectId> idsDesejados = participantesIdsStr.stream()
-                .map(BsonIds::toObjectIdOrNotFound)
+                .map(id -> BsonIds.parse(id, "blocoId"))
                 .collect(Collectors.toSet());
 
         List<Disciplina> ativas = disciplinaRepository.listarPorTrilha(usuarioId, trilhaId);

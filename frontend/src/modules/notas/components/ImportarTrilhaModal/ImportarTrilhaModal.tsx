@@ -95,7 +95,7 @@ export const ImportarTrilhaModal: React.FC<ImportarTrilhaModalProps> = ({
           <Button
             variant="primary"
             onClick={handleImportar}
-            isLoading={importando}
+            loading={importando}
             disabled={!trilhaSelecionadaId}
           >
             Importar Trilha

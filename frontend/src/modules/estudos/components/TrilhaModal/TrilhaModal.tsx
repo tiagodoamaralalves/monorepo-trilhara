@@ -145,7 +145,7 @@ export const TrilhaModal: React.FC<TrilhaModalProps> = ({
         icon={<Route size={22} />}
         onSubmit={handleSubmit}
         submitText="Salvar"
-        isLoading={salvando || excluindo}
+        loading={salvando || excluindo}
         deleteAction={
           isEdicao && onExcluirTrilha ? (
             <Button
@@ -172,7 +172,6 @@ export const TrilhaModal: React.FC<TrilhaModalProps> = ({
             if (erroNome) setErroNome('');
           }}
           error={erroNome}
-          autoFocus
           required
         />
 
@@ -235,7 +234,7 @@ export const TrilhaModal: React.FC<TrilhaModalProps> = ({
               <Button
                 type="button"
                 variant="danger"
-                isLoading={excluindo}
+                loading={excluindo}
                 disabled={!confirmacaoValida || excluindo}
                 onClick={() => void handleExcluir()}
               >
@@ -260,7 +259,6 @@ export const TrilhaModal: React.FC<TrilhaModalProps> = ({
               placeholder="excluir"
               maxLength={20}
               autoComplete="off"
-              autoFocus
             />
           </form>
         </Modal>

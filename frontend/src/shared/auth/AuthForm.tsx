@@ -117,7 +117,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({
           setConfirmandoEmail(false);
         });
     }
-  }, []);
+  }, [authContext, toast]);
 
   const requisitosSenha = useMemo(
     () => avaliarRequisitosSenha(senha, email),
@@ -339,7 +339,6 @@ export const AuthForm: React.FC<AuthFormProps> = ({
               onChange={atualizarCampo('nome')}
               disabled={submetendo}
               maxLength={120}
-              autoFocus={isCadastro}
               leftIcon={<User size={16} />}
               aria-describedby={erroGeral ? 'auth-erro' : undefined}
               required
@@ -359,7 +358,6 @@ export const AuthForm: React.FC<AuthFormProps> = ({
             onChange={atualizarCampo('email')}
             disabled={submetendo}
             maxLength={254}
-            autoFocus={!isCadastro}
             leftIcon={<Mail size={16} />}
             aria-describedby={erroGeral ? 'auth-erro' : undefined}
             required
@@ -475,7 +473,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({
             variant="primary"
             size="lg"
             fullWidth
-            isLoading={submetendo}
+            loading={submetendo}
             rightIcon={<ArrowRight size={17} />}
             className={styles.submitBtn}
           >

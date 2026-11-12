@@ -8,7 +8,7 @@ export interface FormActionsProps {
   cancelText?: string;
   onSubmit?: () => void;
   form?: string;
-  isLoading?: boolean;
+  loading?: boolean;
   submitDisabled?: boolean;
   leadingAction?: React.ReactNode;
 }
@@ -19,7 +19,7 @@ export const FormActions: React.FC<FormActionsProps> = ({
   cancelText = 'Cancelar',
   onSubmit,
   form,
-  isLoading = false,
+  loading = false,
   submitDisabled = false,
   leadingAction
 }) => (
@@ -29,7 +29,7 @@ export const FormActions: React.FC<FormActionsProps> = ({
       type="button"
       variant="secondary"
       onClick={onCancel}
-      disabled={isLoading}
+      disabled={loading}
     >
       {cancelText}
     </Button>
@@ -37,7 +37,7 @@ export const FormActions: React.FC<FormActionsProps> = ({
       type={form ? 'submit' : 'button'}
       form={form}
       onClick={form ? undefined : onSubmit}
-      isLoading={isLoading}
+      loading={loading}
       disabled={submitDisabled}
     >
       {submitText}

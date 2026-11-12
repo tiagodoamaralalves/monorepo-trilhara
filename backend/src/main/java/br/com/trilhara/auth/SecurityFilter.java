@@ -12,7 +12,9 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import br.com.trilhara.auth.TokenService.ClaimsToken;
 import br.com.trilhara.auth.TokenService.TokenInvalidoException;
 import br.com.trilhara.shared.TimezoneContext;
+import br.com.trilhara.shared.erro.CodigoErro;
 import br.com.trilhara.shared.erro.ProblemDetails;
+import br.com.trilhara.shared.erro.ProblemDetailsFactory;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.ws.rs.Priorities;
@@ -108,7 +110,8 @@ public class SecurityFilter implements ContainerRequestFilter, ContainerResponse
                     .header("Access-Control-Allow-Origin", origin)
                     .header("Access-Control-Allow-Credentials", "true")
                     .header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-                    .header("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept, Idempotency-Key, X-Timezone")
+                    .header("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept, Idempotency-Key, X-Timezone, X-Correlation-ID")
+                    .header("Access-Control-Expose-Headers", "X-Correlation-ID, Retry-After")
                     .header("Access-Control-Max-Age", "3600")
                     .build());
         }
@@ -222,6 +225,7 @@ public class SecurityFilter implements ContainerRequestFilter, ContainerResponse
         if (origin != null && origensPermitidas.contains(origin)) {
             responseContext.getHeaders().putSingle("Access-Control-Allow-Origin", origin);
             responseContext.getHeaders().putSingle("Access-Control-Allow-Credentials", "true");
+            responseContext.getHeaders().putSingle("Access-Control-Expose-Headers", "X-Correlation-ID, Retry-After");
             responseContext.getHeaders().putSingle("Vary", ORIGIN_HEADER);
         }
 
@@ -281,17 +285,11 @@ public class SecurityFilter implements ContainerRequestFilter, ContainerResponse
     }
 
     private static void abortarNaoAutorizado(ContainerRequestContext requestContext, String detalhe) {
-        String instance = normalizarPath(requestContext.getUriInfo() != null ? requestContext.getUriInfo().getPath() : null);
-        ProblemDetails problem = new ProblemDetails(
-                "urn:trilhara:error:unauthorized",
-                "Não autorizado",
-                Response.Status.UNAUTHORIZED.getStatusCode(),
+        ProblemDetails problem = ProblemDetailsFactory.criar(
+                CodigoErro.UNAUTHORIZED,
                 detalhe,
-                instance,
-                "UNAUTHORIZED",
-                null
-        );
-        requestContext.abortWith(Response.status(Response.Status.UNAUTHORIZED)
+                instanciaDaRequisicao(requestContext));
+        requestContext.abortWith(Response.status(problem.status())
                 .header(HttpHeaders.WWW_AUTHENTICATE, "Bearer realm=\"trilhara\"")
                 .type(ProblemDetails.MEDIA_TYPE)
                 .entity(problem)
@@ -299,20 +297,19 @@ public class SecurityFilter implements ContainerRequestFilter, ContainerResponse
     }
 
     private static void abortarProibido(ContainerRequestContext requestContext, String detalhe) {
-        String instance = normalizarPath(requestContext.getUriInfo() != null ? requestContext.getUriInfo().getPath() : null);
-        ProblemDetails problem = new ProblemDetails(
-                "urn:trilhara:error:forbidden",
-                "Acesso negado",
-                Response.Status.FORBIDDEN.getStatusCode(),
+        ProblemDetails problem = ProblemDetailsFactory.criar(
+                CodigoErro.FORBIDDEN,
                 detalhe,
-                instance,
-                "FORBIDDEN",
-                null
-        );
-        requestContext.abortWith(Response.status(Response.Status.FORBIDDEN)
+                instanciaDaRequisicao(requestContext));
+        requestContext.abortWith(Response.status(problem.status())
                 .type(ProblemDetails.MEDIA_TYPE)
                 .entity(problem)
                 .build());
+    }
+
+    private static String instanciaDaRequisicao(ContainerRequestContext requestContext) {
+        String path = requestContext.getUriInfo() != null ? requestContext.getUriInfo().getPath() : null;
+        return normalizarPath(path);
     }
 }
 

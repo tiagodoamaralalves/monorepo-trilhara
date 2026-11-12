@@ -7,6 +7,9 @@ import jakarta.ws.rs.core.UriInfo;
 import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
+/**
+ * Recurso inexistente ou de outro tenant → {@code 404 NOT_FOUND}, sem revelar existência (D-03).
+ */
 @Provider
 public class NotFoundExceptionMapper implements ExceptionMapper<NotFoundException> {
 
@@ -15,25 +18,20 @@ public class NotFoundExceptionMapper implements ExceptionMapper<NotFoundExceptio
 
     @Override
     public Response toResponse(NotFoundException exception) {
-        String instance = DomainConflictExceptionMapper.resolvePath(uriInfo);
         String msg = exception.getMessage();
         String detail = (msg != null && !msg.isBlank() && !msg.startsWith("HTTP 404"))
                 ? msg
                 : "Recurso não encontrado.";
 
-        ProblemDetails problem = new ProblemDetails(
-                "urn:trilhara:error:not-found",
-                "Recurso não encontrado",
-                Response.Status.NOT_FOUND.getStatusCode(),
+        ProblemDetails problem = ProblemDetailsFactory.criar(
+                CodigoErro.NOT_FOUND,
                 detail,
-                instance,
-                "NOT_FOUND",
-                null
-        );
+                DomainConflictExceptionMapper.resolvePath(uriInfo));
 
-        return Response.status(Response.Status.NOT_FOUND)
+        return Response.status(problem.status())
                 .type(ProblemDetails.MEDIA_TYPE)
                 .entity(problem)
                 .build();
     }
 }
+

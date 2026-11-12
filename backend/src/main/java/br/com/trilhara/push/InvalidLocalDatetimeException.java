@@ -1,16 +1,29 @@
 package br.com.trilhara.push;
 
-import java.util.Map;
+import br.com.trilhara.shared.erro.CodigoErro;
+import br.com.trilhara.shared.erro.ProblemDetails;
+import br.com.trilhara.shared.erro.ProblemDetailsFactory;
 import jakarta.ws.rs.WebApplicationException;
-import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
+/**
+ * Horário local inexistente por gap de DST → {@code 400 INVALID_LOCAL_DATETIME} (D-04).
+ */
 public class InvalidLocalDatetimeException extends WebApplicationException {
 
     public InvalidLocalDatetimeException(String message) {
-        super(message, Response.status(Response.Status.BAD_REQUEST)
-                .type(MediaType.APPLICATION_JSON_TYPE)
-                .entity(Map.of("codigo", "INVALID_LOCAL_DATETIME", "mensagem", message))
-                .build());
+        super(message, resposta(message));
+    }
+
+    private static Response resposta(String message) {
+        ProblemDetails problem = ProblemDetailsFactory.criar(
+                CodigoErro.INVALID_LOCAL_DATETIME,
+                message,
+                "/api/tarefas");
+        return Response.status(problem.status())
+                .type(ProblemDetails.MEDIA_TYPE)
+                .entity(problem)
+                .build();
     }
 }
+

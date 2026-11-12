@@ -30,7 +30,10 @@ import br.com.trilhara.nota.dto.RestauracaoLixeiraResponse;
 import br.com.trilhara.nota.dto.ResultadoBuscaNotaDTO;
 import br.com.trilhara.nota.dto.SecaoResponse;
 import br.com.trilhara.nota.dto.SincronizacaoTrilhaResponse;
+import br.com.trilhara.shared.erro.CodigoErro;
 import br.com.trilhara.shared.erro.ProblemDetails;
+import br.com.trilhara.shared.erro.ValidationException;
+import br.com.trilhara.shared.erro.ProblemDetailsFactory;
 import br.com.trilhara.shared.mongo.BsonDates;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -479,7 +482,7 @@ public class NotaService {
         if (markdown != null) {
             byte[] bytes = markdown.getBytes(StandardCharsets.UTF_8);
             if (bytes.length > MAX_MARKDOWN_BYTES) {
-                throw new BadRequestException("O conteúdo da página excede o limite máximo permitido de 512 KB.");
+                throw new ValidationException("conteudoMarkdown", "O conteúdo da página excede o limite máximo permitido de 512 KB.");
             }
         }
     }
@@ -831,13 +834,10 @@ public class NotaService {
     }
 
     private WebApplicationException lancarErroItemLixeiraExpirado() {
-        ProblemDetails problem = ProblemDetails.of(
-                "urn:trilhara:error:trash-item-expired",
-                "Item da lixeira expirado",
-                Response.Status.NOT_FOUND.getStatusCode(),
+        ProblemDetails problem = ProblemDetailsFactory.criar(
+                CodigoErro.TRASH_ITEM_EXPIRED,
                 "O item da lixeira expirou após o período de 30 dias ou não foi encontrado.",
-                "/api/notas/lixeira/restaurar",
-                "TRASH_ITEM_EXPIRED"
+                "/api/notas/lixeira/restaurar"
         );
         return new WebApplicationException(
                 Response.status(Response.Status.NOT_FOUND)

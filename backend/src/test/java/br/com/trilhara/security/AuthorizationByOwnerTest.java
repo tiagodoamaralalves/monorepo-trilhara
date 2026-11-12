@@ -525,7 +525,7 @@ public class AuthorizationByOwnerTest {
         given()
                 .header("Authorization", "Bearer " + tokenB)
                 .contentType(ContentType.JSON)
-                .body(Map.of("titulo", "Tarefa Modificada", "concluido", true))
+                .body(Map.of("titulo", "Tarefa Modificada"))
                 .when()
                 .put("/api/tarefas/" + tarefaAId)
                 .then()

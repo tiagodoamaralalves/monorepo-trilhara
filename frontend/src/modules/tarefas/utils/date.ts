@@ -46,20 +46,10 @@ export function criarGradeSemana(inicioISO: string): Date[] {
   });
 }
 
-export function formatarDataBR(dataISO?: string | null): string {
+function formatarDataBR(dataISO?: string | null): string {
   if (!dataISO) return '';
   const [y, m, d] = dataISO.split('-');
   return `${d}/${m}/${y}`;
-}
-
-export function formatarDataExtenso(dataISO: string): string {
-  const [y, m, d] = dataISO.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
-  return date.toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long'
-  });
 }
 
 export function formatarDataRelativa(dataISO: string): { label: string; isAtrasada: boolean } {

@@ -55,7 +55,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
       <div className={styles.left}>
         <div
           className={styles.checkboxWrapper}
-          onClick={(e) => e.stopPropagation()}
+          onClickCapture={(e) => e.stopPropagation()}
         >
           <Checkbox
             checked={tarefa.concluida}

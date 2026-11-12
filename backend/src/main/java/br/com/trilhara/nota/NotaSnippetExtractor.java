@@ -3,7 +3,9 @@ package br.com.trilhara.nota;
 import java.text.Normalizer;
 import java.util.Set;
 
+import br.com.trilhara.shared.erro.CodigoErro;
 import br.com.trilhara.shared.erro.ProblemDetails;
+import br.com.trilhara.shared.erro.ProblemDetailsFactory;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
@@ -136,13 +138,10 @@ public class NotaSnippetExtractor {
     }
 
     private WebApplicationException erroQueryInvalida() {
-        ProblemDetails problem = ProblemDetails.of(
-                "urn:trilhara:error:invalid-search-query",
-                "Consulta de busca inválida",
-                Response.Status.BAD_REQUEST.getStatusCode(),
+        ProblemDetails problem = ProblemDetailsFactory.criar(
+                CodigoErro.INVALID_SEARCH_QUERY,
                 "A consulta de busca deve conter pelo menos um termo significativo com 2 ou mais caracteres (stop words isoladas não são pesquisáveis).",
-                "/api/notas/busca",
-                "INVALID_SEARCH_QUERY"
+                "/api/notas/busca"
         );
         return new WebApplicationException(
                 Response.status(Response.Status.BAD_REQUEST)

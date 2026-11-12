@@ -5,7 +5,7 @@ export type ThemeMode = 'dark' | 'light';
 const STORAGE_THEME_KEY = 'trilhara_theme';
 const THEME_CHANGE_EVENT = 'trilhara:theme-change';
 
-export function getStoredTheme(): ThemeMode {
+function getStoredTheme(): ThemeMode {
   if (typeof window === 'undefined') return 'dark';
   try {
     const saved = window.localStorage.getItem(STORAGE_THEME_KEY);
@@ -18,12 +18,12 @@ export function getStoredTheme(): ThemeMode {
   return 'dark';
 }
 
-export function applyTheme(theme: ThemeMode): void {
+function applyTheme(theme: ThemeMode): void {
   if (typeof document === 'undefined') return;
   document.documentElement.setAttribute('data-theme', theme);
 }
 
-export function setStoredTheme(theme: ThemeMode): void {
+function setStoredTheme(theme: ThemeMode): void {
   applyTheme(theme);
   if (typeof window === 'undefined') return;
   try {

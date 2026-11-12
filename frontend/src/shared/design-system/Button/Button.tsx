@@ -6,26 +6,27 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   size?: 'sm' | 'md' | 'lg';
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
-  isLoading?: boolean;
+  /** Ação em andamento: spinner interno, largura preservada, `aria-busy` e desabilitado (D-37). */
+  loading?: boolean;
   fullWidth?: boolean;
   iconOnly?: boolean;
   selected?: boolean;
 }
 
-export const Button: React.FC<ButtonProps> = ({
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
   children,
   variant = 'primary',
   size = 'md',
   leftIcon,
   rightIcon,
-  isLoading = false,
+  loading = false,
   fullWidth = false,
   iconOnly = false,
   selected,
   className = '',
   disabled,
   ...props
-}) => {
+}, ref) => {
   const classNames = [
     styles.btn,
     styles[variant],
@@ -40,19 +41,22 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <button
+      ref={ref}
       className={classNames}
-      disabled={disabled || isLoading}
-      aria-disabled={disabled || isLoading}
+      disabled={disabled || loading}
+      aria-disabled={disabled || loading}
       aria-pressed={selected}
-      aria-busy={isLoading || undefined}
+      aria-busy={loading || undefined}
       {...props}
     >
-      {isLoading && <span className={styles.spinner} aria-hidden="true" />}
-      <span className={`${styles.content} ${isLoading ? styles.loadingContent : ''}`}>
+      {loading && <span className={styles.spinner} aria-hidden="true" />}
+      <span className={`${styles.content} ${loading ? styles.loadingContent : ''}`}>
         {leftIcon && <span className={styles.icon}>{leftIcon}</span>}
         {children && <span className={styles.label}>{children}</span>}
         {rightIcon && <span className={styles.icon}>{rightIcon}</span>}
       </span>
     </button>
   );
-};
+});
+
+Button.displayName = 'Button';

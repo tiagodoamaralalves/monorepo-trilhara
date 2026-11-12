@@ -1,11 +1,11 @@
 package br.com.trilhara.nota;
 
-import static br.com.trilhara.shared.mongo.BsonIds.toObjectIdOrNotFound;
 
 import org.bson.types.ObjectId;
 
 import br.com.trilhara.auth.Autenticado;
 import br.com.trilhara.auth.AuthContext;
+import br.com.trilhara.shared.mongo.BsonIds;
 import br.com.trilhara.nota.dto.AtualizarSecaoRequest;
 import br.com.trilhara.nota.dto.ExclusaoLixeiraResponse;
 import br.com.trilhara.nota.dto.SecaoResponse;
@@ -34,25 +34,25 @@ public class SecaoResource {
     AuthContext authContext;
 
     private ObjectId usuarioId() {
-        return toObjectIdOrNotFound(authContext.usuarioId());
+        return authContext.usuarioIdObjectId();
     }
 
     @GET
     @Path("/{id}")
     public SecaoResponse buscar(@PathParam("id") String id) {
-        return notaService.buscarSecao(usuarioId(), toObjectIdOrNotFound(id));
+        return notaService.buscarSecao(usuarioId(), BsonIds.parse(id, "id"));
     }
 
     @PUT
     @Path("/{id}")
     @Consumes(MediaType.APPLICATION_JSON)
     public SecaoResponse atualizar(@PathParam("id") String id, @Valid AtualizarSecaoRequest request) {
-        return notaService.atualizarSecao(usuarioId(), toObjectIdOrNotFound(id), request);
+        return notaService.atualizarSecao(usuarioId(), BsonIds.parse(id, "id"), request);
     }
 
     @DELETE
     @Path("/{id}")
     public ExclusaoLixeiraResponse deletar(@PathParam("id") String id) {
-        return notaService.deletarSecao(usuarioId(), toObjectIdOrNotFound(id));
+        return notaService.deletarSecao(usuarioId(), BsonIds.parse(id, "id"));
     }
 }

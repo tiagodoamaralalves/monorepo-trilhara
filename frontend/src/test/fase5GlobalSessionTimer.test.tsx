@@ -17,6 +17,7 @@ import { ToastProvider } from '../shared/design-system/Toast/Toast';
 import { AuthContext, AuthContextValue } from '../shared/auth/AuthContext';
 import { getPomodoroTimerStorageKey } from '../modules/pomodoro/PomodoroApp';
 import * as apiModule from '../shared/auth/api';
+import type { SessaoRegistradaDTO } from '../shared/contracts/domainContracts';
 
 const mockAuthValue = (usuarioId: string | null = 'user-1'): AuthContextValue => ({
   usuario: usuarioId
@@ -135,12 +136,13 @@ describe('FASE 5 - Frontend Shared & Timers', () => {
     });
 
     it('deve suportar retry exclusivo da Etapa 2 quando a sessão já tiver sido salva', async () => {
-      const sessaoPrevia: any = {
+      const sessaoPrevia: SessaoRegistradaDTO = {
         id: 'sess-salva-1',
         trilhaId: 'trilha-1',
         disciplinaId: 'disc-1',
         duracaoSegundos: 1800,
-        dataSessao: '2026-11-09'
+        dataSessao: '2026-11-09',
+        criadoEm: '2026-11-09T12:00:00Z'
       };
 
       const requestSpy = vi.spyOn(apiModule, 'request').mockResolvedValueOnce({

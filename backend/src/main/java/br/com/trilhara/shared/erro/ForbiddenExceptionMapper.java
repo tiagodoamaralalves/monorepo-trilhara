@@ -7,6 +7,9 @@ import jakarta.ws.rs.core.UriInfo;
 import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
+/**
+ * Operação administrativa sem papel exigido → {@code 403 FORBIDDEN} (D-04).
+ */
 @Provider
 public class ForbiddenExceptionMapper implements ExceptionMapper<ForbiddenException> {
 
@@ -15,25 +18,20 @@ public class ForbiddenExceptionMapper implements ExceptionMapper<ForbiddenExcept
 
     @Override
     public Response toResponse(ForbiddenException exception) {
-        String instance = DomainConflictExceptionMapper.resolvePath(uriInfo);
         String msg = exception.getMessage();
         String detail = (msg != null && !msg.isBlank() && !msg.startsWith("HTTP 403"))
                 ? msg
                 : "Acesso negado.";
 
-        ProblemDetails problem = new ProblemDetails(
-                "urn:trilhara:error:forbidden",
-                "Acesso negado",
-                Response.Status.FORBIDDEN.getStatusCode(),
+        ProblemDetails problem = ProblemDetailsFactory.criar(
+                CodigoErro.FORBIDDEN,
                 detail,
-                instance,
-                "FORBIDDEN",
-                null
-        );
+                DomainConflictExceptionMapper.resolvePath(uriInfo));
 
-        return Response.status(Response.Status.FORBIDDEN)
+        return Response.status(problem.status())
                 .type(ProblemDetails.MEDIA_TYPE)
                 .entity(problem)
                 .build();
     }
 }
+

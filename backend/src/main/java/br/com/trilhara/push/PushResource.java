@@ -14,6 +14,7 @@ import br.com.trilhara.push.dto.AtualizarPreferenciasPushResponse;
 import br.com.trilhara.push.dto.PushConfigResponse;
 import br.com.trilhara.push.dto.PushSubscriptionRequest;
 import br.com.trilhara.push.dto.PushSubscriptionResponse;
+import br.com.trilhara.shared.erro.ValidationException;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.Consumes;
@@ -24,6 +25,7 @@ import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -73,11 +75,7 @@ public class PushResource {
     @Path("/subscriptions")
     public Response registrarInscricao(PushSubscriptionRequest request) {
         if (request == null || request.endpoint() == null || request.endpoint().isBlank()) {
-            throw new WebApplicationException(
-                    Response.status(Response.Status.BAD_REQUEST)
-                            .entity(Map.of("erro", "Endpoint é obrigatório."))
-                            .build()
-            );
+            throw new ValidationException("endpoint", "Endpoint é obrigatório.");
         }
 
         ObjectId usuarioId = extrairUsuarioId();
@@ -115,20 +113,12 @@ public class PushResource {
         }
 
         if (endpoint == null || endpoint.isBlank()) {
-            throw new WebApplicationException(
-                    Response.status(Response.Status.BAD_REQUEST)
-                            .entity(Map.of("erro", "Endpoint é obrigatório para remoção."))
-                            .build()
-            );
+            throw new ValidationException("endpoint", "Endpoint é obrigatório para remoção.");
         }
 
         boolean removido = pushSubscriptionRepository.removerPorEndpoint(usuarioId, endpoint.trim());
         if (!removido) {
-            throw new WebApplicationException(
-                    Response.status(Response.Status.NOT_FOUND)
-                            .entity(Map.of("erro", "Inscrição push não encontrada."))
-                            .build()
-            );
+            throw new NotFoundException("Inscrição push não encontrada.");
         }
         return Response.ok(Map.of("removido", true)).build();
     }
@@ -143,10 +133,6 @@ public class PushResource {
     }
 
     private ObjectId extrairUsuarioId() {
-        String uidStr = authContext.usuarioId();
-        if (uidStr == null || !ObjectId.isValid(uidStr)) {
-            throw new WebApplicationException(Response.Status.UNAUTHORIZED);
-        }
-        return new ObjectId(uidStr);
+        return authContext.usuarioIdObjectId();
     }
 }

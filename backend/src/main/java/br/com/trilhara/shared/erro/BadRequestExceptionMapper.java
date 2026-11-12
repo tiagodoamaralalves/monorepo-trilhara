@@ -7,6 +7,13 @@ import jakarta.ws.rs.core.UriInfo;
 import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
+/**
+ * Requisição sintaticamente inválida → {@code 400 VALIDATION_ERROR} (D-04).
+ *
+ * <p>O código legado {@code BAD_REQUEST} foi eliminado do catálogo: todo 400 do produto é
+ * falha de validação do payload. Mensagens genéricas do container ({@code HTTP 400 ...})
+ * são substituídas por um {@code detail} neutro.</p>
+ */
 @Provider
 public class BadRequestExceptionMapper implements ExceptionMapper<BadRequestException> {
 
@@ -15,25 +22,20 @@ public class BadRequestExceptionMapper implements ExceptionMapper<BadRequestExce
 
     @Override
     public Response toResponse(BadRequestException exception) {
-        String instance = DomainConflictExceptionMapper.resolvePath(uriInfo);
         String msg = exception.getMessage();
         String detail = (msg != null && !msg.isBlank() && !msg.startsWith("HTTP 400"))
                 ? msg
-                : "Requisição inválida.";
+                : "Um ou mais campos contêm valores inválidos.";
 
-        ProblemDetails problem = new ProblemDetails(
-                "urn:trilhara:error:bad-request",
-                "Requisição inválida",
-                Response.Status.BAD_REQUEST.getStatusCode(),
+        ProblemDetails problem = ProblemDetailsFactory.criar(
+                CodigoErro.VALIDATION_ERROR,
                 detail,
-                instance,
-                "BAD_REQUEST",
-                null
-        );
+                DomainConflictExceptionMapper.resolvePath(uriInfo));
 
-        return Response.status(Response.Status.BAD_REQUEST)
+        return Response.status(problem.status())
                 .type(ProblemDetails.MEDIA_TYPE)
                 .entity(problem)
                 .build();
     }
 }
+

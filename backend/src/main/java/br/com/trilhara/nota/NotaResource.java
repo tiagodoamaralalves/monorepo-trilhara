@@ -1,6 +1,5 @@
 package br.com.trilhara.nota;
 
-import static br.com.trilhara.shared.mongo.BsonIds.toObjectIdOrNotFound;
 
 import java.net.URI;
 import java.util.List;
@@ -10,6 +9,7 @@ import org.bson.types.ObjectId;
 
 import br.com.trilhara.auth.Autenticado;
 import br.com.trilhara.auth.AuthContext;
+import br.com.trilhara.shared.mongo.BsonIds;
 import br.com.trilhara.nota.dto.AtualizarNotaRequest;
 import br.com.trilhara.nota.dto.BuscaNotasResponse;
 import br.com.trilhara.nota.dto.CriarNotaRequest;
@@ -47,7 +47,7 @@ public class NotaResource {
     AuthContext authContext;
 
     private ObjectId usuarioId() {
-        return toObjectIdOrNotFound(authContext.usuarioId());
+        return authContext.usuarioIdObjectId();
     }
 
     @POST
@@ -65,8 +65,8 @@ public class NotaResource {
 
         NotaDetalheResponse nota = notaService.criarNota(
                 usuarioId(),
-                toObjectIdOrNotFound(cadernoIdStr),
-                toObjectIdOrNotFound(secaoIdStr),
+                BsonIds.parse(cadernoIdStr, "cadernoId"),
+                BsonIds.parse(secaoIdStr, "secaoId"),
                 request
         );
         URI location = URI.create("/api/notas/" + nota.id());
@@ -95,7 +95,7 @@ public class NotaResource {
     public RestauracaoLixeiraResponse restaurar(
             @PathParam("tipo") String tipo,
             @PathParam("id") String id) {
-        return notaService.restaurarItem(usuarioId(), tipo, toObjectIdOrNotFound(id));
+        return notaService.restaurarItem(usuarioId(), tipo, BsonIds.parse(id, "id"));
     }
 
     @DELETE
@@ -107,19 +107,19 @@ public class NotaResource {
     @GET
     @Path("/{id}")
     public NotaDetalheResponse buscar(@PathParam("id") String id) {
-        return notaService.buscarNota(usuarioId(), toObjectIdOrNotFound(id));
+        return notaService.buscarNota(usuarioId(), BsonIds.parse(id, "id"));
     }
 
     @PUT
     @Path("/{id}")
     @Consumes(MediaType.APPLICATION_JSON)
     public NotaDetalheResponse atualizar(@PathParam("id") String id, @Valid AtualizarNotaRequest request) {
-        return notaService.atualizarNota(usuarioId(), toObjectIdOrNotFound(id), request);
+        return notaService.atualizarNota(usuarioId(), BsonIds.parse(id, "id"), request);
     }
 
     @DELETE
     @Path("/{id}")
     public ExclusaoLixeiraResponse deletar(@PathParam("id") String id) {
-        return notaService.deletarNota(usuarioId(), toObjectIdOrNotFound(id));
+        return notaService.deletarNota(usuarioId(), BsonIds.parse(id, "id"));
     }
 }

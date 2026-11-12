@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { registrarFalha } from '@shared/diagnostico';
 import { useGlobalSessionModal } from '@shared/design-system';
 import { sessaoGlobalService } from '@shared/services/sessaoGlobalService';
 import {
   EstudosService,
   CronogramaDTO,
   BlocoCronogramaItemDTO,
-  PaginaBlocosDTO,
+  Pagina,
   DisponibilidadeSemanalDTO,
 } from '../services/estudosService';
 import { Trilha, RegistroPlanejamentoPendente } from '../types/trilhara';
@@ -49,7 +50,7 @@ export function PlanejamentoView({
   const [loadingCronogramas, setLoadingCronogramas] = useState(false);
 
   // Blocos paginados
-  const [paginaBlocos, setPaginaBlocos] = useState<PaginaBlocosDTO | null>(null);
+  const [paginaBlocos, setPaginaBlocos] = useState<Pagina<BlocoCronogramaItemDTO> | null>(null);
   const [page, setPage] = useState(1);
   const [concluidoFiltro, setConcluidoFiltro] = useState<string>('');
   const [loadingBlocos, setLoadingBlocos] = useState(false);
@@ -96,7 +97,7 @@ export function PlanejamentoView({
           setSelectedTrilhaId(lista[0].id);
         }
       } catch (err) {
-        console.error('Erro ao carregar trilhas:', err);
+        registrarFalha('planejamento.trilhas', err);
         setErrorMessage('Não foi possível carregar suas trilhas.');
       } finally {
         setLoadingTrilhas(false);
@@ -122,7 +123,7 @@ export function PlanejamentoView({
         const detalhe = await EstudosService.buscarTrilha(selectedTrilhaId);
         setSelectedTrilhaDetalhe(detalhe);
       } catch (err) {
-        console.error('Erro ao buscar detalhe da trilha:', err);
+        registrarFalha('planejamento.detalheTrilha', err);
       }
     }
     void carregarDetalhe();
@@ -135,7 +136,7 @@ export function PlanejamentoView({
         const disp = await EstudosService.obterDisponibilidadeSemanal();
         setDisponibilidade(disp);
       } catch (err) {
-        console.error('Erro ao carregar disponibilidade semanal:', err);
+        registrarFalha('planejamento.disponibilidade', err);
       }
     }
     void carregarDisponibilidade();
@@ -159,7 +160,7 @@ export function PlanejamentoView({
         setSelectedCronogramaId('');
       }
     } catch (err) {
-      console.error('Erro ao carregar cronogramas:', err);
+      registrarFalha('planejamento.cronogramas', err);
       setErrorMessage('Erro ao buscar cronogramas da trilha.');
     } finally {
       setLoadingCronogramas(false);
@@ -195,7 +196,7 @@ export function PlanejamentoView({
         const res = await EstudosService.listarBlocosCronograma(trilhaId, cronogramaId, params);
         setPaginaBlocos(res);
       } catch (err) {
-        console.error('Erro ao carregar blocos do cronograma:', err);
+        registrarFalha('planejamento.blocos', err);
         setErrorMessage('Erro ao listar blocos do cronograma.');
       } finally {
         setLoadingBlocos(false);
@@ -301,11 +302,11 @@ export function PlanejamentoView({
         const atualizada = await EstudosService.buscarTrilha(selectedTrilhaId);
         onTrilhaAtualizada(atualizada);
       }
-    } catch (err: any) {
-      console.error('Erro ao gerar cronograma:', err);
-      if (err.message && err.message.includes('DUPLICATE_MODALITY')) {
+    } catch (err) {
+      registrarFalha('planejamento.gerar', err);
+      if (err instanceof Error && err.message.includes('DUPLICATE_MODALITY')) {
         setErrorMessage('Esta trilha já possui um cronograma com a modalidade selecionada.');
-      } else if (err.message && err.message.includes('SCHEDULE_GENERATION_IN_PROGRESS')) {
+      } else if (err instanceof Error && err.message.includes('SCHEDULE_GENERATION_IN_PROGRESS')) {
         setErrorMessage('Existe outra geração de cronograma em andamento para esta trilha. Tente novamente em alguns segundos.');
       } else {
         setErrorMessage(err.message || 'Erro ao gerar cronograma.');
@@ -324,8 +325,8 @@ export function PlanejamentoView({
         const atualizada = await EstudosService.buscarTrilha(selectedTrilhaId);
         onTrilhaAtualizada(atualizada);
       }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Erro ao ativar cronograma.');
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Erro ao ativar cronograma.');
     }
   };
 
@@ -341,8 +342,8 @@ export function PlanejamentoView({
         const atualizada = await EstudosService.buscarTrilha(selectedTrilhaId);
         onTrilhaAtualizada(atualizada);
       }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Erro ao excluir cronograma.');
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Erro ao excluir cronograma.');
     }
   };
 
@@ -353,8 +354,8 @@ export function PlanejamentoView({
         if (selectedTrilhaId && selectedCronogramaId) {
           carregarBlocos(selectedTrilhaId, selectedCronogramaId, page, concluidoFiltro);
         }
-      } catch (err: any) {
-        setErrorMessage(err.message || 'Erro ao atualizar status do bloco.');
+      } catch (err) {
+        setErrorMessage(err instanceof Error ? err.message : 'Erro ao atualizar status do bloco.');
       }
     } else {
       abrirModal({
@@ -386,8 +387,8 @@ export function PlanejamentoView({
       if (selectedTrilhaId && selectedCronogramaId) {
         carregarBlocos(selectedTrilhaId, selectedCronogramaId, page, concluidoFiltro);
       }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Erro ao concluir blocos atrasados.');
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Erro ao concluir blocos atrasados.');
     }
   };
 
@@ -661,7 +662,7 @@ export function PlanejamentoView({
                     </div>
                   </div>
 
-                  <div className={styles.cronogramaActions} onClick={e => e.stopPropagation()}>
+                  <div className={styles.cronogramaActions} onClickCapture={(e) => e.stopPropagation()}>
                     {!c.ativo && (
                       <button
                         type="button"

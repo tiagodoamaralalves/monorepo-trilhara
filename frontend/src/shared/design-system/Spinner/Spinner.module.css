@@ -1,0 +1,47 @@
+.spinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.circulo {
+  display: block;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: var(--radius-pill, 999px);
+  animation: girar 700ms linear infinite;
+}
+
+.sm .circulo {
+  width: 14px;
+  height: 14px;
+}
+
+.md .circulo {
+  width: 20px;
+  height: 20px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .circulo {
+    animation-duration: 2s;
+  }
+}

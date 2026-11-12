@@ -14,6 +14,9 @@ import jakarta.ws.rs.core.UriInfo;
 import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
+/**
+ * Bean Validation → {@code 400 VALIDATION_ERROR} com {@code errors} por campo (D-04).
+ */
 @Provider
 public class ConstraintViolationExceptionMapper implements ExceptionMapper<ConstraintViolationException> {
 
@@ -24,18 +27,13 @@ public class ConstraintViolationExceptionMapper implements ExceptionMapper<Const
     public Response toResponse(ConstraintViolationException exception) {
         Map<String, List<String>> errors = agruparErros(exception);
 
-        String instance = DomainConflictExceptionMapper.resolvePath(uriInfo);
-        ProblemDetails problem = new ProblemDetails(
-                "urn:trilhara:error:validation",
-                "Erro de validação",
-                Response.Status.BAD_REQUEST.getStatusCode(),
+        ProblemDetails problem = ProblemDetailsFactory.criar(
+                CodigoErro.VALIDATION_ERROR,
                 "Um ou mais campos contêm valores inválidos.",
-                instance,
-                "VALIDATION_ERROR",
-                errors.isEmpty() ? null : errors
-        );
+                DomainConflictExceptionMapper.resolvePath(uriInfo),
+                errors);
 
-        return Response.status(Response.Status.BAD_REQUEST)
+        return Response.status(problem.status())
                 .type(ProblemDetails.MEDIA_TYPE)
                 .entity(problem)
                 .build();
@@ -68,3 +66,4 @@ public class ConstraintViolationExceptionMapper implements ExceptionMapper<Const
         return nomeCampo == null || nomeCampo.isEmpty() ? "geral" : nomeCampo;
     }
 }
+

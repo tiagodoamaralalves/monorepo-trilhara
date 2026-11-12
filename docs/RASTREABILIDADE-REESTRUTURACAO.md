@@ -38,8 +38,9 @@
 | A23 | Scheduler push não processa o mesmo item em paralelo; expirados não enviados; backoff | `push/PushDeliverySchedulerTest` (3); `push/LembretePushLifecycleTest` (4); `push/LembretePushCalculatorTest` (3) | Coberto |
 | A24 | Frontend com Vitest + RTL + jsdom; cada critério de UI tem teste executável por `npm test` + `npm run build` | 14 arquivos / 109 testes; `npm run build` verde | Coberto |
 | A25 | Conta excluída retorna 202 e worker conclui as 18 coleções sem órfãos, mesmo com falha injetada | `auth/AccountDeletionIntegrationTest` (4, inclui `deveRetomarExclusaoAposFalhasEmCadaColecaoSemDeixarOrfaos`) | **Parcial com risco** — as 3 coleções fora do inventário (`handoff_tokens`, `operacoes_concluir_atrasados`, `planejamento_ciclo`) **não** são purgadas (REVISAO §5 I-3) |
-| A26 | IDs HTTP: malformado → 400 `INVALID_IDENTIFIER`; inexistente/outro tenant → 404 | `AuthorizationByOwnerTest`; `shared/ProblemDetailsMapperTest` (6) | Parcial — `BsonIds.toObjectIdOrNotFound` lança **404**, não 400 (divergência §1.1) |
-| A27 | Erros RFC 9457 (`application/problem+json` + `type/title/status/detail/instance/code`) sem vazar detalhe interno | `shared/ProblemDetailsMapperTest` (6) | Coberto |
+| A26 | IDs HTTP: malformado → 400 `INVALID_IDENTIFIER`; inexistente/outro tenant → 404 | `shared/InvalidIdentifierTest` (3: 400 + `errors[trilhaId]`, 404, 401); `shared/ProblemDetailsCatalogoTest` (4); `shared/mongo/BsonRoundTripTest` (2, `BsonIds.parse`) | **Coberto (R1)** — `toObjectIdOrNotFound` removido; `BsonIds.parse` é a única conversão |
+| A27 | Erros RFC 9457 (`application/problem+json` + `type/title/status/detail/instance/code`) sem vazar detalhe interno | `shared/ProblemDetailsCatalogoTest` (4, varre os 22 códigos); `shared/ProblemDetailsMapperTest` (6); `shared/DuplicateKeyMapperTest` (3); `shared/CorrelationIdFilterTest` (3) | **Coberto (R1)** — `ProblemDetailsFactory` é o único construtor |
+| A29 | Mass assignment: `usuarioId`/`criadoEm` no body → 400 `VALIDATION_ERROR` com `errors[prop]` | `shared/MassAssignmentTest` (3) | **Coberto (R1)** — `quarkus.jackson.fail-on-unknown-properties=true` |
 | A28 | Autorização administrativa: sem papel ADMIN → 403; sem autenticação → 401 | `auth/AuthResourceTest` (15); `edital/EditalResourceTest` (6) | Coberto |
 
 ---
@@ -64,18 +65,40 @@
 
 ## C. Lacunas prioritárias reveladas pela R0 (insumo para R1+)
 
+> **Atualizado na R1 (2026-11-12).** Itens resolvidos marcados; os demais mantêm o dono original.
+
 | Lacuna | Fase dona | Evidência |
 |---|---|---|
-| `tamanho` máximo de paginação = 200 nos blocos (norma: 100) | R5 | REVISAO §6 |
-| `toObjectIdOrNotFound` retorna 404 para ID malformado (norma: 400 `INVALID_IDENTIFIER`) | R2/R5 | REVISAO §12, A26 |
+| `tamanho` máximo de paginação = 200 nos blocos (norma: 100, com 400) | R5 | REVISAO §6 |
+| ~~`toObjectIdOrNotFound` retornava 404 para ID malformado~~ → **resolvido na R1** | — | `shared/InvalidIdentifierTest`; `BsonIds.parse` |
 | 3 coleções fora do inventário de 19 + não purgadas na exclusão de conta | R2/R5/R9 | REVISAO §5 I-2/I-3 |
 | `HandoffService` cria índices fora do `MongoIndexInitializer` | R2 | REVISAO §5 I-1 |
 | `MongoIndexInitializerTest` valida só nomes | R2 | REVISAO §5 I-4 |
 | `scripts/mongo/reset-dev.sh` inexistente | R2 | REVISAO §5 I-5 |
-| Resíduo `Ciclo`/`planejamento_ciclo` em `trilha/` + 101 refs `ciclo` no frontend | R5/R7 | REVISAO §3 |
-| `tarefaStorage.ts` referencia campos inexistentes em `Tarefa` | R7/R13 | REVISAO §10 |
+| Resíduo `Ciclo`/`planejamento_ciclo` em `trilha/` + refs `ciclo` no frontend | R5/R7 | REVISAO §3 |
+| ~~`tarefaStorage.ts` referenciava campos inexistentes~~ → **resolvido na R1** (arquivo removido) | — | `knip` exit 0 |
 | Anexo C precisa de decisão sobre `usaPadraoGlobalLembrete` e `OperacaoConcluirAtrasados` | D-02/R8 | REVISAO §8 |
-| 163 problemas ESLint / 73 achados knip | domínios + R13 | REVISAO §9 |
+| ~~163 problemas ESLint / 73 achados knip~~ → **zerados na R1** | — | `npm run lint -- --max-warnings 0` + `npx knip` |
 | `eslint-plugin-react` ausente nas dependências aprovadas (`react/no-danger` expressa via `no-restricted-syntax`) | R13 | REVISAO §9 |
+
+## D. Critérios específicos da R1
+
+| Critério | Teste / comando | Status |
+|---|---|---|
+| Catálogo fechado com `type = urn:trilhara:problem:<kebab>` para todos os códigos | `shared/ProblemDetailsCatalogoTest` (4) | Coberto |
+| ID malformado → 400 `INVALID_IDENTIFIER` com `errors[campo]`; inexistente → 404 | `shared/InvalidIdentifierTest` (3) | Coberto |
+| Mass assignment rejeitado (`usuarioId`, `criadoEm`) | `shared/MassAssignmentTest` (3) | Coberto |
+| `E11000` → 409 `DUPLICATE_RESOURCE`; outras falhas → 503 | `shared/DuplicateKeyMapperTest` (3) | Coberto |
+| `X-Correlation-ID` em toda resposta (gera/ecoa) | `shared/CorrelationIdFilterTest` (3) | Coberto |
+| `ApiError.code` sempre presente (`NETWORK_ERROR`/`UNKNOWN`) | `src/test/erros.test.ts` (11) | Coberto |
+| `classificarErro` nas 7 categorias de UI | `src/test/erros.test.ts` | Coberto |
+| `Skeleton` só após 200 ms, mínimo 300 ms, `aria-busy` | `src/test/designSystemEstados.test.tsx` (11) | Coberto |
+| `SectionErrorCard` com retry e `aria-describedby` | `designSystemEstados.test.tsx` | Coberto |
+| `Toast` máx. 3, 5 s, ação "Desfazer", região `polite` | `src/test/toastConfirm.test.tsx` (7) | Coberto |
+| `ConfirmDialog` foco no botão seguro + Escape bloqueado em `isConfirming` | `toastConfirm.test.tsx` | Coberto |
+| `useRecurso` nunca expõe lista vazia antes da 1ª resposta | `src/test/useRecurso.test.tsx` (3) | Coberto |
+| `formatarDuracao` (45 s / 12 min / 1 h 05 min) e datas sem deslocamento de fuso | `src/test/format.test.ts` (10) | Coberto |
+| Gate comum verde, sem etapas "esperadas falhando" | `docs/REVISAO-IMPLEMENTADA-R1.md` §7 | Coberto |
+
 
 | A17 | Performance medida em ambiente representativo; estimativas não são garantias | `benchmark/MongoExplainBenchmarkTest` (5) | Parcial — opt-in (`-Dbenchmark=true`), skipped no gate padrão |

@@ -3,37 +3,48 @@ import { AlertCircle, RotateCcw } from 'lucide-react';
 import { Button } from '../Button/Button';
 import styles from './SectionErrorCard.module.css';
 
+type SectionErrorVariant = 'section' | 'inline';
+
 export interface SectionErrorCardProps {
-  title?: string;
-  message?: string;
+  titulo: string;
+  descricao: string;
   onRetry?: () => void;
-  isRetrying?: boolean;
+  /** `section` (padrão) ocupa a área da seção; `inline` fica dentro de um subgrupo. */
+  variant?: SectionErrorVariant;
+  /** Bloqueia o botão enquanto o retry está em andamento. */
+  recarregando?: boolean;
   className?: string;
 }
 
 /**
- * Card compacto de erro recuperável do Design System Trilhara.
- * Utilizado para falhas parciais em seções da Visão Hoje e listagens paginadas.
+ * Falha recuperável de seção/lista (D-37).
+ *
+ * Use para falha de rede, 5xx, 503 e timeout — **nunca** para 401 (nesse caso abra o
+ * `AuthModal`). O botão "Tentar novamente" é ligado à descrição por `aria-describedby`.
  */
 export const SectionErrorCard: React.FC<SectionErrorCardProps> = ({
-  title = 'Erro ao carregar seção',
-  message = 'Não foi possível carregar os dados desta seção.',
+  titulo,
+  descricao,
   onRetry,
-  isRetrying = false,
+  variant = 'section',
+  recarregando = false,
   className = ''
 }) => {
+  const descricaoId = React.useId();
+
   return (
     <div
       role="alert"
-      className={`${styles.card} ${className}`.trim()}
       aria-live="polite"
       data-testid="section-error-card"
+      data-variant={variant}
+      className={`${styles.card} ${styles[variant]} ${className}`.trim()}
     >
       <div className={styles.content}>
         <AlertCircle size={20} className={styles.icon} aria-hidden="true" />
         <div className={styles.textGroup}>
-          <h4 className={styles.title}>{title}</h4>
-          {message && <p className={styles.message}>{message}</p>}
+          <h4 className={styles.title}>{titulo}</h4>
+          <p id={descricaoId} className={styles.message}>{descricao}</p>
         </div>
       </div>
       {onRetry && (
@@ -43,9 +54,9 @@ export const SectionErrorCard: React.FC<SectionErrorCardProps> = ({
             variant="secondary"
             size="sm"
             onClick={onRetry}
-            isLoading={isRetrying}
+            loading={recarregando}
             leftIcon={<RotateCcw size={14} />}
-            aria-label="Tentar novamente"
+            aria-describedby={descricaoId}
           >
             Tentar novamente
           </Button>
@@ -54,3 +65,4 @@ export const SectionErrorCard: React.FC<SectionErrorCardProps> = ({
     </div>
   );
 };
+

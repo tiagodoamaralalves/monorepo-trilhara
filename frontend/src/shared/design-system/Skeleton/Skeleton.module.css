@@ -1,0 +1,69 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.line,
+.row,
+.card,
+.chart {
+  display: block;
+  background: var(--surface-3, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-sm, 6px);
+}
+
+.line {
+  height: 12px;
+  width: 100%;
+}
+
+.row {
+  height: 44px;
+  width: 100%;
+}
+
+.card {
+  height: 128px;
+  width: 100%;
+  border-radius: var(--radius-md, 12px);
+}
+
+.chart {
+  height: 180px;
+  width: 100%;
+  border-radius: var(--radius-md, 12px);
+}
+
+.animado {
+  animation: pulso 1.4s ease-in-out infinite;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes pulso {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animado {
+    animation: none;
+  }
+}

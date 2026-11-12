@@ -8,7 +8,7 @@ export interface FormModalProps extends Omit<ModalProps, 'children' | 'footer'> 
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   submitText: string;
   cancelText?: string;
-  isLoading?: boolean;
+  loading?: boolean;
   submitDisabled?: boolean;
   error?: string;
   deleteAction?: React.ReactNode;
@@ -19,7 +19,7 @@ export const FormModal: React.FC<FormModalProps> = ({
   onSubmit,
   submitText,
   cancelText = 'Cancelar',
-  isLoading = false,
+  loading = false,
   submitDisabled = false,
   error,
   deleteAction,
@@ -28,12 +28,12 @@ export const FormModal: React.FC<FormModalProps> = ({
 }) => {
   const formId = useId();
 
-  const handleClose = isLoading ? () => {} : onClose;
+  const handleClose = loading ? () => {} : onClose;
 
   return (
     <Modal
       {...modalProps}
-      isSaving={isLoading}
+      isSaving={loading}
       onClose={handleClose}
       footer={
         <FormActions
@@ -41,13 +41,13 @@ export const FormModal: React.FC<FormModalProps> = ({
           submitText={submitText}
           cancelText={cancelText}
           form={formId}
-          isLoading={isLoading}
+          loading={loading}
           submitDisabled={submitDisabled}
           leadingAction={deleteAction}
         />
       }
     >
-      <form id={formId} className={styles.form} onSubmit={onSubmit} aria-busy={isLoading}>
+      <form id={formId} className={styles.form} onSubmit={onSubmit} aria-busy={loading}>
         {children}
         {error && <p className={styles.error} role="alert">{error}</p>}
       </form>

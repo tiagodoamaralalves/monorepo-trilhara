@@ -267,7 +267,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       icon={<CheckSquare size={20} />}
       onSubmit={handleSubmit}
       submitText={tarefaParaEditar ? 'Salvar Alterações' : 'Criar Tarefa'}
-      isLoading={salvando}
+      loading={salvando}
     >
       <>
         {isRecorrente && (
@@ -276,9 +276,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               <Repeat size={16} />
               <span>Esta tarefa faz parte de uma série recorrente</span>
             </div>
-            <label style={{ fontSize: '0.85rem', display: 'block', marginBottom: '6px' }}>
+            <span id="escopo-edicao-label" style={{ fontSize: '0.85rem', display: 'block', marginBottom: '6px' }}>
               Selecione o escopo da alteração:
-            </label>
+            </span>
             <Select
               label=""
               value={escopoEdicao}
@@ -302,7 +302,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           }}
           error={erroTitulo}
           disabled={salvando}
-          autoFocus={!tarefaParaEditar}
         />
 
         {listas.length > 0 && (
@@ -503,9 +502,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
                 {frequencia === 'SEMANAL' && (
                   <div>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 500, display: 'block', marginBottom: '6px' }}>
+                    <span id="dias-semana-label" style={{ fontSize: '0.85rem', fontWeight: 500, display: 'block', marginBottom: '6px' }}>
                       Dias da semana:
-                    </label>
+                    </span>
                     <div style={{ display: 'flex', gap: '6px' }}>
                       {[
                         { dia: 1, label: 'Seg' },

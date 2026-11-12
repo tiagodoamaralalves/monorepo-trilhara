@@ -31,7 +31,7 @@ import { EstudosService, PaginaSessoes } from '../services/estudosService';
 import { PlanejamentoStorage } from '../services/planejamentoStorage';
 import {
   formatarDataBR,
-  formatarDuracaoSegundos,
+  formatarDuracao,
   hojeISO,
   paraDataLocalISO
 } from '../utils/format';
@@ -458,7 +458,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }
 
   async function handleExcluirSessao(sessao: Sessao) {
-    const duracao = formatarDuracaoSegundos(sessao.duracaoSegundos || (sessao.minutos ? sessao.minutos * 60 : 0));
+    const duracao = formatarDuracao(sessao.duracaoSegundos || (sessao.minutos ? sessao.minutos * 60 : 0));
     const data = formatarDataBR(sessao.dataSessao || (sessao.inicio ? paraDataLocalISO(sessao.inicio) : ''));
     const confirmou = await confirm({
       title: 'Excluir sessão de estudo?',
@@ -480,7 +480,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }
 
   async function handleExcluirHistoricoDisciplinaRemovida(disciplina: EstatisticaDisciplinaDTO) {
-    const duracao = formatarDuracaoSegundos(disciplina.totalSegundos);
+    const duracao = formatarDuracao(disciplina.totalSegundos);
     const confirmou = await confirm({
       title: `Apagar histórico de "${disciplina.nome}"?`,
       description: `Esta disciplina foi removida da trilha. Esta ação excluirá permanentemente todas as ${disciplina.totalSessoes} sessões (${duracao}) registradas nesta disciplina. Deseja continuar?`,
@@ -584,7 +584,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
               <div className={styles.kpiInfo}>
                 <span className={styles.kpiLabel}>Horas estudadas</span>
-                <span className={styles.kpiVal}>{formatarDuracaoSegundos(totalSegundos)}</span>
+                <span className={styles.kpiVal}>{formatarDuracao(totalSegundos)}</span>
                 <span className={styles.kpiDescription}>
                   {periodoResumo.sessoes} {periodoResumo.sessoes === 1 ? 'sessão registrada' : 'sessões registradas'}
                 </span>
@@ -692,10 +692,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           <ProgressBar
                             value={percentual}
                             color={item.cor || 'var(--primary)'}
-                            label={formatarDuracaoSegundos(item.totalSegundos)}
+                            label={formatarDuracao(item.totalSegundos)}
                             className={styles.barProgress}
                           />
-                          <strong className={styles.barText}>{formatarDuracaoSegundos(item.totalSegundos)}</strong>
+                          <strong className={styles.barText}>{formatarDuracao(item.totalSegundos)}</strong>
                         </div>
                         <span className={styles.metricText}>
                           {totalSegundos > 0 ? `${Math.round((item.totalSegundos / totalSegundos) * 100)}% do total` : ''}
@@ -837,7 +837,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </thead>
                     <tbody>
                       {sessoesTabela.map((sessao) => {
-                        const duracaoFormatada = formatarDuracaoSegundos(
+                        const duracaoFormatada = formatarDuracao(
                           sessao.duracaoSegundos || (sessao.minutos ? sessao.minutos * 60 : 0)
                         );
                         return (

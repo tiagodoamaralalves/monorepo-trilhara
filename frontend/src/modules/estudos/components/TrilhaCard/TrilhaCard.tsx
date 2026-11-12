@@ -1,7 +1,7 @@
 import React from 'react';
 import styles from './TrilhaCard.module.css';
 
-export interface TrilhaCardMetrica {
+interface TrilhaCardMetrica {
   label: string;
   value: React.ReactNode;
   tone?: 'urgente' | 'sucesso';

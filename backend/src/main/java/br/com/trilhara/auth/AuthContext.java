@@ -2,6 +2,8 @@ package br.com.trilhara.auth;
 
 import java.util.List;
 
+import org.bson.types.ObjectId;
+
 import br.com.trilhara.auth.TokenService.ClaimsToken;
 import jakarta.enterprise.context.RequestScoped;
 
@@ -20,6 +22,19 @@ public class AuthContext {
 
     public String usuarioId() {
         return estaAutenticado() ? claims.usuarioId() : null;
+    }
+
+    /**
+     * ID do usuário autenticado como {@link ObjectId} nativo.
+     *
+     * <p>O valor vem exclusivamente do token (D-05); se ele não for um ObjectId válido há
+     * falha de autenticação ({@code 401}), nunca erro de identificador do cliente.</p>
+     */
+    public ObjectId usuarioIdObjectId() {
+        if (!estaAutenticado() || !ObjectId.isValid(claims.usuarioId())) {
+            throw new jakarta.ws.rs.NotAuthorizedException("Autenticação obrigatória.");
+        }
+        return new ObjectId(claims.usuarioId());
     }
 
     public String email() {

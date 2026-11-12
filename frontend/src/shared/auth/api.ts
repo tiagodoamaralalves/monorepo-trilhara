@@ -1,37 +1,56 @@
 import { AuthResponse } from './types';
 import { AuthStorage } from './authStorage';
+import { CodigoErroApi, ehCodigoErro } from '../api';
 
+export interface ApiErrorDetalhes {
+  status: number;
+  code: CodigoErroApi;
+  detail: string;
+  errors?: Record<string, string[]>;
+  type?: string;
+  title?: string;
+  instance?: string;
+  correlationId?: string;
+  data?: unknown;
+}
+
+/**
+ * Erro de API já normalizado para o catálogo do produto (D-04).
+ *
+ * `code` está **sempre** presente: `NETWORK_ERROR` para falha de transporte
+ * (`status: 0`) e `UNKNOWN` quando o backend responde algo fora do catálogo.
+ */
 export class ApiError extends Error {
   readonly status: number;
-  readonly code?: string;
+  readonly code: CodigoErroApi;
   readonly detail: string;
   readonly errors?: Record<string, string[]>;
   readonly data?: unknown;
   readonly type?: string;
   readonly title?: string;
   readonly instance?: string;
+  readonly correlationId?: string;
 
-  constructor(
-    message: string,
-    status: number,
-    data?: unknown,
-    code?: string,
-    errors?: Record<string, string[]>,
-    type?: string,
-    title?: string,
-    instance?: string
-  ) {
-    super(message);
+  constructor(detalhes: ApiErrorDetalhes) {
+    super(detalhes.detail);
     this.name = 'ApiError';
-    this.status = status;
-    this.detail = message;
-    this.data = data;
-    this.code = code;
-    this.errors = errors;
-    this.type = type;
-    this.title = title;
-    this.instance = instance;
+    this.status = detalhes.status;
+    this.code = detalhes.code;
+    this.detail = detalhes.detail;
+    this.data = detalhes.data;
+    this.errors = detalhes.errors;
+    this.type = detalhes.type;
+    this.title = detalhes.title;
+    this.instance = detalhes.instance;
+    this.correlationId = detalhes.correlationId;
   }
+}
+
+/** Normaliza o `code` recebido: fora do catálogo vira `UNKNOWN`. */
+export function normalizarCodigo(code: unknown, status: number): CodigoErroApi {
+  if (ehCodigoErro(code)) return code;
+  if (status === 0) return 'NETWORK_ERROR';
+  return 'UNKNOWN';
 }
 
 export function obterTimezoneNavegador(): string {
@@ -78,7 +97,11 @@ export async function tentarRenovarToken(): Promise<AuthResponse> {
       if (res.status === 400 || res.status === 401 || res.status === 403) {
         AuthStorage.limparSessao();
       }
-      throw new ApiError('Sessão expirada. Faça login novamente.', res.status, undefined, 'SESSION_EXPIRED');
+      throw new ApiError({
+        status: res.status,
+        code: 'UNAUTHORIZED',
+        detail: 'Sessão expirada. Faça login novamente.'
+      });
     }
 
     const dados = (await res.json()) as AuthResponse;
@@ -178,16 +201,17 @@ export async function request<T>(
         errorData = undefined;
       }
 
-      throw new ApiError(
-        errorDetail,
-        res.status,
-        errorData,
-        errorCode,
-        errorErrors,
-        errorType,
-        errorTitle,
-        errorInstance
-      );
+      throw new ApiError({
+        status: res.status,
+        code: normalizarCodigo(errorCode, res.status),
+        detail: errorDetail,
+        errors: errorErrors,
+        type: errorType,
+        title: errorTitle,
+        instance: errorInstance,
+        correlationId: res.headers.get('X-Correlation-ID') ?? undefined,
+        data: errorData
+      });
     }
 
     if (res.status === 204) {
@@ -198,8 +222,11 @@ export async function request<T>(
   } catch (err) {
     if (err instanceof ApiError) throw err;
     const msg = err instanceof Error ? err.message : 'Falha de comunicação com o servidor';
-    throw new ApiError(msg, 0, undefined, 'NETWORK_ERROR');
+    throw new ApiError({
+      status: 0,
+      code: 'NETWORK_ERROR',
+      detail: msg
+    });
   }
 }
 
-export const apiFetch = request;

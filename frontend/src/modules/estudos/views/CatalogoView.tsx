@@ -140,7 +140,7 @@ export const CatalogCard: React.FC<CatalogCardProps> = ({
           type="button"
           variant="primary"
           size="sm"
-          isLoading={importando}
+          loading={importando}
           onClick={() => onUsarTrilha(edital)}
         >
           Usar trilha
@@ -545,7 +545,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                         type="button"
                         variant="primary"
                         size="sm"
-                        isLoading={importandoId === edital.id}
+                        loading={importandoId === edital.id}
                         onClick={() => void handleUsarTrilha(edital)}
                       >
                         Usar trilha

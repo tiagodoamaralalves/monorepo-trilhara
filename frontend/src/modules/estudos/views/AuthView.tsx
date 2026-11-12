@@ -1,1 +1,1 @@
-export { AuthView, type AuthViewProps, type AuthMode } from '@shared/auth';
+export { AuthView, type AuthMode } from '@shared/auth';

@@ -53,7 +53,7 @@ export const ConfiguracaoLembreteModal: React.FC<ConfiguracaoLembreteModalProps>
       await pushService.atualizarPreferenciaGlobal(padrao);
       if (onSalvo) onSalvo(padrao);
       onClose();
-    } catch (err: any) {
+    } catch (err) {
       setMensagemStatus(err?.message || 'Erro ao salvar preferência.');
     } finally {
       setSalvando(false);
@@ -84,7 +84,7 @@ export const ConfiguracaoLembreteModal: React.FC<ConfiguracaoLembreteModalProps>
           <Button
             variant="primary"
             onClick={handleSalvar}
-            isLoading={salvando}
+            loading={salvando}
             data-testid="btn-salvar-preferencias-push"
           >
             Salvar Preferência

@@ -145,7 +145,6 @@ export const ContaModal: React.FC<ContaModalProps> = ({
                 onChange={(e) => setSenha(e.target.value)}
                 placeholder="Sua senha atual"
                 required
-                autoFocus
               />
 
               <Input

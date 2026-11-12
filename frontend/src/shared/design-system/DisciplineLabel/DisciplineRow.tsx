@@ -31,17 +31,18 @@ export const DisciplineRow: React.FC<DisciplineRowProps> = ({
   const isActive = Boolean(hasTopics && topicCount > 0);
 
   return (
-    <li
-      className={`${styles.disciplineItem} ${onClick ? styles.disciplineItemClickable : ''} ${className}`}
-      onClick={onClick}
-      onKeyDown={(event) => {
-        if (!onClick || (event.key !== 'Enter' && event.key !== ' ')) return;
-        event.preventDefault();
-        onClick();
-      }}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
-    >
+    <li className={`${styles.disciplineItem} ${onClick ? styles.disciplineItemClickable : ''} ${className}`}>
+      <span
+        className={styles.disciplineRowContent}
+        role={onClick ? 'button' : undefined}
+        tabIndex={onClick ? 0 : undefined}
+        onClick={onClick}
+        onKeyDown={(event) => {
+          if (!onClick || (event.key !== 'Enter' && event.key !== ' ')) return;
+          event.preventDefault();
+          onClick();
+        }}
+      >
       {nameContent ?? <DisciplineLabel name={name} color={color} className={styles.disciplineName} />}
 
       {hasTopics && (
@@ -56,7 +57,8 @@ export const DisciplineRow: React.FC<DisciplineRowProps> = ({
         <span className={styles.disciplinePeso}>peso {peso}x</span>
       ))}
 
-      {actions && <div className={styles.itemActions}>{actions}</div>}
+        {actions && <div className={styles.itemActions}>{actions}</div>}
+      </span>
     </li>
   );
 };
@@ -84,28 +86,30 @@ export const TopicRow: React.FC<TopicRowProps> = ({
   const isClickable = Boolean(onClick && !isEditing);
 
   return (
-    <li
-      className={`${styles.topicItem} ${isClickable ? styles.topicItemClickable : ''} ${className}`}
-      onClick={isClickable ? onClick : undefined}
-      onKeyDown={(event) => {
-        if (!isClickable) return;
-        if (event.target !== event.currentTarget) return;
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onClick?.();
-        }
-      }}
-      role={isClickable ? 'button' : undefined}
-      tabIndex={isClickable ? 0 : undefined}
-    >
+    <li className={`${styles.topicItem} ${isClickable ? styles.topicItemClickable : ''} ${className}`}>
+      <span
+        className={styles.topicRowContent}
+        role={isClickable ? 'button' : undefined}
+        tabIndex={isClickable ? 0 : undefined}
+        onClick={isClickable ? onClick : undefined}
+        onKeyDown={(event) => {
+          if (!isClickable) return;
+          if (event.target !== event.currentTarget) return;
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onClick?.();
+          }
+        }}
+      >
       {leading}
       <span className={styles.topicNumber}>{index + 1}.</span>
       {content ?? <span className={styles.topicText}>{name}</span>}
-      {actions && (
-        <div className={styles.itemActions} onClick={(event) => event.stopPropagation()}>
-          {actions}
-        </div>
-      )}
+        {actions && (
+          <div className={styles.itemActions} onClickCapture={(event) => event.stopPropagation()}>
+            {actions}
+          </div>
+        )}
+      </span>
     </li>
   );
 };

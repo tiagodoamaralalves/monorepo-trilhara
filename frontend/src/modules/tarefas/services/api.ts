@@ -1,1 +1,1 @@
-export { ApiError, request } from '@shared/auth';
+export { request } from '@shared/auth/api';

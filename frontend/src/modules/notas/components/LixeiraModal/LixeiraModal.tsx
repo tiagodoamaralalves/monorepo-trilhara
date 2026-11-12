@@ -120,9 +120,9 @@ export const LixeiraModal: React.FC<LixeiraModalProps> = ({
         </div>
       ) : itens.length === 0 ? (
         <EmptyState
-          icon={<Trash2 size={40} />}
-          title="Lixeira vazia"
-          description="Nenhum caderno, seção ou página foi excluído nos últimos 30 dias."
+          icone={<Trash2 size={40} />}
+          titulo="Lixeira vazia"
+          descricao="Nenhum caderno, seção ou página foi excluído nos últimos 30 dias."
         />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '420px', overflowY: 'auto' }}>
@@ -177,7 +177,7 @@ export const LixeiraModal: React.FC<LixeiraModalProps> = ({
                 variant="secondary"
                 size="sm"
                 leftIcon={<RotateCcw size={13} />}
-                isLoading={acaoId === item.id}
+                loading={acaoId === item.id}
                 onClick={() => handleRestaurar(item)}
               >
                 Restaurar

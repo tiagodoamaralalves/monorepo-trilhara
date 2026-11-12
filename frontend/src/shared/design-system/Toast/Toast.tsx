@@ -3,26 +3,46 @@ import { AlertCircle, CheckCircle2, Info, TriangleAlert, X } from 'lucide-react'
 import { Button } from '../Button/Button';
 import styles from './Toast.module.css';
 
-export interface ProblemDetail {
+interface ProblemDetail {
   title?: string;
   detail?: string;
   status?: number;
 }
 
-export type ToastMessage = string | Error | ProblemDetail;
-export type ToastVariant = 'success' | 'error' | 'warning' | 'info';
+type ToastMessage = string | Error | ProblemDetail;
+type ToastVariant = 'success' | 'error' | 'warning' | 'info';
+
+/** Duração padrão de um toast (D-37). */
+const TOAST_DURACAO_MS = 5000;
+
+/** Máximo de toasts empilhados ao mesmo tempo (D-37). */
+export const TOAST_MAXIMO = 3;
+
+interface ToastAction {
+  rotulo: string;
+  aoAcionar: () => void;
+}
+
+interface ToastOptions {
+  /** Ação opcional, tipicamente "Desfazer". */
+  acao?: ToastAction;
+  /** Sobrescreve a duração padrão de 5 s. */
+  duracaoMs?: number;
+}
 
 interface ToastItem {
   id: number;
   variant: ToastVariant;
   message: string;
+  acao?: ToastAction;
+  duracaoMs: number;
 }
 
 export interface ToastContextValue {
-  success: (message: ToastMessage) => void;
-  error: (message: ToastMessage) => void;
-  warning: (message: ToastMessage) => void;
-  info: (message: ToastMessage) => void;
+  success: (message: ToastMessage, options?: ToastOptions) => void;
+  error: (message: ToastMessage, options?: ToastOptions) => void;
+  warning: (message: ToastMessage, options?: ToastOptions) => void;
+  info: (message: ToastMessage, options?: ToastOptions) => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -42,29 +62,41 @@ const variantIcons = {
 
 export const ToastProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const sequenciaRef = useRef(0);
 
   const dismiss = useCallback((id: number) => {
     setToasts((current) => current.filter((toast) => toast.id !== id));
   }, []);
 
-  const enqueue = useCallback((variant: ToastVariant, message: ToastMessage) => {
-    setToasts((current) => [
-      ...current,
-      { id: Date.now() + Math.random(), variant, message: getMessage(message) }
-    ]);
+  const enqueue = useCallback((variant: ToastVariant, message: ToastMessage, options?: ToastOptions) => {
+    sequenciaRef.current += 1;
+    const novo: ToastItem = {
+      id: sequenciaRef.current,
+      variant,
+      message: getMessage(message),
+      acao: options?.acao,
+      duracaoMs: options?.duracaoMs ?? TOAST_DURACAO_MS
+    };
+    setToasts((current) => [...current, novo].slice(-TOAST_MAXIMO));
   }, []);
 
   const value = useMemo<ToastContextValue>(() => ({
-    success: (message) => enqueue('success', message),
-    error: (message) => enqueue('error', message),
-    warning: (message) => enqueue('warning', message),
-    info: (message) => enqueue('info', message)
+    success: (message, options) => enqueue('success', message, options),
+    error: (message, options) => enqueue('error', message, options),
+    warning: (message, options) => enqueue('warning', message, options),
+    info: (message, options) => enqueue('info', message, options)
   }), [enqueue]);
 
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className={styles.region} role="region" aria-label="Notificações">
+      <div
+        className={styles.region}
+        role="region"
+        aria-label="Notificações"
+        aria-live="polite"
+        data-testid="toast-region"
+      >
         {toasts.map((toast) => {
           const Icon = variantIcons[toast.variant];
           return (
@@ -78,6 +110,7 @@ export const ToastProvider: React.FC<React.PropsWithChildren> = ({ children }) =
   );
 };
 
+
 interface ToastNoticeProps {
   toast: ToastItem;
   onDismiss: (id: number) => void;
@@ -86,8 +119,7 @@ interface ToastNoticeProps {
 
 const ToastNotice: React.FC<ToastNoticeProps> = ({ toast, onDismiss, children }) => {
   const [isPaused, setIsPaused] = useState(false);
-  const defaultDuration = toast.variant === 'error' ? 5000 : 3200;
-  const remainingRef = useRef(defaultDuration);
+  const remainingRef = useRef(toast.duracaoMs);
   const startTimeRef = useRef(Date.now());
 
   useEffect(() => {
@@ -111,11 +143,17 @@ const ToastNotice: React.FC<ToastNoticeProps> = ({ toast, onDismiss, children })
     }
   };
 
+  const handleAcao = () => {
+    toast.acao?.aoAcionar();
+    onDismiss(toast.id);
+  };
+
   return (
     <div
       className={`${styles.toast} ${styles[toast.variant]}`}
-      role={toast.variant === 'error' ? 'alert' : 'status'}
-      aria-live={toast.variant === 'error' ? 'assertive' : 'polite'}
+      role="status"
+      data-testid="toast"
+      aria-live="polite"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onFocus={handleFocus}
@@ -123,6 +161,11 @@ const ToastNotice: React.FC<ToastNoticeProps> = ({ toast, onDismiss, children })
     >
       <span className={styles.icon}>{children}</span>
       <span className={styles.message}>{toast.message}</span>
+      {toast.acao && (
+        <Button type="button" variant="ghost" size="sm" onClick={handleAcao}>
+          {toast.acao.rotulo}
+        </Button>
+      )}
       <Button
         type="button"
         variant="ghost"

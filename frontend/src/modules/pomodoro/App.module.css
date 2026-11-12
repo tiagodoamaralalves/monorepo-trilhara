@@ -770,3 +770,16 @@
   background: var(--primary-bg);
 }
 
+
+.clockEditButton {
+  all: unset;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.clockEditButton:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm, 6px);
+}

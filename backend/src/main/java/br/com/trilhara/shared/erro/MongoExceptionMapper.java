@@ -10,6 +10,11 @@ import jakarta.ws.rs.core.UriInfo;
 import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
+/**
+ * Falha genérica do MongoDB → {@code 503 SERVICE_UNAVAILABLE}, sem expor detalhe interno (D-04).
+ *
+ * <p>Chave duplicada é tratada antes por {@link MongoWriteExceptionMapper}.</p>
+ */
 @Provider
 public class MongoExceptionMapper implements ExceptionMapper<MongoException> {
 
@@ -20,22 +25,19 @@ public class MongoExceptionMapper implements ExceptionMapper<MongoException> {
 
     @Override
     public Response toResponse(MongoException exception) {
-        LOG.errorf(exception, "Falha de operacao no MongoDB: %s", exception.getMessage());
-        String instance = DomainConflictExceptionMapper.resolvePath(uriInfo);
+        String correlationId = ProblemDetailsFactory.novoCorrelationId();
+        LOG.errorf(exception, "Falha de operacao no MongoDB [correlationId=%s]", correlationId);
 
-        ProblemDetails problem = new ProblemDetails(
-                "urn:trilhara:error:service-unavailable",
-                "Serviço indisponível",
-                Response.Status.SERVICE_UNAVAILABLE.getStatusCode(),
-                "Banco de dados MongoDB indisponível.",
-                instance,
-                "SERVICE_UNAVAILABLE",
-                null
-        );
+        ProblemDetails problem = ProblemDetailsFactory.criar(
+                CodigoErro.SERVICE_UNAVAILABLE,
+                "Banco de dados indisponível. Tente novamente em instantes.",
+                DomainConflictExceptionMapper.resolvePath(uriInfo));
 
-        return Response.status(Response.Status.SERVICE_UNAVAILABLE)
+        return Response.status(problem.status())
+                .header(ProblemDetailsFactory.HEADER_CORRELATION_ID, correlationId)
                 .type(ProblemDetails.MEDIA_TYPE)
                 .entity(problem)
                 .build();
     }
 }
+

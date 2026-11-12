@@ -12,7 +12,7 @@ import { useAuth } from '@shared/auth';
 
 export type BreakType = 'short' | 'long';
 
-export interface PersistedStudyTimerState {
+interface PersistedStudyTimerState {
   trilhaId: string;
   disciplinaId: string;
   blocoId?: string;
@@ -50,7 +50,7 @@ export interface StartTimerOptions {
   force?: boolean;
 }
 
-export interface StudyTimerContextValue {
+interface StudyTimerContextValue {
   state: PersistedStudyTimerState;
   now: number;
   start: (timerId?: string, opts?: StartTimerOptions) => boolean;

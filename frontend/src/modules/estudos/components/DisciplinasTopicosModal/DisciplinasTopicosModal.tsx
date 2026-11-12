@@ -336,7 +336,6 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
         value={nomeDisciplinaEditado}
         placeholder={creatingDiscipline ? 'Digite o nome da disciplina' : undefined}
         maxLength={100}
-        autoFocus
         aria-label="Nome da disciplina"
         onChange={(event) => setNomeDisciplinaEditado(event.target.value)}
         onBlur={handleRenomearDisciplina}
@@ -556,7 +555,7 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
                   variant="danger"
                   size="md"
                   leftIcon={<Trash2 size={15} />}
-                  isLoading={isDeleting}
+                  loading={isDeleting}
                   disabled={isSaving || isDeleting}
                   onClick={() => void handleExcluirDisciplina(disciplinaSelecionada)}
                 >
@@ -578,7 +577,7 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
                 type="button"
                 variant="primary"
                 size="md"
-                isLoading={isSaving}
+                loading={isSaving}
                 disabled={!nomeFinalValido || isSaving || isDeleting}
                 onClick={handleSalvar}
               >
@@ -655,7 +654,6 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
                           value={nomeTopicoEditado}
                           aria-label="Nome do assunto"
                           maxLength={500}
-                          autoFocus
                           onChange={(event) => setNomeTopicoEditado(event.target.value)}
                           onBlur={handleRenomearTopico}
                           onKeyDown={(event) => {

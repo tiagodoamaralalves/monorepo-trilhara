@@ -134,7 +134,7 @@ export const GlobalSessionModal: React.FC = () => {
       .catch(() => {
         setDisciplinas([]);
       });
-  }, [isOpen, selectedTrilhaId]);
+  }, [isOpen, selectedTrilhaId, selectedDisciplinaId]);
 
   // Restaura foco ao fechar
   const handleFechar = useCallback(() => {

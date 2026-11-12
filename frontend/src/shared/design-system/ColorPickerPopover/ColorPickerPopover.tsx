@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '../Button/Button';
 import { ColorPicker, DISCIPLINE_COLORS } from '../Controls/Controls';
@@ -36,13 +36,13 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const updateIsOpen = (next: boolean | ((prev: boolean) => boolean)) => {
+  const updateIsOpen = useCallback((next: boolean | ((prev: boolean) => boolean)) => {
     setIsOpen((prev) => {
       const resolved = typeof next === 'function' ? next(prev) : next;
       onOpenChange?.(resolved);
       return resolved;
     });
-  };
+  }, [onOpenChange]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -66,7 +66,7 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
       document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen]);
+  }, [isOpen, updateIsOpen]);
 
   const corValida = color || DISCIPLINE_COLORS[0];
 

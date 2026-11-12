@@ -11,6 +11,7 @@ import java.util.Objects;
 
 import org.bson.types.ObjectId;
 
+import br.com.trilhara.shared.erro.ResourceLimitExceededException;
 import br.com.trilhara.trilha.Disciplina;
 import jakarta.ws.rs.BadRequestException;
 
@@ -89,7 +90,7 @@ public final class GeradorBlocosCronograma {
         };
 
         if (blocosGerados.size() > MAX_BLOCOS_TOTAL) {
-            throw new BadRequestException("Total de blocos gerados excede o limite máximo permitido (" + MAX_BLOCOS_TOTAL + ").");
+            throw new ResourceLimitExceededException("Total de blocos gerados excede o limite máximo permitido (" + MAX_BLOCOS_TOTAL + ").");
         }
 
         return blocosGerados;
@@ -241,7 +242,7 @@ public final class GeradorBlocosCronograma {
             Map<String, Disciplina> discPorId,
             Instant agora) {
         if (idsDia.size() > MAX_BLOCOS_POR_DIA) {
-            throw new BadRequestException("O dia " + diaSemana + " na semana modelo excede o limite de " + MAX_BLOCOS_POR_DIA + " blocos.");
+            throw new ResourceLimitExceededException("O dia " + diaSemana + " na semana modelo excede o limite de " + MAX_BLOCOS_POR_DIA + " blocos.");
         }
         for (int i = 0; i < idsDia.size(); i++) {
             String dIdStr = idsDia.get(i);

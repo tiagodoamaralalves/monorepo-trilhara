@@ -1,4 +1,5 @@
 import { request } from '@shared/auth';
+import { registrarFalha } from '@shared/diagnostico';
 import {
   Caderno,
   Secao,
@@ -156,7 +157,7 @@ export const NotaService = {
       const chave = this.obterChaveRascunho(usuarioId, notaId);
       window.localStorage.setItem(chave, JSON.stringify(rascunho));
     } catch (e) {
-      console.warn('Falha ao gravar rascunho local em localStorage', e);
+      registrarFalha('notas.rascunho.gravar', e);
     }
   },
 
@@ -168,7 +169,7 @@ export const NotaService = {
       if (!raw) return null;
       return JSON.parse(raw) as RascunhoNotaLocal;
     } catch (e) {
-      console.warn('Falha ao ler rascunho local de localStorage', e);
+      registrarFalha('notas.rascunho.ler', e);
       return null;
     }
   },
@@ -179,7 +180,7 @@ export const NotaService = {
       const chave = this.obterChaveRascunho(usuarioId, notaId);
       window.localStorage.removeItem(chave);
     } catch (e) {
-      console.warn('Falha ao remover rascunho local de localStorage', e);
+      registrarFalha('notas.rascunho.remover', e);
     }
   },
 

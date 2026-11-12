@@ -90,7 +90,7 @@ export const SecaoModal: React.FC<SecaoModalProps> = ({
         borderColor: 'transparent'
       }}
       submitText={secaoParaEditar ? 'Salvar Alterações' : 'Criar Seção'}
-      isLoading={salvando}
+      loading={salvando}
       overflowVisible={true}
     >
       <div className={`${styles.formBody} ${popoverAberto ? styles.formBodyOpen : ''}`}>
@@ -104,7 +104,6 @@ export const SecaoModal: React.FC<SecaoModalProps> = ({
           }}
           error={erroTitulo}
           required
-          autoFocus
         />
       </div>
     </FormModal>

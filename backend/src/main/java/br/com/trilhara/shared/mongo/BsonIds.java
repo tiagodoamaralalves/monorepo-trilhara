@@ -2,8 +2,7 @@ package br.com.trilhara.shared.mongo;
 
 import org.bson.types.ObjectId;
 
-import jakarta.ws.rs.BadRequestException;
-import jakarta.ws.rs.NotFoundException;
+import br.com.trilhara.shared.erro.InvalidIdentifierException;
 
 /**
  * Utilitários BSON para conversão, validação e manipulação padronizada de ObjectId nativo.
@@ -14,26 +13,19 @@ public final class BsonIds {
     }
 
     /**
-     * Converte uma string hexadecimal para ObjectId validando seu formato.
-     * Se inválido ou nulo, lança BadRequestException (400).
+     * Converte uma string hexadecimal de 24 caracteres em {@link ObjectId} (D-03).
+     *
+     * <p>ID malformado lança {@link InvalidIdentifierException}, mapeada para
+     * {@code 400 INVALID_IDENTIFIER} com {@code errors[campo]}. Recurso inexistente ou de
+     * outro tenant continua sendo {@code 404 NOT_FOUND}, decidido pela consulta escopada
+     * ao {@code usuarioId}.</p>
      */
-    public static ObjectId toObjectId(String hexId, String nomeCampo) {
-        if (hexId == null || !ObjectId.isValid(hexId)) {
-            String campo = (nomeCampo != null && !nomeCampo.isBlank()) ? nomeCampo : "id";
-            throw new BadRequestException("Identificador inválido para " + campo);
+    public static ObjectId parse(String valor, String campo) {
+        String normalizado = valor != null ? valor.trim() : null;
+        if (normalizado == null || !ObjectId.isValid(normalizado)) {
+            throw new InvalidIdentifierException(campo);
         }
-        return new ObjectId(hexId);
-    }
-
-    /**
-     * Converte uma string hexadecimal para ObjectId.
-     * Se inválido ou nulo, lança NotFoundException (404).
-     */
-    public static ObjectId toObjectIdOrNotFound(String hexId) {
-        if (hexId == null || !ObjectId.isValid(hexId)) {
-            throw new NotFoundException("Recurso não encontrado.");
-        }
-        return new ObjectId(hexId);
+        return new ObjectId(normalizado);
     }
 
     /**
@@ -57,3 +49,4 @@ public final class BsonIds {
         return hexId != null && ObjectId.isValid(hexId);
     }
 }
+

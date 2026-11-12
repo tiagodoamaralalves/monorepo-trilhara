@@ -39,10 +39,11 @@ import { request } from '@shared/auth/api';
 import { useAgendaHoje } from '@shared/services/agendaHojeService';
 import {
   BlocoCronogramaItemDTO,
-  PaginaBlocosDTO,
+  BlocoHojeDTO,
   ConcluirAtrasadosResponse,
   TrilhaResumoDTO
 } from '@shared/contracts/domainContracts';
+import type { Pagina } from '@shared/contracts';
 
 import { Navbar } from './components/Navbar/Navbar';
 import { TrilhaComCronogramaInfo } from './components/Navbar/MinhasListasNav';
@@ -98,7 +99,7 @@ const OPCOES_ORDENACAO = [
   { value: 'manual', label: 'Ordem Padrão' }
 ];
 
-export function TarefasApp() {
+function TarefasApp() {
   const toast = useToast();
   const { confirm } = useConfirm();
   const { usuario, isAuthenticated, carregando, logout, abrirContaModal } = useAuth();
@@ -163,12 +164,12 @@ export function TarefasApp() {
       try {
         const trilhasApi = await request<TrilhaResumoDTO[]>('/trilhas');
         const comCronograma: TrilhaComCronogramaInfo[] = (trilhasApi || [])
-          .filter((t) => Boolean(t.cronogramaAtivoResumo?.cronogramaAtivoId || (t as any).cronogramaAtivoId))
+          .filter((t) => Boolean(t.cronogramaAtivoResumo?.cronogramaAtivoId))
           .map((t) => ({
             id: t.id,
             nome: t.nome,
             cor: t.cor,
-            cronogramaAtivoId: (t.cronogramaAtivoResumo?.cronogramaAtivoId || (t as any).cronogramaAtivoId)!
+            cronogramaAtivoId: t.cronogramaAtivoResumo?.cronogramaAtivoId
           }));
         setTrilhasComCronograma(comCronograma);
       } catch {
@@ -203,7 +204,7 @@ export function TarefasApp() {
       setCarregandoBlocos(true);
       setErroBlocos(null);
       try {
-        const res = await request<PaginaBlocosDTO>(
+        const res = await request<Pagina<BlocoCronogramaItemDTO>>(
           `/trilhas/${encodeURIComponent(trilha.id)}/cronogramas/${encodeURIComponent(
             trilha.cronogramaAtivoId
           )}/blocos?concluido=false&pagina=${pagina}&tamanho=50`
@@ -289,8 +290,9 @@ export function TarefasApp() {
   };
 
   // Concluir bloco abrindo GlobalSessionModal (FASE 7)
-  const handleConcluirBloco = (bloco: BlocoCronogramaItemDTO | any) => {
-    const blocoId = bloco.blocoId || bloco.id;
+  const handleConcluirBloco = (bloco: BlocoCronogramaItemDTO | BlocoHojeDTO) => {
+    const blocoId = 'blocoId' in bloco ? bloco.blocoId : bloco.id;
+    const trilhaNome = 'trilhaNome' in bloco ? bloco.trilhaNome : undefined;
     abrirModalSessao({
       modo: 'BLOCO_DIRETO',
       trilhaId: bloco.trilhaId || trilhaAtiva?.id,
@@ -298,7 +300,7 @@ export function TarefasApp() {
       blocoId,
       duracaoInicialSegundos: (bloco.duracaoMinutos || 25) * 60,
       dataSessao: bloco.data,
-      trilhaNome: bloco.trilhaNome || trilhaAtiva?.nome,
+      trilhaNome: trilhaNome || trilhaAtiva?.nome,
       disciplinaNome: bloco.disciplinaNome,
       disciplinaCor: bloco.disciplinaCor,
       onSuccess: () => {
@@ -349,7 +351,7 @@ export function TarefasApp() {
           ...dados.recorrencia,
           titulo: dados.titulo || '',
           descricao: dados.descricao || dados.observacoes,
-          prioridade: (dados.prioridade as any) || 'MEDIA',
+          prioridade: dados.prioridade || 'MEDIA',
           horario: dados.horario,
           subtarefasModelo: (dados.subtarefas || []).map((s, idx) => ({
             id: s.id,
@@ -1028,7 +1030,7 @@ export function TarefasApp() {
                     variant="danger"
                     size="sm"
                     onClick={handleConcluirTodasAtrasadasSemSalvar}
-                    isLoading={concluindoAtrasados}
+                    loading={concluindoAtrasados}
                   >
                     Concluir todas as atrasadas sem salvar ({blocosAtrasadosTrilha.length})
                   </Button>
@@ -1037,10 +1039,10 @@ export function TarefasApp() {
 
               {erroBlocos ? (
                 <SectionErrorCard
-                  title="Erro ao carregar blocos da trilha"
-                  message={erroBlocos.message}
+                  titulo="Erro ao carregar blocos da trilha"
+                  descricao={erroBlocos.message}
                   onRetry={() => carregarBlocosTrilha(1)}
-                  isRetrying={carregandoBlocos}
+                  recarregando={carregandoBlocos}
                 />
               ) : blocosTrilha.length > 0 ? (
                 <>
@@ -1083,7 +1085,7 @@ export function TarefasApp() {
                               </span>
                             </div>
                           </div>
-                          <Badge variant={badgeVariant as any}>{badgeLabel}</Badge>
+                          <Badge variant={badgeVariant}>{badgeLabel}</Badge>
                         </div>
                       );
                     })}
@@ -1096,7 +1098,7 @@ export function TarefasApp() {
                         variant="secondary"
                         size="md"
                         onClick={() => carregarBlocosTrilha(paginaBlocos + 1)}
-                        isLoading={carregandoBlocos}
+                        loading={carregandoBlocos}
                       >
                         Carregar mais blocos
                       </Button>
@@ -1105,9 +1107,9 @@ export function TarefasApp() {
                 </>
               ) : !carregandoBlocos ? (
                 <EmptyState
-                  icon={<BookOpen size={24} />}
-                  title="Nenhum bloco pendente"
-                  description="Todos os blocos de estudo deste cronograma já foram concluídos!"
+                  icone={<BookOpen size={24} />}
+                  titulo="Nenhum bloco pendente"
+                  descricao="Todos os blocos de estudo deste cronograma já foram concluídos!"
                 />
               ) : null}
             </div>
@@ -1119,10 +1121,10 @@ export function TarefasApp() {
               {/* Seção 1: Atrasadas (com agrupamento por série) */}
               {agendaHoje?.erroTarefas ? (
                 <SectionErrorCard
-                  title="Erro ao carregar tarefas atrasadas"
-                  message={agendaHoje.erroTarefas.message}
+                  titulo="Erro ao carregar tarefas atrasadas"
+                  descricao={agendaHoje.erroTarefas.message}
                   onRetry={recarregarAgenda}
-                  isRetrying={carregandoAgenda}
+                  recarregando={carregandoAgenda}
                 />
               ) : (agendaHoje?.atrasadasAgrupadas || []).length > 0 ? (
                 <div style={{ marginBottom: '24px' }}>
@@ -1218,10 +1220,10 @@ export function TarefasApp() {
                 {/* Subdivisão 1: Blocos de Estudo de Hoje */}
                 {agendaHoje?.erroEstudos ? (
                   <SectionErrorCard
-                    title="Erro ao carregar blocos de estudos"
-                    message={agendaHoje.erroEstudos.message}
+                    titulo="Erro ao carregar blocos de estudos"
+                    descricao={agendaHoje.erroEstudos.message}
                     onRetry={recarregarAgenda}
-                    isRetrying={carregandoAgenda}
+                    recarregando={carregandoAgenda}
                   />
                 ) : (agendaHoje?.blocosHoje || []).length > 0 ? (
                   <div style={{ marginBottom: '16px' }}>
@@ -1271,10 +1273,10 @@ export function TarefasApp() {
                 {/* Subdivisão 2: Tarefas Manuais de Hoje */}
                 {agendaHoje?.erroTarefas ? (
                   <SectionErrorCard
-                    title="Erro ao carregar tarefas de hoje"
-                    message={agendaHoje.erroTarefas.message}
+                    titulo="Erro ao carregar tarefas de hoje"
+                    descricao={agendaHoje.erroTarefas.message}
                     onRetry={recarregarAgenda}
-                    isRetrying={carregandoAgenda}
+                    recarregando={carregandoAgenda}
                   />
                 ) : (agendaHoje?.tarefasHoje || []).length > 0 ? (
                   <div>
@@ -1314,10 +1316,10 @@ export function TarefasApp() {
               {/* Seção 3: Sem Data */}
               {agendaHoje?.erroTarefas ? (
                 <SectionErrorCard
-                  title="Erro ao carregar tarefas sem data"
-                  message={agendaHoje.erroTarefas.message}
+                  titulo="Erro ao carregar tarefas sem data"
+                  descricao={agendaHoje.erroTarefas.message}
                   onRetry={recarregarAgenda}
-                  isRetrying={carregandoAgenda}
+                  recarregando={carregandoAgenda}
                 />
               ) : (agendaHoje?.semData || []).length > 0 ? (
                 <div style={{ marginBottom: '24px' }}>
@@ -1386,10 +1388,10 @@ export function TarefasApp() {
                 </div>
               ) : tarefasFiltradas.length === 0 ? (
                 <EmptyState
-                  icon={<Filter size={24} />}
-                  title="Nenhuma tarefa cadastrada"
-                  description="Adicione novas tarefas acima ou crie suas próprias listas personalizadas."
-                  action={
+                  icone={<Filter size={24} />}
+                  titulo="Nenhuma tarefa cadastrada"
+                  descricao="Adicione novas tarefas acima ou crie suas próprias listas personalizadas."
+                  acaoPrimaria={
                     <Button
                       variant="primary"
                       leftIcon={<Plus size={16} />}

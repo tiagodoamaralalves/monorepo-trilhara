@@ -36,6 +36,8 @@ import {
   useToast,
   EmptyState
 } from '@shared/design-system';
+import { formatarRelogio as formatarSegundos } from '@shared/format';
+import { registrarFalha } from '@shared/diagnostico';
 import { useAuth } from '@shared/auth';
 import { useAgendaHoje } from '@shared/services/agendaHojeService';
 import { BlocoHojeDTO } from '@shared/contracts/domainContracts';
@@ -84,12 +86,6 @@ const STORAGE_NOTIF_KEY = 'trilhara_alarme_notif';
 const LEGACY_STORAGE_SOUND_KEY = 'trilhara_pomodoro_sound';
 const LEGACY_STORAGE_NOTIF_KEY = 'trilhara_pomodoro_notification';
 const STORAGE_POMODORO_MODE_KEY = 'trilhara_pomodoro_mode_active';
-
-function formatarSegundos(totalSegundos: number): string {
-  const minutos = Math.floor(totalSegundos / 60);
-  const segundos = totalSegundos % 60;
-  return `${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
-}
 
 function lerDuracaoLocalStorage(chave: string, padrao: number, minimo: number, maximo: number): number {
   if (typeof window === 'undefined') return padrao;
@@ -241,7 +237,7 @@ export default function PomodoroApp() {
       await TarefaService.alternarConclusao(tarefaId, true);
       if (focoItem?.id === tarefaId) setFocoItem(null);
       notificarMudanca();
-    } catch (err) {
+    } catch {
       toast.error('Não foi possível concluir a tarefa.');
     }
   };
@@ -251,14 +247,14 @@ export default function PomodoroApp() {
       modo: 'BLOCO_DIRETO',
       trilhaId: bloco.trilhaId,
       disciplinaId: bloco.disciplinaId,
-      blocoId: bloco.blocoId || (bloco as any).id,
+      blocoId: bloco.blocoId,
       duracaoInicialSegundos: (bloco.duracaoMinutos || 25) * 60,
       dataSessao: bloco.data,
       trilhaNome: bloco.trilhaNome,
       disciplinaNome: bloco.disciplinaNome,
       disciplinaCor: bloco.disciplinaCor,
       onSuccess: () => {
-        if (focoItem?.id === (bloco.blocoId || (bloco as any).id)) setFocoItem(null);
+        if (focoItem?.id === (bloco.blocoId)) setFocoItem(null);
         notificarMudanca();
       }
     });
@@ -271,7 +267,9 @@ export default function PomodoroApp() {
         const parsed = JSON.parse(raw);
         if (typeof parsed.pomodoroMode === 'boolean') return parsed.pomodoroMode;
       }
-    } catch {}
+    } catch (e) {
+      registrarFalha('estado-local.pomodoroMode', e);
+    }
     return lerBooleanoLocalStorage(STORAGE_POMODORO_MODE_KEY, true);
   });
 
@@ -288,7 +286,9 @@ export default function PomodoroApp() {
           return parsed.pomodoroDurationSeconds;
         }
       }
-    } catch {}
+    } catch (e) {
+      registrarFalha('estado-local.pomodoroDuration', e);
+    }
     const secStr = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_POMODORO_SECONDS_KEY) : null;
     if (secStr) {
       const val = Number.parseInt(secStr, 10);
@@ -310,7 +310,9 @@ export default function PomodoroApp() {
         const parsed = JSON.parse(raw);
         if (typeof parsed.timerSeconds === 'number') return parsed.timerSeconds;
       }
-    } catch {}
+    } catch (e) {
+      registrarFalha('estado-local.timerSeconds', e);
+    }
     const isPomodoroActive = lerBooleanoLocalStorage(STORAGE_POMODORO_MODE_KEY, true);
     if (isPomodoroActive) {
       const secStr = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_POMODORO_SECONDS_KEY) : null;
@@ -434,7 +436,9 @@ export default function PomodoroApp() {
               stopwatchStartTimeRef.current = null;
             }
           }
-        } catch {}
+        } catch (e) {
+          registrarFalha('estado-local.sincronizarTimer', e);
+        }
       }
     };
     window.addEventListener('storage', handleStorageChange);
@@ -498,7 +502,9 @@ export default function PomodoroApp() {
         channel.close();
         broadcastChannelRef.current = null;
       };
-    } catch {}
+    } catch (e) {
+      registrarFalha('broadcast.encerrar', e);
+    }
   }, []);
 
   // Logout e Troca de Conta: pausa o timer e persiste sob a chave isolada da conta
@@ -531,7 +537,9 @@ export default function PomodoroApp() {
             updatedAt: Date.now()
           })
         );
-      } catch {}
+      } catch (e) {
+        registrarFalha('broadcast.publicar', e);
+      }
     };
 
     window.addEventListener('trilhara:auth:logout', handleLogout);
@@ -567,11 +575,13 @@ export default function PomodoroApp() {
           setBreakSeconds(0);
           setTimerSeconds(pomodoroDurationSeconds);
         }
-      } catch {}
+      } catch (e) {
+        registrarFalha('estado-local.restaurarTimer', e);
+      }
     }
   }, [usuarioId, pomodoroDurationSeconds]);
 
-  const salvarETransmitir = useCallback((overrides: Record<string, any> = {}) => {
+  const salvarETransmitir = useCallback((overrides: Record<string, unknown> = {}) => {
     const key = getPomodoroTimerStorageKey(usuarioIdRef.current);
     const estadoSalvar = {
       pomodoroMode,
@@ -594,7 +604,9 @@ export default function PomodoroApp() {
 
     try {
       window.localStorage.setItem(key, JSON.stringify(estadoSalvar));
-    } catch {}
+    } catch (e) {
+      registrarFalha('estado-local.gravar', e);
+    }
 
     if (broadcastChannelRef.current) {
       try {
@@ -604,7 +616,9 @@ export default function PomodoroApp() {
           usuarioId: usuarioIdRef.current || 'anon',
           state: estadoSalvar
         });
-      } catch {}
+      } catch (e) {
+        registrarFalha('broadcast.transmitir', e);
+      }
     }
   }, [
     pomodoroMode,
@@ -983,7 +997,7 @@ export default function PomodoroApp() {
     }, 50);
   };
 
-  const concluirEdicaoInline = () => {
+  const concluirEdicaoInline = useCallback(() => {
     const mins = Math.max(0, Math.min(360, Number.parseInt(editMinutesStr, 10) || 0));
     const secs = Math.max(0, Math.min(59, Number.parseInt(editSecondsStr, 10) || 0));
     let totalSecs = mins * 60 + secs;
@@ -995,7 +1009,7 @@ export default function PomodoroApp() {
     setTimerSeconds(totalSecs);
     targetEndTimeRef.current = null;
     setIsEditingInline(false);
-  };
+  }, [editMinutesStr, editSecondsStr, setPomodoroDurationSeconds, setTimerSeconds]);
 
   const cancelarEdicaoInline = () => {
     setIsEditingInline(false);
@@ -1015,7 +1029,7 @@ export default function PomodoroApp() {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isEditingInline, editMinutesStr, editSecondsStr]);
+  }, [isEditingInline, editMinutesStr, editSecondsStr, concluirEdicaoInline]);
 
   const salvarConfiguracoes = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1239,19 +1253,23 @@ export default function PomodoroApp() {
                 className={`${styles.clockDigits} ${pomodoroMode && !isRunning && !breakType ? styles.clockEditable : ''} ${
                   isRunning ? styles.clockRunning : breakType || !isTimerAtStart ? styles.clockPaused : ''
                 }`}
-                role="timer"
                 aria-live="off"
-                onClick={pomodoroMode && !isRunning && !breakType ? () => abrirEdicaoInline('minutes') : undefined}
-                title={pomodoroMode && !isRunning && !breakType ? 'Clique para editar o tempo' : undefined}
-                tabIndex={pomodoroMode && !isRunning && !breakType ? 0 : undefined}
-                onKeyDown={(e) => {
-                  if (pomodoroMode && !isRunning && !breakType && (e.key === 'Enter' || e.key === ' ')) {
-                    e.preventDefault();
-                    abrirEdicaoInline('minutes');
-                  }
-                }}
               >
-                {tempoFormatado}
+                {pomodoroMode && !isRunning && !breakType ? (
+                  <span role="timer" aria-live="off">
+                    <button
+                      type="button"
+                      className={styles.clockEditButton}
+                      onClick={() => abrirEdicaoInline('minutes')}
+                      title="Clique para editar o tempo"
+                      aria-label={`Tempo atual ${tempoFormatado}. Editar duração do ciclo.`}
+                    >
+                      {tempoFormatado}
+                    </button>
+                  </span>
+                ) : (
+                  <span role="timer" aria-live="off">{tempoFormatado}</span>
+                )}
               </div>
             )}
           </div>
@@ -1364,7 +1382,7 @@ export default function PomodoroApp() {
                     size="sm"
                     iconOnly
                     onClick={recarregarAgenda}
-                    isLoading={carregandoAgenda}
+                    loading={carregandoAgenda}
                     title="Atualizar agenda"
                     aria-label="Atualizar agenda"
                   >
@@ -1394,10 +1412,10 @@ export default function PomodoroApp() {
                 {/* Seção 1: Atrasadas */}
                 {agendaHoje?.erroTarefas ? (
                   <SectionErrorCard
-                    title="Erro ao carregar atrasadas"
-                    message={agendaHoje.erroTarefas.message}
+                    titulo="Erro ao carregar atrasadas"
+                    descricao={agendaHoje.erroTarefas.message}
                     onRetry={recarregarAgenda}
-                    isRetrying={carregandoAgenda}
+                    recarregando={carregandoAgenda}
                   />
                 ) : (agendaHoje?.atrasadasAgrupadas || []).length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1427,7 +1445,8 @@ export default function PomodoroApp() {
                                 <Check size={12} />
                               </button>
 
-                              <div
+                              <button
+                                type="button"
                                 className={styles.agendaItemContent}
                                 onClick={() =>
                                   setFocoItem({
@@ -1440,7 +1459,7 @@ export default function PomodoroApp() {
                                 <span className={styles.agendaItemTitulo} title={principal.titulo}>
                                   {principal.titulo}
                                 </span>
-                              </div>
+                              </button>
 
                               <Badge variant="danger">Atrasada</Badge>
                             </div>
@@ -1493,7 +1512,8 @@ export default function PomodoroApp() {
                                         >
                                           <Check size={12} />
                                         </button>
-                                        <div
+                                        <button
+                                          type="button"
                                           className={styles.agendaItemContent}
                                           onClick={() =>
                                             setFocoItem({
@@ -1506,7 +1526,7 @@ export default function PomodoroApp() {
                                           <span className={styles.agendaItemTitulo} title={ant.titulo}>
                                             {ant.titulo}
                                           </span>
-                                        </div>
+                                        </button>
                                       </div>
                                     ))}
                                   </div>
@@ -1525,10 +1545,10 @@ export default function PomodoroApp() {
                   {/* Subdivisão 1: Blocos de Estudo */}
                   {agendaHoje?.erroEstudos ? (
                     <SectionErrorCard
-                      title="Erro ao carregar blocos de estudos"
-                      message={agendaHoje.erroEstudos.message}
+                      titulo="Erro ao carregar blocos de estudos"
+                      descricao={agendaHoje.erroEstudos.message}
                       onRetry={recarregarAgenda}
-                      isRetrying={carregandoAgenda}
+                      recarregando={carregandoAgenda}
                     />
                   ) : (agendaHoje?.blocosHoje || []).length > 0 ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -1541,7 +1561,7 @@ export default function PomodoroApp() {
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         {agendaHoje?.blocosHoje.map((bloco) => {
-                          const blocoId = bloco.blocoId || (bloco as any).id || '';
+                          const blocoId = bloco.blocoId || '';
                           const isFocado = focoItem?.id === blocoId;
 
                           return (
@@ -1559,7 +1579,8 @@ export default function PomodoroApp() {
                                 <Check size={12} />
                               </button>
 
-                              <div
+                              <button
+                                type="button"
                                 className={styles.agendaItemContent}
                                 onClick={() =>
                                   setFocoItem({
@@ -1576,7 +1597,7 @@ export default function PomodoroApp() {
                                 <span style={{ fontSize: '11px', color: 'var(--text-soft)' }}>
                                   {bloco.duracaoMinutos}m
                                 </span>
-                              </div>
+                              </button>
 
                               <Badge variant="warning">Hoje</Badge>
                             </div>
@@ -1589,10 +1610,10 @@ export default function PomodoroApp() {
                   {/* Subdivisão 2: Tarefas Manuais */}
                   {agendaHoje?.erroTarefas ? (
                     <SectionErrorCard
-                      title="Erro ao carregar tarefas de hoje"
-                      message={agendaHoje.erroTarefas.message}
+                      titulo="Erro ao carregar tarefas de hoje"
+                      descricao={agendaHoje.erroTarefas.message}
                       onRetry={recarregarAgenda}
-                      isRetrying={carregandoAgenda}
+                      recarregando={carregandoAgenda}
                     />
                   ) : (agendaHoje?.tarefasHoje || []).length > 0 ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -1622,7 +1643,8 @@ export default function PomodoroApp() {
                                 <Check size={12} />
                               </button>
 
-                              <div
+                              <button
+                                type="button"
                                 className={styles.agendaItemContent}
                                 onClick={() =>
                                   setFocoItem({
@@ -1635,7 +1657,7 @@ export default function PomodoroApp() {
                                 <span className={styles.agendaItemTitulo} title={tarefa.titulo}>
                                   {tarefa.titulo}
                                 </span>
-                              </div>
+                              </button>
                             </div>
                           );
                         })}
@@ -1647,10 +1669,10 @@ export default function PomodoroApp() {
                 {/* Seção 3: Sem Data */}
                 {agendaHoje?.erroTarefas ? (
                   <SectionErrorCard
-                    title="Erro ao carregar tarefas sem data"
-                    message={agendaHoje.erroTarefas.message}
+                    titulo="Erro ao carregar tarefas sem data"
+                    descricao={agendaHoje.erroTarefas.message}
                     onRetry={recarregarAgenda}
-                    isRetrying={carregandoAgenda}
+                    recarregando={carregandoAgenda}
                   />
                 ) : (agendaHoje?.semData || []).length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -1677,7 +1699,8 @@ export default function PomodoroApp() {
                               <Check size={12} />
                             </button>
 
-                            <div
+                            <button
+                              type="button"
                               className={styles.agendaItemContent}
                               onClick={() =>
                                 setFocoItem({
@@ -1690,7 +1713,7 @@ export default function PomodoroApp() {
                               <span className={styles.agendaItemTitulo} title={tarefa.titulo}>
                                 {tarefa.titulo}
                               </span>
-                            </div>
+                            </button>
                           </div>
                         );
                       })}
@@ -1706,9 +1729,9 @@ export default function PomodoroApp() {
                   !agendaHoje?.erroEstudos &&
                   !agendaHoje?.erroTarefas && (
                     <EmptyState
-                      icon={<Check size={20} />}
-                      title="Tudo em dia para hoje!"
-                      description="Nenhuma tarefa ou bloco de estudo pendente na sua agenda."
+                      icone={<Check size={20} />}
+                      titulo="Tudo em dia por hoje"
+                      descricao="Nenhuma tarefa ou bloco pendente para hoje."
                     />
                   )}
               </>

@@ -1,11 +1,10 @@
 import {
-  PrioridadeTarefa,
   EstadoTarefa,
+  PrioridadeTarefa,
   EscopoRecorrencia,
   FrequenciaRecorrencia,
   ModoMensal,
   TipoTermino,
-  SubtarefaDTO,
   ListaTarefasDTO,
   SerieRecorrenteDTO,
   TarefaDTO,
@@ -16,12 +15,10 @@ import {
 
 export type {
   PrioridadeTarefa,
-  EstadoTarefa,
   EscopoRecorrencia,
   FrequenciaRecorrencia,
   ModoMensal,
   TipoTermino,
-  SubtarefaDTO,
   ListaTarefasDTO,
   SerieRecorrenteDTO,
   TarefaDTO,

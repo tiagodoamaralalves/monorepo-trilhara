@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { registrarFalha } from '@shared/diagnostico';
 import { Navbar } from './components/Navbar/Navbar';
 import { HubView } from './views/HubView';
 import { PlanejamentoView } from './views/PlanejamentoView';
@@ -176,7 +177,7 @@ export default function EstudosApp() {
     } finally {
       setCarregando(false);
     }
-  }, [toast]);
+  }, [toast, logout]);
 
   // Carrega trilhas sempre que o usuário estiver autenticado
   useEffect(() => {
@@ -212,7 +213,7 @@ export default function EstudosApp() {
       }
       navegar('hub');
     }
-  }, [isAuthenticated, paginaAtiva, verificandoSessao, navegar]);
+  }, [isAuthenticated, paginaAtiva, verificandoSessao, navegar, usuario]);
 
   useEffect(() => {
     function sincronizarComUrl() {
@@ -248,7 +249,7 @@ export default function EstudosApp() {
       })
       .catch((err) => {
         if (!active) return;
-        console.error('Falha ao carregar detalhe da trilha:', err);
+        registrarFalha('estudos.detalheTrilha', err);
       })
       .finally(() => {
         if (active) setCarregandoDetalhe(false);

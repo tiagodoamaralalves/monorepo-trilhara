@@ -46,7 +46,7 @@ export const VerTrilhaModal: React.FC<VerTrilhaModalProps> = ({
           type="button"
           variant="primary"
           leftIcon={<Download size={15} />}
-          isLoading={importando}
+          loading={importando}
           disabled={!exibido}
           onClick={() => exibido && onUsar(exibido)}
         >

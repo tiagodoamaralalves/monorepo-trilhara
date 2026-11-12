@@ -38,11 +38,11 @@ export function isIOSNonStandalone(): boolean {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const isStandalone =
     (typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches) ||
-    Boolean((navigator as any).standalone);
+    Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
   return isIOS && !isStandalone;
 }
 
-export function urlB64ToUint8Array(base64String: string): Uint8Array {
+function urlB64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = window.atob(base64);
@@ -121,8 +121,8 @@ export const pushService = {
       }
 
       return { sucesso: true };
-    } catch (e: any) {
-      return { sucesso: false, mensagem: e?.message || 'Falha ao ativar notificações.' };
+    } catch (e) {
+      return { sucesso: false, mensagem: e instanceof Error ? e.message : 'Falha ao ativar notificações.' };
     }
   }
 };

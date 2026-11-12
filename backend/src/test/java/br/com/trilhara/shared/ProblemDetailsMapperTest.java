@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import br.com.trilhara.shared.erro.BadRequestExceptionMapper;
+import br.com.trilhara.shared.erro.CodigoErro;
 import br.com.trilhara.shared.erro.ConstraintViolationExceptionMapper;
 import br.com.trilhara.shared.erro.DomainConflictException;
 import br.com.trilhara.shared.erro.DomainConflictExceptionMapper;
@@ -57,17 +58,17 @@ class ProblemDetailsMapperTest {
 
         ProblemDetails details = (ProblemDetails) response.getEntity();
         assertEquals(400, details.status());
-        assertEquals("urn:trilhara:error:bad-request", details.type());
-        assertEquals("Requisição inválida", details.title());
+        assertEquals("urn:trilhara:problem:validation-error", details.type());
+        assertEquals("Erro de validação", details.title());
         assertEquals("Parâmetro 'tamanho' inválido", details.detail());
-        assertEquals("BAD_REQUEST", details.code());
+        assertEquals("VALIDATION_ERROR", details.code());
         assertNull(details.errors());
 
         // Validação da serialização JSON
         String json = objectMapper.writeValueAsString(details);
         JsonNode root = objectMapper.readTree(json);
         assertEquals(400, root.get("status").asInt());
-        assertEquals("BAD_REQUEST", root.get("code").asText());
+        assertEquals("VALIDATION_ERROR", root.get("code").asText());
         assertEquals("Parâmetro 'tamanho' inválido", root.get("detail").asText());
         assertFalse(root.has("errors"), "Campo 'errors' nulo não deve ser serializado");
     }
@@ -110,7 +111,7 @@ class ProblemDetailsMapperTest {
         assertEquals(ProblemDetails.MEDIA_TYPE, response.getMediaType().toString());
         ProblemDetails details = (ProblemDetails) response.getEntity();
         assertEquals(404, details.status());
-        assertEquals("urn:trilhara:error:not-found", details.type());
+        assertEquals("urn:trilhara:problem:not-found", details.type());
         assertEquals("Recurso não encontrado", details.title());
         assertEquals("Trilha não encontrada", details.detail());
         assertEquals("NOT_FOUND", details.code());
@@ -129,7 +130,7 @@ class ProblemDetailsMapperTest {
         setField(mapper, "uriInfo", new StubUriInfo("/api/trilhas/123/sessoes"));
 
         DomainConflictException ex = new DomainConflictException(
-                "IDEMPOTENCY_KEY_CONFLICT",
+                CodigoErro.IDEMPOTENCY_KEY_CONFLICT,
                 "Chave de idempotência já utilizada com parâmetros funcionais distintos."
         );
 
@@ -139,8 +140,8 @@ class ProblemDetailsMapperTest {
         assertEquals(ProblemDetails.MEDIA_TYPE, response.getMediaType().toString());
         ProblemDetails details = (ProblemDetails) response.getEntity();
         assertEquals(409, details.status());
-        assertEquals("urn:trilhara:error:conflict", details.type());
-        assertEquals("Conflito de negócio", details.title());
+        assertEquals("urn:trilhara:problem:idempotency-key-conflict", details.type());
+        assertEquals("Conflito de chave de idempotência", details.title());
         assertEquals("IDEMPOTENCY_KEY_CONFLICT", details.code());
         assertEquals("Chave de idempotência já utilizada com parâmetros funcionais distintos.", details.detail());
         assertEquals("/api/trilhas/123/sessoes", details.instance());

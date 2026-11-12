@@ -52,6 +52,18 @@
   flex-shrink: 0;
 }
 
+/* Variante `section` (padrão): ocupa a área da seção com respiro vertical. */
+.section {
+  margin: 12px 0;
+}
+
+/* Variante `inline`: fica dentro de um subgrupo já delimitado. */
+.inline {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm, 8px);
+}
+
 @media (max-width: 600px) {
   .card {
     flex-direction: column;

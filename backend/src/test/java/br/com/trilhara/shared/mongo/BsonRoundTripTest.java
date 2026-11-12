@@ -13,11 +13,10 @@ import java.util.Date;
 
 import org.bson.Document;
 import org.bson.types.ObjectId;
+import br.com.trilhara.shared.erro.InvalidIdentifierException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import jakarta.ws.rs.BadRequestException;
-import jakarta.ws.rs.NotFoundException;
 
 @DisplayName("FASE 1 - Utilitários BSON e Round-Trip de Tipos (ObjectId, Instant e LocalDate)")
 class BsonRoundTripTest {
@@ -26,7 +25,7 @@ class BsonRoundTripTest {
     @DisplayName("BsonIds: deve converter string hexadecimal válida para ObjectId")
     void deveConverterHexValidoParaObjectId() {
         String hex = "654321654321654321654321";
-        ObjectId id = BsonIds.toObjectId(hex, "usuarioId");
+        ObjectId id = BsonIds.parse(hex, "usuarioId");
         assertNotNull(id);
         assertEquals(hex, id.toHexString());
         assertEquals(hex, BsonIds.toHex(id));
@@ -34,30 +33,27 @@ class BsonRoundTripTest {
     }
 
     @Test
-    @DisplayName("BsonIds: deve lançar BadRequestException para id malformado ou nulo")
-    void deveLancarBadRequestParaIdInvalido() {
-        BadRequestException exNulo = assertThrows(
-                BadRequestException.class,
-                () -> BsonIds.toObjectId(null, "trilhaId"));
-        assertTrue(exNulo.getMessage().contains("trilhaId"));
+    @DisplayName("BsonIds.parse: deve lançar InvalidIdentifierException (400) para id malformado ou nulo")
+    void deveLancarInvalidIdentifierParaIdInvalido() {
+        InvalidIdentifierException exNulo = assertThrows(
+                InvalidIdentifierException.class,
+                () -> BsonIds.parse(null, "trilhaId"));
+        assertEquals("trilhaId", exNulo.getCampo());
 
-        BadRequestException exInvalido = assertThrows(
-                BadRequestException.class,
-                () -> BsonIds.toObjectId("id-curto", "disciplinaId"));
-        assertTrue(exInvalido.getMessage().contains("disciplinaId"));
+        InvalidIdentifierException exInvalido = assertThrows(
+                InvalidIdentifierException.class,
+                () -> BsonIds.parse("id-curto", "disciplinaId"));
+        assertEquals("disciplinaId", exInvalido.getCampo());
 
         assertFalse(BsonIds.isValid("invalido"));
         assertFalse(BsonIds.isValid(null));
     }
 
     @Test
-    @DisplayName("BsonIds: toObjectIdOrNotFound deve lançar NotFoundException quando inválido")
-    void deveLancarNotFoundParaIdInvalido() {
-        assertThrows(NotFoundException.class, () -> BsonIds.toObjectIdOrNotFound("nao-existe"));
-        assertThrows(NotFoundException.class, () -> BsonIds.toObjectIdOrNotFound(null));
-
+    @DisplayName("BsonIds.parse: deve aceitar hexadecimal válido de 24 caracteres")
+    void deveAceitarHexValido() {
         ObjectId valido = new ObjectId();
-        assertEquals(valido, BsonIds.toObjectIdOrNotFound(valido.toHexString()));
+        assertEquals(valido, BsonIds.parse(valido.toHexString(), "id"));
     }
 
     @Test

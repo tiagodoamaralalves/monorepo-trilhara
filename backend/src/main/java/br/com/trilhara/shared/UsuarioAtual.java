@@ -53,7 +53,12 @@ public class UsuarioAtual {
     }
 
     public ObjectId usuarioIdObjectId() {
-        return BsonIds.toObjectId(donoId(), "usuarioId");
+        String dono = donoId();
+        if (dono == null || !ObjectId.isValid(dono)) {
+            // O ID vem exclusivamente do token; ausência/erro é 401, nunca 400 do cliente.
+            throw new NotAuthorizedException("Autenticação obrigatória.");
+        }
+        return new ObjectId(dono);
     }
 
     public String usuarioId() {

@@ -5,6 +5,8 @@
  * - Alerta visual de alternância no título da aba
  */
 
+import { registrarFalha } from '@shared/diagnostico';
+
 const CHAVE_ALARME_SOM = 'trilhara_alarme_som';
 const CHAVE_ALARME_NOTIF = 'trilhara_alarme_notif';
 
@@ -57,7 +59,7 @@ class SoundEngine {
         osc.stop(endTime);
       });
     } catch (err) {
-      console.warn('Não foi possível tocar o alarme sonoro:', err);
+      registrarFalha('alarme.som', err);
     }
   }
 
@@ -172,7 +174,7 @@ export const AlarmService = {
         notif.close();
       };
     } catch (err) {
-      console.warn('Erro ao disparar notificação do navegador:', err);
+      registrarFalha('alarme.notificacao', err);
     }
   },
 

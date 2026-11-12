@@ -19,20 +19,20 @@ const MESES = [
 
 const DIAS_SEMANA = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 
-export function parseISO(dateISO?: string | null): { year: number; month: number; day: number } | null {
+function parseISO(dateISO?: string | null): { year: number; month: number; day: number } | null {
   if (!dateISO || !/^\d{4}-\d{2}-\d{2}$/.test(dateISO)) return null;
   const [y, m, d] = dateISO.split('-').map(Number);
   return { year: y, month: m - 1, day: d };
 }
 
-export function formatISO(year: number, month: number, day: number): string {
+function formatISO(year: number, month: number, day: number): string {
   const y = String(year).padStart(4, '0');
   const m = String(month + 1).padStart(2, '0');
   const d = String(day).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
 
-export function formatDisplayDate(dateISO?: string | null): string {
+function formatDisplayDate(dateISO?: string | null): string {
   if (!dateISO) return '';
   const parsed = parseISO(dateISO);
   if (!parsed) return '';
@@ -41,12 +41,12 @@ export function formatDisplayDate(dateISO?: string | null): string {
   return `${d}/${m}/${parsed.year}`;
 }
 
-export function getTodayISO(): string {
+function getTodayISO(): string {
   const d = new Date();
   return formatISO(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-export interface CalendarProps {
+interface CalendarProps {
   value?: string;
   onChange?: (dateISO: string) => void;
   min?: string;
@@ -55,7 +55,7 @@ export interface CalendarProps {
   className?: string;
 }
 
-export const Calendar: React.FC<CalendarProps> = ({
+const Calendar: React.FC<CalendarProps> = ({
   value,
   onChange,
   min,
@@ -74,7 +74,7 @@ export const Calendar: React.FC<CalendarProps> = ({
       setViewYear(parsedValue.year);
       setViewMonth(parsedValue.month);
     }
-  }, [parsedValue?.year, parsedValue?.month]);
+  }, [parsedValue]);
 
   function voltarMes() {
     if (viewMonth === 0) {

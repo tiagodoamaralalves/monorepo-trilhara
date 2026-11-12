@@ -136,7 +136,7 @@ describe('FASE 8 — Reestruturação de Cadernos, Seções e Notas', () => {
       );
       expect(resultado).toHaveLength(2);
       // Confirma que o DTO de listagem projeta metadados
-      expect((resultado[0] as any).conteudoMarkdown).toBeUndefined();
+      expect('conteudoMarkdown' in resultado[0]).toBe(false);
     });
 
     it('buscarNota busca conteúdo completo sob demanda', async () => {

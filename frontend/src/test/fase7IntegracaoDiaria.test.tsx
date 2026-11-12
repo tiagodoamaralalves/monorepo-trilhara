@@ -15,7 +15,7 @@ import { AuthContext, AuthContextValue } from '../shared/auth/AuthContext';
 import * as apiModule from '../shared/auth/api';
 import { TarefaService } from '../modules/tarefas/services/tarefaService';
 import PomodoroApp from '../modules/pomodoro/PomodoroApp';
-import { TarefasApp } from '../modules/tarefas/TarefasApp';
+import TarefasApp from '../modules/tarefas/TarefasApp';
 import { BlocoHojeDTO, TarefasHojeDTO, TarefaDTO } from '../shared/contracts/domainContracts';
 
 // Mock do módulo de API request central
@@ -251,8 +251,8 @@ describe('FASE 7 — Integração Diária: SectionErrorCard, AgendaHojeService, 
 
       render(
         <SectionErrorCard
-          title="Erro ao carregar blocos de estudo"
-          message="Falha de conexão com a API de Estudos."
+          titulo="Erro ao carregar blocos de estudo"
+          descricao="Falha de conexão com a API de Estudos."
           onRetry={onRetryMock}
         />
       );
@@ -338,8 +338,12 @@ describe('FASE 7 — Integração Diária: SectionErrorCard, AgendaHojeService, 
       const spyAlternar = vi.spyOn(TarefaService, 'alternarConclusao').mockResolvedValue({
         id: 'tar-manual-1',
         titulo: 'Resolver 20 questões de RLM',
-        concluida: true
-      } as any);
+        concluida: true,
+        prioridade: 'MEDIA',
+        origem: 'MANUAL',
+        criadoEm: '2026-11-09T12:00:00Z',
+        atualizadoEm: '2026-11-09T12:00:00Z'
+      });
 
       vi.mocked(apiModule.request).mockImplementation(async (path: string) => {
         if (path === '/tarefas/hoje') return mockTarefasHoje;

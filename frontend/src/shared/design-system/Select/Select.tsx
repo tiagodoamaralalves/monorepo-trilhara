@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import { DisciplineLabel } from '../DisciplineLabel/DisciplineLabel';
 import styles from './Select.module.css';
 
-export interface SelectOption {
+interface SelectOption {
   value: string;
   label: string;
   dotColor?: string;
@@ -178,9 +178,16 @@ export const Select: React.FC<SelectProps> = ({
                 className={`${styles.menuOption} ${activeIndex === index ? styles.menuOptionActive : ''} ${value === option.value ? styles.menuOptionSelected : ''}`}
                 role="option"
                 aria-selected={value === option.value}
+                tabIndex={activeIndex === index ? 0 : -1}
                 onMouseDown={(event) => event.preventDefault()}
                 onMouseMove={() => setActiveIndex(index)}
                 onClick={() => selectOption(option)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    selectOption(option);
+                  }
+                }}
               >
                 {option.dotColor ? (
                   <DisciplineLabel name={option.label} color={option.dotColor} />

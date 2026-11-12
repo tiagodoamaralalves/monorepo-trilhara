@@ -24,6 +24,7 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.ReplaceOptions;
 import com.mongodb.client.model.Sorts;
 
+import br.com.trilhara.shared.mongo.BsonIds;
 import jakarta.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped
@@ -48,20 +49,20 @@ public class EditalRepository {
     public void salvar(Edital edital) {
         Document documento = paraDocumento(edital);
         documento.remove("id");
-        documento.put("_id", new ObjectId(edital.id()));
-        editais.replaceOne(eq("_id", new ObjectId(edital.id())), documento, new ReplaceOptions().upsert(true));
+        documento.put("_id", BsonIds.parse(edital.id(), "id"));
+        editais.replaceOne(eq("_id", BsonIds.parse(edital.id(), "id")), documento, new ReplaceOptions().upsert(true));
     }
 
     public Optional<Edital> buscar(String id) {
         if (!ObjectId.isValid(id)) {
             return Optional.empty();
         }
-        return Optional.ofNullable(editais.find(eq("_id", new ObjectId(id))).first()).map(this::paraEdital);
+        return Optional.ofNullable(editais.find(eq("_id", BsonIds.parse(id, "id"))).first()).map(this::paraEdital);
     }
 
     public boolean excluir(String id) {
         return ObjectId.isValid(id)
-                && editais.deleteOne(eq("_id", new ObjectId(id))).getDeletedCount() > 0;
+                && editais.deleteOne(eq("_id", BsonIds.parse(id, "id"))).getDeletedCount() > 0;
     }
 
     public Pagina<Edital> listarAdmin(StatusEdital status, String banca, String orgao, String cargo, int page, int size) {

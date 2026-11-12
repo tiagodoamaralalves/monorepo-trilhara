@@ -102,5 +102,3 @@ export const sessaoGlobalService = {
   }
 };
 
-export const SessaoGlobalService = sessaoGlobalService;
-export default sessaoGlobalService;

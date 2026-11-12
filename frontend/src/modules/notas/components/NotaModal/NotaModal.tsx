@@ -55,7 +55,7 @@ export const NotaModal: React.FC<NotaModalProps> = ({
       title={notaParaEditar ? 'Renomear Nota' : 'Nova Nota'}
       icon={<FileText size={20} />}
       submitText={notaParaEditar ? 'Salvar Alterações' : 'Criar Nota'}
-      isLoading={salvando}
+      loading={salvando}
     >
       <Input
         label="Título da Nota"
@@ -67,7 +67,6 @@ export const NotaModal: React.FC<NotaModalProps> = ({
         }}
         error={erroTitulo}
         required
-        autoFocus
       />
     </FormModal>
   );

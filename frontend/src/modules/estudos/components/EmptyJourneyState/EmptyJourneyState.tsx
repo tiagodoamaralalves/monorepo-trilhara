@@ -14,12 +14,12 @@ export const EmptyJourneyState: React.FC<EmptyJourneyStateProps> = ({
   onViewCatalog
 }) => (
   <EmptyState
-    icon={<Route size={28} />}
-    title={hasTrilha ? 'Sua trilha ainda não tem disciplinas' : 'Vamos iniciar sua primeira jornada?'}
-    description={hasTrilha
+    icone={<Route size={28} />}
+    titulo={hasTrilha ? 'Sua trilha ainda não tem disciplinas' : 'Vamos iniciar sua primeira jornada?'}
+    descricao={hasTrilha
       ? 'Cadastre as disciplinas e os assuntos do edital para começar a organizar seus estudos.'
       : 'Crie uma trilha de estudos personalizada ou escolha uma trilha pronta no catálogo abaixo para dar o pontapé inicial com matérias e assuntos já estruturados.'}
-    action={
+    acaoPrimaria={
       <>
         <Button variant="secondary" leftIcon={<Plus size={16} />} onClick={onPrimaryAction}>
           {hasTrilha ? 'Cadastrar Disciplinas' : 'Criar Minha Trilha'}

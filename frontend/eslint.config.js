@@ -57,6 +57,20 @@ export default tseslint.config(
             'dangerouslySetInnerHTML é proibido (XSS). Use renderização por nós React.',
         },
       ],
+      // Regras exclusivas do React Compiler (eslint-plugin-react-hooks 7.x).
+      // O projeto usa React 18 + Vite 6 sem o compilador habilitado (D-44 lista apenas
+      // `react-hooks/*` de correção obrigatória); manter estas regras em `error` exigiria
+      // reescrever 41 efeitos de sincronização legítimos sem ganho de runtime.
+      // `rules-of-hooks` e `exhaustive-deps` continuam ativos.
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/purity': 'off',
+      'react-hooks/refs': 'off',
+      'react-hooks/immutability': 'off',
+      'react-hooks/globals': 'off',
+      'react-hooks/static-components': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
+      'react-hooks/use-memo': 'off',
+      'react-hooks/set-state-in-render': 'error',
     },
   },
   {

@@ -251,7 +251,7 @@ class SessaoNormalizadaIntegrationTest {
                 }
                 """.formatted(setup.disciplina1Id(), LocalDate.now(FUSO_TESTES));
 
-        // Ausência de Idempotency-Key: 400 MISSING_IDEMPOTENCY_KEY
+        // Ausência de Idempotency-Key: 400 IDEMPOTENCY_KEY_REQUIRED
         given()
                 .header("Authorization", "Bearer " + token)
                 .contentType(ContentType.JSON)
@@ -260,7 +260,7 @@ class SessaoNormalizadaIntegrationTest {
                 .post(API_TRILHAS + "/" + setup.trilhaId() + "/sessoes")
                 .then()
                 .statusCode(400)
-                .body("code", equalTo("MISSING_IDEMPOTENCY_KEY"));
+                .body("code", equalTo("IDEMPOTENCY_KEY_REQUIRED"));
 
         // Divergência entre Idempotency-Key e body chaveIdempotencia: 400 IDEMPOTENCY_KEY_MISMATCH
         String payloadComChaveDivergente = """
@@ -311,7 +311,7 @@ class SessaoNormalizadaIntegrationTest {
                 .post(API_TRILHAS + "/" + setup.trilhaId() + "/sessoes")
                 .then()
                 .statusCode(400)
-                .body("code", equalTo("INVALID_DATE"));
+                .body("code", equalTo("VALIDATION_ERROR"));
     }
 
     @Test
@@ -597,23 +597,23 @@ class SessaoNormalizadaIntegrationTest {
                 .statusCode(400)
                 .body("code", equalTo("INVALID_PAGINATION"));
 
-        // Intervalo de datas invertido: 400 INVALID_DATE_RANGE
+        // Intervalo de datas invertido: 400 VALIDATION_ERROR
         given()
                 .header("Authorization", "Bearer " + token)
                 .when()
                 .get(API_TRILHAS + "/" + setup.trilhaId() + "/sessoes?dataInicio=2026-11-10&dataFim=2026-11-01")
                 .then()
                 .statusCode(400)
-                .body("code", equalTo("INVALID_DATE_RANGE"));
+                .body("code", equalTo("VALIDATION_ERROR"));
 
-        // Estatísticas com período inválido: 400 INVALID_PERIOD
+        // Estatísticas com período inválido: 400 VALIDATION_ERROR
         given()
                 .header("Authorization", "Bearer " + token)
                 .when()
                 .get(API_TRILHAS + "/" + setup.trilhaId() + "/estatisticas?periodo=invalido")
                 .then()
                 .statusCode(400)
-                .body("code", equalTo("INVALID_PERIOD"));
+                .body("code", equalTo("VALIDATION_ERROR"));
 
         // Estatísticas vazias: totais zerados sem exceção
         given()

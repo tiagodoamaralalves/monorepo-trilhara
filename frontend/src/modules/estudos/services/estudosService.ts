@@ -4,7 +4,7 @@ import {
   CriarCronogramaPayload,
   AtualizarCronogramaPayload,
   BlocoCronogramaItemDTO,
-  PaginaBlocosDTO,
+  Pagina,
   ConcluirAtrasadosResponse,
   DisponibilidadeSemanalDTO,
   BlocoHojeDTO
@@ -24,7 +24,6 @@ import {
   AtualizarDisciplinaRequest,
   RegistrarSessaoPayload,
   SessaoRegistradaDTO,
-  PaginaSessoesDTO,
   EstatisticasTrilhaDTO,
   RemocaoSessoesDisciplinaResponse,
   ItemProgresso,
@@ -430,7 +429,7 @@ export const EstudosService = {
     if (filtro?.pagina !== undefined) params.set('pagina', String(filtro.pagina));
     if (filtro?.tamanho !== undefined) params.set('tamanho', String(filtro.tamanho));
     const query = params.toString() ? `?${params.toString()}` : '';
-    const res = await request<PaginaSessoesDTO>(
+    const res = await request<Pagina<SessaoRegistradaDTO>>(
       `/trilhas/${encodeURIComponent(trilhaId)}/sessoes${query}`
     );
     return {
@@ -548,7 +547,7 @@ export const EstudosService = {
       pagina?: number;
       tamanho?: number;
     }
-  ): Promise<PaginaBlocosDTO> {
+  ): Promise<Pagina<BlocoCronogramaItemDTO>> {
     const search = new URLSearchParams();
     if (params?.concluido !== undefined) search.set('concluido', String(params.concluido));
     if (params?.dataInicio) search.set('dataInicio', params.dataInicio);
@@ -557,7 +556,7 @@ export const EstudosService = {
     if (params?.tamanho) search.set('tamanho', String(params.tamanho));
     const query = search.toString() ? `?${search.toString()}` : '';
 
-    return await request<PaginaBlocosDTO>(
+    return await request<Pagina<BlocoCronogramaItemDTO>>(
       `/trilhas/${encodeURIComponent(trilhaId)}/cronogramas/${encodeURIComponent(cronogramaId)}/blocos${query}`
     );
   },
@@ -605,13 +604,12 @@ export const EstudosService = {
   }
 };
 
-export const estudosService = EstudosService;
 export type {
   CronogramaDTO,
   CriarCronogramaPayload,
   AtualizarCronogramaPayload,
   BlocoCronogramaItemDTO,
-  PaginaBlocosDTO,
+  Pagina,
   ConcluirAtrasadosResponse,
   DisponibilidadeSemanalDTO,
   BlocoHojeDTO

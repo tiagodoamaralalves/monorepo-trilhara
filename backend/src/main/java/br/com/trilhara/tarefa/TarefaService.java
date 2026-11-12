@@ -18,6 +18,7 @@ import br.com.trilhara.push.LembretePushCalculator;
 import br.com.trilhara.push.LembretePushService;
 import br.com.trilhara.shared.TimezoneContext;
 import br.com.trilhara.shared.mongo.BsonDates;
+import br.com.trilhara.shared.mongo.BsonIds;
 import br.com.trilhara.tarefa.RegraRecorrenciaValidator.ParametrosRegraRecorrencia;
 import br.com.trilhara.tarefa.dto.AtualizarListaTarefasRequest;
 import br.com.trilhara.tarefa.dto.AtualizarSerieRecorrenteRequest;
@@ -1102,10 +1103,7 @@ public class TarefaService {
     }
 
     private ObjectId validarObjectId(String idStr, String nomeCampo) {
-        if (idStr == null || !ObjectId.isValid(idStr.trim())) {
-            throw new BadRequestException("Identificador inválido para " + nomeCampo + ": " + idStr);
-        }
-        return new ObjectId(idStr.trim());
+        return BsonIds.parse(idStr, nomeCampo);
     }
 
     private ListaTarefasResponse paraListaResponse(ListaTarefas l, long totalTarefas) {

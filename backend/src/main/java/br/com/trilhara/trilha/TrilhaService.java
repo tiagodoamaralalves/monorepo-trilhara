@@ -22,7 +22,9 @@ import br.com.trilhara.edital.EditalRepository;
 import br.com.trilhara.edital.StatusEdital;
 import br.com.trilhara.sessao.SessaoRepository;
 import br.com.trilhara.shared.TimezoneContext;
+import br.com.trilhara.shared.erro.CodigoErro;
 import br.com.trilhara.shared.erro.DomainConflictException;
+import br.com.trilhara.shared.erro.ResourceLimitExceededException;
 import br.com.trilhara.shared.mongo.BsonDates;
 import br.com.trilhara.shared.mongo.BsonIds;
 import br.com.trilhara.trilha.dto.AtualizarDisciplinaRequest;
@@ -51,7 +53,6 @@ public class TrilhaService {
     private static final String CAMPO_CARGO = "cargo";
     private static final String CAMPO_AREA_CARGO = "areaCargo";
     private static final String MSG_CONFLITO_LEASE = "Geração de cronograma ou modificação concorrente em andamento para esta trilha.";
-    private static final String CODIGO_CONFLITO_LEASE = "SCHEDULE_GENERATION_IN_PROGRESS";
 
     public static final int MAX_TRILHAS_PADRAO = 50;
     public static final int MAX_DISCIPLINAS_POR_TRILHA = 100;
@@ -136,7 +137,7 @@ public class TrilhaService {
 
     public TrilhaDetalheDTO buscarDetalhe(String trilhaIdStr) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
 
         Document doc = repository.buscarEntidade(usuarioId, trilhaId)
                 .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
@@ -221,9 +222,8 @@ public class TrilhaService {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
 
         if (repository.contar(usuarioId) >= maxTrilhasPorUsuario) {
-            throw new DomainConflictException(
-                    "Limite de " + maxTrilhasPorUsuario + " trilhas por usuário atingido.",
-                    "RESOURCE_LIMIT_EXCEEDED");
+            throw new ResourceLimitExceededException(
+                    "Limite de " + maxTrilhasPorUsuario + " trilhas por usuário atingido.");
         }
 
         boolean temEdital = request.editalId() != null && !request.editalId().isBlank();
@@ -307,7 +307,7 @@ public class TrilhaService {
         List<CriarDisciplinaRequest> iniciais = request.obterDisciplinasEfetivas();
         if (!iniciais.isEmpty()) {
             if (iniciais.size() > MAX_DISCIPLINAS_POR_TRILHA) {
-                throw new DomainConflictException("A trilha pode ter no máximo " + MAX_DISCIPLINAS_POR_TRILHA + " disciplinas.", "RESOURCE_LIMIT_EXCEEDED");
+                throw new ResourceLimitExceededException("A trilha pode ter no máximo " + MAX_DISCIPLINAS_POR_TRILHA + " disciplinas.");
             }
             List<Disciplina> disciplinasNorm = construirDisciplinasManuais(usuarioId, trilhaId, iniciais, agora);
             disciplinaRepository.inserirEmLote(disciplinasNorm);
@@ -341,7 +341,7 @@ public class TrilhaService {
 
     private void validarLimiteTopicos(CriarDisciplinaRequest request) {
         if (request.topicos() != null && request.topicos().size() > MAX_TOPICOS_POR_DISCIPLINA) {
-            throw new BadRequestException("Cada disciplina pode ter no máximo " + MAX_TOPICOS_POR_DISCIPLINA + " tópicos.");
+            throw new ResourceLimitExceededException("Cada disciplina pode ter no máximo " + MAX_TOPICOS_POR_DISCIPLINA + " tópicos.");
         }
     }
 
@@ -365,7 +365,7 @@ public class TrilhaService {
 
     public TrilhaDetalheDTO atualizarMetadados(String trilhaIdStr, AtualizarMetadadosTrilhaRequest request) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
 
         Document doc = repository.buscarEntidade(usuarioId, trilhaId)
                 .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
@@ -384,7 +384,7 @@ public class TrilhaService {
 
     public void excluirTrilha(String trilhaIdStr) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
 
         repository.buscarEntidade(usuarioId, trilhaId)
                 .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
@@ -393,7 +393,7 @@ public class TrilhaService {
         Instant expiraEm = Instant.now().plusSeconds(30);
         boolean adquiriu = repository.adquirirLease(usuarioId, trilhaId, leaseToken, expiraEm);
         if (!adquiriu) {
-            throw new DomainConflictException(MSG_CONFLITO_LEASE, CODIGO_CONFLITO_LEASE);
+            throw new DomainConflictException(CodigoErro.SCHEDULE_GENERATION_IN_PROGRESS, MSG_CONFLITO_LEASE);
         }
 
         try {
@@ -436,19 +436,18 @@ public class TrilhaService {
 
     public DisciplinaDTO criarDisciplina(String trilhaIdStr, CriarDisciplinaRequest request) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
 
         repository.buscarEntidade(usuarioId, trilhaId)
                 .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
 
         if (disciplinaRepository.contarPorTrilha(usuarioId, trilhaId) >= MAX_DISCIPLINAS_POR_TRILHA) {
-            throw new DomainConflictException(
-                    "Limite de " + MAX_DISCIPLINAS_POR_TRILHA + " disciplinas por trilha atingido.",
-                    "RESOURCE_LIMIT_EXCEEDED");
+            throw new ResourceLimitExceededException(
+                    "Limite de " + MAX_DISCIPLINAS_POR_TRILHA + " disciplinas por trilha atingido.");
         }
 
         if (request.topicos() != null && request.topicos().size() > MAX_TOPICOS_POR_DISCIPLINA) {
-            throw new BadRequestException("Cada disciplina pode ter no máximo " + MAX_TOPICOS_POR_DISCIPLINA + " tópicos.");
+            throw new ResourceLimitExceededException("Cada disciplina pode ter no máximo " + MAX_TOPICOS_POR_DISCIPLINA + " tópicos.");
         }
 
         int ordem = (int) disciplinaRepository.contarPorTrilha(usuarioId, trilhaId);
@@ -501,8 +500,8 @@ public class TrilhaService {
 
     public DisciplinaDTO atualizarDisciplina(String trilhaIdStr, String disciplinaIdStr, AtualizarDisciplinaRequest request) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
-        ObjectId disciplinaId = BsonIds.toObjectIdOrNotFound(disciplinaIdStr);
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId disciplinaId = BsonIds.parse(disciplinaIdStr, "disciplinaId");
 
         Disciplina existente = disciplinaRepository.buscarPorId(usuarioId, trilhaId, disciplinaId)
                 .orElseThrow(() -> new NotFoundException("Disciplina não encontrada"));
@@ -559,7 +558,7 @@ public class TrilhaService {
             return existente.topicos();
         }
         if (topicosReq.size() > MAX_TOPICOS_POR_DISCIPLINA) {
-            throw new BadRequestException("Cada disciplina pode ter no máximo " + MAX_TOPICOS_POR_DISCIPLINA + " tópicos.");
+            throw new ResourceLimitExceededException("Cada disciplina pode ter no máximo " + MAX_TOPICOS_POR_DISCIPLINA + " tópicos.");
         }
 
         Set<String> idsAtuais = existente.topicos().stream()
@@ -590,7 +589,7 @@ public class TrilhaService {
 
     public void reordenarDisciplinas(String trilhaIdStr, ReordenarDisciplinasRequest request) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
 
         repository.buscarEntidade(usuarioId, trilhaId)
                 .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
@@ -617,8 +616,8 @@ public class TrilhaService {
 
     public void excluirDisciplina(String trilhaIdStr, String disciplinaIdStr) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
-        ObjectId disciplinaId = BsonIds.toObjectIdOrNotFound(disciplinaIdStr);
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId disciplinaId = BsonIds.parse(disciplinaIdStr, "disciplinaId");
 
         disciplinaRepository.buscarPorId(usuarioId, trilhaId, disciplinaId)
                 .orElseThrow(() -> new NotFoundException("Disciplina não encontrada"));
@@ -627,7 +626,7 @@ public class TrilhaService {
         Instant expiraEm = Instant.now().plusSeconds(30);
         boolean adquiriu = repository.adquirirLease(usuarioId, trilhaId, leaseToken, expiraEm);
         if (!adquiriu) {
-            throw new DomainConflictException(MSG_CONFLITO_LEASE, CODIGO_CONFLITO_LEASE);
+            throw new DomainConflictException(CodigoErro.SCHEDULE_GENERATION_IN_PROGRESS, MSG_CONFLITO_LEASE);
         }
 
         try {
@@ -649,7 +648,7 @@ public class TrilhaService {
 
     public void marcarTopicoConcluido(String trilhaIdStr, String topicoId) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
 
         repository.buscarEntidade(usuarioId, trilhaId)
                 .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
@@ -662,7 +661,7 @@ public class TrilhaService {
 
     public void desmarcarTopicoConcluido(String trilhaIdStr, String topicoId) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
 
         repository.buscarEntidade(usuarioId, trilhaId)
                 .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));

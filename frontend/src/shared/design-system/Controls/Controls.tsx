@@ -1,9 +1,8 @@
 import React from 'react';
-import { Scale } from 'lucide-react';
 import { Button } from '../Button/Button';
 import styles from './Controls.module.css';
 
-export interface ToggleOption<T extends string> {
+interface ToggleOption<T extends string> {
   value: T;
   label: string;
   icon?: React.ReactNode;
@@ -45,22 +44,6 @@ export function ToggleGroup<const T extends string>({
   );
 }
 
-export interface ChipProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
-  selected?: boolean;
-  children: React.ReactNode;
-}
-
-export const Chip: React.FC<ChipProps> = ({ selected = false, children, ...props }) => (
-  <Button
-    {...props}
-    type={props.type || 'button'}
-    variant="secondary"
-    size="sm"
-    selected={selected}
-  >
-    {children}
-  </Button>
-);
 
 export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
@@ -180,47 +163,6 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
   );
 };
 
-export interface WeightPickerProps {
-  value: number;
-  onChange: (weight: number) => void;
-  label?: string;
-  compact?: boolean;
-}
-
-export const WeightPicker: React.FC<WeightPickerProps> = ({
-  value,
-  onChange,
-  label = 'Peso no ciclo',
-  compact = false
-}) => (
-  <div className={`${styles.field} ${compact ? styles.weightPickerCompact : ''}`}>
-    <span className={`${styles.label} ${styles.weightLabel} ${compact ? styles.weightLabelCompact : ''}`}>
-      <Scale size={14} aria-hidden="true" />
-      {label}
-    </span>
-    <div
-      className={`${styles.weightPills} ${compact ? styles.weightPillsCompact : ''}`}
-      role="group"
-      aria-label={label}
-    >
-      {[1, 2, 3, 4, 5].map((weight) => (
-        <button
-          key={weight}
-          type="button"
-          className={`${styles.weightPill} ${compact ? styles.weightPillCompact : ''} ${
-            value === weight ? styles.weightPillActive : ''
-          }`}
-          onClick={() => onChange(weight)}
-          aria-pressed={value === weight}
-          aria-label={`Selecionar peso ${weight}x`}
-        >
-          {weight}x
-        </button>
-      ))}
-    </div>
-  </div>
-);
-
 export interface ProgressBarProps {
   value: number;
   max?: number;
@@ -266,31 +208,3 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   );
 };
 
-export interface StepperProps {
-  steps: readonly string[];
-  currentStep: number;
-  ariaLabel?: string;
-}
-
-export const Stepper: React.FC<StepperProps> = ({
-  steps,
-  currentStep,
-  ariaLabel = 'Etapas'
-}) => (
-  <ol className={styles.stepper} aria-label={ariaLabel}>
-    {steps.map((step, index) => (
-      <li
-        key={`${index}-${step}`}
-        className={[
-          styles.step,
-          index < currentStep ? styles.stepComplete : '',
-          index === currentStep ? styles.stepCurrent : ''
-        ].filter(Boolean).join(' ')}
-        aria-current={index === currentStep ? 'step' : undefined}
-      >
-        <span className={styles.stepNumber}>{index + 1}</span>
-        <span>{step}</span>
-      </li>
-    ))}
-  </ol>
-);

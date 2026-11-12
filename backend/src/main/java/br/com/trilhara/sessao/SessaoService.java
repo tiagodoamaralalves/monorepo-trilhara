@@ -24,8 +24,10 @@ import br.com.trilhara.sessao.dto.RemocaoSessoesDisciplinaResponse;
 import br.com.trilhara.sessao.dto.SessaoDTO;
 import br.com.trilhara.shared.TimezoneContext;
 import br.com.trilhara.shared.UsuarioAtual;
+import br.com.trilhara.shared.erro.CodigoErro;
 import br.com.trilhara.shared.erro.DomainConflictException;
 import br.com.trilhara.shared.erro.ProblemDetails;
+import br.com.trilhara.shared.erro.ProblemDetailsFactory;
 import br.com.trilhara.shared.mongo.BsonIds;
 import br.com.trilhara.trilha.Disciplina;
 import br.com.trilhara.trilha.DisciplinaRepository;
@@ -64,7 +66,7 @@ public class SessaoService {
             String idempotencyKeyHeader,
             RegistrarSessaoRequest request) {
         ObjectId usuarioId = usuarioAtual.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
         String path = "/api/trilhas/" + trilhaIdStr + "/sessoes";
 
         // 1. Validação do cabeçalho de Idempotência
@@ -86,7 +88,7 @@ public class SessaoService {
         Document trilhaDoc = trilhaRepository.buscarEntidade(usuarioId, trilhaId)
                 .orElseThrow(() -> new NotFoundException("Trilha não encontrada"));
 
-        ObjectId disciplinaId = BsonIds.toObjectId(request.disciplinaId(), "disciplinaId");
+        ObjectId disciplinaId = BsonIds.parse(request.disciplinaId(), "disciplinaId");
         Disciplina disciplina = disciplinaRepository.buscarPorId(usuarioId, trilhaId, disciplinaId)
                 .orElseThrow(() -> new NotFoundException("Disciplina não encontrada na trilha"));
 
@@ -126,7 +128,7 @@ public class SessaoService {
         if (docExistenteOpt.isPresent()) {
             Document doc = docExistenteOpt.get();
             if (doc.get("deletedAt") != null) {
-                throw new DomainConflictException("IDEMPOTENCY_RESULT_REMOVED",
+                throw new DomainConflictException(CodigoErro.IDEMPOTENCY_RESULT_REMOVED,
                         "Esta sessão foi excluída e sua chave de idempotência não pode ser reutilizada.");
             }
             String existingHash = doc.getString("requestHash");
@@ -137,7 +139,7 @@ public class SessaoService {
                 boolean editavel = s.id().equals(primeiraId);
                 return new RegistroResultado(paraDTO(s, disciplina.nome(), disciplina.cor(), false, editavel), false);
             } else {
-                throw new DomainConflictException("IDEMPOTENCY_KEY_CONFLICT",
+                throw new DomainConflictException(CodigoErro.IDEMPOTENCY_KEY_CONFLICT,
                         "Chave de idempotência já utilizada com dados diferentes.");
             }
         }
@@ -176,7 +178,7 @@ public class SessaoService {
                 Document doc = repository.buscarDocumentoPorChaveIdempotencia(usuarioId, chave)
                         .orElseThrow(() -> e);
                 if (doc.get("deletedAt") != null) {
-                    throw new DomainConflictException("IDEMPOTENCY_RESULT_REMOVED",
+                    throw new DomainConflictException(CodigoErro.IDEMPOTENCY_RESULT_REMOVED,
                             "Esta sessão foi excluída e sua chave de idempotência não pode ser reutilizada.");
                 }
                 String existingHash = doc.getString("requestHash");
@@ -187,7 +189,7 @@ public class SessaoService {
                     boolean editavel = s.id().equals(primeiraId);
                     return new RegistroResultado(paraDTO(s, discNome, discCor, false, editavel), false);
                 } else {
-                    throw new DomainConflictException("IDEMPOTENCY_KEY_CONFLICT",
+                    throw new DomainConflictException(CodigoErro.IDEMPOTENCY_KEY_CONFLICT,
                             "Chave de idempotência já utilizada com dados diferentes.");
                 }
             }
@@ -205,8 +207,8 @@ public class SessaoService {
             String sessaoIdStr,
             AtualizarSessaoRequest request) {
         ObjectId usuarioId = usuarioAtual.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
-        ObjectId sessaoId = BsonIds.toObjectId(sessaoIdStr, "sessaoId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId sessaoId = BsonIds.parse(sessaoIdStr, "sessaoId");
         String path = "/api/trilhas/" + trilhaIdStr + "/sessoes/" + sessaoIdStr;
 
         trilhaRepository.buscarEntidade(usuarioId, trilhaId)
@@ -220,7 +222,7 @@ public class SessaoService {
             if (sessaoExistente.isEmpty()) {
                 throw new NotFoundException("Sessão não encontrada.");
             }
-            throw new DomainConflictException("LATEST_SESSION_ONLY",
+            throw new DomainConflictException(CodigoErro.LATEST_SESSION_ONLY,
                     "Apenas a sessão mais recente da trilha pode ser editada.");
         }
 
@@ -274,8 +276,8 @@ public class SessaoService {
 
     public void excluirIndividual(String trilhaIdStr, String sessaoIdStr) {
         ObjectId usuarioId = usuarioAtual.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
-        ObjectId sessaoId = BsonIds.toObjectId(sessaoIdStr, "sessaoId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId sessaoId = BsonIds.parse(sessaoIdStr, "sessaoId");
 
         trilhaRepository.buscarEntidade(usuarioId, trilhaId)
                 .orElseThrow(() -> new NotFoundException("Trilha não encontrada"));
@@ -292,8 +294,8 @@ public class SessaoService {
             String trilhaIdStr,
             String disciplinaIdStr) {
         ObjectId usuarioId = usuarioAtual.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
-        ObjectId disciplinaId = BsonIds.toObjectId(disciplinaIdStr, "disciplinaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId disciplinaId = BsonIds.parse(disciplinaIdStr, "disciplinaId");
 
         trilhaRepository.buscarEntidade(usuarioId, trilhaId)
                 .orElseThrow(() -> new NotFoundException("Trilha não encontrada"));
@@ -309,7 +311,7 @@ public class SessaoService {
             Integer pagina,
             Integer tamanho) {
         ObjectId usuarioId = usuarioAtual.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
         String path = "/api/trilhas/" + trilhaIdStr + "/sessoes";
 
         trilhaRepository.buscarEntidade(usuarioId, trilhaId)
@@ -324,7 +326,7 @@ public class SessaoService {
 
         ObjectId disciplinaId = null;
         if (disciplinaIdStr != null && !disciplinaIdStr.isBlank()) {
-            disciplinaId = BsonIds.toObjectId(disciplinaIdStr, "disciplinaId");
+            disciplinaId = BsonIds.parse(disciplinaIdStr, "disciplinaId");
         }
 
         LocalDate dataInicio = null;
@@ -368,7 +370,7 @@ public class SessaoService {
             String dataInicioStr,
             String dataFimStr) {
         ObjectId usuarioId = usuarioAtual.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.toObjectIdOrNotFound(trilhaIdStr);
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
         String path = "/api/trilhas/" + trilhaIdStr + "/estatisticas";
 
         trilhaRepository.buscarEntidade(usuarioId, trilhaId)
@@ -475,20 +477,29 @@ public class SessaoService {
     }
 
     private WebApplicationException badRequest(String code, String detail, String instance) {
-        ProblemDetails problem = new ProblemDetails(
-                "urn:trilhara:error:bad-request",
-                "Requisição inválida",
-                Response.Status.BAD_REQUEST.getStatusCode(),
-                detail,
-                instance,
-                code,
-                null
-        );
+        ProblemDetails problem = ProblemDetailsFactory.criar(codigoDoErro(code), detail, instance);
         return new WebApplicationException(
-                Response.status(Response.Status.BAD_REQUEST)
+                Response.status(problem.status())
                         .type(ProblemDetails.MEDIA_TYPE)
                         .entity(problem)
                         .build()
         );
+    }
+
+    /**
+     * Mapeia os códigos de validação de sessão para o catálogo fechado (D-04).
+     * Todo erro de payload é {@code VALIDATION_ERROR}; apenas a paginação e o
+     * descasamento de idempotência têm código próprio.
+     */
+    private static CodigoErro codigoDoErro(String code) {
+        if (code == null) {
+            return CodigoErro.VALIDATION_ERROR;
+        }
+        return switch (code) {
+            case "INVALID_PAGINATION" -> CodigoErro.INVALID_PAGINATION;
+            case "MISSING_IDEMPOTENCY_KEY" -> CodigoErro.IDEMPOTENCY_KEY_REQUIRED;
+            case "IDEMPOTENCY_KEY_MISMATCH" -> CodigoErro.IDEMPOTENCY_KEY_MISMATCH;
+            default -> CodigoErro.VALIDATION_ERROR;
+        };
     }
 }

@@ -13,7 +13,9 @@ export interface ModalProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl';
-  initialFocus?: 'first' | 'autofocus';
+  initialFocus?: 'first' | 'autofocus' | 'none';
+  /** Seletor CSS do elemento que deve receber o foco inicial (substitui `autoFocus`). */
+  focoInicial?: string;
   overflowVisible?: boolean;
   className?: string;
   isSaving?: boolean;
@@ -32,6 +34,7 @@ export const Modal: React.FC<ModalProps> = ({
   footer,
   maxWidth = 'md',
   initialFocus = 'autofocus',
+  focoInicial,
   overflowVisible = false,
   className = '',
   isSaving = false
@@ -102,13 +105,15 @@ export const Modal: React.FC<ModalProps> = ({
         const dialog = dialogRef.current;
         if (!dialog) return;
 
-        // Se algum elemento interno já recebeu autoFocus do React, não rouba o foco
-        if (dialog.contains(document.activeElement) && document.activeElement !== dialog) {
+        if (initialFocus === 'none') {
+          dialog.focus();
           return;
         }
 
-        const autoFocusTarget = dialog.querySelector<HTMLElement>('[autofocus]');
-        const target = autoFocusTarget || (initialFocus === 'first'
+        const alvoExplicito = focoInicial
+          ? dialog.querySelector<HTMLElement>(focoInicial)
+          : dialog.querySelector<HTMLElement>('[autofocus]');
+        const target = alvoExplicito || (initialFocus === 'first'
           ? dialog.querySelector<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
           : null);
         (target || dialog).focus();
@@ -129,7 +134,7 @@ export const Modal: React.FC<ModalProps> = ({
         previousFocusRef.current.focus();
       }
     };
-  }, [initialFocus, isOpen, isSaving]);
+  }, [focoInicial, initialFocus, isOpen, isSaving]);
 
   if (!isOpen) return null;
 

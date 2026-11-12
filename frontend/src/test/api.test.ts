@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { apiFetch, request, ApiError, obterTimezoneNavegador } from '../shared/auth/api';
+import { request, ApiError, obterTimezoneNavegador } from '../shared/auth/api';
 import type {
   ProblemDetailsResponse,
   ModoModalSessao,
@@ -42,7 +42,7 @@ describe('Frontend API e Contratos Base (FASE 0)', () => {
       });
     });
 
-    const resultado = await apiFetch<{ ok: boolean }>('/test-endpoint');
+    const resultado = await request<{ ok: boolean }>('/test-endpoint');
     expect(resultado).toEqual({ ok: true });
     expect(cabecalhosEnviados).not.toBeNull();
     expect(cabecalhosEnviados?.get('X-Timezone')).toBe(timezoneDetectado);
@@ -107,7 +107,7 @@ describe('Frontend API e Contratos Base (FASE 0)', () => {
     });
 
     try {
-      await apiFetch('/trilhas/123/sessoes');
+      await request('/trilhas/123/sessoes');
       expect.unreachable('Deveria ter lançado ApiError');
     } catch (err) {
       expect(err).toBeInstanceOf(ApiError);

@@ -1,3 +1,6 @@
+type WindowComPush = Window & { PushManager?: unknown; Notification?: unknown };
+type NavigatorComStandalone = Navigator & { standalone?: boolean };
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import fs from 'fs';
@@ -17,7 +20,7 @@ describe('FASE 10 — Web Push e Notificações de Tarefas', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    (window as any).PushManager = function() {};
+    (window as WindowComPush).PushManager = function() {};
     Object.defineProperty(navigator, 'serviceWorker', {
       value: {
         ready: Promise.resolve({
@@ -30,30 +33,30 @@ describe('FASE 10 — Web Push e Notificações de Tarefas', () => {
       configurable: true,
       writable: true
     });
-    (window as any).Notification = { permission: 'default', requestPermission: vi.fn() };
+    (window as WindowComPush).Notification = { permission: 'default', requestPermission: vi.fn() };
   });
 
   afterEach(() => {
-    (window as any).Notification = originalNotification;
-    delete (window as any).PushManager;
+    (window as WindowComPush).Notification = originalNotification;
+    delete (window as WindowComPush).PushManager;
   });
 
   describe('1. Suporte e Estados de Permissão do Navegador', () => {
     it('deve identificar ausência de suporte quando Notification ou ServiceWorker estiver ausente', () => {
       // Simula ausência de Notification
-      delete (window as any).Notification;
+      delete (window as WindowComPush).Notification;
       expect(isPushSupported()).toBe(false);
       expect(getPushPermissionState()).toBe('unsupported');
     });
 
     it('deve reportar estados de permissão default, granted e denied', () => {
-      (window as any).Notification = { permission: 'default' };
+      (window as WindowComPush).Notification = { permission: 'default' };
       expect(getPushPermissionState()).toBe('default');
 
-      (window as any).Notification = { permission: 'granted' };
+      (window as WindowComPush).Notification = { permission: 'granted' };
       expect(getPushPermissionState()).toBe('granted');
 
-      (window as any).Notification = { permission: 'denied' };
+      (window as WindowComPush).Notification = { permission: 'denied' };
       expect(getPushPermissionState()).toBe('denied');
     });
 
@@ -65,7 +68,7 @@ describe('FASE 10 — Web Push e Notificações de Tarefas', () => {
         value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1',
         configurable: true
       });
-      (window.navigator as any).standalone = false;
+      (window.navigator as NavigatorComStandalone).standalone = false;
       window.matchMedia = vi.fn().mockImplementation((query) => ({
         matches: false,
         media: query
@@ -89,7 +92,7 @@ describe('FASE 10 — Web Push e Notificações de Tarefas', () => {
 
   describe('2. TaskModal: Seletor de Lembrete e Badges Informativos', () => {
     it('exibe badge informativo discreto quando push for unsupported sem bloquear salvamento', async () => {
-      delete (window as any).Notification;
+      delete (window as WindowComPush).Notification;
 
       const onSalvar = vi.fn();
       render(
@@ -127,7 +130,7 @@ describe('FASE 10 — Web Push e Notificações de Tarefas', () => {
     });
 
     it('exibe badge informativo discreto quando a permissão estiver denied', async () => {
-      (window as any).Notification = { permission: 'denied' };
+      (window as WindowComPush).Notification = { permission: 'denied' };
 
       const onSalvar = vi.fn();
       render(
@@ -157,12 +160,12 @@ describe('FASE 10 — Web Push e Notificações de Tarefas', () => {
     });
 
     it('no iOS Safari exige clique do usuário para revelar a instrução de Adicionar à Tela de Início', async () => {
-      (window as any).Notification = { permission: 'default' };
+      (window as WindowComPush).Notification = { permission: 'default' };
       Object.defineProperty(window.navigator, 'userAgent', {
         value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_4 like Mac OS X) Mobile/15E148 Safari/604.1',
         configurable: true
       });
-      (window.navigator as any).standalone = false;
+      (window.navigator as NavigatorComStandalone).standalone = false;
       window.matchMedia = vi.fn().mockReturnValue({ matches: false });
 
       render(

@@ -1,6 +1,5 @@
 package br.com.trilhara.nota;
 
-import static br.com.trilhara.shared.mongo.BsonIds.toObjectIdOrNotFound;
 
 import java.net.URI;
 import java.util.List;
@@ -9,6 +8,7 @@ import org.bson.types.ObjectId;
 
 import br.com.trilhara.auth.Autenticado;
 import br.com.trilhara.auth.AuthContext;
+import br.com.trilhara.shared.mongo.BsonIds;
 import br.com.trilhara.nota.dto.AtualizarCadernoRequest;
 import br.com.trilhara.nota.dto.AtualizarSecaoRequest;
 import br.com.trilhara.nota.dto.CadernoResponse;
@@ -49,7 +49,7 @@ public class CadernoResource {
     AuthContext authContext;
 
     private ObjectId usuarioId() {
-        return toObjectIdOrNotFound(authContext.usuarioId());
+        return authContext.usuarioIdObjectId();
     }
 
     // ── CADERNOS ──
@@ -70,20 +70,20 @@ public class CadernoResource {
     @GET
     @Path("/{id}")
     public CadernoResponse buscar(@PathParam("id") String id) {
-        return notaService.buscarCaderno(usuarioId(), toObjectIdOrNotFound(id));
+        return notaService.buscarCaderno(usuarioId(), BsonIds.parse(id, "id"));
     }
 
     @PUT
     @Path("/{id}")
     @Consumes(MediaType.APPLICATION_JSON)
     public CadernoResponse atualizar(@PathParam("id") String id, @Valid AtualizarCadernoRequest request) {
-        return notaService.atualizarCaderno(usuarioId(), toObjectIdOrNotFound(id), request);
+        return notaService.atualizarCaderno(usuarioId(), BsonIds.parse(id, "id"), request);
     }
 
     @DELETE
     @Path("/{id}")
     public ExclusaoLixeiraResponse deletar(@PathParam("id") String id) {
-        return notaService.deletarCaderno(usuarioId(), toObjectIdOrNotFound(id));
+        return notaService.deletarCaderno(usuarioId(), BsonIds.parse(id, "id"));
     }
 
     // ── IMPORTAÇÃO E SINCRONIZAÇÃO DE TRILHA ──
@@ -91,7 +91,7 @@ public class CadernoResource {
     @POST
     @Path("/importar-trilha/{trilhaId}")
     public Response importarTrilha(@PathParam("trilhaId") String trilhaId) {
-        CadernoResponse caderno = notaService.importarTrilha(usuarioId(), toObjectIdOrNotFound(trilhaId));
+        CadernoResponse caderno = notaService.importarTrilha(usuarioId(), BsonIds.parse(trilhaId, "trilhaId"));
         URI location = URI.create("/api/cadernos/" + caderno.id());
         return Response.created(location).entity(caderno).build();
     }
@@ -99,7 +99,7 @@ public class CadernoResource {
     @POST
     @Path("/{id}/sincronizar-trilha")
     public SincronizacaoTrilhaResponse sincronizarTrilha(@PathParam("id") String id) {
-        return notaService.sincronizarTrilha(usuarioId(), toObjectIdOrNotFound(id));
+        return notaService.sincronizarTrilha(usuarioId(), BsonIds.parse(id, "id"));
     }
 
     // ── SEÇÕES DO CADERNO ──
@@ -107,14 +107,14 @@ public class CadernoResource {
     @GET
     @Path("/{id}/secoes")
     public List<SecaoResponse> listarSecoes(@PathParam("id") String id) {
-        return notaService.listarSecoes(usuarioId(), toObjectIdOrNotFound(id));
+        return notaService.listarSecoes(usuarioId(), BsonIds.parse(id, "id"));
     }
 
     @POST
     @Path("/{id}/secoes")
     @Consumes(MediaType.APPLICATION_JSON)
     public Response criarSecao(@PathParam("id") String id, @Valid CriarSecaoRequest request) {
-        SecaoResponse secao = notaService.criarSecao(usuarioId(), toObjectIdOrNotFound(id), request);
+        SecaoResponse secao = notaService.criarSecao(usuarioId(), BsonIds.parse(id, "id"), request);
         URI location = URI.create("/api/secoes/" + secao.id());
         return Response.created(location).entity(secao).build();
     }
@@ -126,7 +126,7 @@ public class CadernoResource {
             @PathParam("id") String id,
             @PathParam("secaoId") String secaoId,
             @Valid AtualizarSecaoRequest request) {
-        return notaService.atualizarSecao(usuarioId(), toObjectIdOrNotFound(secaoId), request);
+        return notaService.atualizarSecao(usuarioId(), BsonIds.parse(secaoId, "secaoId"), request);
     }
 
     @DELETE
@@ -134,7 +134,7 @@ public class CadernoResource {
     public ExclusaoLixeiraResponse deletarSecaoNoCaderno(
             @PathParam("id") String id,
             @PathParam("secaoId") String secaoId) {
-        return notaService.deletarSecao(usuarioId(), toObjectIdOrNotFound(secaoId));
+        return notaService.deletarSecao(usuarioId(), BsonIds.parse(secaoId, "secaoId"));
     }
 
     // ── PÁGINAS DA SEÇÃO DO CADERNO ──
@@ -148,8 +148,8 @@ public class CadernoResource {
             @QueryParam("tamanho") @DefaultValue("50") int tamanho) {
         return notaService.listarNotasMetadados(
                 usuarioId(),
-                toObjectIdOrNotFound(id),
-                toObjectIdOrNotFound(secaoId),
+                BsonIds.parse(id, "id"),
+                BsonIds.parse(secaoId, "secaoId"),
                 pagina,
                 tamanho
         );
@@ -164,8 +164,8 @@ public class CadernoResource {
             @Valid CriarNotaRequest request) {
         NotaDetalheResponse nota = notaService.criarNota(
                 usuarioId(),
-                toObjectIdOrNotFound(id),
-                toObjectIdOrNotFound(secaoId),
+                BsonIds.parse(id, "id"),
+                BsonIds.parse(secaoId, "secaoId"),
                 request
         );
         URI location = URI.create("/api/notas/" + nota.id());

@@ -8,6 +8,9 @@ import jakarta.ws.rs.core.UriInfo;
 import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
+/**
+ * Limite de requisições excedido → {@code 429 RATE_LIMITED} com {@code Retry-After} (D-04).
+ */
 @Provider
 public class RateLimitExceptionMapper implements ExceptionMapper<RateLimitExceededException> {
 
@@ -16,25 +19,20 @@ public class RateLimitExceptionMapper implements ExceptionMapper<RateLimitExceed
 
     @Override
     public Response toResponse(RateLimitExceededException exception) {
-        String instance = DomainConflictExceptionMapper.resolvePath(uriInfo);
         String detail = exception.getMessage() != null
                 ? exception.getMessage()
                 : "Muitas tentativas. Tente novamente mais tarde.";
 
-        ProblemDetails problem = new ProblemDetails(
-                "urn:trilhara:error:rate-limit",
-                "Limite de requisições excedido",
-                Response.Status.TOO_MANY_REQUESTS.getStatusCode(),
+        ProblemDetails problem = ProblemDetailsFactory.criar(
+                CodigoErro.RATE_LIMITED,
                 detail,
-                instance,
-                "RATE_LIMIT_EXCEEDED",
-                null
-        );
+                DomainConflictExceptionMapper.resolvePath(uriInfo));
 
-        return Response.status(Response.Status.TOO_MANY_REQUESTS)
+        return Response.status(problem.status())
                 .header(HttpHeaders.RETRY_AFTER, String.valueOf(exception.getRetryAfterSeconds()))
                 .type(ProblemDetails.MEDIA_TYPE)
                 .entity(problem)
                 .build();
     }
 }
+

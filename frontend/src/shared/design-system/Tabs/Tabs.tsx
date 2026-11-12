@@ -57,6 +57,7 @@ export const Tabs: React.FC<TabsProps> = ({
     <div
       className={`${styles.tabsContainer} ${className}`}
       role="tablist"
+      tabIndex={-1}
       onKeyDown={handleKeyDown}
     >
       {items.map((item, index) => {

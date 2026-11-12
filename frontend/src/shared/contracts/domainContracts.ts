@@ -76,14 +76,6 @@ export interface SessaoRegistradaDTO {
   chaveIdempotencia?: string;
 }
 
-export interface PaginaSessoesDTO {
-  itens: SessaoRegistradaDTO[];
-  pagina: number;
-  tamanho: number;
-  totalItens: number;
-  totalPaginas: number;
-}
-
 export interface EstatisticaDisciplinaDTO {
   disciplinaId: string;
   nome: string;
@@ -97,7 +89,7 @@ export interface EstatisticaDisciplinaDTO {
   percentualAcerto: number;
 }
 
-export interface SerieTemporalDiaDTO {
+interface SerieTemporalDiaDTO {
   data: string; // yyyy-MM-dd
   totalSegundos: number;
   totalQuestoes: number;
@@ -206,7 +198,7 @@ export interface TrilhaResumoDTO {
   atualizadoEm?: string;
 }
 
-export interface TopicoDTO {
+interface TopicoDTO {
   id: string;
   nome: string;
   ordem?: number;
@@ -264,13 +256,13 @@ export interface ProgressoTopicoDTO {
   concluidoEm?: string;
 }
 
-export interface CriarTopicoPayload {
+interface CriarTopicoPayload {
   id?: string;
   nome: string;
   ordem?: number;
 }
 
-export interface CriarDisciplinaPayload {
+interface CriarDisciplinaPayload {
   id?: string;
   nome: string;
   cor?: string;
@@ -281,7 +273,7 @@ export interface CriarDisciplinaPayload {
 
 export type CriarDisciplinaRequest = CriarDisciplinaPayload;
 
-export interface AtualizarDisciplinaPayload {
+interface AtualizarDisciplinaPayload {
   nome: string;
   cor?: string;
   peso?: number;
@@ -291,13 +283,6 @@ export interface AtualizarDisciplinaPayload {
 
 export type AtualizarDisciplinaRequest = AtualizarDisciplinaPayload;
 
-export interface ReordenarDisciplinasPayload {
-  disciplinaIds: string[];
-}
-
-export interface ReordenarDisciplinasRequest {
-  ordemIds: string[];
-}
 
 // =========================================================================
 // CONTRATOS FASE 4: CRONOGRAMAS, BLOCOS E DISPONIBILIDADE SEMANAL
@@ -359,14 +344,6 @@ export interface BlocoCronogramaItemDTO {
   atualizadoEm?: string;
 }
 
-export interface PaginaBlocosDTO {
-  itens: BlocoCronogramaItemDTO[];
-  pagina: number;
-  tamanho: number;
-  totalItens: number;
-  totalPaginas: number;
-}
-
 export interface ConcluirAtrasadosResponse {
   operationId: string;
   totalProcessados: number;
@@ -382,10 +359,6 @@ export interface DisponibilidadeSemanalDTO {
   sobrecargaPorDia: boolean[];
 }
 
-export interface AtualizarDisponibilidadeSemanalPayload {
-  disponibilidadeSemanalMinutos: number[];
-}
-
 // ============================================================================
 // Domínio Tarefas: Listas, Tarefas Manuais, Séries Recorrentes e Lixeira
 // ============================================================================
@@ -397,7 +370,7 @@ export type FrequenciaRecorrencia = 'DIARIO' | 'SEMANAL' | 'MENSAL';
 export type ModoMensal = 'DIA_DO_MES' | 'ORDINAL_SEMANA';
 export type TipoTermino = 'NUNCA' | 'EM_DATA' | 'APOS_OCORRENCIAS';
 
-export interface SubtarefaDTO {
+interface SubtarefaDTO {
   id: string;
   titulo: string;
   concluida: boolean;

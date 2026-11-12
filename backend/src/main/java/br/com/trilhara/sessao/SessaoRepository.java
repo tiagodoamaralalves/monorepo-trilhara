@@ -365,8 +365,8 @@ public class SessaoRepository {
                 return a.disciplinaRemovida() ? 1 : -1;
             }
             if (!a.disciplinaRemovida()) {
-                ObjectId idA = BsonIds.toObjectIdOrNotFound(a.disciplinaId());
-                ObjectId idB = BsonIds.toObjectIdOrNotFound(b.disciplinaId());
+                ObjectId idA = BsonIds.parse(a.disciplinaId(), "disciplinaId");
+                ObjectId idB = BsonIds.parse(b.disciplinaId(), "disciplinaId");
                 int oA = ordemMap.getOrDefault(idA, 0);
                 int oB = ordemMap.getOrDefault(idB, 0);
                 return Integer.compare(oA, oB);

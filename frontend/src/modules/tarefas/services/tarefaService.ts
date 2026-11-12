@@ -13,7 +13,7 @@ import {
   PrioridadeTarefa
 } from '../types/tarefa';
 
-function normalizarPrioridade(p?: any): PrioridadeTarefa {
+function normalizarPrioridade(p?: unknown): PrioridadeTarefa {
   if (!p) return 'MEDIA';
   const upper = String(p).toUpperCase();
   if (upper === 'BAIXA' || upper === 'MEDIA' || upper === 'ALTA') return upper;
@@ -22,8 +22,8 @@ function normalizarPrioridade(p?: any): PrioridadeTarefa {
 }
 
 function normalizarTarefa(t: TarefaDTO | Tarefa): Tarefa {
-  const data = t.dataVencimento || (t as any).data || '';
-  const desc = t.descricao || (t as any).observacoes || '';
+  const data = t.dataVencimento || '';
+  const desc = t.descricao || '';
   return {
     ...t,
     data,
@@ -37,7 +37,7 @@ function normalizarTarefa(t: TarefaDTO | Tarefa): Tarefa {
 }
 
 function normalizarLista(l: ListaTarefasDTO | ListaTarefas): ListaTarefas {
-  const nome = l.nome || (l as any).titulo || 'Sem título';
+  const nome = l.nome || 'Sem título';
   return {
     ...l,
     nome,

@@ -3,35 +3,26 @@ import {
   TrilhaResumoDTO,
   TrilhaDetalheDTO,
   DisciplinaDTO,
-  TopicoDTO,
   ProgressoTopicoDTO,
   CriarDisciplinaRequest,
   AtualizarDisciplinaRequest,
-  ReordenarDisciplinasRequest,
   RegistrarSessaoPayload,
   SessaoRegistradaDTO,
-  PaginaSessoesDTO,
   EstatisticaDisciplinaDTO,
-  SerieTemporalDiaDTO,
   EstatisticasTrilhaDTO,
   RemocaoSessoesDisciplinaResponse
 } from '@shared/contracts/domainContracts';
 
 export type {
-  CronogramaAtivoResumoDTO,
   TrilhaResumoDTO,
   TrilhaDetalheDTO,
   DisciplinaDTO,
-  TopicoDTO,
   ProgressoTopicoDTO,
   CriarDisciplinaRequest,
   AtualizarDisciplinaRequest,
-  ReordenarDisciplinasRequest,
   RegistrarSessaoPayload,
   SessaoRegistradaDTO,
-  PaginaSessoesDTO,
   EstatisticaDisciplinaDTO,
-  SerieTemporalDiaDTO,
   EstatisticasTrilhaDTO,
   RemocaoSessoesDisciplinaResponse
 };
@@ -52,7 +43,7 @@ export interface Disciplina {
   topicos: Topico[];
 }
 
-export interface DisciplinaConfigCiclo {
+interface DisciplinaConfigCiclo {
   disciplinaId: string;
   participa: boolean;
 }
@@ -127,19 +118,6 @@ export interface PaginaEditais {
   total: number;
 }
 
-export interface EstatisticaDisciplina {
-  disciplinaId: string;
-  nome?: string;
-  cor?: string;
-  disciplinaRemovida?: boolean;
-  totalSegundos?: number;
-  minutos: number;
-  questoes: number;
-  acertos: number;
-  erros: number;
-  percentualAcerto?: number;
-}
-
 export interface Sessao {
   id: string;
   trilhaId: string;
@@ -195,7 +173,7 @@ export interface RegistroPlanejamentoPendente {
   proximoIndiceRastreador?: number;
 }
 
-export type RoleUsuario = 'USER' | 'ADMIN';
+type RoleUsuario = 'USER' | 'ADMIN';
 
 export interface UsuarioAutenticado {
   id: string;
@@ -205,14 +183,6 @@ export interface UsuarioAutenticado {
   ativo: boolean;
   emailVerificado: boolean;
   criadoEm: string;
-}
-
-export interface AuthResponse {
-  accessToken: string;
-  refreshToken?: string;
-  tokenType: string;
-  expiresIn: number;
-  usuario: UsuarioAutenticado;
 }
 
 export type PaginaAtiva =

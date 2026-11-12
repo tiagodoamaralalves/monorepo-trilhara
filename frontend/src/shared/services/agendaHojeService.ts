@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { registrarFalha } from '../diagnostico';
 import { request } from '../auth/api';
 import {
   BlocoHojeDTO,
@@ -204,7 +205,7 @@ class AgendaHojeManager {
       try {
         ouvinte(dados);
       } catch (e) {
-        console.error('Erro em ouvinte da AgendaHoje:', e);
+        registrarFalha('agenda.ouvinte', e);
       }
     }
   }

@@ -1,0 +1,7 @@
+.erro {
+  display: block;
+  margin-top: 4px;
+  color: var(--danger, #f87171);
+  font-size: 0.8125rem;
+  line-height: 1.3;
+}

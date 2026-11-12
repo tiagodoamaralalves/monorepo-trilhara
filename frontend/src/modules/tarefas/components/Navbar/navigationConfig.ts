@@ -49,4 +49,3 @@ export const NAV_ITEMS_TAREFAS: readonly NavItemConfigTarefas[] = [
   }
 ];
 
-export const NAV_ITEMS_FILTROS = NAV_ITEMS_TAREFAS;

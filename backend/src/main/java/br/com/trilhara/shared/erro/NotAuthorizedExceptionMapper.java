@@ -8,6 +8,9 @@ import jakarta.ws.rs.core.UriInfo;
 import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
+/**
+ * Falta de autenticação, sessão revogada ou conta em exclusão → {@code 401 UNAUTHORIZED} (D-04).
+ */
 @Provider
 public class NotAuthorizedExceptionMapper implements ExceptionMapper<NotAuthorizedException> {
 
@@ -16,26 +19,21 @@ public class NotAuthorizedExceptionMapper implements ExceptionMapper<NotAuthoriz
 
     @Override
     public Response toResponse(NotAuthorizedException exception) {
-        String instance = DomainConflictExceptionMapper.resolvePath(uriInfo);
         String msg = exception.getMessage();
         String detail = (msg != null && !msg.isBlank() && !msg.startsWith("HTTP 401"))
                 ? msg
                 : "Não autorizado.";
 
-        ProblemDetails problem = new ProblemDetails(
-                "urn:trilhara:error:unauthorized",
-                "Não autorizado",
-                Response.Status.UNAUTHORIZED.getStatusCode(),
+        ProblemDetails problem = ProblemDetailsFactory.criar(
+                CodigoErro.UNAUTHORIZED,
                 detail,
-                instance,
-                "UNAUTHORIZED",
-                null
-        );
+                DomainConflictExceptionMapper.resolvePath(uriInfo));
 
-        return Response.status(Response.Status.UNAUTHORIZED)
+        return Response.status(problem.status())
                 .header(HttpHeaders.WWW_AUTHENTICATE, "Bearer realm=\"trilhara\"")
                 .type(ProblemDetails.MEDIA_TYPE)
                 .entity(problem)
                 .build();
     }
 }
+

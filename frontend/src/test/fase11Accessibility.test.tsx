@@ -31,12 +31,12 @@ const ModalHarness: React.FC<{ isSaving?: boolean }> = ({ isSaving = false }) =>
 };
 
 // Componente auxiliar para teste de FormModal
-const FormModalHarness: React.FC<{ isLoading: boolean }> = ({ isLoading }) => {
+const FormModalHarness: React.FC<{ loading: boolean }> = ({ loading }) => {
   const [open, setOpen] = useState(true);
   return (
     <FormModal
       isOpen={open}
-      isLoading={isLoading}
+      loading={loading}
       onClose={() => setOpen(false)}
       onSubmit={(e) => e.preventDefault()}
       title="Form Modal Acessibilidade"
@@ -164,7 +164,7 @@ describe('FASE 11 — Auditoria e Testes Automatizados de Acessibilidade (WCAG 2
 
   describe('2. FormModal e propagação de isSaving={isLoading}', () => {
     it('deve impedir fechamento por Escape quando FormModal está salvando (isLoading == true)', () => {
-      const { rerender } = render(<FormModalHarness isLoading={true} />);
+      const { rerender } = render(<FormModalHarness loading={true} />);
 
       expect(screen.getByRole('dialog')).toBeInTheDocument();
 
@@ -172,8 +172,8 @@ describe('FASE 11 — Auditoria e Testes Automatizados de Acessibilidade (WCAG 2
       fireEvent.keyDown(window, { key: 'Escape' });
       expect(screen.getByRole('dialog')).toBeInTheDocument();
 
-      // Rerender com isLoading=false permite fechar
-      rerender(<FormModalHarness isLoading={false} />);
+      // Rerender com loading=false permite fechar
+      rerender(<FormModalHarness loading={false} />);
       fireEvent.keyDown(window, { key: 'Escape' });
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });

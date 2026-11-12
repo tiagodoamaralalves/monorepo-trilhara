@@ -84,7 +84,6 @@ export const BuscaModal: React.FC<BuscaModalProps> = ({
           value={termo}
           onChange={handleTermoChange}
           leftIcon={<Search size={16} />}
-          autoFocus
         />
 
         {buscando && (
@@ -109,9 +108,9 @@ export const BuscaModal: React.FC<BuscaModalProps> = ({
 
         {!buscando && termo.trim().length >= 2 && resultados.length === 0 && !mensagemErro && (
           <EmptyState
-            icon={<Search size={36} />}
-            title="Nenhum resultado encontrado"
-            description={`Não foram encontradas páginas contendo os termos "${termo}".`}
+            icone={<Search size={36} />}
+            titulo="Nenhum resultado encontrado"
+            descricao={`Não foram encontradas páginas contendo os termos "${termo}".`}
           />
         )}
 
@@ -122,8 +121,9 @@ export const BuscaModal: React.FC<BuscaModalProps> = ({
             </span>
 
             {resultados.map((item) => (
-              <div
+              <button
                 key={item.notaId}
+                type="button"
                 onClick={() => {
                   onSelecionarNota(item.cadernoId, item.secaoId, item.notaId);
                   onClose();
@@ -137,6 +137,7 @@ export const BuscaModal: React.FC<BuscaModalProps> = ({
                   border: '1px solid var(--border-subtle)',
                   background: 'var(--surface-1)',
                   cursor: 'pointer',
+                  textAlign: 'left',
                   transition: 'border-color 0.15s ease, background-color 0.15s ease'
                 }}
                 onMouseEnter={(e) => {
@@ -171,7 +172,7 @@ export const BuscaModal: React.FC<BuscaModalProps> = ({
                     {item.snippet}
                   </p>
                 )}
-              </div>
+              </button>
             ))}
           </div>
         )}

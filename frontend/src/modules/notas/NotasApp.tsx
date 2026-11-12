@@ -37,7 +37,7 @@ function obterTelaAuthInicial(): AuthScreen {
   return 'none';
 }
 
-export function NotasApp() {
+function NotasApp() {
   const toast = useToast();
   const { confirm } = useConfirm();
   const { usuario, isAuthenticated, carregando, logout, abrirContaModal } = useAuth();
@@ -543,10 +543,10 @@ export function NotasApp() {
         {cadernos.length === 0 ? (
           <div className={styles.emptyStateWrapper}>
             <EmptyState
-              icon={<BookMarked size={44} />}
-              title="Nenhum caderno criado"
-              description="Crie seu primeiro caderno para começar a organizar seus resumos e anotações."
-              action={
+              icone={<BookMarked size={44} />}
+              titulo="Nenhum caderno criado"
+              descricao="Crie seu primeiro caderno para começar a organizar seus resumos e anotações."
+              acaoPrimaria={
                 <Button
                   variant="primary"
                   leftIcon={<Plus size={16} />}
@@ -563,10 +563,10 @@ export function NotasApp() {
         ) : secoes.length === 0 ? (
           <div className={styles.emptyStateWrapper}>
             <EmptyState
-              icon={<Folder size={44} />}
-              title="Nenhuma seção neste caderno"
-              description="Adicione uma seção divisória para começar a organizar as páginas deste caderno."
-              action={
+              icone={<Folder size={44} />}
+              titulo="Nenhuma seção neste caderno"
+              descricao="Adicione uma seção divisória para começar a organizar as páginas deste caderno."
+              acaoPrimaria={
                 <Button
                   variant="primary"
                   leftIcon={<Plus size={16} />}
@@ -630,14 +630,14 @@ export function NotasApp() {
               ) : (
                 <div className={styles.emptyStateWrapper}>
                   <EmptyState
-                    icon={<FileText size={38} />}
-                    title={notasMetadados.length === 0 ? "Nenhuma página na seção" : "Nenhuma página selecionada"}
-                    description={
+                    icone={<FileText size={38} />}
+                    titulo={notasMetadados.length === 0 ? "Nenhuma página na seção" : "Nenhuma página selecionada"}
+                    descricao={
                       notasMetadados.length === 0
                         ? "Crie uma nova página para iniciar o conteúdo desta seção."
                         : "Selecione uma página na coluna ao lado para começar a redigir."
                     }
-                    action={
+                    acaoPrimaria={
                       <Button
                         variant="primary"
                         leftIcon={<Plus size={16} />}

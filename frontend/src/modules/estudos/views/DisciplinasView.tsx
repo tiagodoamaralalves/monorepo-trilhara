@@ -590,7 +590,7 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
       icon={<BookOpen size={20} />}
       onSubmit={salvarDisciplinasLote}
       submitText="Salvar"
-      isLoading={salvandoDisciplinasLote}
+      loading={salvandoDisciplinasLote}
       error={erroDisciplinasLote}
     >
       <>
@@ -849,7 +849,7 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
           icon={<Award size={20} />}
           onSubmit={handleSalvarQuestoes}
           submitText="Salvar Caderno"
-          isLoading={salvandoQuestoes}
+          loading={salvandoQuestoes}
           error={erroQuestoes}
         >
           <>
@@ -973,7 +973,7 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
                 type="button"
                 variant="danger"
                 onClick={() => void executarSalvarDisciplinaEditada(renomeacaoPendente.editada, true)}
-                isLoading={salvandoDisciplina}
+                loading={salvandoDisciplina}
               >
                 Zerar histórico
               </Button>
@@ -981,7 +981,7 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
                 type="button"
                 variant="primary"
                 onClick={() => void executarSalvarDisciplinaEditada(renomeacaoPendente.editada, false)}
-                isLoading={salvandoDisciplina}
+                loading={salvandoDisciplina}
               >
                 Manter histórico
               </Button>
