@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 
+import br.com.trilhara.auth.RateLimitService;
 import br.com.trilhara.auth.UserRepository;
 import br.com.trilhara.cronograma.dto.AtualizarCronogramaRequest;
 import br.com.trilhara.cronograma.dto.BlocoCronogramaItemDTO;
@@ -85,6 +86,7 @@ public class CronogramaService {
     private final LeaseTrilhaService leaseTrilhaService;
     private final TimezoneContext timezoneContext;
     private final FaultInjector faultInjector;
+    private final RateLimitService rateLimitService;
 
     @Inject
     public CronogramaService(
@@ -95,7 +97,8 @@ public class CronogramaService {
             UserRepository userRepository,
             LeaseTrilhaService leaseTrilhaService,
             TimezoneContext timezoneContext,
-            FaultInjector faultInjector) {
+            FaultInjector faultInjector,
+            RateLimitService rateLimitService) {
         this.cronogramaRepository = cronogramaRepository;
         this.blocoCronogramaRepository = blocoCronogramaRepository;
         this.trilhaRepository = trilhaRepository;
@@ -104,10 +107,16 @@ public class CronogramaService {
         this.leaseTrilhaService = leaseTrilhaService;
         this.timezoneContext = timezoneContext;
         this.faultInjector = faultInjector;
+        this.rateLimitService = rateLimitService;
     }
 
     public CronogramaDTO criar(String trilhaIdStr, CriarCronogramaRequest request) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
+
+        // D-45: geração de cronograma limitada a 30/min por usuário. Fica antes do lease para
+        // que uma rajada não chegue nem a disputar a trava da trilha.
+        rateLimitService.verificarLimiteCriacaoCronograma(usuarioId.toHexString());
+
         ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
 
         String leaseToken = UUID.randomUUID().toString();

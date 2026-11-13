@@ -330,23 +330,69 @@ A **FASE 11** conclui integralmente a reestruturação arquitetural do ecossiste
 
 > Fonte para `RotasPublicasContratoTest` e `AuthorizationByOwnerTest`. Rotas ausentes desta lista devem ser removidas ou acrescentadas aqui com justificativa (no mesmo PR). Rotas de autenticação já existentes não relacionadas à reestruturação (login, cadastro, confirmação de e-mail, recuperação/alteração de senha, logout, logout-all, refresh, me) permanecem e devem ser listadas na primeira execução de R0.
 
-**Auth/Usuário:** `POST /api/auth/handoff`, `POST /api/auth/handoff/consume`, `DELETE /api/auth/conta`, `GET /api/auth/me`, `PUT /api/usuarios/me/preferencias/tema`, `GET|PUT /api/usuarios/me/disponibilidade-semanal`.
+> **Sincronizado na R13** a partir do código: `RotasInventarioTest#inventariarRotas` +
+> `RotasPublicasContratoTest` (bidirecional). Total: **109 rotas**. Fonte executável:
+> `backend/src/test/java/br/com/trilhara/security/RotasPrivadas.java` → `TODAS_AS_ROTAS`.
 
-**Estudos — trilhas/disciplinas/progresso:** `GET|POST /api/trilhas`, `GET|PUT|DELETE /api/trilhas/{trilhaId}`, `GET /api/trilhas/{trilhaId}/impacto-exclusao`, `POST /api/trilhas/{trilhaId}/disciplinas`, `PUT /api/trilhas/{trilhaId}/disciplinas/reordenar`, `PUT|DELETE /api/trilhas/{trilhaId}/disciplinas/{disciplinaId}`, `PUT|DELETE /api/trilhas/{trilhaId}/topicos/{topicoId}/progresso`.
+**Auth/Usuário (19):** `POST /api/auth/cadastro`, `POST /api/auth/login`, `POST /api/auth/refresh`,
+`POST /api/auth/logout`, `POST /api/auth/logout-all`, `POST /api/auth/recuperar-senha`,
+`POST /api/auth/resetar-senha`, `POST /api/auth/confirmar-email`, `POST /api/auth/reenviar-confirmacao`,
+`PUT /api/auth/senha`, `GET /api/auth/me`, `GET /api/auth/sessoes`, `DELETE /api/auth/sessoes/{familiaId}`,
+`POST /api/auth/handoff`, `POST /api/auth/handoff/consume`, `DELETE /api/auth/conta`,
+`PUT /api/usuarios/me/preferencias/tema`, `GET|PUT /api/usuarios/me/disponibilidade-semanal`.
 
-**Estudos — sessões/estatísticas:** `GET|POST /api/trilhas/{trilhaId}/sessoes`, `PATCH|DELETE /api/trilhas/{trilhaId}/sessoes/{sessaoId}`, `DELETE /api/trilhas/{trilhaId}/disciplinas/{disciplinaId}/sessoes`, `GET /api/trilhas/{trilhaId}/estatisticas`.
+**Administração (8):** `GET|POST /api/admin/editais`, `GET|PUT|DELETE /api/admin/editais/{id}`,
+`PATCH /api/admin/editais/{id}/status`, `GET /api/auth/admin/usuarios`,
+`PATCH /api/auth/admin/usuarios/{id}/papeis`.
 
-**Estudos — cronogramas/blocos:** `GET|POST /api/trilhas/{trilhaId}/cronogramas`, `PUT|DELETE /api/trilhas/{trilhaId}/cronogramas/{cronogramaId}`, `PATCH /api/trilhas/{trilhaId}/cronogramas/{cronogramaId}/ativar`, `GET /api/trilhas/{trilhaId}/cronogramas/{cronogramaId}/blocos`, `POST /api/trilhas/{trilhaId}/cronogramas/{cronogramaId}/blocos/concluir-atrasados`, `GET /api/blocos/hoje`, `PATCH /api/blocos/{blocoId}/conclusao`.
+**Estudos — trilhas/disciplinas/progresso/impacto (~13):** `GET|POST /api/trilhas`, `GET|PUT|DELETE /api/trilhas/{trilhaId}`,
+`GET /api/trilhas/{trilhaId}/impacto-exclusao`, `POST /api/trilhas/{trilhaId}/disciplinas`,
+`PUT /api/trilhas/{trilhaId}/disciplinas/reordenar`, `PUT|DELETE /api/trilhas/{trilhaId}/disciplinas/{disciplinaId}`,
+`PUT|DELETE /api/trilhas/{trilhaId}/topicos/{topicoId}/progresso`.
 
-**Catálogo:** rotas existentes de `editais` (leitura pública/autenticada e administração com `403` para não-ADMIN), a listar em R0.
+**Estudos — sessões/estatísticas (~5):** `GET|POST /api/trilhas/{trilhaId}/sessoes`,
+`PATCH|DELETE /api/trilhas/{trilhaId}/sessoes/{sessaoId}`,
+`DELETE /api/trilhas/{trilhaId}/disciplinas/{disciplinaId}/sessoes`, `GET /api/trilhas/{trilhaId}/estatisticas`.
 
-**Tarefas:** `GET|POST /api/listas-tarefas`, `GET|PUT|DELETE /api/listas-tarefas/{listaId}`, `GET /api/listas-tarefas/{listaId}/impacto-exclusao`, `POST /api/listas-tarefas/{listaId}/restaurar`, `GET|POST /api/tarefas`, `GET /api/tarefas/hoje`, `GET|PUT|DELETE /api/tarefas/{tarefaId}`, `PATCH /api/tarefas/{tarefaId}/conclusao`, `PATCH /api/tarefas/{tarefaId}/subtarefas/{subtarefaId}`, `POST /api/tarefas/{tarefaId}/pular`, `GET|POST /api/series-recorrentes`, `GET|PUT|DELETE /api/series-recorrentes/{serieId}`, `GET /api/tarefas/lixeira`, `POST /api/tarefas/lixeira/{tarefaId}/restaurar`, `DELETE /api/tarefas/lixeira/esvaziar`.
+**Estudos — cronogramas/blocos (~9):** `GET|POST /api/trilhas/{trilhaId}/cronogramas`,
+`PUT|DELETE /api/trilhas/{trilhaId}/cronogramas/{cronogramaId}`,
+`PATCH /api/trilhas/{trilhaId}/cronogramas/{cronogramaId}/ativar`,
+`GET /api/trilhas/{trilhaId}/cronogramas/{cronogramaId}/blocos`,
+`POST /api/trilhas/{trilhaId}/cronogramas/{cronogramaId}/blocos/concluir-atrasados`,
+`GET /api/blocos/hoje`, `PATCH /api/blocos/{blocoId}/conclusao`.
 
-**Notas:** `GET|POST /api/cadernos`, `PUT|DELETE /api/cadernos/{cadernoId}`, `GET /api/cadernos/{cadernoId}/impacto-exclusao`, `GET|POST /api/cadernos/{cadernoId}/secoes`, `PUT|DELETE /api/secoes/{secaoId}`, `GET /api/secoes/{secaoId}/impacto-exclusao`, `GET|POST /api/cadernos/{cadernoId}/secoes/{secaoId}/notas`, `GET|PUT|DELETE /api/notas/{notaId}`, `GET /api/notas/busca`, `POST /api/cadernos/importar-trilha/{trilhaId}`, `POST /api/cadernos/{cadernoId}/sincronizar-trilha`, `GET /api/notas/lixeira`, `POST /api/notas/lixeira/{tipo}/{id}/restaurar`, `DELETE /api/notas/lixeira/esvaziar`.
+**Catálogo público (2):** `GET /api/editais`, `GET /api/editais/{id}`.
 
-**Push:** `GET /api/push/config`, `POST|DELETE /api/push/subscriptions`, `PUT /api/push/preferencias`.
+**Tarefas (24):** `GET|POST /api/listas-tarefas`, `GET|PUT|DELETE /api/listas-tarefas/{listaId}`,
+`GET /api/listas-tarefas/{listaId}/impacto-exclusao`, `POST /api/listas-tarefas/{listaId}/restaurar`,
+`GET|POST /api/tarefas`, `GET /api/tarefas/hoje`, `GET /api/tarefas/lixeira`,
+`GET|PUT|DELETE /api/tarefas/{tarefaId}`, `PATCH /api/tarefas/{tarefaId}/conclusao`,
+`PATCH /api/tarefas/{tarefaId}/subtarefas/{subtarefaId}`, `POST /api/tarefas/{tarefaId}/pular`,
+`POST /api/tarefas/lixeira/{tarefaId}/restaurar`, `DELETE /api/tarefas/lixeira/esvaziar`,
+`GET|POST /api/series-recorrentes`, `GET|PUT|DELETE /api/series-recorrentes/{serieId}`.
 
-**Removidas explicitamente:** `PATCH /api/trilhas/{id}/progresso/{topicoId}`, `GET /api/cadernos/{c}/secoes/{s}/notas/{n}`, `PATCH /api/push/preferencias`, qualquer rota de "ciclo"/"planejamento-ciclo".
+**Notas (25):** `GET|POST /api/cadernos`, `GET|PUT|DELETE /api/cadernos/{id}`,
+`GET /api/cadernos/{id}/impacto-exclusao`, `GET|POST /api/cadernos/{id}/secoes`,
+`GET|PUT|DELETE /api/cadernos/{id}/secoes/{secaoId}`,
+`GET|POST /api/cadernos/{id}/secoes/{secaoId}/notas`, `GET|PUT|DELETE /api/secoes/{id}`,
+`GET /api/secoes/{id}/impacto-exclusao`, `GET /api/notas/busca`, `GET /api/notas/lixeira`,
+`GET|PUT|DELETE /api/notas/{id}`, `POST /api/notas/lixeira/{tipo}/{id}/restaurar`,
+`DELETE /api/notas/lixeira/esvaziar`, `POST /api/cadernos/importar-trilha/{trilhaId}`,
+`POST /api/cadernos/{id}/sincronizar-trilha`.
+
+**Push (4):** `GET /api/push/config`, `POST /api/push/subscriptions`,
+`DELETE /api/push/subscriptions`, `PUT /api/push/preferencias`.
+
+**Removidas explicitamente:** `PATCH /api/trilhas/{trilhaId}/progresso/{topicoId}`,
+`GET /api/cadernos/{cadernoId}/secoes/{secaoId}/notas/{notaId}`, `PATCH /api/push/preferencias`,
+qualquer rota de "ciclo"/"planejamento-ciclo". Verificadas por
+`RotasPublicasContratoTest#rotasRemovidasNaoVoltam`.
+
+> **Contagem por grupo (verificada sobre `TODAS_AS_ROTAS`):** auth/usuário **19**, administração
+> **8**, estudos (trilhas+disciplinas+progresso+sessões+cronogramas+blocos) **27**, tarefas
+> **24**, notas **25**, push **4**, catálogo público **2** — total **109**. As formas `GET|POST`
+> acima estão expandidas e contam uma rota por verbo. A exatidão é garantida por
+> `RotasPublicasContratoTest`, não pela legibilidade desta lista.
 
 ---
 

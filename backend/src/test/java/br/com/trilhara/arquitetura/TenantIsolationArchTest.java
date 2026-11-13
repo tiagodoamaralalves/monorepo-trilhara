@@ -17,7 +17,6 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaParameter;
-import com.tngtech.archunit.junit.ArchIgnore;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchCondition;
@@ -109,21 +108,18 @@ class TenantIsolationArchTest {
             .because("D-06(c): recurso HTTP não injeta MongoClient/MongoCollection diretamente.");
 
     /**
-     * Habilita em R2 (D-06a): todo {@code *Repository} de coleção privada recebe
-     * {@code ObjectId usuarioId} como primeiro parâmetro e filtra por ele.
-     * Ignorada agora porque há repositórios multi-tenant legítimos ainda não
-     * marcados com {@code @SystemScope} (ex.: MongoIndexInitializer,
-     * HandoffService, AccountDeletionService).
+     * R13 (D-06a): todo {@code *Repository} guarda apenas acesso a dados — nenhum repositório
+     * pode depender de {@code ..job..} (job chama repositório, nunca o contrário).
+     *
+     * <p>Até a R12 havia aqui um {@code @ArchIgnore} com a razão "habilitar em R2"; a razão
+     * nunca foi cumprida e a regra ficou morta. A versão ativa usa um predicado que de fato
+     * expressa a invariante.</p>
      */
-    @ArchIgnore(reason = "Habilitar em R2 (D-06a): repositórios ainda sem usuarioId no prefixo")
     @ArchTest
-    static final ArchRule repositoriosRecebemUsuarioIdPrimeiro = noClasses()
-            .that(simpleNameEndingWith("Repository"))
-            .should()
-            .dependOnClassesThat()
-            .resideInAPackage("..job..")
-            .because("D-06(a): assinatura começa com ObjectId usuarioId e filtro por usuarioId.");
-
+    static final ArchRule repositoriosNaoDependemDeJobs = noClasses()
+            .that().haveSimpleNameEndingWith("Repository")
+            .should().dependOnClassesThat().resideInAPackage("..job..")
+            .because("D-06(a): a direção da dependência é job → repositório, nunca o inverso.");
     /**
      * Habilitada na R3 (D-06a, escopo do domínio de estudos): todo método de consulta/escrita
      * pública dos repositórios de {@code ..trilha..} recebe {@code ObjectId usuarioId} como
@@ -189,16 +185,29 @@ class TenantIsolationArchTest {
                             + "exceto a purga de tombstones em @SystemScope.");
 
     /**
-     * Habilita em R2 (D-06b): acesso multi-tenant apenas em classes
-     * {@code @SystemScope} dentro de pacote {@code ..job..}.
-     * A anotação {@code @SystemScope} ainda não existe no código.
+     * R13 (D-06b): toda varredura multi-tenant declara {@code @SystemScope} — diretamente na
+     * classe ou na classe para a qual ela delega.
+     *
+     * <p>Há dois arranjos legítimos no código e a regra aceita os dois:</p>
+     * <ul>
+     *   <li>{@code PushDeliveryScheduler} faz a varredura ele mesmo → anotado;</li>
+     *   <li>{@code PurgaLixeiraNotasJob} é só o gatilho agendado e delega a
+     *       {@code NotaPurgaService}, que é quem varre os tenants → o job não precisa da
+     *       anotação, mas <strong>precisa</strong> depender de uma classe anotada.</li>
+     * </ul>
+     *
+     * <p>A versão anterior ({@code @ArchIgnore}) exigia apenas que a classe fosse
+     * {@code public} — não verificava nada.</p>
      */
-    @ArchIgnore(reason = "Habilitar em R2 (D-06b): @SystemScope ainda não existe no código")
     @ArchTest
-    static final ArchRule acessoMultiTenantSomenteEmSystemScope = noClasses()
-            .that().resideInAPackage("..job..")
-            .should().bePublic()
-            .because("D-06(b): purgas/scheduler/exclusão de conta vivem em ..job.. sem HTTP.");
+    static final ArchRule schedulersExigemEscopoDeSistema = classes()
+            .that().haveSimpleNameEndingWith("Scheduler")
+            .or().haveSimpleNameEndingWith("Job")
+            .should().beAnnotatedWith(br.com.trilhara.shared.SystemScope.class)
+            .orShould().dependOnClassesThat()
+            .areAnnotatedWith(br.com.trilhara.shared.SystemScope.class)
+            .because("D-06(b): job/scheduler que varre todos os tenants é @SystemScope ou "
+                    + "delega a um serviço marcado como tal.");
 
     /**
      * Ativa em R5 (D-06a): todo {@code *Repository} do pacote {@code cronograma} recebe

@@ -153,6 +153,10 @@ public class AuthService {
     }
 
     public AuthResponse renovarToken(String refreshTokenPuro, String userAgent, String ip) {
+        // D-45: 10/min por IP. Antes da rotação para que uma rajada não consuma a família de
+        // tokens nem derrube a sessão da vítima por falso "reuso".
+        rateLimitService.verificarLimiteRefresh(ip);
+
         if (refreshTokenPuro == null || refreshTokenPuro.isBlank()) {
             throw criarExcecaoNaoAutorizado("Refresh token é obrigatório.");
         }

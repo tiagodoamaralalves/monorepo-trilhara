@@ -1,5 +1,7 @@
 package br.com.trilhara.auth;
 
+import br.com.trilhara.shared.Pseudonimo;
+
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -54,7 +56,9 @@ public class EmailService {
         String link = base + "/?pagina=confirmar-email&token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
 
         if (resendApiKey.isBlank()) {
-            LOG.warnf("[DEV] Resend API Key não configurada. Link de confirmação de e-mail para %s: %s", destinatario, link);
+            // D-04/R13: nunca logar destinatario nem o link (o link contém o token puro).
+            LOG.warnf("[DEV] Resend API Key não configurada. Confirmação de e-mail emitida conta=%s integracao=resend",
+                    Pseudonimo.de(destinatario));
             return CompletableFuture.completedFuture(true);
         }
 
@@ -106,7 +110,9 @@ public class EmailService {
         String link = base + "/?pagina=resetar-senha&token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
 
         if (resendApiKey.isBlank()) {
-            LOG.warnf("[DEV] Resend API Key não configurada. Link de recuperação para %s: %s", destinatario, link);
+            // D-04/R13: o link de recuperação contém o token puro — não pode ir para o log.
+            LOG.warnf("[DEV] Resend API Key não configurada. Recuperação de senha emitida conta=%s integracao=resend",
+                    Pseudonimo.de(destinatario));
             return CompletableFuture.completedFuture(true);
         }
 
@@ -170,20 +176,24 @@ public class EmailService {
             return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
                     .thenApply(response -> {
                         if (response.statusCode() >= 200 && response.statusCode() < 300) {
-                            LOG.infof("E-mail '%s' enviado com sucesso para %s via Resend.", assunto, destinatario);
+                            LOG.infof("event=EMAIL_ENVIADO conta=%s integracao=resend",
+                                    Pseudonimo.de(destinatario));
                             return true;
                         } else {
-                            LOG.errorf("Falha na API Resend ao enviar e-mail para %s. Status: %d, Resposta: %s",
-                                    destinatario, response.statusCode(), response.body());
+                            // D-04/R13: status sim, corpo do provedor não (pode ecoar o destinatário).
+                            LOG.errorf("event=EMAIL_FALHA conta=%s integracao=resend status=%d",
+                                    Pseudonimo.de(destinatario), response.statusCode());
                             return false;
                         }
                     })
                     .exceptionally(ex -> {
-                        LOG.errorf(ex, "Erro de rede/comunicação ao disparar e-mail '%s' para %s", assunto, destinatario);
+                        LOG.errorf(ex, "event=EMAIL_ERRO_REDE conta=%s integracao=resend",
+                                Pseudonimo.de(destinatario));
                         return false;
                     });
         } catch (Exception e) {
-            LOG.errorf(e, "Erro ao serializar payload de envio de e-mail para %s", destinatario);
+            LOG.errorf(e, "event=EMAIL_PAYLOAD_INVALIDO conta=%s integracao=resend",
+                    Pseudonimo.de(destinatario));
             return CompletableFuture.completedFuture(false);
         }
     }

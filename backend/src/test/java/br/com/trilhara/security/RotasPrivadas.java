@@ -107,6 +107,145 @@ public final class RotasPrivadas {
             "GET /api/notas/lixeira"
     );
 
+
+    /**
+     * Allowlist completa da superfície HTTP (Anexo A sincronizado com o código na R13).
+     *
+     * <p>Fonte única para {@code RotasPublicasContratoTest}. O conjunto é derivado de
+     * {@code RotasInventarioTest#inventariarRotas} e conferido nos dois sentidos: rota nova no
+     * código sem entrada aqui falha, e entrada aqui sem rota no código também falha.</p>
+     */
+    public static final Set<String> TODAS_AS_ROTAS = Set.of(
+            "DELETE /api/admin/editais/{id}",
+            "DELETE /api/auth/conta",
+            "DELETE /api/auth/sessoes/{familiaId}",
+            "DELETE /api/cadernos/{id}",
+            "DELETE /api/cadernos/{id}/secoes/{secaoId}",
+            "DELETE /api/listas-tarefas/{listaId}",
+            "DELETE /api/notas/lixeira/esvaziar",
+            "DELETE /api/notas/{id}",
+            "DELETE /api/push/subscriptions",
+            "DELETE /api/secoes/{id}",
+            "DELETE /api/series-recorrentes/{serieId}",
+            "DELETE /api/tarefas/lixeira/esvaziar",
+            "DELETE /api/tarefas/{tarefaId}",
+            "DELETE /api/trilhas/{trilhaId}",
+            "DELETE /api/trilhas/{trilhaId}/cronogramas/{cronogramaId}",
+            "DELETE /api/trilhas/{trilhaId}/disciplinas/{disciplinaId}",
+            "DELETE /api/trilhas/{trilhaId}/disciplinas/{disciplinaId}/sessoes",
+            "DELETE /api/trilhas/{trilhaId}/sessoes/{sessaoId}",
+            "DELETE /api/trilhas/{trilhaId}/topicos/{topicoId}/progresso",
+            "GET /api/admin/editais",
+            "GET /api/admin/editais/{id}",
+            "GET /api/auth/admin/usuarios",
+            "GET /api/auth/me",
+            "GET /api/auth/sessoes",
+            "GET /api/blocos/hoje",
+            "GET /api/cadernos",
+            "GET /api/cadernos/{id}",
+            "GET /api/cadernos/{id}/impacto-exclusao",
+            "GET /api/cadernos/{id}/secoes",
+            "GET /api/cadernos/{id}/secoes/{secaoId}/notas",
+            "GET /api/editais",
+            "GET /api/editais/{id}",
+            "GET /api/listas-tarefas",
+            "GET /api/listas-tarefas/{listaId}",
+            "GET /api/listas-tarefas/{listaId}/impacto-exclusao",
+            "GET /api/notas/busca",
+            "GET /api/notas/lixeira",
+            "GET /api/notas/{id}",
+            "GET /api/push/config",
+            "GET /api/secoes/{id}",
+            "GET /api/secoes/{id}/impacto-exclusao",
+            "GET /api/series-recorrentes",
+            "GET /api/series-recorrentes/{serieId}",
+            "GET /api/tarefas",
+            "GET /api/tarefas/hoje",
+            "GET /api/tarefas/lixeira",
+            "GET /api/tarefas/{tarefaId}",
+            "GET /api/trilhas",
+            "GET /api/trilhas/{trilhaId}",
+            "GET /api/trilhas/{trilhaId}/cronogramas",
+            "GET /api/trilhas/{trilhaId}/cronogramas/{cronogramaId}/blocos",
+            "GET /api/trilhas/{trilhaId}/estatisticas",
+            "GET /api/trilhas/{trilhaId}/impacto-exclusao",
+            "GET /api/trilhas/{trilhaId}/sessoes",
+            "GET /api/usuarios/me/disponibilidade-semanal",
+            "PATCH /api/admin/editais/{id}/status",
+            "PATCH /api/auth/admin/usuarios/{id}/papeis",
+            "PATCH /api/blocos/{blocoId}/conclusao",
+            "PATCH /api/tarefas/{tarefaId}/conclusao",
+            "PATCH /api/tarefas/{tarefaId}/subtarefas/{subtarefaId}",
+            "PATCH /api/trilhas/{trilhaId}/cronogramas/{cronogramaId}/ativar",
+            "PATCH /api/trilhas/{trilhaId}/sessoes/{sessaoId}",
+            "POST /api/admin/editais",
+            "POST /api/auth/cadastro",
+            "POST /api/auth/confirmar-email",
+            "POST /api/auth/handoff",
+            "POST /api/auth/handoff/consume",
+            "POST /api/auth/login",
+            "POST /api/auth/logout",
+            "POST /api/auth/logout-all",
+            "POST /api/auth/recuperar-senha",
+            "POST /api/auth/reenviar-confirmacao",
+            "POST /api/auth/refresh",
+            "POST /api/auth/resetar-senha",
+            "POST /api/cadernos",
+            "POST /api/cadernos/importar-trilha/{trilhaId}",
+            "POST /api/cadernos/{id}/secoes",
+            "POST /api/cadernos/{id}/secoes/{secaoId}/notas",
+            "POST /api/cadernos/{id}/sincronizar-trilha",
+            "POST /api/listas-tarefas",
+            "POST /api/listas-tarefas/{listaId}/restaurar",
+            "POST /api/notas/lixeira/{tipo}/{id}/restaurar",
+            "POST /api/push/subscriptions",
+            "POST /api/series-recorrentes",
+            "POST /api/tarefas",
+            "POST /api/tarefas/lixeira/{tarefaId}/restaurar",
+            "POST /api/tarefas/{tarefaId}/pular",
+            "POST /api/trilhas",
+            "POST /api/trilhas/{trilhaId}/cronogramas",
+            "POST /api/trilhas/{trilhaId}/cronogramas/{cronogramaId}/blocos/concluir-atrasados",
+            "POST /api/trilhas/{trilhaId}/disciplinas",
+            "POST /api/trilhas/{trilhaId}/sessoes",
+            "PUT /api/admin/editais/{id}",
+            "PUT /api/auth/senha",
+            "PUT /api/cadernos/{id}",
+            "PUT /api/cadernos/{id}/secoes/{secaoId}",
+            "PUT /api/listas-tarefas/{listaId}",
+            "PUT /api/notas/{id}",
+            "PUT /api/push/preferencias",
+            "PUT /api/secoes/{id}",
+            "PUT /api/series-recorrentes/{serieId}",
+            "PUT /api/tarefas/{tarefaId}",
+            "PUT /api/trilhas/{trilhaId}",
+            "PUT /api/trilhas/{trilhaId}/cronogramas/{cronogramaId}",
+            "PUT /api/trilhas/{trilhaId}/disciplinas/reordenar",
+            "PUT /api/trilhas/{trilhaId}/disciplinas/{disciplinaId}",
+            "PUT /api/trilhas/{trilhaId}/topicos/{topicoId}/progresso",
+            "PUT /api/usuarios/me/disponibilidade-semanal",
+            "PUT /api/usuarios/me/preferencias/tema"
+    );
+
+    /**
+     * Rotas removidas pela reestruturação (D-11/D-23): não podem reaparecer.
+     */
+    public static final Set<String> REMOVIDAS = Set.of(
+            "PATCH /api/trilhas/{trilhaId}/progresso/{topicoId}",
+            "GET /api/cadernos/{cadernoId}/secoes/{secaoId}/notas/{notaId}",
+            "PATCH /api/push/preferencias"
+    );
+
+    /** Todas as rotas declaradas, para asserções de contrato. */
+    public static Set<String> todasAsRotas() {
+        return TODAS_AS_ROTAS;
+    }
+
+    /** Mesma coleção, como lista, para detectar duplicidade na declaração. */
+    public static List<String> todasAsRotasEmOrdemDeDeclaracao() {
+        return List.copyOf(TODAS_AS_ROTAS);
+    }
+
     public static Stream<Arguments> casos() {
         return casosDeclarados().stream().map(caso -> Arguments.of(
                 caso.metodo(), caso.caminho(), caso.comCorpo(),

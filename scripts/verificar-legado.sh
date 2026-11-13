@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 #
-# verificar-legado.sh — Gate anti-legado da reestruturação Trilhara (R0).
+# verificar-legado.sh — Gate anti-legado da reestruturação Trilhara (R0, endurecido na R13).
 #
 # Falha (exit 1) ao encontrar qualquer padrão proibido fora das ALLOWLISTS
 # declaradas abaixo. Interface:
 #
-#   bash scripts/verificar-legado.sh            # exit 1 se houver achados
-#   bash scripts/verificar-legado.sh --report   # imprime e retorna 0 (baseline R0)
+#   bash scripts/verificar-legado.sh            # exit 1 se houver achados (gate de CI)
 #   bash scripts/verificar-legado.sh --quiet    # só o resumo por padrão
+#
+# R13/D-44: o modo `--report` (que retornava 0 mesmo com achados) foi REMOVIDO.
+# Ele existia como baseline da R0 e permitia que o CI ficasse verde com legado
+# presente.
 #
 # Motor: usa `rg --pcre2` quando disponível; caso contrário cai para
 # `grep -rInE` (GNU grep). Nenhum padrão depende de recurso exclusivo de PCRE.
@@ -19,15 +22,19 @@ cd "$RAIZ" || exit 2
 
 MODO="estrito"
 case "${1:-}" in
-  --report) MODO="report" ;;
   --quiet)  MODO="quiet" ;;
   "")       ;;
   -h|--help)
-    sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
     exit 0
     ;;
+  --report)
+    echo "verificar-legado: --report foi removido na R13 (D-44). Use o modo estrito:" >&2
+    echo "  bash scripts/verificar-legado.sh" >&2
+    exit 2
+    ;;
   *)
-    echo "verificar-legado: opção desconhecida '$1' (use --report ou --quiet)." >&2
+    echo "verificar-legado: opção desconhecida '$1' (use --quiet)." >&2
     exit 2
     ;;
 esac
@@ -64,10 +71,16 @@ ALLOWLIST=(
 
 # Código de teste: o Anexo C permite console.* em teste. A renomeação dos testes
 # por fase é dívida de R12/R13 e não pode mascarar código de aplicação.
+#
+# R13: a allowlist NÃO se aplica aos padrões de nomenclatura por fase (E3/E3b) —
+# aplicá-la tornava o gate cego justamente para `backend/src/test/`, onde viviam
+# `class Fase6*Test`. O controle é feito pela variável `APLICAR_ALLOWLIST_TESTE`,
+# ligada por omissão e desligada antes dos padrões que valem em código de teste.
 ALLOWLIST_TESTE=(
   "frontend/src/test/"
   "backend/src/test/"
 )
+APLICAR_ALLOWLIST_TESTE=1
 
 TOTAL=0
 FALHAS=0
@@ -122,7 +135,7 @@ buscar() {
     for permitido in "${ALLOWLIST[@]}"; do
       case "$caminho" in *"$permitido") ignorar=1; break ;; esac
     done
-    if [ "$ignorar" -eq 0 ]; then
+    if [ "$ignorar" -eq 0 ] && [ "$APLICAR_ALLOWLIST_TESTE" -eq 1 ]; then
       for permitido in "${ALLOWLIST_TESTE[@]}"; do
         case "$caminho" in *"$permitido"*) ignorar=1; break ;; esac
       done
@@ -196,11 +209,17 @@ buscar "E1-deleteMany-com-filtro" backend/src/main -- \
 buscar "E2-storage-auth-chaves" frontend/src -- \
   'trilhara_auth_(token|access_token|refresh_token|user)'
 # E3: nomenclatura por fase (D-43) em blocos de teste.
+# R13: case-insensitive (`FASE 3`, `Fase6`) e sem a allowlist de teste — é
+# exatamente em `src/test` que esse padrão precisa falhar.
+APLICAR_ALLOWLIST_TESTE=0
 buscar "E3-nomenclatura-fase" "backend/src/test" "frontend/src/test" -- \
-  "describe\(['\"]fase|class Fase[0-9]"
+  '(?i)describe\((['"'"'"])fase|class [Ff]ase[0-9]|\b(it|test)\((['"'"'"])fase'
 
-# E3b: arquivos de teste nomeados por fase.
-ARQUIVOS_FASE="$(find backend/src/test frontend/src/test -type f 2>/dev/null | grep -E '(^|/)fase[0-9].*\.test\.' || true)"
+# E3b: arquivos de teste nomeados por fase (JS/TS e Java — o padrão anterior
+# `\.test\.` nunca casava `Fase6*Test.java`, então o gate passava em silêncio).
+ARQUIVOS_FASE="$(find backend/src/test frontend/src/test -type f 2>/dev/null \
+  | grep -Ei '(^|/)[fF]ase[0-9].*(\.test\.(t|j)sx?$|Test\.java$)' || true)"
+APLICAR_ALLOWLIST_TESTE=1
 QTD_ARQUIVOS_FASE=0
 if [ -n "$ARQUIVOS_FASE" ]; then
   QTD_ARQUIVOS_FASE="$(printf '%s\n' "$ARQUIVOS_FASE" | grep -c . || true)"
@@ -225,11 +244,6 @@ echo "-------------------------------------------------------------"
 printf '%s\n' "${RESUMO[@]}"
 echo "-------------------------------------------------------------"
 echo "Total de achados: $TOTAL (padroes com ocorrencia: $FALHAS)"
-
-if [ "$MODO" = "report" ]; then
-  echo "Modo --report: retornando 0 (baseline R0; correcoes nas fases de dominio)."
-  exit 0
-fi
 
 if [ "$TOTAL" -gt 0 ]; then
   echo "FALHOU: padroes de legado encontrados." >&2

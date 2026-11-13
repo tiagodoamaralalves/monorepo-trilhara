@@ -2,10 +2,18 @@ package br.com.trilhara.auth;
 
 import org.jboss.logging.Logger;
 
+import br.com.trilhara.shared.SystemScope;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+/**
+ * Job de retomada da exclusão de conta (D-35b).
+ *
+ * <p>{@code @SystemScope} (D-06b): a varredura é multi-tenant — busca exclusões pendentes de
+ * todos os usuários — e não há requisição HTTP de onde tirar {@code usuarioId}.</p>
+ */
+@SystemScope
 @ApplicationScoped
 public class AccountDeletionJob {
 

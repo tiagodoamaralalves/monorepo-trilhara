@@ -26,7 +26,7 @@ import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 
 @QuarkusTest
-class Fase6TarefaResourceTest {
+class TarefaRecorrenciaResourceTest {
 
     private static final String LISTAS = "/api/listas-tarefas";
     private static final String TAREFAS = "/api/tarefas";

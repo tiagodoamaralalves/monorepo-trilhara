@@ -1,5 +1,7 @@
 package br.com.trilhara.push;
 
+import br.com.trilhara.shared.Pseudonimo;
+
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -130,7 +132,9 @@ public class PushDeliveryScheduler {
         List<PushSubscription> subscriptions = pushSubscriptionRepository.listarPorUsuario(lembrete.usuarioId());
         if (subscriptions.isEmpty()) {
             // Nada foi entregue: FALHA_FINAL (ENVIADO significa entrega efetiva ao provedor).
-            LOG.infof("Lembrete %s sem inscrições para o usuário %s.", lembrete.id(), lembrete.usuarioId());
+            // D-04/R13: o usuarioId não pode aparecer em log; pseudônimo preserva a correlação.
+            LOG.infof("event=PUSH_SEM_INSCRICOES lembrete=%s conta=%s",
+                    lembrete.id(), Pseudonimo.de(lembrete.usuarioId().toHexString()));
             filaRepository.concluir(lembrete.id(), leaseToken, LembretePush.ESTADO_FALHA_FINAL, agora);
             return;
         }

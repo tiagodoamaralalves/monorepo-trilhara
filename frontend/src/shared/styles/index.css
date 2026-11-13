@@ -1,3 +1,5 @@
+@import './fonts.css';
+
 /* ── DESIGN SYSTEM TRILHARA: TOKENS GLOBAIS ── */
 :root,
 [data-theme='dark'] {

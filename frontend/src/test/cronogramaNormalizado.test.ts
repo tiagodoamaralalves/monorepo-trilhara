@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EstudosService } from '../modules/estudos/services/estudosService';
 import * as apiModule from '../modules/estudos/services/api';
 
-describe('FASE 4 - Frontend: Cronogramas, Blocos e Disponibilidade Semanal', () => {
+describe('Cronogramas, blocos e disponibilidade semanal', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });

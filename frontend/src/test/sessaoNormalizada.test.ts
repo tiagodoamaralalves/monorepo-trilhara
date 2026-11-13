@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EstudosService } from '../modules/estudos/services/estudosService';
 import * as apiModule from '../modules/estudos/services/api';
 
-describe('FASE 3 - Frontend: Sessões Normalizadas e Estatísticas', () => {
+describe('Sessões normalizadas e estatísticas', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });

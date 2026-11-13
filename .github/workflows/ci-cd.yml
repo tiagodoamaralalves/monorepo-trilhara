@@ -31,14 +31,27 @@ jobs:
       - name: Instalar dependências limpas (npm ci)
         run: npm --prefix frontend ci --ignore-scripts --prefer-offline --no-audit
 
-      - name: Typecheck (tsc -b) e Build de Produção (Vite)
+      - name: Build de Produção (tsc -b + Vite)
         run: npm --prefix frontend run build
 
-      - name: Testes automatizados do Frontend (Vitest + RTL + jsdom)
-        run: npm --prefix frontend test -- --run
+      # R13/D-44: as verificações abaixo faltavam no CI, então o pipeline ficava verde
+      # com código morto, warnings de lint e dependências não usadas.
+      - name: Typecheck isolado (tsc --noEmit)
+        run: npm --prefix frontend run typecheck
 
-      - name: Gate anti-legado (R0) — modo report
-        run: bash scripts/verificar-legado.sh --report
+      - name: ESLint com zero warnings (D-44)
+        run: npm --prefix frontend run lint -- --max-warnings 0
+
+      - name: Detecção de código morto (knip, D-44)
+        run: npm --prefix frontend run knip
+
+      # R13/D-43: cobertura enforce via vite.config.ts -> test.coverage.thresholds.
+      - name: Testes do Frontend com cobertura enforce (D-43)
+        run: npm --prefix frontend test -- --run --coverage
+
+      # R13/D-44: o modo `--report` foi removido — o gate agora falha em achados.
+      - name: Gate anti-legado (modo estrito, D-44)
+        run: bash scripts/verificar-legado.sh
 
       - name: Validar sintaxe do Caddyfile
         run: |
@@ -46,6 +59,10 @@ jobs:
             -v "${{ github.workspace }}/Caddyfile:/etc/caddy/Caddyfile:ro" \
             caddy:2-alpine \
             caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
+      # R13/D-47: teste de fumaça dos cabeçalhos de segurança nas 5 origens.
+      - name: Cabeçalhos de segurança D-47 (CSP, Permissions-Policy, HSTS)
+        run: bash scripts/verificar-cabecalhos.sh
 
   # ──────────────────────────────────────────────────────────────────────────
   # 2. CI Backend: Quarkus Java 25 + Testes Integrados com MongoDB 7
@@ -85,3 +102,22 @@ jobs:
           AUTH_JWT_SECRET: ci-jwt-secret-com-pelo-menos-32-bytes-ok
           AUTH_PASSWORD_PEPPER: ci-pepper
         run: bash backend/mvnw -f backend/pom.xml verify -B
+
+      # R13/D-44: o verify já roda `dependency:analyze` no phase verify (pom.xml), que
+      # falha em dependência não declarada/usada. Step explícito para o log do CI.
+      - name: Dependências não usadas/undeclared (D-44)
+        env:
+          MONGODB_URL: mongodb://localhost:27017
+          RESEND_API_KEY: chave-dummy-ci
+          AUTH_JWT_SECRET: ci-jwt-secret-com-pelo-menos-32-bytes-ok
+          AUTH_PASSWORD_PEPPER: ci-pepper
+        run: bash backend/mvnw -f backend/pom.xml dependency:analyze -B
+
+      # R13/D-43: JaCoCo em modo enforce (check no phase verify do pom.xml).
+      - name: Cobertura JaCoCo (publicar relatório)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: backend/target/jacoco-report/
+          if-no-files-found: ignore

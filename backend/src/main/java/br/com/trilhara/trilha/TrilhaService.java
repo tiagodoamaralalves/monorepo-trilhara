@@ -13,6 +13,7 @@ import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.eclipse.microprofile.config.ConfigProvider;
 
+import br.com.trilhara.auth.RateLimitService;
 import br.com.trilhara.cronograma.BlocoCronogramaRepository;
 import br.com.trilhara.cronograma.Cronograma;
 import br.com.trilhara.cronograma.CronogramaRepository;
@@ -87,6 +88,7 @@ public class TrilhaService {
     private final CadernoRepository cadernoRepository;
     private final LeaseTrilhaService leaseTrilhaService;
     private final TimezoneContext timezoneContext;
+    private final RateLimitService rateLimitService;
     private final int maxTrilhasPorUsuario;
 
     @Inject
@@ -100,7 +102,8 @@ public class TrilhaService {
             CronogramaRepository cronogramaRepository,
             CadernoRepository cadernoRepository,
             LeaseTrilhaService leaseTrilhaService,
-            TimezoneContext timezoneContext) {
+            TimezoneContext timezoneContext,
+            RateLimitService rateLimitService) {
         this.repository = repository;
         this.disciplinaRepository = disciplinaRepository;
         this.progressoRepository = progressoRepository;
@@ -111,6 +114,7 @@ public class TrilhaService {
         this.cadernoRepository = cadernoRepository;
         this.leaseTrilhaService = leaseTrilhaService;
         this.timezoneContext = timezoneContext;
+        this.rateLimitService = rateLimitService;
         this.maxTrilhasPorUsuario = ConfigProvider.getConfig()
                 .getOptionalValue("trilhara.trilhas.max-por-usuario", Integer.class)
                 .orElse(MAX_TRILHAS_PADRAO);
@@ -237,6 +241,9 @@ public class TrilhaService {
 
     public TrilhaDetalheDTO criarTrilha(CriarTrilhaRequest request) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
+
+        // D-45: criação de trilha limitada a 30/min por usuário (contenção de escrita em massa).
+        rateLimitService.verificarLimiteCriacaoTrilha(usuarioId.toHexString());
 
         if (repository.contar(usuarioId) >= maxTrilhasPorUsuario) {
             throw new ResourceLimitExceededException(

@@ -10,7 +10,7 @@ import org.bson.types.ObjectId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-class Fase6RecorrenciaEngineTest {
+class RecorrenciaCalendarioTest {
 
     private final RecorrenciaEngine engine = new RecorrenciaEngine(null, null);
 

@@ -5,6 +5,7 @@ import java.util.Map;
 import org.bson.types.ObjectId;
 
 import br.com.trilhara.auth.AuthContext;
+import br.com.trilhara.auth.RateLimitService;
 import br.com.trilhara.auth.Autenticado;
 import br.com.trilhara.nota.dto.AtualizarNotaRequest;
 import br.com.trilhara.nota.dto.BuscaNotasResponse;
@@ -46,6 +47,9 @@ public class NotaResource {
     @Inject
     AuthContext authContext;
 
+    @Inject
+    RateLimitService rateLimitService;
+
     private ObjectId usuarioId() {
         return authContext.usuarioIdObjectId();
     }
@@ -56,6 +60,8 @@ public class NotaResource {
             @QueryParam("q") String q,
             @QueryParam("pagina") @DefaultValue("1") int pagina,
             @QueryParam("tamanho") @DefaultValue("20") int tamanho) {
+        // D-45: busca em texto pleno limitada a 60/min por usuário (consulta $text é a mais cara).
+        rateLimitService.verificarLimiteBuscaNotas(authContext.usuarioId());
         return notaService.buscarGlobal(usuarioId(), q, pagina, tamanho);
     }
 

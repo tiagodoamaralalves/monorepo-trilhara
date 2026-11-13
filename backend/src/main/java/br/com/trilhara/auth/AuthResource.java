@@ -72,6 +72,7 @@ public class AuthResource {
     private final EmailService emailService;
     private final HandoffService handoffService;
     private final AccountDeletionService accountDeletionService;
+    private final RateLimitService rateLimitService;
 
     private final String cookieName;
     private final boolean cookieSecure;
@@ -89,6 +90,7 @@ public class AuthResource {
             EmailService emailService,
             HandoffService handoffService,
             AccountDeletionService accountDeletionService,
+            RateLimitService rateLimitService,
             @ConfigProperty(name = "trilhara.auth.refresh.cookie-name", defaultValue = "trilhara_rt") String cookieName,
             @ConfigProperty(name = "trilhara.auth.refresh.cookie-secure", defaultValue = "true") boolean cookieSecure,
             @ConfigProperty(name = "trilhara.auth.refresh.cookie-same-site", defaultValue = "Strict") String cookieSameSite,
@@ -102,6 +104,7 @@ public class AuthResource {
         this.emailService = emailService;
         this.handoffService = handoffService;
         this.accountDeletionService = accountDeletionService;
+        this.rateLimitService = rateLimitService;
         this.cookieName = cookieName;
         this.cookieSecure = cookieSecure;
         this.cookieSameSite = cookieSameSite;
@@ -201,7 +204,10 @@ public class AuthResource {
     @APIResponse(responseCode = "200", description = "Código emitido com sucesso")
     @APIResponse(responseCode = "400", description = "Destino inválido ou fora da allowlist")
     @APIResponse(responseCode = "401", description = "Não autenticado")
-    public HandoffResponse emitirHandoff(@Valid HandoffRequest request) {
+    public HandoffResponse emitirHandoff(@Valid HandoffRequest request,
+            @Context RoutingContext routingContext) {
+        // D-45: 10/min por IP — cada emissão persiste um código em tokens_handoff_sso.
+        rateLimitService.verificarLimiteHandoffEmissao(extrairIpCliente(routingContext));
         return handoffService.emitirHandoff(authContext.usuarioId(), request.destino());
     }
 
@@ -215,6 +221,9 @@ public class AuthResource {
             @Valid ConsumeHandoffRequest request,
             @Context HttpHeaders headers,
             @Context RoutingContext routingContext) {
+        // D-45: 20/min por IP — contenção de carga (o código é opaco e de uso único).
+        rateLimitService.verificarLimiteHandoffConsumo(extrairIpCliente(routingContext));
+
         String host = extrairHost(headers);
         String usuarioId = handoffService.consumirHandoff(request.codigo(), host);
         AuthResponse resposta = authService.autenticarPorUsuarioId(

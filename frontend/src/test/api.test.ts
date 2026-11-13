@@ -10,7 +10,7 @@ import type {
   SyncStatusState
 } from '../shared/contracts';
 
-describe('Frontend API e Contratos Base (FASE 0)', () => {
+describe('API compartilhada: contratos base e cabeçalhos', () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {

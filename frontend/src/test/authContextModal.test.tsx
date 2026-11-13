@@ -22,7 +22,7 @@ const ComponenteFilhoComFormulario: React.FC = () => {
   );
 };
 
-describe('AuthContext - Reabertura de Modal em 401 sem Desmontagem (FASE 1)', () => {
+describe('AuthContext: reabertura do modal em 401 sem desmontar a árvore', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();

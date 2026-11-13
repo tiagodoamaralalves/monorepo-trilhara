@@ -19,6 +19,16 @@ public class RateLimitService {
     private static final int LIMITE_EXCLUSAO_CONTA = 5;
     private static final long JANELA_EXCLUSAO_CONTA_SEGUNDOS = 15 * 60;
 
+    /** D-45: login/refresh/handoff — 10 por minuto por IP. */
+    private static final int LIMITE_AUTH_POR_IP = 10;
+    /** D-45: `handoff/consume` — janela mais larga que a emissão (20/min/IP). */
+    private static final int LIMITE_HANDOFF_CONSUMO_POR_IP = 20;
+    /** D-45: busca de notas — 60 por minuto por usuário. */
+    private static final int LIMITE_BUSCA_NOTAS = 60;
+    /** D-45: criação de trilha/cronograma — 30 por minuto por usuário. */
+    private static final int LIMITE_CRIACAO_ESTRUTURA = 30;
+    private static final long JANELA_PADRAO_SEGUNDOS = 60;
+
     private final Map<String, Deque<Instant>> janelasPorChave = new ConcurrentHashMap<>();
     private final int maxTentativasLogin;
     private final int maxTentativasCadastro;
@@ -80,6 +90,62 @@ public class RateLimitService {
 
     public void limparTudo() {
         janelasPorChave.clear();
+    }
+
+    // ========================================================================
+    // D-45 — limitadores exigidos pela decisão e ausentes até a R13
+    // ========================================================================
+
+    /**
+     * D-45: {@code POST /api/auth/refresh} — <strong>10/min por IP</strong>.
+     *
+     * <p>O refresh é a rota mais chamada da renovação de sessão (single-flight por aba, 5 s
+     * de throttle) e não tinha limite algum; um atacante com refresh token roubado podia
+     * forçar rotações em paralelo até disparar a revogação por reuso da vítima.</p>
+     */
+    public void verificarLimiteRefresh(String ip) {
+        registrarEVerificar("refresh:ip:" + normalizar(ip), LIMITE_AUTH_POR_IP, JANELA_PADRAO_SEGUNDOS);
+    }
+
+    /**
+     * D-45: {@code POST /api/auth/handoff} (emissão) — <strong>10/min por IP</strong>.
+     *
+     * <p>Cada emissão grava um código persistido; sem limite, o endpoint autenticado vira
+     * vetor de escrita em massa em {@code tokens_handoff_sso}.</p>
+     */
+    public void verificarLimiteHandoffEmissao(String ip) {
+        registrarEVerificar("handoff-emissao:ip:" + normalizar(ip), LIMITE_AUTH_POR_IP,
+                JANELA_PADRAO_SEGUNDOS);
+    }
+
+    /**
+     * D-45: {@code POST /api/auth/handoff/consume} — <strong>20/min por IP</strong>.
+     *
+     * <p>Limite mais alto que a emissão porque o consumo pode ser tentado por várias abas
+     * simultâneas da origem de destino. Não é um limite de adivinhação do código (o código é
+     * opaco e de uso único), e sim de contenção de carga.</p>
+     */
+    public void verificarLimiteHandoffConsumo(String ip) {
+        registrarEVerificar("handoff-consumo:ip:" + normalizar(ip), LIMITE_HANDOFF_CONSUMO_POR_IP,
+                JANELA_PADRAO_SEGUNDOS);
+    }
+
+    /** D-45: {@code GET /api/notas/busca} — <strong>60/min por usuário</strong>. */
+    public void verificarLimiteBuscaNotas(String usuarioId) {
+        registrarEVerificar("busca-notas:usuario:" + normalizar(usuarioId), LIMITE_BUSCA_NOTAS,
+                JANELA_PADRAO_SEGUNDOS);
+    }
+
+    /** D-45: {@code POST /api/trilhas} — <strong>30/min por usuário</strong>. */
+    public void verificarLimiteCriacaoTrilha(String usuarioId) {
+        registrarEVerificar("criacao-trilha:usuario:" + normalizar(usuarioId), LIMITE_CRIACAO_ESTRUTURA,
+                JANELA_PADRAO_SEGUNDOS);
+    }
+
+    /** D-45: {@code POST /api/trilhas/{trilhaId}/cronogramas} — <strong>30/min por usuário</strong>. */
+    public void verificarLimiteCriacaoCronograma(String usuarioId) {
+        registrarEVerificar("criacao-cronograma:usuario:" + normalizar(usuarioId), LIMITE_CRIACAO_ESTRUTURA,
+                JANELA_PADRAO_SEGUNDOS);
     }
 
     private void registrarEVerificar(String chave, int limiteMaximo) {

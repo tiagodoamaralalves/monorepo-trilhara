@@ -45,7 +45,7 @@ class AuthCookieDomainTest {
     @DisplayName("determinarCookieDomain: deve omitir Domain em desenvolvimento local (localhost, *.localhost, 127.0.0.1)")
     void deveOmitirDomainEmAmbienteLocal() {
         AuthResource resourceLocal = new AuthResource(
-                authService, userService, refreshTokenService, null, emailService, handoffService, null,
+                authService, userService, refreshTokenService, null, emailService, handoffService, null, null,
                 "trilhara_rt", false, "Strict", Optional.empty(),
                 "trilhara_session_state", "Lax"
         );
@@ -56,7 +56,7 @@ class AuthCookieDomainTest {
         assertNull(resourceLocal.determinarCookieDomain("127.0.0.1:8080"));
 
         AuthResource resourceComLocalhostConfigurado = new AuthResource(
-                authService, userService, refreshTokenService, null, emailService, handoffService, null,
+                authService, userService, refreshTokenService, null, emailService, handoffService, null, null,
                 "trilhara_rt", false, "Strict", Optional.of("localhost"),
                 "trilhara_session_state", "Lax"
         );
@@ -67,7 +67,7 @@ class AuthCookieDomainTest {
     @DisplayName("determinarCookieDomain: deve emitir Domain compartilhado apenas quando host pertencer ao domínio produtivo")
     void deveEmitirDomainEmProducaoValida() {
         AuthResource resourceProd = new AuthResource(
-                authService, userService, refreshTokenService, null, emailService, handoffService, null,
+                authService, userService, refreshTokenService, null, emailService, handoffService, null, null,
                 "trilhara_rt", true, "Strict", Optional.of(".trilhara.com.br"),
                 "trilhara_session_state", "Lax"
         );
@@ -85,7 +85,7 @@ class AuthCookieDomainTest {
     @DisplayName("construirCookieRefreshToken e session_state: sem atributo Domain quando Host for estudos.localhost")
     void deveConstruirCookiesSemDomainParaHostLocal() {
         AuthResource resource = new AuthResource(
-                authService, userService, refreshTokenService, null, emailService, handoffService, null,
+                authService, userService, refreshTokenService, null, emailService, handoffService, null, null,
                 "trilhara_rt", false, "Strict", Optional.of(".trilhara.com.br"),
                 "trilhara_session_state", "Lax"
         );
@@ -107,7 +107,7 @@ class AuthCookieDomainTest {
     @DisplayName("construirCookieRefreshToken e session_state: com Domain=.trilhara.com.br quando configurado para produção")
     void deveConstruirCookiesComDomainParaHostProducao() {
         AuthResource resource = new AuthResource(
-                authService, userService, refreshTokenService, null, emailService, handoffService, null,
+                authService, userService, refreshTokenService, null, emailService, handoffService, null, null,
                 "trilhara_rt", true, "Strict", Optional.of(".trilhara.com.br"),
                 "trilhara_session_state", "Lax"
         );

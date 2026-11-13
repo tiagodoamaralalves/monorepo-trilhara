@@ -11,7 +11,7 @@ import {
 } from '../shared/auth/sso';
 import { AuthStorage } from '../shared/auth/authStorage';
 
-describe('SSO e Handoff Local (FASE 1)', () => {
+describe('SSO e handoff entre origens locais', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();

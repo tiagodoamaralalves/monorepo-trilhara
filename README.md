@@ -11,7 +11,7 @@ O **Trilhara** é um ecossistema completo para estudantes e concurseiros de alta
 ## 1. Arquitetura e Tecnologias
 
 ### Backend
-- **Java 21 / 25** com **Quarkus 3.40.1** (REST Reactive, Hibernate Validator, SmallRye OpenAPI).
+- **Java 25** com **Quarkus 3.40.1** (REST Reactive, Hibernate Validator, SmallRye OpenAPI).
 - **MongoDB 7**: 19 coleções normalizadas com índices compostos, texto pleno e unicidade parcial.
 - **Segurança**: Autenticação stateless JWT (HS256) com tolerância de clock-skew (30s), Refresh Tokens com rotação e detecção de reuso, hash PBKDF2-SHA512 com pepper, isolamento estrito multi-inquilino (`usuarioId`), autorização anti-IDOR e exclusão de conta em lote com reconciliação assíncrona.
 - **Web Push**: RFC 8030 e VAPID (RFC 8292) com janela útil de entrega de 15 minutos e descarte inteligente de lembretes expirados fora do prazo.
@@ -29,8 +29,8 @@ O **Trilhara** é um ecossistema completo para estudantes e concurseiros de alta
 
 ## 2. Pré-requisitos de Ambiente
 
-- **Java JDK 21+** (recomendado Java 21 LTS ou OpenJDK 25)
-- **Node.js 20+** e **npm 10+**
+- **Java JDK 25** (obrigatório: `maven.compiler.release=25`)
+- **Node.js 20+** e **npm 10+** (CI usa Node 22)
 - **Docker** e **Docker Compose** (com MongoDB 7)
 - **Caddy 2** (opcional para proxy local com HTTPS)
 
@@ -92,25 +92,35 @@ npm run dev
 
 ## 5. Testes Automatizados e Qualidade de Código
 
+### Gate completo (obrigatório antes de qualquer PR)
+
+Reproduza o ambiente e execute na ordem — é exatamente o que o CI roda:
+```bash
+eval "$(bash scripts/env-gate.sh)"          # JAVA_HOME (JDK 25), MONGODB_URL, RESEND_API_KEY
+
+cd backend  && ./mvnw -q verify              # testes + ArchUnit + JaCoCo check + dependency:analyze
+cd ../frontend   && npm run typecheck   && npm run lint -- --max-warnings 0   && npm test -- --run --coverage   && npm run build   && npx knip
+
+cd .. && bash scripts/verificar-legado.sh    # modo estrito: falha em achados
+cd .. && bash scripts/verificar-cabecalhos.sh # CSP/HSTS/Permissions-Policy nas 5 origens
+```
+
 ### Backend (JUnit 5 + REST Assured + Testcontainers/DevServices)
-Para rodar a suíte completa de testes unitários e de integração:
 ```bash
 cd backend
-./mvnw test
+./mvnw -q verify
 ```
-*Garante validações de autorização por proprietário (anti-IDOR), exclusão atômica de contas em 18 coleções filhas, engine de recorrência, cronogramas, sessões e push.*
+O `verify` executa, além dos testes:
+- **ArchUnit** — `TenantIsolationArchTest` (isolamento por `usuarioId`, sem `@ArchIgnore`) e `LegacyPackagesArchTest` (pacotes/símbolos do Anexo C);
+- **JaCoCo em enforce** — `check` sobre `target/jacoco-quarkus.exec`, piso de 75% de instrução por bundle (medido: 80,0%);
+- **`dependency:analyze`** — falha em dependência declarada não usada ou usada não declarada;
+- `AuthorizationByOwnerTest` (anti-IDOR ⇒ 404), `MassAssignmentParametrizadoTest`, `LogSemPiiTest`, `RotasPublicasContratoTest` e `InventarioColecoesTest`.
 
 ### Frontend (Vitest + React Testing Library + jsdom)
-Para rodar os testes de componentes, hooks e serviços:
 ```bash
 cd frontend
-npm test -- --run
-```
-
-Para validar a tipagem estrita do TypeScript e compilação do bundle de produção:
-```bash
-cd frontend
-npm run build
+npm test -- --run --coverage   # limiares enforce em vite.config.ts (test.coverage.thresholds)
+npm run build                  # tsc -b && vite build
 ```
 
 ---

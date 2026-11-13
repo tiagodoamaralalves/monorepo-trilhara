@@ -8,6 +8,7 @@
 >
 > Baseline de referência: backend 144 testes / frontend 109 testes (R0).
 > **R12:** backend 350+ testes / **frontend 57 arquivos e 438 testes**.
+> **R13:** backend **494 testes** (0 falhas, 10 skipped) / frontend **438 testes**; JaCoCo 80,0% enforce.
 
 ---
 
@@ -399,3 +400,33 @@
 | D-08 | 18 coleções filhas privadas + `usuarios` por último | `AccountDeletionIntegrationTest` (29) |
 | D-36 | Push versionado por `(tarefaId, versaoAgendamento)` | `LembretePushLifecycleTest` (9); `PushResourceTest` (7) |
 
+---
+
+## P. Critérios específicos da R13 (limpeza e hardening final)
+
+> Execução: 2026-11-13. Relatório completo: `docs/REVISAO-IMPLEMENTADA-R13.md`.
+
+| Critério | Teste / comando | Status |
+|---|---|---|
+| `npx knip` sem achados, com `entry` de produção | `npx knip` → exit 0 (config: `index.html` + testes) | **Coberto na R13** |
+| ESLint e `tsc` sem erros/warnings | `lint -- --max-warnings 0`; `typecheck` | **Coberto na R13** |
+| Gate anti-legado **capaz de falhar** | provado: regex antiga dava 0 com 6 achados presentes; corrigida → 6 → 0 após renomeação | **Coberto na R13** — falsos negativos `E3`/`E3b` eliminados |
+| Nenhum teste nomeado por fase (D-43) | `RecorrenciaCalendarioTest`, `TarefaRecorrenciaResourceTest`; 5 `describe` renomeados; gate `E3`/`E3b` = 0 | **Coberto na R13** |
+| Símbolos/pacotes legados proibidos no bytecode | `LegacyPackagesArchTest` (6 regras: pacotes, tipos, `PlanejamentoCiclo*`, métodos, campos D-02, `USUARIO_LOCAL_PADRAO`) | **Coberto na R13** |
+| ArchUnit sem `@ArchIgnore` | `TenantIsolationArchTest` (13 regras ativas, 0 ignoradas) | **Coberto na R13** |
+| Mass assignment em **todos** os DTOs | `MassAssignmentParametrizadoTest` (3) — 45 records varridos por reflexão | **Coberto na R13** |
+| Contrato de rotas código ↔ Anexo A | `RotasPublicasContratoTest` (4) — 109 rotas, bidirecional + removidas | **Coberto na R13** |
+| Nenhuma PII em log `INFO+` | `LogSemPiiTest` (3); 7 vazamentos corrigidos (`EmailService` ×6, `PushDeliveryScheduler` ×1) | **Coberto na R13** |
+| Rate limiting D-45 completo | `RateLimitPorUsuarioTest` (6) — 429 + `Retry-After` + `code=RATE_LIMITED` por limitador | **Coberto na R13** |
+| CSP/HSTS/Permissions-Policy D-47 | `scripts/verificar-cabecalhos.sh` — 5 origens, sem `unsafe-eval`, HSTS só em HTTPS | **Coberto na R13** |
+| App funciona sem origem externa de fonte | fontes self-hosted em `/fonts/*`; `index.html` sem `fonts.googleapis.com` | **Coberto na R13** |
+| `dependency:analyze` limpo | plugin 3.10.0 + exceções de BOM justificadas | **Coberto na R13** |
+| JaCoCo enforce, domínio ≥ 75% | `jacoco:check` → **80,0%** | **Coberto na R13** |
+| Vitest coverage enforce | `test.coverage.thresholds` → ratchet medido | **Coberto na R13** (limiares; meta D-43 pendente) |
+| `shared/` ≥ 80% e módulos ≥ 70% | medido 69,9% / 34,4% | **NÃO ATENDIDO** — ver R13 §3.2 e §7 |
+| CI com gate completo | `ci-cd.yml`: typecheck, lint, knip, coverage, gate estrito, cabeçalhos, `dependency:analyze`, artefato JaCoCo | **Coberto na R13** |
+| README/.env.example atualizados (D-49) | Java 25, gate real, 43 chaves em `.env.example` | **Coberto na R13** |
+| Contagem ≥ baseline | backend **494** (era 472); frontend **438** (era 438) | **Coberto na R13** |
+
+**Resumo da R13:** 18 critérios cobertos, 1 não atendido (metas de cobertura por diretório no
+frontend), declarado como pendência em vez de "Atendido".
