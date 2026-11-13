@@ -1,17 +1,17 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { FileText, Plus, Search, Trash2, X } from 'lucide-react';
 import { Badge, Button, Input } from '@shared/design-system';
-import { Nota } from '../../types/nota';
+import { NotaMetadata } from '../../types/nota';
 import styles from './ListaPaginas.module.css';
 
 export interface ListaPaginasProps {
   secaoNome?: string;
   secaoCor?: string;
-  notas: Nota[];
+  notas: NotaMetadata[];
   notaAtivaId?: string;
   onSelecionarNota: (id: string) => void;
   onNovaPagina: () => void;
-  onExcluirNota: (nota: Nota) => void;
+  onExcluirNota: (nota: NotaMetadata) => void;
 }
 
 function formatarDataOneNote(dataIso?: string): string {
@@ -43,24 +43,6 @@ function formatarDataOneNote(dataIso?: string): string {
   return `${dia}/${mes}/${ano}, ${horaFormatada}`;
 }
 
-function extrairSnippetMarkdown(markdown?: string): string {
-  if (!markdown || !markdown.trim()) {
-    return '';
-  }
-
-  return markdown
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/`([^`]+)`/g, '$1')
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/^#{1,6}\s+/gm, '')
-    .replace(/^[\s*>-]+\s+/gm, '')
-    .replace(/[*_~]/g, '')
-    .replace(/\|/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 export const ListaPaginas: React.FC<ListaPaginasProps> = ({
   secaoNome = 'Seção',
   secaoCor,
@@ -84,11 +66,8 @@ export const ListaPaginas: React.FC<ListaPaginasProps> = ({
   const notasFiltradas = useMemo(() => {
     if (!termoBusca.trim()) return notas;
     const termo = termoBusca.toLowerCase().trim();
-    return notas.filter(
-      (n) =>
-        n.titulo.toLowerCase().includes(termo) ||
-        (n.conteudoMarkdown && n.conteudoMarkdown.toLowerCase().includes(termo))
-    );
+    // A listagem projeta apenas metadados: o filtro local considera somente o título.
+    return notas.filter((n) => n.titulo.toLowerCase().includes(termo));
   }, [notas, termoBusca]);
 
   const handleKeyDown = (e: React.KeyboardEvent, indexAtual: number) => {
@@ -227,7 +206,6 @@ export const ListaPaginas: React.FC<ListaPaginasProps> = ({
         >
           {notasFiltradas.map((nota, idx) => {
             const isAtiva = nota.id === notaAtivaId;
-            const snippet = extrairSnippetMarkdown(nota.conteudoMarkdown);
             const dataFormatada = formatarDataOneNote(nota.atualizadoEm || nota.criadoEm);
 
             return (
@@ -250,11 +228,6 @@ export const ListaPaginas: React.FC<ListaPaginasProps> = ({
                     </span>
                     {dataFormatada && (
                       <span className={styles.itemDate}>{dataFormatada}</span>
-                    )}
-                    {snippet ? (
-                      <span className={styles.itemSnippet}>{snippet}</span>
-                    ) : (
-                      <span className={styles.itemSnippetEmpty}>Página em branco</span>
                     )}
                   </button>
                   <button

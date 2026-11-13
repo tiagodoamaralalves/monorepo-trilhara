@@ -15,7 +15,7 @@ public record Nota(
     String titulo,
     String conteudoMarkdown,
     int ordem,
-    String origemTopicoId,
+    String topicoOrigemId,
     Instant deletedAt,
     Instant expiresAt,
     String loteExclusaoId,

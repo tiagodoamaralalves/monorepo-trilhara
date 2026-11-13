@@ -1,8 +1,19 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Search, FileText } from 'lucide-react';
-import { Modal, Input, EmptyState } from '@shared/design-system';
+import { Modal, Input, EmptyState, SectionErrorCard, Pagination } from '@shared/design-system';
+import { ApiError } from '@shared/auth';
 import { ResultadoBuscaNota } from '../../types/nota';
 import { NotaService } from '../../services/notaService';
+import { SnippetDestacado } from './SnippetDestacado';
+import styles from './BuscaModal.module.css';
+
+/** Debounce da busca (D-30). */
+export const DEBOUNCE_BUSCA_MS = 300;
+
+/** Mínimo de caracteres alfanuméricos para disparar a busca, validado no cliente. */
+const MINIMO_ALFANUMERICOS = 2;
+
+const TAMANHO_PAGINA = 20;
 
 export interface BuscaModalProps {
   isOpen: boolean;
@@ -10,63 +21,137 @@ export interface BuscaModalProps {
   onSelecionarNota: (cadernoId: string, secaoId: string, notaId: string) => void;
 }
 
-export const BuscaModal: React.FC<BuscaModalProps> = ({
-  isOpen,
-  onClose,
-  onSelecionarNota
-}) => {
+/** Conta só letras/dígitos: "a b" e "--" não atingem o mínimo e não geram request. */
+function contarAlfanumericos(texto: string): number {
+  return (texto.match(/[\p{L}\p{N}]/gu) ?? []).length;
+}
+
+/**
+ * Busca global de páginas (D-30).
+ *
+ * O backend devolve snippet em texto puro + offsets; a renderização é sempre por nós de texto
+ * React com `<mark>`. O mínimo de caracteres é validado **no cliente** (mensagem inline, sem
+ * request) e o `429` tem mensagem própria.
+ */
+export const BuscaModal: React.FC<BuscaModalProps> = ({ isOpen, onClose, onSelecionarNota }) => {
   const [termo, setTermo] = useState('');
   const [resultados, setResultados] = useState<ResultadoBuscaNota[]>([]);
-  const [total, setTotal] = useState(0);
+  const [pagina, setPagina] = useState(1);
+  const [totalItens, setTotalItens] = useState(0);
+  const [totalPaginas, setTotalPaginas] = useState(0);
   const [buscando, setBuscando] = useState(false);
-  const [mensagemErro, setMensagemErro] = useState<string | null>(null);
+  const [erro, setErro] = useState<unknown>(null);
+  const [mensagemInline, setMensagemInline] = useState<string | null>(null);
+  const [termoBuscado, setTermoBuscado] = useState('');
+
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const controllerRef = useRef<AbortController | null>(null);
+
+  const limparTimer = useCallback(() => {
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const resetar = useCallback(() => {
+    setTermo('');
+    setResultados([]);
+    setPagina(1);
+    setTotalItens(0);
+    setTotalPaginas(0);
+    setErro(null);
+    setMensagemInline(null);
+    setTermoBuscado('');
+    controllerRef.current?.abort();
+    limparTimer();
+  }, [limparTimer]);
 
   useEffect(() => {
     if (!isOpen) {
-      setTermo('');
-      setResultados([]);
-      setTotal(0);
-      setMensagemErro(null);
+      resetar();
     }
-  }, [isOpen]);
+  }, [isOpen, resetar]);
 
-  const executarBusca = async (texto: string) => {
+  useEffect(() => {
+    return () => {
+      controllerRef.current?.abort();
+      limparTimer();
+    };
+  }, [limparTimer]);
+
+  const executarBusca = useCallback(async (texto: string, paginaAlvo: number) => {
     const q = texto.trim();
-    if (q.length < 2) {
+    if (contarAlfanumericos(q) < MINIMO_ALFANUMERICOS) {
       setResultados([]);
-      setTotal(0);
-      setMensagemErro(null);
+      setTotalItens(0);
+      setTotalPaginas(0);
+      setErro(null);
       return;
     }
 
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+
     try {
       setBuscando(true);
-      setMensagemErro(null);
-      const res = await NotaService.buscarGlobal(q, 1, 20);
-      setResultados(res.itens || []);
-      setTotal(res.total || 0);
-    } catch (err: unknown) {
+      setErro(null);
+      setMensagemInline(null);
+      const resposta = await NotaService.buscarGlobal(q, paginaAlvo, TAMANHO_PAGINA, {
+        signal: controller.signal
+      });
+      if (controller.signal.aborted) return;
+      setResultados(resposta.itens ?? []);
+      setTotalItens(resposta.totalItens ?? 0);
+      setTotalPaginas(resposta.totalPaginas ?? 0);
+      setPagina(resposta.pagina ?? paginaAlvo);
+      setTermoBuscado(q);
+    } catch (falha) {
+      if (controller.signal.aborted) return;
       setResultados([]);
-      setTotal(0);
-      setMensagemErro(err instanceof Error ? err.message : 'Falha ao buscar páginas.');
+      setTotalItens(0);
+      setTotalPaginas(0);
+      setErro(falha);
     } finally {
-      setBuscando(false);
+      if (!controller.signal.aborted) {
+        setBuscando(false);
+      }
     }
-  };
+  }, []);
 
-  const handleTermoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setTermo(val);
+  const handleTermoChange = (evento: React.ChangeEvent<HTMLInputElement>) => {
+    const valor = evento.target.value;
+    setTermo(valor);
 
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
+    if (contarAlfanumericos(valor) < MINIMO_ALFANUMERICOS) {
+      limparTimer();
+      controllerRef.current?.abort();
+      setResultados([]);
+      setTotalItens(0);
+      setTotalPaginas(0);
+      setErro(null);
+      setMensagemInline(
+        valor.trim().length > 0 ? 'Digite ao menos 2 letras ou números para buscar.' : null
+      );
+      return;
     }
 
+    setMensagemInline(null);
+    limparTimer();
     timerRef.current = setTimeout(() => {
-      void executarBusca(val);
-    }, 350);
+      timerRef.current = null;
+      void executarBusca(valor, 1);
+    }, DEBOUNCE_BUSCA_MS);
   };
+
+  const mensagemErro =
+    erro instanceof ApiError && erro.status === 429
+      ? 'Muitas buscas seguidas. Aguarde alguns segundos.'
+      : null;
+
+  const erroRecuperavel = erro !== null && mensagemErro === null;
+  const mostraVazio = !buscando && !erro && totalItens === 0 && termoBuscado.length > 0;
 
   return (
     <Modal
@@ -77,103 +162,91 @@ export const BuscaModal: React.FC<BuscaModalProps> = ({
       icon={<Search size={20} />}
       maxWidth="lg"
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div className={styles.conteudo}>
         <Input
           type="search"
           placeholder="Digite ao menos 2 caracteres para pesquisar..."
           value={termo}
           onChange={handleTermoChange}
           leftIcon={<Search size={16} />}
+          aria-describedby={mensagemInline ? 'busca-aviso' : undefined}
         />
 
-        {buscando && (
-          <div style={{ textAlign: 'center', padding: '16px', color: 'var(--text-muted)' }}>
-            Pesquisando no banco de dados...
-          </div>
+        {mensagemInline && (
+          <p id="busca-aviso" className={styles.aviso} role="status">
+            {mensagemInline}
+          </p>
         )}
+
+        {buscando && <p className={styles.carregando}>Pesquisando…</p>}
 
         {mensagemErro && (
-          <div
-            style={{
-              padding: '10px 14px',
-              borderRadius: '6px',
-              background: 'rgba(239, 68, 68, 0.1)',
-              color: '#dc2626',
-              fontSize: '0.85rem'
-            }}
-          >
+          <p className={styles.avisoErro} role="alert">
             {mensagemErro}
-          </div>
+          </p>
         )}
 
-        {!buscando && termo.trim().length >= 2 && resultados.length === 0 && !mensagemErro && (
+        {erroRecuperavel && (
+          <SectionErrorCard
+            variant="inline"
+            titulo="Não foi possível carregar"
+            descricao="Verifique sua conexão e tente novamente."
+            onRetry={() => void executarBusca(termoBuscado || termo, pagina)}
+            recarregando={buscando}
+          />
+        )}
+
+        {mostraVazio && (
           <EmptyState
             icone={<Search size={36} />}
-            titulo="Nenhum resultado encontrado"
-            descricao={`Não foram encontradas páginas contendo os termos "${termo}".`}
+            titulo={`Nenhuma página encontrada para “${termoBuscado}”`}
+            descricao="A busca encontra palavras inteiras."
           />
         )}
 
         {resultados.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflowY: 'auto' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              {total} {total === 1 ? 'resultado encontrado' : 'resultados encontrados'}:
+          <div className={styles.resultados}>
+            <span className={styles.resumo}>
+              {totalItens} {totalItens === 1 ? 'resultado encontrado' : 'resultados encontrados'}
             </span>
 
             {resultados.map((item) => (
               <button
                 key={item.notaId}
                 type="button"
+                className={styles.item}
                 onClick={() => {
                   onSelecionarNota(item.cadernoId, item.secaoId, item.notaId);
                   onClose();
                 }}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                  padding: '10px 14px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-subtle)',
-                  background: 'var(--surface-1)',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'border-color 0.15s ease, background-color 0.15s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--primary)';
-                  e.currentTarget.style.backgroundColor = 'var(--surface-2)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                  e.currentTarget.style.backgroundColor = 'var(--surface-1)';
-                }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <FileText size={15} color="var(--primary)" />
-                  <strong style={{ fontSize: '0.9rem' }}>{item.titulo}</strong>
-                </div>
+                <span className={styles.itemTitulo}>
+                  <FileText size={15} aria-hidden="true" />
+                  <strong>{item.titulo}</strong>
+                </span>
 
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  <span>{item.cadernoTitulo}</span>
-                  <span> &gt; </span>
-                  <span>{item.secaoTitulo}</span>
-                </div>
+                <span className={styles.itemBreadcrumb}>
+                  {item.cadernoTitulo} &gt; {item.secaoTitulo}
+                </span>
 
                 {item.snippet && (
-                  <p
-                    style={{
-                      fontSize: '0.8rem',
-                      color: 'var(--text)',
-                      margin: '4px 0 0 0',
-                      lineHeight: '1.3'
-                    }}
-                  >
-                    {item.snippet}
-                  </p>
+                  <span className={styles.itemSnippet}>
+                    <SnippetDestacado snippet={item.snippet} destaques={item.destaques} />
+                  </span>
                 )}
               </button>
             ))}
+
+            {totalPaginas > 1 && (
+              <Pagination
+                ariaLabel="Paginação dos resultados de busca"
+                currentPage={pagina}
+                totalPages={totalPaginas}
+                onPageChange={(proxima) => void executarBusca(termoBuscado, proxima)}
+                disabled={buscando}
+                summary={`${totalItens} resultados`}
+              />
+            )}
           </div>
         )}
       </div>

@@ -1,18 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { BookMarked, ChevronLeft, FileText, Folder, Plus } from 'lucide-react';
-import {
-  Button,
-  EmptyState,
-  useConfirm,
-  useToast
-} from '@shared/design-system';
-import {
-  useAuth,
-  AuthView,
-  request
-} from '@shared/auth';
+import { BookMarked, ChevronLeft, FileText, Folder, Plus, Trash2 } from 'lucide-react';
+import { Button, EmptyState, useConfirm, useToast } from '@shared/design-system';
+import { useAuth, AuthView, request } from '@shared/auth';
 
-import { Caderno, Secao, Nota, NotaMetadata } from './types/nota';
+import { Caderno, Nota, NotaMetadata, Secao } from './types/nota';
 import { NotaService } from './services/notaService';
 import { LandingView } from './views/LandingView';
 import { Navbar } from './components/Navbar/Navbar';
@@ -21,20 +12,31 @@ import { TiptapEditor } from './components/Editor/TiptapEditor';
 import { CadernoModal } from './components/CadernoModal/CadernoModal';
 import { SecaoModal } from './components/SecaoModal/SecaoModal';
 import { NotaModal } from './components/NotaModal/NotaModal';
-import { ImportarTrilhaModal, TrilhaItem } from './components/ImportarTrilhaModal/ImportarTrilhaModal';
+import {
+  CHAVE_OCULTAR_MODAL_IMPORTACAO,
+  ImportarTrilhaModal,
+  TrilhaItem
+} from './components/ImportarTrilhaModal/ImportarTrilhaModal';
 import { LixeiraModal } from './components/LixeiraModal/LixeiraModal';
 import { BuscaModal } from './components/BuscaModal/BuscaModal';
 import styles from './App.module.css';
 
 type AuthScreen = 'none' | 'login' | 'cadastro' | 'recuperar';
 
+const TAMANHO_PAGINA_NOTAS = 50;
+
 function obterTelaAuthInicial(): AuthScreen {
   if (typeof window === 'undefined') return 'none';
-  const p = new URLSearchParams(window.location.search).get('pagina');
-  if (p === 'login' || p === 'cadastro' || p === 'recuperar') return p;
-  const a = new URLSearchParams(window.location.search).get('auth');
-  if (a === 'login' || a === 'cadastro' || a === 'recuperar') return a;
+  const params = new URLSearchParams(window.location.search);
+  const direto = params.get('pagina') ?? params.get('auth');
+  if (direto === 'login' || direto === 'cadastro' || direto === 'recuperar') return direto;
   return 'none';
+}
+
+/** Parâmetro do link "Abrir no Notas" de Estudos (R3/R9). */
+function obterOrigemTrilhaInicial(): string | null {
+  if (typeof window === 'undefined') return null;
+  return new URLSearchParams(window.location.search).get('origemTrilhaId');
 }
 
 function NotasApp() {
@@ -43,32 +45,26 @@ function NotasApp() {
   const { usuario, isAuthenticated, carregando, logout, abrirContaModal } = useAuth();
   const [telaAuth, setTelaAuth] = useState<AuthScreen>(obterTelaAuthInicial);
 
-  // Estados de dados da arquitetura de 3 níveis: Caderno -> Seção -> Nota/Página
   const [cadernos, setCadernos] = useState<Caderno[]>([]);
-  const [cadernoAtivoId, setCadernoAtivoId] = useState<string>('');
+  const [cadernoAtivoId, setCadernoAtivoId] = useState('');
   const [secoes, setSecoes] = useState<Secao[]>([]);
-  const [secaoAtivaId, setSecaoAtivaId] = useState<string>('');
+  const [secaoAtivaId, setSecaoAtivaId] = useState('');
   const [notasMetadados, setNotasMetadados] = useState<NotaMetadata[]>([]);
-  const [notaAtivaId, setNotaAtivaId] = useState<string>('');
+  const [notaAtivaId, setNotaAtivaId] = useState('');
   const [notaAtivaDetalhe, setNotaAtivaDetalhe] = useState<Nota | null>(null);
 
-  // Modais de Criação / Edição
   const [modalCadernoAberto, setModalCadernoAberto] = useState(false);
   const [cadernoParaEditar, setCadernoParaEditar] = useState<Caderno | null>(null);
-
   const [modalSecaoAberto, setModalSecaoAberto] = useState(false);
   const [secaoParaEditar, setSecaoParaEditar] = useState<Secao | null>(null);
-
   const [modalNotaAberto, setModalNotaAberto] = useState(false);
   const [notaParaEditar, setNotaParaEditar] = useState<NotaMetadata | null>(null);
 
-  // Modais Fase 8: Importar Trilha, Lixeira, Busca Global
   const [modalImportarTrilhaAberto, setModalImportarTrilhaAberto] = useState(false);
   const [trilhasDisponiveis, setTrilhasDisponiveis] = useState<TrilhaItem[]>([]);
   const [modalLixeiraAberto, setModalLixeiraAberto] = useState(false);
   const [modalBuscaAberto, setModalBuscaAberto] = useState(false);
 
-  // Estado de recolhimento da sidebar
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     try {
       return window.localStorage.getItem('trilhara_sidebar_collapsed') === 'true';
@@ -77,10 +73,11 @@ function NotasApp() {
     }
   });
 
-  // Controle de alternância em telas móveis (< 960px): Lista de Páginas vs Editor Full Canvas
   const [mobileVisao, setMobileVisao] = useState<'lista' | 'editor'>('lista');
 
   const reqNotaIdRef = useRef<string | null>(null);
+  const sugestaoImportacaoAvaliadaRef = useRef(false);
+  const origemTrilhaInicialRef = useRef<string | null>(obterOrigemTrilhaInicial());
 
   const alternarTelaAuth = (modo: AuthScreen) => {
     setTelaAuth(modo);
@@ -94,165 +91,177 @@ function NotasApp() {
     window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
   };
 
-  // 1. Carrega lista de cadernos ao autenticar
-  const carregarCadernos = useCallback(async () => {
-    try {
-      const lista = await NotaService.listarCadernos();
-      setCadernos(lista);
-      if (lista.length > 0) {
-        setCadernoAtivoId((prev) => {
-          const existe = lista.some((c) => c.id === prev);
-          return existe ? prev : lista[0].id;
-        });
-      } else {
-        setCadernoAtivoId('');
+  const carregarCadernos = useCallback(
+    async (origemTrilhaId?: string) => {
+      try {
+        const lista = await NotaService.listarCadernos(origemTrilhaId);
+        setCadernos(lista);
+        if (lista.length > 0) {
+          setCadernoAtivoId((prev) => (lista.some((c) => c.id === prev) ? prev : lista[0].id));
+        } else {
+          setCadernoAtivoId('');
+          setSecoes([]);
+          setSecaoAtivaId('');
+          setNotasMetadados([]);
+          setNotaAtivaId('');
+          setNotaAtivaDetalhe(null);
+        }
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : 'Falha ao buscar cadernos');
+      }
+    },
+    [toast]
+  );
+
+  const carregarSecoes = useCallback(
+    async (cadernoId: string) => {
+      if (!cadernoId) {
         setSecoes([]);
         setSecaoAtivaId('');
         setNotasMetadados([]);
         setNotaAtivaId('');
         setNotaAtivaDetalhe(null);
+        return;
       }
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Falha ao buscar cadernos');
-    }
-  }, [toast]);
+      try {
+        const lista = await NotaService.listarSecoes(cadernoId);
+        setSecoes(lista);
+        if (lista.length > 0) {
+          setSecaoAtivaId((prev) => (lista.some((s) => s.id === prev) ? prev : lista[0].id));
+        } else {
+          setSecaoAtivaId('');
+          setNotasMetadados([]);
+          setNotaAtivaId('');
+          setNotaAtivaDetalhe(null);
+        }
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : 'Falha ao buscar seções do caderno');
+      }
+    },
+    [toast]
+  );
 
-  // 2. Carrega seções quando o caderno ativo muda
-  const carregarSecoes = useCallback(async (cadId: string) => {
-    if (!cadId) {
-      setSecoes([]);
-      setSecaoAtivaId('');
-      setNotasMetadados([]);
-      setNotaAtivaId('');
-      setNotaAtivaDetalhe(null);
-      return;
-    }
-    try {
-      const listaSecoes = await NotaService.listarSecoes(cadId);
-      setSecoes(listaSecoes);
-      if (listaSecoes.length > 0) {
-        setSecaoAtivaId((prev) => {
-          const existe = listaSecoes.some((s) => s.id === prev);
-          return existe ? prev : listaSecoes[0].id;
-        });
-      } else {
-        setSecaoAtivaId('');
+  const carregarNotasMetadados = useCallback(
+    async (cadernoId: string, secaoId: string) => {
+      if (!cadernoId || !secaoId) {
         setNotasMetadados([]);
         setNotaAtivaId('');
         setNotaAtivaDetalhe(null);
+        return;
       }
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Falha ao buscar seções do caderno');
-    }
-  }, [toast]);
+      try {
+        const pagina = await NotaService.listarNotasPorSecao(
+          cadernoId,
+          secaoId,
+          1,
+          TAMANHO_PAGINA_NOTAS
+        );
+        setNotasMetadados(pagina.itens);
+        if (pagina.itens.length > 0) {
+          setNotaAtivaId((prev) =>
+            pagina.itens.some((n) => n.id === prev) ? prev : pagina.itens[0].id
+          );
+        } else {
+          setNotaAtivaId('');
+          setNotaAtivaDetalhe(null);
+        }
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : 'Falha ao buscar páginas da seção');
+      }
+    },
+    [toast]
+  );
 
-  // 3. Carrega lista de metadados das notas quando a seção ativa muda (projeção leve sem markdown)
-  const carregarNotasMetadados = useCallback(async (cadId: string, secId: string) => {
-    if (!cadId || !secId) {
-      setNotasMetadados([]);
-      setNotaAtivaId('');
-      setNotaAtivaDetalhe(null);
-      return;
-    }
-    try {
-      const lista = await NotaService.listarNotasPorSecao(cadId, secId);
-      setNotasMetadados(lista);
-      if (lista.length > 0) {
-        setNotaAtivaId((prev) => {
-          const existe = lista.some((n) => n.id === prev);
-          return existe ? prev : lista[0].id;
-        });
-      } else {
-        setNotaAtivaId('');
+  const carregarNotaDetalhe = useCallback(
+    async (idNota: string) => {
+      if (!idNota) {
         setNotaAtivaDetalhe(null);
+        return;
       }
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Falha ao buscar páginas da seção');
-    }
-  }, [toast]);
+      reqNotaIdRef.current = idNota;
+      try {
+        const detalhe = await NotaService.buscarNota(idNota);
+        if (reqNotaIdRef.current === idNota) {
+          setNotaAtivaDetalhe(detalhe);
+        }
+      } catch (err: unknown) {
+        if (reqNotaIdRef.current === idNota) {
+          toast.error(err instanceof Error ? err.message : 'Falha ao carregar conteúdo da página');
+        }
+      }
+    },
+    [toast]
+  );
 
-  // 4. Carrega o markdown completo sob demanda apenas para a nota ativa
-  const carregarNotaDetalhe = useCallback(async (idNota: string) => {
-    if (!idNota) {
-      setNotaAtivaDetalhe(null);
-      return;
-    }
-    reqNotaIdRef.current = idNota;
-    try {
-      const detalhe = await NotaService.buscarNota(idNota);
-      if (reqNotaIdRef.current === idNota) {
-        setNotaAtivaDetalhe(detalhe);
-      }
-    } catch (err: unknown) {
-      if (reqNotaIdRef.current === idNota) {
-        toast.error(err instanceof Error ? err.message : 'Falha ao carregar conteúdo da página');
-      }
-    }
-  }, [toast]);
-
+  // 1. Carga inicial: respeita o filtro `origemTrilhaId` do link "Abrir no Notas" (R3/R9).
   useEffect(() => {
-    if (isAuthenticated) {
-      carregarCadernos();
-    }
+    if (!isAuthenticated) return;
+    void carregarCadernos(origemTrilhaInicialRef.current ?? undefined);
   }, [isAuthenticated, carregarCadernos]);
 
   useEffect(() => {
     if (isAuthenticated && cadernoAtivoId) {
-      carregarSecoes(cadernoAtivoId);
+      void carregarSecoes(cadernoAtivoId);
     }
   }, [isAuthenticated, cadernoAtivoId, carregarSecoes]);
 
   useEffect(() => {
     if (isAuthenticated && cadernoAtivoId && secaoAtivaId) {
-      carregarNotasMetadados(cadernoAtivoId, secaoAtivaId);
+      void carregarNotasMetadados(cadernoAtivoId, secaoAtivaId);
     }
   }, [isAuthenticated, cadernoAtivoId, secaoAtivaId, carregarNotasMetadados]);
 
   useEffect(() => {
     if (isAuthenticated && notaAtivaId) {
-      carregarNotaDetalhe(notaAtivaId);
+      void carregarNotaDetalhe(notaAtivaId);
     } else {
       setNotaAtivaDetalhe(null);
     }
   }, [isAuthenticated, notaAtivaId, carregarNotaDetalhe]);
 
-  // 5. Consulta em segundo plano /api/trilhas para sugestão automática de importação
+  // 2. Consulta em segundo plano de /api/trilhas: a sugestão automática é apenas um convite.
+  //    É avaliada UMA vez por sessão de tela (nunca reabre a cada recarga de cadernos) e a falha
+  //    da consulta não abre o modal nem exibe erro intrusivo.
   useEffect(() => {
     if (!isAuthenticated || !usuario?.id) return;
+    if (sugestaoImportacaoAvaliadaRef.current) return;
 
-    const ocultarModal = window.localStorage.getItem(`trilhara:u:${usuario.id}:notas_hide_auto_import_modal`) === 'true';
+    const ocultarModal =
+      window.localStorage.getItem(CHAVE_OCULTAR_MODAL_IMPORTACAO(usuario.id)) === 'true';
 
     request<TrilhaItem[]>('/trilhas')
       .then((trilhas) => {
+        sugestaoImportacaoAvaliadaRef.current = true;
         if (!trilhas) return;
         setTrilhasDisponiveis(trilhas);
+        if (ocultarModal || trilhas.length === 0) return;
 
-        if (!ocultarModal && trilhas.length > 0) {
-          const existeTrilhaNaoImportada = trilhas.some(
-            (t) => !cadernos.some((c) => c.origemTrilhaId === t.id && !c.deletedAt)
-          );
-          if (existeTrilhaNaoImportada) {
-            setModalImportarTrilhaAberto(true);
-          }
+        const existeNaoImportada = trilhas.some(
+          (trilha) => !cadernos.some((c) => c.origemTrilhaId === trilha.id)
+        );
+        if (existeNaoImportada) {
+          setModalImportarTrilhaAberto(true);
         }
       })
       .catch(() => {
-        // Ignora silenciosamente se o endpoint de trilhas falhar
+        // Sugestão best-effort: a ação "Importar trilha" da sidebar continua disponível.
+        sugestaoImportacaoAvaliadaRef.current = true;
       });
-  }, [isAuthenticated, usuario?.id, cadernos]);
+    // Avaliada apenas quando a identidade do usuário muda: deps intencionais.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, usuario?.id]);
 
-  // Referências do Caderno, Seção e Nota ativas
   const cadernoAtivo = useMemo(
-    () => cadernos.find((c) => c.id === cadernoAtivoId) || null,
+    () => cadernos.find((c) => c.id === cadernoAtivoId) ?? null,
     [cadernos, cadernoAtivoId]
   );
 
   const secaoAtiva = useMemo(
-    () => secoes.find((s) => s.id === secaoAtivaId) || null,
+    () => secoes.find((s) => s.id === secaoAtivaId) ?? null,
     [secoes, secaoAtivaId]
   );
 
-  // ── AÇÕES DE CADERNO (Nível 1) ──
+  // ── AÇÕES DE CADERNO ──
 
   const handleSalvarCaderno = async (dados: { titulo: string; cor?: string; icone?: string }) => {
     try {
@@ -262,7 +271,7 @@ function NotasApp() {
         toast.success(`O caderno "${atualizado.titulo}" foi atualizado.`);
       } else {
         const novo = await NotaService.criarCaderno(dados);
-        setCadernos((prev) => [novo, ...prev]);
+        await carregarCadernos();
         setCadernoAtivoId(novo.id);
         toast.success(`O caderno "${novo.titulo}" foi criado com sucesso.`);
       }
@@ -272,33 +281,55 @@ function NotasApp() {
     }
   };
 
+  const restaurarCaderno = useCallback(
+    async (cadernoId: string, titulo: string) => {
+      try {
+        await NotaService.restaurarItemLixeira('CADERNO', cadernoId);
+        toast.success(`O caderno "${titulo}" foi restaurado.`);
+        await carregarCadernos();
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : 'Não foi possível desfazer a exclusão.');
+      }
+    },
+    [carregarCadernos, toast]
+  );
+
+  /**
+   * Exclusão de caderno com contagem real de impacto (D-33).
+   *
+   * O número vem de `GET /api/cadernos/{id}/impacto-exclusao` e conta só itens ativos. Sem essa
+   * resposta não há confirmação destrutiva: o erro aparece no toast.
+   */
   const handleExcluirCaderno = async () => {
     if (!cadernoAtivo) return;
 
-    const totalSec = cadernoAtivo.totalSecoes ?? secoes.length;
-    const totalNot = cadernoAtivo.totalNotas ?? 0;
-
-    const confirmado = await confirm({
-      title: 'Mover Caderno para Lixeira',
-      description: `Tem certeza de que deseja mover o caderno "${cadernoAtivo.titulo}" para a lixeira? Serão afetadas ${totalSec} seção(ões) e ${totalNot} página(s). Os itens permanecerão na lixeira por até 30 dias.`,
-      confirmText: 'Mover para Lixeira',
-      variant: 'danger'
-    });
-
-    if (!confirmado) return;
-
     try {
+      const impacto = await NotaService.obterImpactoExclusaoCaderno(cadernoAtivo.id);
+      const confirmado = await confirm({
+        title: 'Mover caderno para a lixeira',
+        description:
+          `O caderno "${impacto.titulo}" será movido para a lixeira com ` +
+          `${impacto.secoes} seção(ões) e ${impacto.paginas} página(s). ` +
+          'Os itens permanecem recuperáveis por 30 dias.',
+        confirmText: 'Mover para a lixeira',
+        variant: 'danger'
+      });
+      if (!confirmado) return;
+
       await NotaService.excluirCaderno(cadernoAtivo.id);
-      toast.success(`O caderno "${cadernoAtivo.titulo}" foi movido para a lixeira.`);
+      toast.success(`O caderno "${cadernoAtivo.titulo}" foi movido para a lixeira.`, {
+        acao: {
+          rotulo: 'Desfazer',
+          aoAcionar: () => void restaurarCaderno(cadernoAtivo.id, cadernoAtivo.titulo)
+        }
+      });
       await carregarCadernos();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Não foi possível excluir o caderno.');
     }
   };
 
-  // ── AÇÕES DE SEÇÃO (Nível 2) ──
-
-  const handleSalvarSecao = async (dados: { titulo: string; cor?: string }) => {
+  const handleSalvarSecao = async (dados: { titulo: string }) => {
     if (!cadernoAtivoId) return;
 
     try {
@@ -318,30 +349,48 @@ function NotasApp() {
     }
   };
 
+  const restaurarSecao = useCallback(
+    async (cadernoId: string, secaoId: string, titulo: string) => {
+      try {
+        await NotaService.restaurarItemLixeira('SECAO', secaoId);
+        toast.success(`A seção "${titulo}" foi restaurada.`);
+        await carregarSecoes(cadernoId);
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : 'Não foi possível desfazer a exclusão.');
+      }
+    },
+    [carregarSecoes, toast]
+  );
+
   const handleExcluirSecao = async (secao: Secao) => {
     if (!cadernoAtivoId) return;
 
-    const totalNot = secao.totalNotas ?? 0;
-
-    const confirmado = await confirm({
-      title: 'Mover Seção para Lixeira',
-      description: `Deseja realmente mover a seção "${secao.titulo}" para a lixeira? ${totalNot > 0 ? `Todas as ${totalNot} páginas desta seção também serão movidas.` : ''} Os itens permanecerão na lixeira por até 30 dias.`,
-      confirmText: 'Mover para Lixeira',
-      variant: 'danger'
-    });
-
-    if (!confirmado) return;
-
     try {
+      const impacto = await NotaService.obterImpactoExclusaoSecao(secao.id);
+      const confirmado = await confirm({
+        title: 'Mover seção para a lixeira',
+        description:
+          `A seção "${impacto.titulo}" será movida para a lixeira com ` +
+          `${impacto.paginas} página(s). Os itens permanecem recuperáveis por 30 dias.`,
+        confirmText: 'Mover para a lixeira',
+        variant: 'danger'
+      });
+      if (!confirmado) return;
+
       await NotaService.excluirSecao(cadernoAtivoId, secao.id);
-      toast.success(`A seção "${secao.titulo}" foi movida para a lixeira.`);
+      toast.success(`A seção "${secao.titulo}" foi movida para a lixeira.`, {
+        acao: {
+          rotulo: 'Desfazer',
+          aoAcionar: () => void restaurarSecao(cadernoAtivoId, secao.id, secao.titulo)
+        }
+      });
       await carregarSecoes(cadernoAtivoId);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Não foi possível excluir a seção.');
     }
   };
 
-  // ── AÇÕES DE NOTA / PÁGINA (Nível 3) ──
+  // ── AÇÕES DE PÁGINA ──
 
   const handleSalvarNota = async (titulo: string) => {
     if (!cadernoAtivoId || !secaoAtivaId) return;
@@ -349,9 +398,19 @@ function NotasApp() {
     try {
       if (notaParaEditar) {
         const atualizada = await NotaService.atualizarNota(notaParaEditar.id, { titulo });
-        setNotasMetadados((prev) => prev.map((n) => (n.id === atualizada.id ? atualizada : n)));
-        if (notaAtivaDetalhe && notaAtivaDetalhe.id === atualizada.id) {
-          setNotaAtivaDetalhe(atualizada);
+        setNotasMetadados((prev) =>
+          prev.map((n) =>
+            n.id === atualizada.id
+              ? { ...n, titulo: atualizada.titulo, atualizadoEm: atualizada.atualizadoEm }
+              : n
+          )
+        );
+        if (notaAtivaDetalhe?.id === atualizada.id) {
+          setNotaAtivaDetalhe((prev) =>
+            prev
+              ? { ...prev, titulo: atualizada.titulo, atualizadoEm: atualizada.atualizadoEm }
+              : prev
+          );
         }
         toast.success(`A página foi renomeada para "${atualizada.titulo}".`);
       } else {
@@ -372,21 +431,41 @@ function NotasApp() {
     }
   };
 
-  const handleSalvarConteudoNota = async (idNota: string, novoTitulo: string, novoMarkdown: string) => {
-    if (!idNota) return;
-
-    const atualizada = await NotaService.atualizarNota(idNota, {
-      titulo: novoTitulo,
-      conteudoMarkdown: novoMarkdown
-    });
+  /**
+   * Persistência chamada pelo autosave do editor.
+   *
+   * O `AbortSignal` do hook é repassado ao `PUT`; o retorno carrega o `atualizadoEm` novo, que
+   * vira a nova base do rascunho (D-31b).
+   */
+  const handleSalvarConteudoNota = async (
+    idNota: string,
+    novoTitulo: string,
+    novoMarkdown: string,
+    signal?: AbortSignal
+  ): Promise<{ atualizadoEm: string }> => {
+    const atualizada = await NotaService.atualizarNota(
+      idNota,
+      { titulo: novoTitulo, conteudoMarkdown: novoMarkdown },
+      { signal }
+    );
 
     setNotasMetadados((prev) =>
-      prev.map((n) => (n.id === idNota ? { ...n, titulo: atualizada.titulo, atualizadoEm: atualizada.atualizadoEm } : n))
+      prev.map((n) =>
+        n.id === idNota
+          ? { ...n, titulo: atualizada.titulo, atualizadoEm: atualizada.atualizadoEm }
+          : n
+      )
     );
 
     if (reqNotaIdRef.current === idNota) {
-      setNotaAtivaDetalhe(atualizada);
+      setNotaAtivaDetalhe((prev) =>
+        prev && prev.id === idNota
+          ? { ...prev, titulo: atualizada.titulo, atualizadoEm: atualizada.atualizadoEm }
+          : prev
+      );
     }
+
+    return { atualizadoEm: atualizada.atualizadoEm };
   };
 
   const handleUpdateTituloNota = (novoTitulo: string) => {
@@ -397,22 +476,31 @@ function NotasApp() {
     setNotaAtivaDetalhe((prev) => (prev ? { ...prev, titulo: novoTitulo } : null));
   };
 
+  const restaurarNota = useCallback(
+    async (notaId: string, titulo: string) => {
+      try {
+        await NotaService.restaurarItemLixeira('NOTA', notaId);
+        toast.success(`A página "${titulo}" foi restaurada.`);
+        if (cadernoAtivoId && secaoAtivaId) {
+          await carregarNotasMetadados(cadernoAtivoId, secaoAtivaId);
+        }
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : 'Não foi possível desfazer a exclusão.');
+      }
+    },
+    [cadernoAtivoId, carregarNotasMetadados, secaoAtivaId, toast]
+  );
+
+  /** Exclusão de página com toast "Desfazer" (Anexo B). */
   const handleExcluirNota = async (notaAlvo?: NotaMetadata) => {
-    const alvo = notaAlvo || notaAtivaDetalhe;
+    const alvo = notaAlvo ?? notaAtivaDetalhe;
     if (!alvo) return;
-
-    const confirmado = await confirm({
-      title: 'Mover Página para Lixeira',
-      description: `Deseja realmente mover a página "${alvo.titulo}" para a lixeira? Ela permanecerá disponível por até 30 dias.`,
-      confirmText: 'Mover para Lixeira',
-      variant: 'danger'
-    });
-
-    if (!confirmado) return;
 
     try {
       await NotaService.excluirNota(alvo.id);
-      toast.success('A página foi movida para a lixeira.');
+      toast.success('Página movida para a lixeira', {
+        acao: { rotulo: 'Desfazer', aoAcionar: () => void restaurarNota(alvo.id, alvo.titulo) }
+      });
       if (cadernoAtivoId && secaoAtivaId) {
         await carregarNotasMetadados(cadernoAtivoId, secaoAtivaId);
       }
@@ -421,12 +509,12 @@ function NotasApp() {
     }
   };
 
-  // ── IMPORTAÇÃO E SINCRONIZAÇÃO DE TRILHA ──
+  // ── IMPORTAÇÃO E SINCRONIZAÇÃO DE TRILHA (D-29) ──
 
-  const handleImportarTrilha = async (trilhaId: string) => {
+  const handleImportarTrilha = async (trilhaId: string, reimportar: boolean) => {
     try {
-      const caderno = await NotaService.importarTrilha(trilhaId);
-      toast.success(`Caderno "${caderno.titulo}" importado com sucesso a partir da trilha.`);
+      const caderno = await NotaService.importarTrilha(trilhaId, reimportar);
+      toast.success(`Caderno "${caderno.titulo}" importado a partir da trilha.`);
       await carregarCadernos();
       setCadernoAtivoId(caderno.id);
     } catch (err: unknown) {
@@ -439,9 +527,11 @@ function NotasApp() {
     if (!cadernoAtivo) return;
 
     try {
-      const res = await NotaService.sincronizarTrilha(cadernoAtivo.id);
+      const resultado = await NotaService.sincronizarTrilha(cadernoAtivo.id);
       toast.success(
-        `Trilha sincronizada com sucesso. Criadas: ${res.secoesCriadas} seção(ões), ${res.paginasCriadas} página(s).`
+        `Trilha sincronizada. Seções criadas: ${resultado.secoesCriadas}, ` +
+          `renomeadas: ${resultado.secoesRenomeadas}, desvinculadas: ${resultado.secoesDesvinculadas}, ` +
+          `páginas criadas: ${resultado.paginasCriadas}.`
       );
       await carregarCadernos();
       await carregarSecoes(cadernoAtivo.id);
@@ -450,21 +540,21 @@ function NotasApp() {
     }
   };
 
-  // ── NAVEGAÇÃO DE RESULTADO DE BUSCA ──
+  // ── NAVEGAÇÃO A PARTIR DA BUSCA ──
 
-  const handleSelecionarNotaDaBusca = (cadId: string, secId: string, notId: string) => {
-    setCadernoAtivoId(cadId);
-    setSecaoAtivaId(secId);
-    setNotaAtivaId(notId);
+  const handleSelecionarNotaDaBusca = (cadernoId: string, secaoId: string, notaId: string) => {
+    setCadernoAtivoId(cadernoId);
+    setSecaoAtivaId(secaoId);
+    setNotaAtivaId(notaId);
     setMobileVisao('editor');
   };
 
-  // ── RENDERIZAÇÃO DA INTERFACE ──
+  // ── RENDERIZAÇÃO ──
 
   if (carregando) {
     return (
       <div className={styles.loading}>
-        <span>Carregando seus cadernos...</span>
+        <span>Carregando…</span>
       </div>
     );
   }
@@ -489,7 +579,6 @@ function NotasApp() {
 
   return (
     <div className={styles.shell}>
-      {/* ── 1. SIDEBAR DE NAVEGAÇÃO COMPARTILHADA COM 3 NÍVEIS ── */}
       <Navbar
         cadernos={cadernos}
         cadernoAtivoId={cadernoAtivoId}
@@ -538,7 +627,6 @@ function NotasApp() {
         onCollapsedChange={setSidebarCollapsed}
       />
 
-      {/* ── 2. ÁREA DE TRABALHO: LAYOUT ONENOTE (COLUNA 2: PÁGINAS + COLUNA 3: EDITOR) ── */}
       <main className={`${styles.workspace} ${sidebarCollapsed ? styles.workspaceCollapsed : ''}`}>
         {cadernos.length === 0 ? (
           <div className={styles.emptyStateWrapper}>
@@ -555,7 +643,7 @@ function NotasApp() {
                     setModalCadernoAberto(true);
                   }}
                 >
-                  Criar Primeiro Caderno
+                  Criar primeiro caderno
                 </Button>
               }
             />
@@ -564,30 +652,40 @@ function NotasApp() {
           <div className={styles.emptyStateWrapper}>
             <EmptyState
               icone={<Folder size={44} />}
-              titulo="Nenhuma seção neste caderno"
-              descricao="Adicione uma seção divisória para começar a organizar as páginas deste caderno."
+              titulo="Este caderno não tem seções"
+              descricao="Crie uma seção para organizar as páginas ou restaure uma seção que esteja na lixeira."
               acaoPrimaria={
-                <Button
-                  variant="primary"
-                  leftIcon={<Plus size={16} />}
-                  onClick={() => {
-                    setSecaoParaEditar(null);
-                    setModalSecaoAberto(true);
-                  }}
-                >
-                  Criar Primeira Seção
-                </Button>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <Button
+                    variant="primary"
+                    leftIcon={<Plus size={16} />}
+                    onClick={() => {
+                      setSecaoParaEditar(null);
+                      setModalSecaoAberto(true);
+                    }}
+                  >
+                    Nova seção
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    leftIcon={<Trash2 size={16} />}
+                    onClick={() => setModalLixeiraAberto(true)}
+                  >
+                    Abrir lixeira
+                  </Button>
+                </div>
               }
             />
           </div>
         ) : (
           <>
-            {/* ── COLUNA 2: PAINEL DE PÁGINAS ONENOTE ── */}
-            <div className={`${styles.pagesColumn} ${mobileVisao === 'editor' ? styles.hideOnMobile : ''}`}>
+            <div
+              className={`${styles.pagesColumn} ${mobileVisao === 'editor' ? styles.hideOnMobile : ''}`}
+            >
               <ListaPaginas
-                secaoNome={secaoAtiva?.titulo || 'Seção'}
-                secaoCor={secaoAtiva?.cor || cadernoAtivo?.cor}
-                notas={notasMetadados as Nota[]}
+                secaoNome={secaoAtiva?.titulo ?? 'Seção'}
+                secaoCor={cadernoAtivo?.cor}
+                notas={notasMetadados}
                 notaAtivaId={notaAtivaId}
                 onSelecionarNota={(id) => {
                   setNotaAtivaId(id);
@@ -597,13 +695,13 @@ function NotasApp() {
                   setNotaParaEditar(null);
                   setModalNotaAberto(true);
                 }}
-                onExcluirNota={(nota) => handleExcluirNota(nota)}
+                onExcluirNota={(nota) => void handleExcluirNota(nota)}
               />
             </div>
 
-            {/* ── COLUNA 3: EDITOR TIPTAP FULL CANVAS COM CARREGAMENTO SOB DEMANDA ── */}
-            <div className={`${styles.editorContainer} ${mobileVisao === 'lista' ? styles.hideOnMobile : ''}`}>
-              {/* Botão de retorno visível apenas em telas menores / mobile */}
+            <div
+              className={`${styles.editorContainer} ${mobileVisao === 'lista' ? styles.hideOnMobile : ''}`}
+            >
               <div className={styles.mobileNavHeader}>
                 <Button
                   variant="ghost"
@@ -611,31 +709,35 @@ function NotasApp() {
                   leftIcon={<ChevronLeft size={16} />}
                   onClick={() => setMobileVisao('lista')}
                 >
-                  Voltar às Páginas ({secaoAtiva?.titulo || 'Seção'})
+                  Voltar às páginas ({secaoAtiva?.titulo ?? 'Seção'})
                 </Button>
               </div>
 
               {notaAtivaDetalhe ? (
                 <TiptapEditor
                   key={notaAtivaDetalhe.id}
-                  usuarioId={usuario?.id || ''}
+                  usuarioId={usuario?.id ?? ''}
                   notaId={notaAtivaDetalhe.id}
                   titulo={notaAtivaDetalhe.titulo}
                   conteudoMarkdown={notaAtivaDetalhe.conteudoMarkdown}
                   atualizadoEmServidor={notaAtivaDetalhe.atualizadoEm}
                   onSalvar={handleSalvarConteudoNota}
                   onUpdateTitulo={handleUpdateTituloNota}
-                  onExcluirNota={() => handleExcluirNota(notaAtivaDetalhe)}
+                  onExcluirNota={() => void handleExcluirNota(notaAtivaDetalhe)}
                 />
               ) : (
                 <div className={styles.emptyStateWrapper}>
                   <EmptyState
                     icone={<FileText size={38} />}
-                    titulo={notasMetadados.length === 0 ? "Nenhuma página na seção" : "Nenhuma página selecionada"}
+                    titulo={
+                      notasMetadados.length === 0
+                        ? 'Nenhuma página na seção'
+                        : 'Nenhuma página selecionada'
+                    }
                     descricao={
                       notasMetadados.length === 0
-                        ? "Crie uma nova página para iniciar o conteúdo desta seção."
-                        : "Selecione uma página na coluna ao lado para começar a redigir."
+                        ? 'Crie uma nova página para iniciar o conteúdo desta seção.'
+                        : 'Selecione uma página na coluna ao lado para começar a redigir.'
                     }
                     acaoPrimaria={
                       <Button
@@ -646,7 +748,7 @@ function NotasApp() {
                           setModalNotaAberto(true);
                         }}
                       >
-                        Nova Página
+                        Nova página
                       </Button>
                     }
                   />
@@ -657,7 +759,6 @@ function NotasApp() {
         )}
       </main>
 
-      {/* ── 3. MODAIS DE CADERNO, SEÇÃO E NOTA ── */}
       <CadernoModal
         isOpen={modalCadernoAberto}
         onClose={() => setModalCadernoAberto(false)}
@@ -671,23 +772,21 @@ function NotasApp() {
         onClose={() => setModalSecaoAberto(false)}
         onSalvar={handleSalvarSecao}
         secaoParaEditar={secaoParaEditar}
-        corSugerida={cadernoAtivo?.cor}
       />
 
       <NotaModal
         isOpen={modalNotaAberto}
         onClose={() => setModalNotaAberto(false)}
         onSalvar={handleSalvarNota}
-        notaParaEditar={notaParaEditar as Nota | null}
+        notaParaEditar={notaParaEditar}
       />
 
-      {/* ── 4. MODAIS FASE 8: IMPORTAR TRILHA, BUSCA GLOBAL, LIXEIRA ── */}
       <ImportarTrilhaModal
         isOpen={modalImportarTrilhaAberto}
         onClose={() => setModalImportarTrilhaAberto(false)}
         trilhas={trilhasDisponiveis}
         cadernos={cadernos}
-        usuarioId={usuario?.id || ''}
+        usuarioId={usuario?.id ?? ''}
         onImportar={handleImportarTrilha}
       />
 
@@ -715,3 +814,4 @@ function NotasApp() {
 }
 
 export default NotasApp;
+

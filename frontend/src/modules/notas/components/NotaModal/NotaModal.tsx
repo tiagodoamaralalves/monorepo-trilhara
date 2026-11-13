@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { FileText } from 'lucide-react';
 import { FormModal, Input } from '@shared/design-system';
-import { Nota } from '../../types/nota';
+import { NotaMetadata } from '../../types/nota';
 
 export interface NotaModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSalvar: (titulo: string) => Promise<void> | void;
-  notaParaEditar?: Nota | null;
+  notaParaEditar?: NotaMetadata | null;
 }
 
 export const NotaModal: React.FC<NotaModalProps> = ({

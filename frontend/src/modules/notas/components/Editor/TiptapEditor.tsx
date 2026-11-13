@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Table from '@tiptap/extension-table';
@@ -20,9 +20,11 @@ import {
   Trash2,
   AlertTriangle
 } from 'lucide-react';
-import { SyncStatusBadge, SyncStatus } from '@shared/design-system';
+import { SyncStatusBadge } from '@shared/design-system';
 import { NotaService } from '../../services/notaService';
 import { RascunhoNotaLocal } from '../../types/nota';
+import { useAutosaveNota } from '../../hooks/useAutosaveNota';
+import { LinkSeguro } from './linkSeguro';
 import styles from './TiptapEditor.module.css';
 
 export interface TiptapEditorProps {
@@ -31,89 +33,78 @@ export interface TiptapEditorProps {
   titulo: string;
   conteudoMarkdown: string;
   atualizadoEmServidor?: string;
-  statusSalvamento?: SyncStatus;
-  onSalvar: (notaId: string, novoTitulo: string, novoMarkdown: string) => Promise<void> | void;
+  /** Deve devolver o `atualizadoEm` novo para virar a base do rascunho (D-31b). */
+  onSalvar: (
+    notaId: string,
+    novoTitulo: string,
+    novoMarkdown: string,
+    signal?: AbortSignal
+  ) => Promise<{ atualizadoEm: string } | void>;
   onUpdateTitulo?: (novoTitulo: string) => void;
   onExcluirNota?: () => void;
 }
 
+function lerMarkdown(editor: { storage: unknown } | null): string {
+  const storage = editor?.storage as { markdown?: { getMarkdown: () => string } } | undefined;
+  return storage?.markdown?.getMarkdown() ?? '';
+}
+
+/**
+ * Editor de página com autosave e recuperação de rascunho (D-30/D-31).
+ *
+ * - Markdown com `html: false` (HTML bruto desabilitado) e colagem pelo schema do ProseMirror;
+ * - links passam pelo mark `LinkSeguro` (allowlist `http:`/`https:`/`mailto:`, `rel` e `target`);
+ * - autosave com debounce de 800 ms, `seq` por página e `AbortController` no hook
+ *   `useAutosaveNota`;
+ * - barra de recuperação aparece quando existe rascunho local com **conteúdo diferente** do
+ *   servidor (nunca por comparação de relógios), avisando quando a versão do servidor mudou.
+ */
 export const TiptapEditor: React.FC<TiptapEditorProps> = ({
   usuarioId,
   notaId,
   titulo,
   conteudoMarkdown,
   atualizadoEmServidor,
-  statusSalvamento: statusSalvamentoProp,
   onSalvar,
   onUpdateTitulo,
   onExcluirNota
 }) => {
-  const [tituloLocal, setTituloLocal] = useState(titulo);
-  const [statusInterno, setStatusInterno] = useState<SyncStatus>(statusSalvamentoProp || 'salvo');
   const [rascunhoPendente, setRascunhoPendente] = useState<RascunhoNotaLocal | null>(null);
+  const [servidorMudouDesdeRascunho, setServidorMudouDesdeRascunho] = useState(false);
+  const editorRef = useRef<ReturnType<typeof useEditor>>(null);
 
-  const statusAtual = statusSalvamentoProp || statusInterno;
+  const salvarNoServidor = useCallback(
+    async (
+      id: string,
+      novoTitulo: string,
+      novoMarkdown: string,
+      signal: AbortSignal
+    ): Promise<{ atualizadoEm: string } | void> => onSalvar(id, novoTitulo, novoMarkdown, signal),
+    [onSalvar]
+  );
 
-  const notaIdAtualRef = useRef(notaId);
-  const tituloRef = useRef(titulo);
-  const onSalvarRef = useRef(onSalvar);
-  const ultimoMarkdownPendenteRef = useRef(conteudoMarkdown || '');
-  const temAlteracaoPendenteRef = useRef(false);
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    onSalvarRef.current = onSalvar;
-  }, [onSalvar]);
-
-  useEffect(() => {
-    notaIdAtualRef.current = notaId;
-  }, [notaId]);
-
-  // Executa salvamento assíncrono com gestão de status e contingência em localStorage
-  const executarSalvamento = useCallback(async (idAlvo: string, tit: string, md: string) => {
-    if (!idAlvo) return;
-    setStatusInterno('salvando');
-
-    // Antes de confirmar, salva rascunho de contingência em localStorage
-    const rascunho: RascunhoNotaLocal = {
-      titulo: tit,
-      conteudoMarkdown: md,
-      atualizadoEmLocal: new Date().toISOString(),
-      baseAtualizadoEmServidor: atualizadoEmServidor
-    };
-    NotaService.salvarRascunhoLocal(usuarioId, idAlvo, rascunho);
-
-    try {
-      await onSalvarRef.current(idAlvo, tit, md);
-      // Se salvamento teve sucesso e ainda estamos na mesma nota, limpa o rascunho local
-      if (notaIdAtualRef.current === idAlvo) {
-        NotaService.removerRascunhoLocal(usuarioId, idAlvo);
-        setStatusInterno('salvo');
-        setRascunhoPendente(null);
-      }
-    } catch {
-      if (notaIdAtualRef.current === idAlvo) {
-        setStatusInterno('erro');
-      }
-    }
-  }, [usuarioId, atualizadoEmServidor]);
+  const autosave = useAutosaveNota({
+    usuarioId,
+    notaId,
+    tituloInicial: titulo,
+    conteudoInicial: conteudoMarkdown,
+    atualizadoEmServidor: atualizadoEmServidor ?? null,
+    salvar: salvarNoServidor
+  });
 
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3]
-        }
+        heading: { levels: [1, 2, 3] }
       }),
-      Table.configure({
-        resizable: true
-      }),
+      Table.configure({ resizable: true }),
       TableRow,
       TableHeader,
       TableCell,
       Placeholder.configure({
         placeholder: 'Comece a escrever suas anotações em Markdown puro...'
       }),
+      LinkSeguro,
       Markdown.configure({
         html: false,
         transformPastedText: true,
@@ -121,141 +112,81 @@ export const TiptapEditor: React.FC<TiptapEditorProps> = ({
       })
     ],
     content: conteudoMarkdown || '',
-    onUpdate: ({ editor }) => {
-      const markdown = (editor.storage as { markdown?: { getMarkdown: () => string } }).markdown?.getMarkdown() ?? '';
-      ultimoMarkdownPendenteRef.current = markdown;
-      temAlteracaoPendenteRef.current = true;
-      setStatusInterno('alteracoes-locais');
-
-      // Grava rascunho imediatamente em localStorage
-      NotaService.salvarRascunhoLocal(usuarioId, notaIdAtualRef.current, {
-        titulo: tituloRef.current,
-        conteudoMarkdown: markdown,
-        atualizadoEmLocal: new Date().toISOString(),
-        baseAtualizadoEmServidor: atualizadoEmServidor
-      });
-
-      // Debounce do salvamento automático (800ms)
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-
-      debounceTimerRef.current = setTimeout(() => {
-        temAlteracaoPendenteRef.current = false;
-        executarSalvamento(notaIdAtualRef.current, tituloRef.current, markdown);
-      }, 800);
+    onUpdate: ({ editor: instancia }) => {
+      autosave.alterarConteudo(lerMarkdown(instancia as unknown as { storage: unknown }));
     }
   });
 
-  // Verifica existência de rascunho local não salvo mais recente ao abrir a página
   useEffect(() => {
-    if (!usuarioId || !notaId) return;
+    editorRef.current = editor;
+  }, [editor]);
+
+  // Ao trocar de página, recarrega o conteúdo do servidor no editor.
+  const notaIdAnteriorRef = useRef(notaId);
+  useEffect(() => {
+    if (notaIdAnteriorRef.current === notaId) return;
+    notaIdAnteriorRef.current = notaId;
+    if (editor) {
+      editor.commands.setContent(conteudoMarkdown || '');
+    }
+  }, [conteudoMarkdown, editor, notaId]);
+
+  // Recuperação de rascunho: compara CONTEÚDO, não relógios (D-31b).
+  useEffect(() => {
+    if (!usuarioId || !notaId) {
+      setRascunhoPendente(null);
+      setServidorMudouDesdeRascunho(false);
+      return;
+    }
 
     const rascunho = NotaService.obterRascunhoLocal(usuarioId, notaId);
-    if (rascunho && rascunho.atualizadoEmLocal) {
-      const tempoLocal = new Date(rascunho.atualizadoEmLocal).getTime();
-      const tempoServidor = atualizadoEmServidor ? new Date(atualizadoEmServidor).getTime() : 0;
-
-      // Se rascunho local for mais recente que o servidor, exibe barra de recuperação
-      if (tempoLocal > tempoServidor && (rascunho.conteudoMarkdown !== conteudoMarkdown || rascunho.titulo !== titulo)) {
-        setRascunhoPendente(rascunho);
-      } else {
-        setRascunhoPendente(null);
-      }
-    } else {
+    if (!rascunho) {
       setRascunhoPendente(null);
-    }
-  }, [usuarioId, notaId, atualizadoEmServidor, conteudoMarkdown, titulo]);
-
-  // Atualiza conteúdo e título quando muda a nota selecionada
-  useEffect(() => {
-    setTituloLocal(titulo);
-    tituloRef.current = titulo;
-
-    if (editor && notaIdAtualRef.current !== notaId) {
-      if (temAlteracaoPendenteRef.current) {
-        if (debounceTimerRef.current) {
-          clearTimeout(debounceTimerRef.current);
-        }
-        temAlteracaoPendenteRef.current = false;
-        executarSalvamento(notaIdAtualRef.current, tituloRef.current, ultimoMarkdownPendenteRef.current);
-      }
-      notaIdAtualRef.current = notaId;
-      ultimoMarkdownPendenteRef.current = conteudoMarkdown || '';
-      editor.commands.setContent(conteudoMarkdown || '');
-      setStatusInterno('salvo');
-    }
-  }, [notaId, titulo, conteudoMarkdown, editor, executarSalvamento]);
-
-  // Flush no cleanup de desmontagem
-  useEffect(() => {
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-      if (temAlteracaoPendenteRef.current) {
-        temAlteracaoPendenteRef.current = false;
-        executarSalvamento(notaIdAtualRef.current, tituloRef.current, ultimoMarkdownPendenteRef.current);
-      }
-    };
-  }, [executarSalvamento]);
-
-  const handleTituloChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const novo = e.target.value;
-    setTituloLocal(novo);
-    tituloRef.current = novo;
-    if (onUpdateTitulo) {
-      onUpdateTitulo(novo);
+      setServidorMudouDesdeRascunho(false);
+      return;
     }
 
-    temAlteracaoPendenteRef.current = true;
-    setStatusInterno('alteracoes-locais');
+    const conteudoDiferente =
+      rascunho.conteudoMarkdown !== conteudoMarkdown || rascunho.titulo !== titulo;
 
-    const markdown = (editor?.storage as { markdown?: { getMarkdown: () => string } })?.markdown?.getMarkdown() ?? ultimoMarkdownPendenteRef.current;
-    NotaService.salvarRascunhoLocal(usuarioId, notaIdAtualRef.current, {
-      titulo: novo,
-      conteudoMarkdown: markdown,
-      atualizadoEmLocal: new Date().toISOString(),
-      baseAtualizadoEmServidor: atualizadoEmServidor
-    });
-
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
+    if (!conteudoDiferente) {
+      // Rascunho idêntico ao servidor: já está salvo, não há o que recuperar.
+      NotaService.removerRascunhoLocal(usuarioId, notaId);
+      setRascunhoPendente(null);
+      setServidorMudouDesdeRascunho(false);
+      return;
     }
 
-    debounceTimerRef.current = setTimeout(() => {
-      temAlteracaoPendenteRef.current = false;
-      executarSalvamento(notaIdAtualRef.current, novo, markdown);
-    }, 800);
+    const base = rascunho.baseAtualizadoEmServidor ?? null;
+    setServidorMudouDesdeRascunho(
+      Boolean(base) && Boolean(atualizadoEmServidor) && base !== atualizadoEmServidor
+    );
+    setRascunhoPendente(rascunho);
+  }, [atualizadoEmServidor, conteudoMarkdown, notaId, titulo, usuarioId]);
+
+  const handleTituloChange = (evento: React.ChangeEvent<HTMLInputElement>) => {
+    const novo = evento.target.value;
+    autosave.alterarTitulo(novo);
+    onUpdateTitulo?.(novo);
   };
 
   const handleRestaurarRascunho = () => {
     if (!rascunhoPendente) return;
-    setTituloLocal(rascunhoPendente.titulo);
-    tituloRef.current = rascunhoPendente.titulo;
-    if (onUpdateTitulo) {
-      onUpdateTitulo(rascunhoPendente.titulo);
-    }
     if (editor) {
       editor.commands.setContent(rascunhoPendente.conteudoMarkdown);
     }
-    ultimoMarkdownPendenteRef.current = rascunhoPendente.conteudoMarkdown;
-    temAlteracaoPendenteRef.current = true;
-    setStatusInterno('alteracoes-locais');
+    // `aplicarRascunho` recebe título e conteúdo prontos e envia sem debounce: evita o estado
+    // defasado entre duas chamadas de `alterar*` (D-31e).
+    autosave.aplicarRascunho(rascunhoPendente.titulo, rascunhoPendente.conteudoMarkdown);
+    onUpdateTitulo?.(rascunhoPendente.titulo);
     setRascunhoPendente(null);
-
-    // Salva imediatamente no servidor
-    executarSalvamento(notaId, rascunhoPendente.titulo, rascunhoPendente.conteudoMarkdown);
+    setServidorMudouDesdeRascunho(false);
   };
 
   const handleDescartarRascunho = () => {
     NotaService.removerRascunhoLocal(usuarioId, notaId);
     setRascunhoPendente(null);
-  };
-
-  const handleRetry = () => {
-    const markdown = (editor?.storage as { markdown?: { getMarkdown: () => string } })?.markdown?.getMarkdown() ?? ultimoMarkdownPendenteRef.current;
-    executarSalvamento(notaId, tituloRef.current, markdown);
+    setServidorMudouDesdeRascunho(false);
   };
 
   const handleInserirTabela = useCallback(() => {
@@ -263,165 +194,159 @@ export const TiptapEditor: React.FC<TiptapEditorProps> = ({
     editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
   }, [editor]);
 
-  const contagemPalavras = editor?.storage.characterCount?.words?.() ?? (editor?.getText().trim().split(/\s+/).filter(Boolean).length || 0);
-  const contagemCaracteres = editor?.getText().length || 0;
+  const contagemPalavras =
+    (editor?.storage as { characterCount?: { words?: () => number } })?.characterCount?.words?.() ??
+    editor?.getText().trim().split(/\s+/).filter(Boolean).length ??
+    0;
+  const contagemCaracteres = editor?.getText().length ?? 0;
 
   return (
     <div className={styles.editorWrapper}>
-      {/* ── BARRA DE RECUPERAÇÃO DE RASCUNHO NÃO SALVO ── */}
       {rascunhoPendente && (
-        <div className={styles.recoveryBanner} role="alert">
+        <div className={styles.recoveryBanner} role="region" aria-label="Rascunho local encontrado">
           <div className={styles.recoveryBannerContent}>
             <AlertTriangle size={16} aria-hidden="true" />
-            <span>Existe um rascunho local não salvo mais recente do que a versão do servidor.</span>
+            <span>
+              Existe um rascunho local com alterações diferentes da versão salva.
+              {servidorMudouDesdeRascunho && (
+                <>
+                  {' '}
+                  <strong>A versão do servidor mudou desde este rascunho.</strong>
+                </>
+              )}
+            </span>
           </div>
           <div className={styles.recoveryActions}>
-            <button
-              type="button"
-              className={styles.restoreBtn}
-              onClick={handleRestaurarRascunho}
-            >
+            <button type="button" className={styles.restoreBtn} onClick={handleRestaurarRascunho}>
               Restaurar rascunho não salvo
             </button>
-            <button
-              type="button"
-              className={styles.discardBtn}
-              onClick={handleDescartarRascunho}
-            >
+            <button type="button" className={styles.discardBtn} onClick={handleDescartarRascunho}>
               Descartar rascunho
             </button>
           </div>
         </div>
       )}
 
-      {/* Topo: Título da Nota, Toolbar Minimalista e Indicador SyncStatusBadge */}
       <header className={styles.editorHeader}>
         <div className={styles.headerLeft}>
           <input
-            type="text"
             className={styles.titleInput}
-            value={tituloLocal}
+            value={autosave.titulo}
             onChange={handleTituloChange}
-            placeholder="Título da nota..."
+            placeholder="Título da página"
+            aria-label="Título da página"
           />
         </div>
 
-        <div className={styles.headerRight}>
-          {/* Toolbar Minimalista e Discreta */}
-          <div className={styles.minimalToolbar}>
-            <button
-              type="button"
-              className={`${styles.toolBtn} ${editor?.isActive('bold') ? styles.toolBtnActive : ''}`}
-              onClick={() => editor?.chain().focus().toggleBold().run()}
-              title="Negrito (**)"
-              aria-label="Negrito"
-            >
-              <Bold size={15} />
-            </button>
-            <button
-              type="button"
-              className={`${styles.toolBtn} ${editor?.isActive('italic') ? styles.toolBtnActive : ''}`}
-              onClick={() => editor?.chain().focus().toggleItalic().run()}
-              title="Itálico (*)"
-              aria-label="Itálico"
-            >
-              <Italic size={15} />
-            </button>
-            <button
-              type="button"
-              className={`${styles.toolBtn} ${editor?.isActive('heading', { level: 1 }) ? styles.toolBtnActive : ''}`}
-              onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
-              title="Título 1 (#)"
-              aria-label="Título 1"
-            >
-              <Heading1 size={15} />
-            </button>
-            <button
-              type="button"
-              className={`${styles.toolBtn} ${editor?.isActive('heading', { level: 2 }) ? styles.toolBtnActive : ''}`}
-              onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
-              title="Título 2 (##)"
-              aria-label="Título 2"
-            >
-              <Heading2 size={15} />
-            </button>
-            <button
-              type="button"
-              className={`${styles.toolBtn} ${editor?.isActive('bulletList') ? styles.toolBtnActive : ''}`}
-              onClick={() => editor?.chain().focus().toggleBulletList().run()}
-              title="Lista com marcadores (-)"
-              aria-label="Lista com marcadores"
-            >
-              <List size={15} />
-            </button>
-            <button
-              type="button"
-              className={`${styles.toolBtn} ${editor?.isActive('orderedList') ? styles.toolBtnActive : ''}`}
-              onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-              title="Lista numerada (1.)"
-              aria-label="Lista numerada"
-            >
-              <ListOrdered size={15} />
-            </button>
-            <button
-              type="button"
-              className={`${styles.toolBtn} ${editor?.isActive('blockquote') ? styles.toolBtnActive : ''}`}
-              onClick={() => editor?.chain().focus().toggleBlockquote().run()}
-              title="Citação (>)"
-              aria-label="Citação"
-            >
-              <Quote size={15} />
-            </button>
-            <button
-              type="button"
-              className={`${styles.toolBtn} ${editor?.isActive('codeBlock') ? styles.toolBtnActive : ''}`}
-              onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
-              title="Bloco de código (```)"
-              aria-label="Bloco de código"
-            >
-              <Code size={15} />
-            </button>
-            <button
-              type="button"
-              className={styles.toolBtn}
-              onClick={handleInserirTabela}
-              title="Inserir Tabela"
-              aria-label="Inserir Tabela"
-            >
-              <TableIcon size={15} />
-            </button>
-          </div>
-
-          {/* Componente SyncStatusBadge do Design System */}
-          <SyncStatusBadge
-            status={statusAtual}
-            onRetry={handleRetry}
-          />
-
-          {onExcluirNota && (
-            <button
-              type="button"
-              className={styles.toolBtn}
-              onClick={onExcluirNota}
-              title="Excluir esta nota"
-              aria-label="Excluir nota"
-            >
-              <Trash2 size={15} />
-            </button>
-          )}
+        <div className={styles.toolbar} role="toolbar" aria-label="Formatação do texto">
+          <button
+            type="button"
+            className={`${styles.toolBtn} ${editor?.isActive('bold') ? styles.toolBtnActive : ''}`}
+            onClick={() => editor?.chain().focus().toggleBold().run()}
+            title="Negrito"
+            aria-label="Negrito"
+          >
+            <Bold size={15} />
+          </button>
+          <button
+            type="button"
+            className={`${styles.toolBtn} ${editor?.isActive('italic') ? styles.toolBtnActive : ''}`}
+            onClick={() => editor?.chain().focus().toggleItalic().run()}
+            title="Itálico"
+            aria-label="Itálico"
+          >
+            <Italic size={15} />
+          </button>
+          <button
+            type="button"
+            className={`${styles.toolBtn} ${editor?.isActive('heading', { level: 1 }) ? styles.toolBtnActive : ''}`}
+            onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
+            title="Título 1 (#)"
+            aria-label="Título 1"
+          >
+            <Heading1 size={15} />
+          </button>
+          <button
+            type="button"
+            className={`${styles.toolBtn} ${editor?.isActive('heading', { level: 2 }) ? styles.toolBtnActive : ''}`}
+            onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+            title="Título 2 (##)"
+            aria-label="Título 2"
+          >
+            <Heading2 size={15} />
+          </button>
+          <button
+            type="button"
+            className={`${styles.toolBtn} ${editor?.isActive('bulletList') ? styles.toolBtnActive : ''}`}
+            onClick={() => editor?.chain().focus().toggleBulletList().run()}
+            title="Lista com marcadores (-)"
+            aria-label="Lista com marcadores"
+          >
+            <List size={15} />
+          </button>
+          <button
+            type="button"
+            className={`${styles.toolBtn} ${editor?.isActive('orderedList') ? styles.toolBtnActive : ''}`}
+            onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+            title="Lista numerada (1.)"
+            aria-label="Lista numerada"
+          >
+            <ListOrdered size={15} />
+          </button>
+          <button
+            type="button"
+            className={`${styles.toolBtn} ${editor?.isActive('blockquote') ? styles.toolBtnActive : ''}`}
+            onClick={() => editor?.chain().focus().toggleBlockquote().run()}
+            title="Citação (>)"
+            aria-label="Citação"
+          >
+            <Quote size={15} />
+          </button>
+          <button
+            type="button"
+            className={`${styles.toolBtn} ${editor?.isActive('codeBlock') ? styles.toolBtnActive : ''}`}
+            onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
+            title="Bloco de código (```)"
+            aria-label="Bloco de código"
+          >
+            <Code size={15} />
+          </button>
+          <button
+            type="button"
+            className={styles.toolBtn}
+            onClick={handleInserirTabela}
+            title="Inserir Tabela"
+            aria-label="Inserir Tabela"
+          >
+            <TableIcon size={15} />
+          </button>
         </div>
+
+        <SyncStatusBadge status={autosave.status} onRetry={autosave.tentarNovamente} />
+
+        {onExcluirNota && (
+          <button
+            type="button"
+            className={styles.toolBtn}
+            onClick={onExcluirNota}
+            title="Excluir esta nota"
+            aria-label="Excluir nota"
+          >
+            <Trash2 size={15} />
+          </button>
+        )}
       </header>
 
-      {/* Área Central: Folha em Branco Minimalista */}
       <div className={styles.editorScrollArea}>
         <div className={styles.editorCanvas}>
           <EditorContent editor={editor} />
         </div>
       </div>
 
-      {/* Rodapé: Contagem e atalhos */}
       <footer className={styles.editorFooter}>
-        <span>{contagemPalavras} {contagemPalavras === 1 ? 'palavra' : 'palavras'}</span>
+        <span>
+          {contagemPalavras} {contagemPalavras === 1 ? 'palavra' : 'palavras'}
+        </span>
         <span>{contagemCaracteres} caracteres</span>
       </footer>
     </div>

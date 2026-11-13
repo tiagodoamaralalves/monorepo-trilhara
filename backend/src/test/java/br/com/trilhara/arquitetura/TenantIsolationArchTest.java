@@ -4,6 +4,7 @@ import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPac
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.simpleNameEndingWith;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 
 import java.util.List;
 import java.util.Set;
@@ -71,6 +72,14 @@ class TenantIsolationArchTest {
      */
     private static final Set<String> EXCECOES_PURGA_TAREFA = Set.of(
             "purgarExpiradas", "listarExpiradas");
+
+    /**
+     * Varreduras multi-tenant da purga da lixeira de Notas ({@code NotaPurgaService},
+     * {@code @SystemScope}, D-34): operam por {@code expiresAt} em todos os tenants, sem
+     * {@code usuarioId}.
+     */
+    private static final Set<String> EXCECOES_PURGA_NOTA = Set.of(
+            "purgarExpirados", "listarLixeira", "contarLixeira");
 
     /**
      * Ativa em R0: nenhum recurso HTTP acessa o MongoDB diretamente. Vale hoje
@@ -245,6 +254,55 @@ class TenantIsolationArchTest {
                     })
                     .because("D-06(a): as coleções de tarefa são privadas e sempre filtram por usuarioId; "
                             + "só a purga em @SystemScope varre por expiresAt.");
+
+    /**
+     * Ativa em R9 (D-06a): todo {@code *Repository} do pacote {@code nota} recebe
+     * {@code ObjectId usuarioId} como primeiro parâmetro. Exceções: conversões BSON
+     * ({@code paraDocumento}/{@code paraEntidade}), inserção/atualização da própria entidade
+     * (que já carrega {@code usuarioId}) e a purga em {@code @SystemScope}
+     * ({@code purgarExpirados}), multi-tenant por definição.
+     */
+    @ArchTest
+    static final ArchRule repositoriosDeNotaExigemUsuarioId =
+            methods()
+                    .that().arePublic()
+                    .and().areDeclaredInClassesThat().resideInAPackage("..nota..")
+                    .and().areDeclaredInClassesThat().haveSimpleNameEndingWith("Repository")
+                    .should(new ArchCondition<JavaMethod>("ter ObjectId usuarioId como primeiro parâmetro") {
+                        @Override
+                        public void check(JavaMethod metodo, ConditionEvents eventos) {
+                            String nome = metodo.getName();
+                            if (EXCECOES_POR_ENTIDADE.contains(nome)
+                                    || EXCECOES_PURGA_NOTA.contains(nome)) {
+                                return;
+                            }
+                            List<JavaParameter> parametros = metodo.getParameters();
+                            boolean valido = !parametros.isEmpty()
+                                    && parametros.get(0).getRawType().isAssignableTo(ObjectId.class);
+                            if (!valido) {
+                                eventos.add(SimpleConditionEvent.violated(metodo,
+                                        metodo.getFullName()
+                                                + " não recebe ObjectId usuarioId como primeiro parâmetro"));
+                            }
+                        }
+                    })
+                    .because("D-06(a): cadernos, secoes e notas são coleções privadas e sempre "
+                            + "filtram por usuarioId; só a purga em @SystemScope varre por expiresAt.");
+
+    /**
+     * Anti-regressão do R9: nenhum repositório expõe busca por ID sem {@code usuarioId}.
+     *
+     * <p>O método {@code buscarPorIdSemUsuario} existia em três repositórios sem nenhum call site
+     * e era uma porta aberta para vazamento entre tenants. A regra impede a reintrodução em
+     * qualquer {@code *Repository} do domínio {@code nota}.</p>
+     */
+    @ArchTest
+    static final ArchRule repositoriosDeNotaNaoBuscamSemUsuario =
+            noMethods()
+                    .that().areDeclaredInClassesThat().resideInAPackage("..nota..")
+                    .and().areDeclaredInClassesThat().haveSimpleNameEndingWith("Repository")
+                    .should().haveNameMatching(".*SemUsuario.*")
+                    .because("D-06(a): leitura sem usuarioId revela recurso de outro tenant.");
 
     /**
      * Habilitada em R2: guarda anti-regressão dos pacotes legados (Anexo C / DC-01).

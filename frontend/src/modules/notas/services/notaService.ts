@@ -1,26 +1,51 @@
 import { request } from '@shared/auth';
 import { registrarFalha } from '@shared/diagnostico';
 import {
+  BuscaNotasResponse,
   Caderno,
-  Secao,
+  CadernoImpactoExclusao,
+  ExclusaoLixeiraResponse,
+  LixeiraNotasResponse,
   Nota,
   NotaMetadata,
-  BuscaNotasResponse,
-  ItemLixeira,
   RascunhoNotaLocal,
+  RestauracaoLixeiraResponse,
+  Secao,
+  SecaoImpactoExclusao,
   SincronizacaoTrilhaResponse,
-  ExclusaoLixeiraResponse
+  TipoItemLixeira
 } from '../types/nota';
 
-export const NotaService = {
-  // ── GESTÃO DE CADERNOS (Nível 1) ──
+/** Envelope normativo de paginação por offset (D-28). */
+export interface PaginaNotas {
+  itens: NotaMetadata[];
+  pagina: number;
+  tamanho: number;
+  totalItens: number;
+  totalPaginas: number;
+}
 
-  async listarCadernos(): Promise<Caderno[]> {
-    return request<Caderno[]>('/cadernos');
+export interface OpcoesRequisicao {
+  signal?: AbortSignal;
+}
+
+/**
+ * Cliente HTTP do domínio Notas.
+ *
+ * Regras transversais: toda chamada privada usa o `request` central (que já injeta
+ * `Authorization` e `X-Timezone`), IDs vão em `encodeURIComponent` e nenhuma listagem
+ * transfere `conteudoMarkdown` — o Markdown completo só é buscado em `buscarNota`.
+ */
+export const NotaService = {
+  // ── CADERNOS ──
+
+  async listarCadernos(origemTrilhaId?: string): Promise<Caderno[]> {
+    const qs = origemTrilhaId ? `?origemTrilhaId=${encodeURIComponent(origemTrilhaId)}` : '';
+    return request<Caderno[]>(`/cadernos${qs}`);
   },
 
   async buscarCaderno(id: string): Promise<Caderno> {
-    return request<Caderno>(`/cadernos/${id}`);
+    return request<Caderno>(`/cadernos/${encodeURIComponent(id)}`);
   },
 
   async criarCaderno(dados: { titulo: string; cor?: string; icone?: string }): Promise<Caderno> {
@@ -30,67 +55,102 @@ export const NotaService = {
     });
   },
 
-  async atualizarCaderno(id: string, dados: { titulo?: string; cor?: string; icone?: string }): Promise<Caderno> {
-    return request<Caderno>(`/cadernos/${id}`, {
+  async atualizarCaderno(
+    id: string,
+    dados: { titulo?: string; cor?: string; icone?: string }
+  ): Promise<Caderno> {
+    return request<Caderno>(`/cadernos/${encodeURIComponent(id)}`, {
       method: 'PUT',
       body: JSON.stringify(dados)
     });
   },
 
+  /** Contagens exibidas no ConfirmDialog antes de mover o caderno para a lixeira (D-33). */
+  async obterImpactoExclusaoCaderno(id: string): Promise<CadernoImpactoExclusao> {
+    return request<CadernoImpactoExclusao>(`/cadernos/${encodeURIComponent(id)}/impacto-exclusao`);
+  },
+
   async excluirCaderno(id: string): Promise<ExclusaoLixeiraResponse> {
-    return request<ExclusaoLixeiraResponse>(`/cadernos/${id}`, {
+    return request<ExclusaoLixeiraResponse>(`/cadernos/${encodeURIComponent(id)}`, {
       method: 'DELETE'
     });
   },
 
-  // ── IMPORTAÇÃO E SINCRONIZAÇÃO DE TRILHA ──
+  // ── IMPORTAÇÃO E SINCRONIZAÇÃO DE TRILHA (D-29) ──
 
-  async importarTrilha(trilhaId: string): Promise<Caderno> {
-    return request<Caderno>(`/cadernos/importar-trilha/${trilhaId}`, {
+  /**
+   * Importa uma trilha. Sem `reimportar`, uma trilha já vinculada responde
+   * `409 TRAIL_ALREADY_IMPORTED` com `errors.cadernoId`.
+   */
+  async importarTrilha(trilhaId: string, reimportar = false): Promise<Caderno> {
+    const qs = reimportar ? '?reimportar=true' : '';
+    return request<Caderno>(`/cadernos/importar-trilha/${encodeURIComponent(trilhaId)}${qs}`, {
       method: 'POST'
     });
   },
 
   async sincronizarTrilha(cadernoId: string): Promise<SincronizacaoTrilhaResponse> {
-    return request<SincronizacaoTrilhaResponse>(`/cadernos/${cadernoId}/sincronizar-trilha`, {
-      method: 'POST'
-    });
+    return request<SincronizacaoTrilhaResponse>(
+      `/cadernos/${encodeURIComponent(cadernoId)}/sincronizar-trilha`,
+      { method: 'POST' }
+    );
   },
 
-  // ── GESTÃO DE SEÇÕES (Nível 2) ──
+  // ── SEÇÕES ──
 
   async listarSecoes(cadernoId: string): Promise<Secao[]> {
-    return request<Secao[]>(`/cadernos/${cadernoId}/secoes`);
+    return request<Secao[]>(`/cadernos/${encodeURIComponent(cadernoId)}/secoes`);
   },
 
   async criarSecao(cadernoId: string, dados: { titulo: string; cor?: string }): Promise<Secao> {
-    return request<Secao>(`/cadernos/${cadernoId}/secoes`, {
+    return request<Secao>(`/cadernos/${encodeURIComponent(cadernoId)}/secoes`, {
       method: 'POST',
       body: JSON.stringify(dados)
     });
   },
 
-  async atualizarSecao(cadernoId: string, secaoId: string, dados: { titulo?: string; cor?: string }): Promise<Secao> {
-    return request<Secao>(`/cadernos/${cadernoId}/secoes/${secaoId}`, {
-      method: 'PUT',
-      body: JSON.stringify(dados)
-    });
+  async atualizarSecao(
+    cadernoId: string,
+    secaoId: string,
+    dados: { titulo?: string; cor?: string }
+  ): Promise<Secao> {
+    return request<Secao>(
+      `/cadernos/${encodeURIComponent(cadernoId)}/secoes/${encodeURIComponent(secaoId)}`,
+      { method: 'PUT', body: JSON.stringify(dados) }
+    );
+  },
+
+  async obterImpactoExclusaoSecao(secaoId: string): Promise<SecaoImpactoExclusao> {
+    return request<SecaoImpactoExclusao>(`/secoes/${encodeURIComponent(secaoId)}/impacto-exclusao`);
   },
 
   async excluirSecao(cadernoId: string, secaoId: string): Promise<ExclusaoLixeiraResponse> {
-    return request<ExclusaoLixeiraResponse>(`/cadernos/${cadernoId}/secoes/${secaoId}`, {
-      method: 'DELETE'
-    });
+    return request<ExclusaoLixeiraResponse>(
+      `/cadernos/${encodeURIComponent(cadernoId)}/secoes/${encodeURIComponent(secaoId)}`,
+      { method: 'DELETE' }
+    );
   },
 
-  // ── GESTÃO DE NOTAS / PÁGINAS (Nível 3: Projeção de Metadados e Carregamento Sob Demanda) ──
+  // ── PÁGINAS ──
 
-  async listarNotasPorSecao(cadernoId: string, secaoId: string, pagina = 1, tamanho = 50): Promise<NotaMetadata[]> {
-    return request<NotaMetadata[]>(`/cadernos/${cadernoId}/secoes/${secaoId}/notas?pagina=${pagina}&tamanho=${tamanho}`);
+  /** Metadados paginados — sem `conteudoMarkdown` (D-29). */
+  async listarNotasPorSecao(
+    cadernoId: string,
+    secaoId: string,
+    pagina = 1,
+    tamanho = 50,
+    opcoes: OpcoesRequisicao = {}
+  ): Promise<PaginaNotas> {
+    return request<PaginaNotas>(
+      `/cadernos/${encodeURIComponent(cadernoId)}/secoes/${encodeURIComponent(secaoId)}` +
+        `/notas?pagina=${pagina}&tamanho=${tamanho}`,
+      { signal: opcoes.signal }
+    );
   },
 
-  async buscarNota(id: string): Promise<Nota> {
-    return request<Nota>(`/notas/${id}`);
+  /** Único caminho de leitura completa da página (D-32). */
+  async buscarNota(id: string, opcoes: OpcoesRequisicao = {}): Promise<Nota> {
+    return request<Nota>(`/notas/${encodeURIComponent(id)}`, { signal: opcoes.signal });
   },
 
   async criarNota(dados: {
@@ -99,53 +159,83 @@ export const NotaService = {
     titulo: string;
     conteudoMarkdown?: string;
   }): Promise<Nota> {
-    return request<Nota>(`/cadernos/${dados.cadernoId}/secoes/${dados.secaoId}/notas`, {
-      method: 'POST',
-      body: JSON.stringify({
-        titulo: dados.titulo,
-        conteudoMarkdown: dados.conteudoMarkdown
-      })
-    });
+    return request<Nota>(
+      `/cadernos/${encodeURIComponent(dados.cadernoId)}/secoes/${encodeURIComponent(dados.secaoId)}/notas`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          titulo: dados.titulo,
+          conteudoMarkdown: dados.conteudoMarkdown
+        })
+      }
+    );
   },
 
-  async atualizarNota(id: string, dados: { titulo?: string; conteudoMarkdown?: string }): Promise<Nota> {
-    return request<Nota>(`/notas/${id}`, {
+  /**
+   * Atualiza uma página. O `signal` permite abortar o PUT pendente na troca de nota
+   * (D-31c) sem perder o rascunho local, que é gravado antes do abort.
+   */
+  async atualizarNota(
+    id: string,
+    dados: { titulo?: string; conteudoMarkdown?: string },
+    opcoes: OpcoesRequisicao = {}
+  ): Promise<Nota> {
+    return request<Nota>(`/notas/${encodeURIComponent(id)}`, {
       method: 'PUT',
-      body: JSON.stringify(dados)
+      body: JSON.stringify(dados),
+      signal: opcoes.signal
     });
   },
 
   async excluirNota(id: string): Promise<ExclusaoLixeiraResponse> {
-    return request<ExclusaoLixeiraResponse>(`/notas/${id}`, {
+    return request<ExclusaoLixeiraResponse>(`/notas/${encodeURIComponent(id)}`, {
       method: 'DELETE'
     });
   },
 
-  // ── BUSCA GLOBAL NO BACKEND ──
+  // ── BUSCA GLOBAL (D-30) ──
 
-  async buscarGlobal(termo: string, pagina = 1, tamanho = 20): Promise<BuscaNotasResponse> {
-    return request<BuscaNotasResponse>(`/notas/busca?q=${encodeURIComponent(termo)}&pagina=${pagina}&tamanho=${tamanho}`);
+  async buscarGlobal(
+    termo: string,
+    pagina = 1,
+    tamanho = 20,
+    opcoes: OpcoesRequisicao = {}
+  ): Promise<BuscaNotasResponse> {
+    return request<BuscaNotasResponse>(
+      `/notas/busca?q=${encodeURIComponent(termo)}&pagina=${pagina}&tamanho=${tamanho}`,
+      { signal: opcoes.signal }
+    );
   },
 
-  // ── LIXEIRA HIERÁRQUICA E PURGA ──
+  // ── LIXEIRA HIERÁRQUICA (D-34) ──
 
-  async listarLixeira(pagina = 1, tamanho = 50): Promise<ItemLixeira[]> {
-    return request<ItemLixeira[]>(`/notas/lixeira?pagina=${pagina}&tamanho=${tamanho}`);
+  async listarLixeira(pagina = 1, tamanho = 20): Promise<LixeiraNotasResponse> {
+    return request<LixeiraNotasResponse>(`/notas/lixeira?pagina=${pagina}&tamanho=${tamanho}`);
   },
 
-  async restaurarItemLixeira(tipo: 'CADERNO' | 'SECAO' | 'NOTA', id: string): Promise<{ mensagem: string }> {
-    return request<{ mensagem: string }>(`/notas/lixeira/${tipo.toLowerCase()}/${id}/restaurar`, {
-      method: 'POST'
-    });
+  async restaurarItemLixeira(
+    tipo: TipoItemLixeira,
+    id: string
+  ): Promise<RestauracaoLixeiraResponse> {
+    return request<RestauracaoLixeiraResponse>(
+      `/notas/lixeira/${tipo.toLowerCase()}/${encodeURIComponent(id)}/restaurar`,
+      { method: 'POST' }
+    );
   },
 
-  async esvaziarLixeira(): Promise<{ cadernosRemovidos: number; secoesRemovidas: number; notasRemovidas: number }> {
-    return request<{ cadernosRemovidos: number; secoesRemovidas: number; notasRemovidas: number }>('/notas/lixeira/esvaziar', {
-      method: 'DELETE'
-    });
+  async esvaziarLixeira(): Promise<{
+    cadernosRemovidos: number;
+    secoesRemovidas: number;
+    notasRemovidas: number;
+  }> {
+    return request<{
+      cadernosRemovidos: number;
+      secoesRemovidas: number;
+      notasRemovidas: number;
+    }>('/notas/lixeira/esvaziar', { method: 'DELETE' });
   },
 
-  // ── RASCUNHOS DE CONTINGÊNCIA EM LOCALSTORAGE ──
+  // ── RASCUNHOS DE CONTINGÊNCIA (D-31) ──
 
   obterChaveRascunho(usuarioId: string, notaId: string): string {
     return `trilhara:u:${usuarioId}:nota_draft:${notaId}`;
@@ -154,8 +244,7 @@ export const NotaService = {
   salvarRascunhoLocal(usuarioId: string, notaId: string, rascunho: RascunhoNotaLocal): void {
     if (!usuarioId || !notaId) return;
     try {
-      const chave = this.obterChaveRascunho(usuarioId, notaId);
-      window.localStorage.setItem(chave, JSON.stringify(rascunho));
+      window.localStorage.setItem(this.obterChaveRascunho(usuarioId, notaId), JSON.stringify(rascunho));
     } catch (e) {
       registrarFalha('notas.rascunho.gravar', e);
     }
@@ -164,10 +253,13 @@ export const NotaService = {
   obterRascunhoLocal(usuarioId: string, notaId: string): RascunhoNotaLocal | null {
     if (!usuarioId || !notaId) return null;
     try {
-      const chave = this.obterChaveRascunho(usuarioId, notaId);
-      const raw = window.localStorage.getItem(chave);
+      const raw = window.localStorage.getItem(this.obterChaveRascunho(usuarioId, notaId));
       if (!raw) return null;
-      return JSON.parse(raw) as RascunhoNotaLocal;
+      const dados = JSON.parse(raw) as RascunhoNotaLocal;
+      if (typeof dados?.conteudoMarkdown !== 'string' || typeof dados?.titulo !== 'string') {
+        return null;
+      }
+      return dados;
     } catch (e) {
       registrarFalha('notas.rascunho.ler', e);
       return null;
@@ -177,8 +269,7 @@ export const NotaService = {
   removerRascunhoLocal(usuarioId: string, notaId: string): void {
     if (!usuarioId || !notaId) return;
     try {
-      const chave = this.obterChaveRascunho(usuarioId, notaId);
-      window.localStorage.removeItem(chave);
+      window.localStorage.removeItem(this.obterChaveRascunho(usuarioId, notaId));
     } catch (e) {
       registrarFalha('notas.rascunho.remover', e);
     }
@@ -195,13 +286,12 @@ export const NotaService = {
           const notaId = chave.substring(prefixo.length);
           const raw = window.localStorage.getItem(chave);
           if (raw) {
-            const data = JSON.parse(raw);
-            rascunhos.push({ ...data, notaId });
+            rascunhos.push({ ...(JSON.parse(raw) as RascunhoNotaLocal), notaId });
           }
         }
       }
-    } catch {
-      // Ignora erro de acesso a localStorage
+    } catch (e) {
+      registrarFalha('notas.rascunho.listar', e);
     }
     return rascunhos;
   }

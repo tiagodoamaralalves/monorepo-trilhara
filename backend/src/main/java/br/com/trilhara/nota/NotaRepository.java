@@ -8,10 +8,13 @@ import static com.mongodb.client.model.Filters.ne;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.bson.Document;
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -29,11 +32,21 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 /**
- * Repositório direto BSON para a coleção normalizada 'notas'.
- * Conforme REQUISITOS-REESTRUTURACAO-DADOS.md §10 e PLANO-IMPLEMENTACAO-REESTRUTURACAO.md §8.2.
+ * Repositório BSON da coleção {@code notas} (REQUISITOS §10, D-29).
+ *
+ * <p>Toda operação de tenant recebe {@code ObjectId usuarioId} como primeiro parâmetro
+ * (D-06a) e o aplica no filtro — inclusive as consultas compostas. As únicas exceções são as
+ * conversões BSON e a varredura de purga por {@code expiresAt}, que é multi-tenant por
+ * definição (D-06b).</p>
+ *
+ * <p>Listagens nunca projetam {@code conteudoMarkdown}: ele só é lido por
+ * {@link #buscarAtiva(ObjectId, ObjectId)} e pela busca textual, que precisa do texto para
+ * montar o snippet em memória.</p>
  */
 @ApplicationScoped
 public class NotaRepository {
+
+    private static final String CAMPO_CONTEUDO = "conteudoMarkdown";
 
     private final MongoCollection<Document> collection;
 
@@ -74,15 +87,14 @@ public class NotaRepository {
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
 
-    public Optional<Nota> buscarPorIdSemUsuario(ObjectId notaId) {
-        Document doc = collection.find(eq("_id", notaId)).first();
-        return Optional.ofNullable(doc).map(this::paraEntidade);
-    }
-
-    public List<Nota> listarMetadadosPorSecao(ObjectId usuarioId, ObjectId cadernoId, ObjectId secaoId, int pagina, int tamanho) {
-        int limit = Math.max(1, Math.min(100, tamanho));
-        int skip = Math.max(0, (pagina - 1) * limit);
-
+    /**
+     * Lista metadados de uma seção, sem {@code conteudoMarkdown}.
+     *
+     * <p>A ordenação inclui {@code _id} como desempate estável, como exige a norma de
+     * paginação por offset.</p>
+     */
+    public List<Nota> listarMetadadosPorSecao(
+            ObjectId usuarioId, ObjectId cadernoId, ObjectId secaoId, int pagina, int tamanho) {
         List<Nota> lista = new ArrayList<>();
         collection.find(and(
                 eq("usuarioId", usuarioId),
@@ -90,10 +102,13 @@ public class NotaRepository {
                 eq("secaoId", secaoId),
                 eq("deletedAt", null)
         ))
-        .projection(Projections.exclude("conteudoMarkdown"))
-        .sort(Sorts.ascending("ordem", "criadoEm"))
-        .skip(skip)
-        .limit(limit)
+        .projection(Projections.exclude(CAMPO_CONTEUDO))
+        .sort(Sorts.orderBy(
+                Sorts.ascending("ordem"),
+                Sorts.ascending("criadoEm"),
+                Sorts.ascending("_id")))
+        .skip(deslocamento(pagina, tamanho))
+        .limit(tamanho)
         .forEach(doc -> lista.add(paraEntidade(doc)));
 
         return lista;
@@ -115,6 +130,41 @@ public class NotaRepository {
         ));
     }
 
+    /**
+     * Contagens de páginas por caderno em <strong>uma</strong> agregação — evita N+1 na
+     * listagem de até 500 cadernos.
+     */
+    public Map<ObjectId, Long> contarPorCadernosEmLote(ObjectId usuarioId, List<ObjectId> cadernoIds) {
+        Map<ObjectId, Long> contagens = new HashMap<>();
+        if (cadernoIds == null || cadernoIds.isEmpty()) {
+            return contagens;
+        }
+        collection.aggregate(List.of(
+                new Document("$match", new Document("usuarioId", usuarioId)
+                        .append("cadernoId", new Document("$in", cadernoIds))
+                        .append("deletedAt", null)),
+                new Document("$group", new Document("_id", "$cadernoId")
+                        .append("total", new Document("$sum", 1)))
+        )).forEach(doc -> contagens.put(doc.getObjectId("_id"), ((Number) doc.get("total")).longValue()));
+        return contagens;
+    }
+
+    /** Contagens de páginas por seção em uma agregação — evita N+1 na listagem de seções. */
+    public Map<ObjectId, Long> contarPorSecoesEmLote(ObjectId usuarioId, List<ObjectId> secaoIds) {
+        Map<ObjectId, Long> contagens = new HashMap<>();
+        if (secaoIds == null || secaoIds.isEmpty()) {
+            return contagens;
+        }
+        collection.aggregate(List.of(
+                new Document("$match", new Document("usuarioId", usuarioId)
+                        .append("secaoId", new Document("$in", secaoIds))
+                        .append("deletedAt", null)),
+                new Document("$group", new Document("_id", "$secaoId")
+                        .append("total", new Document("$sum", 1)))
+        )).forEach(doc -> contagens.put(doc.getObjectId("_id"), ((Number) doc.get("total")).longValue()));
+        return contagens;
+    }
+
     public int proximaOrdem(ObjectId usuarioId, ObjectId secaoId) {
         Document doc = collection.find(and(
                 eq("usuarioId", usuarioId),
@@ -128,10 +178,11 @@ public class NotaRepository {
         return 0;
     }
 
+    /**
+     * Busca textual sobre o índice composto {@code idx_notas_usuarioId_deletedAt_text}
+     * (D-30). Sempre {@code $text}: nenhum fallback para regex ou varredura da coleção.
+     */
     public List<Document> buscaGlobal(ObjectId usuarioId, String termoBusca, int pagina, int tamanho) {
-        int limit = Math.max(1, Math.min(100, tamanho));
-        int skip = Math.max(0, (pagina - 1) * limit);
-
         List<Document> resultados = new ArrayList<>();
         collection.find(and(
                 eq("usuarioId", usuarioId),
@@ -139,7 +190,8 @@ public class NotaRepository {
                 Filters.text(termoBusca, new TextSearchOptions().language("portuguese"))
         ))
         .projection(Projections.fields(
-                Projections.include("_id", "usuarioId", "cadernoId", "secaoId", "titulo", "conteudoMarkdown", "atualizadoEm", "criadoEm"),
+                Projections.include("_id", "usuarioId", "cadernoId", "secaoId", "titulo",
+                        CAMPO_CONTEUDO, "atualizadoEm", "criadoEm"),
                 Projections.metaTextScore("score")
         ))
         .sort(Sorts.orderBy(
@@ -147,8 +199,8 @@ public class NotaRepository {
                 Sorts.descending("atualizadoEm"),
                 Sorts.descending("_id")
         ))
-        .skip(skip)
-        .limit(limit)
+        .skip(deslocamento(pagina, tamanho))
+        .limit(tamanho)
         .into(resultados);
 
         return resultados;
@@ -162,7 +214,8 @@ public class NotaRepository {
         ));
     }
 
-    public boolean moverParaLixeira(ObjectId usuarioId, ObjectId notaId, String loteExclusaoId, Instant agora, Instant expiresAt) {
+    public boolean moverParaLixeira(
+            ObjectId usuarioId, ObjectId notaId, String loteExclusaoId, Instant agora, Instant expiresAt) {
         return collection.updateOne(
                 and(eq("_id", notaId), eq("usuarioId", usuarioId), eq("deletedAt", null)),
                 Updates.combine(
@@ -174,7 +227,8 @@ public class NotaRepository {
         ).getModifiedCount() > 0;
     }
 
-    public long moverPorSecaoParaLixeira(ObjectId usuarioId, ObjectId secaoId, String loteExclusaoId, Instant agora, Instant expiresAt) {
+    public long moverPorSecaoParaLixeira(
+            ObjectId usuarioId, ObjectId secaoId, String loteExclusaoId, Instant agora, Instant expiresAt) {
         return collection.updateMany(
                 and(eq("secaoId", secaoId), eq("usuarioId", usuarioId), eq("deletedAt", null)),
                 Updates.combine(
@@ -186,7 +240,8 @@ public class NotaRepository {
         ).getModifiedCount();
     }
 
-    public long moverPorCadernoParaLixeira(ObjectId usuarioId, ObjectId cadernoId, String loteExclusaoId, Instant agora, Instant expiresAt) {
+    public long moverPorCadernoParaLixeira(
+            ObjectId usuarioId, ObjectId cadernoId, String loteExclusaoId, Instant agora, Instant expiresAt) {
         return collection.updateMany(
                 and(eq("cadernoId", cadernoId), eq("usuarioId", usuarioId), eq("deletedAt", null)),
                 Updates.combine(
@@ -210,25 +265,10 @@ public class NotaRepository {
         ).getModifiedCount() > 0;
     }
 
-    public long restaurarPorLoteESecao(ObjectId usuarioId, ObjectId secaoId, String loteExclusaoId) {
-        if (loteExclusaoId == null) return 0;
-        return collection.updateMany(
-                and(
-                        eq("secaoId", secaoId),
-                        eq("usuarioId", usuarioId),
-                        eq("loteExclusaoId", loteExclusaoId)
-                ),
-                Updates.combine(
-                        Updates.unset("deletedAt"),
-                        Updates.unset("expiresAt"),
-                        Updates.unset("loteExclusaoId"),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(Instant.now()))
-                )
-        ).getModifiedCount();
-    }
-
     public long restaurarPorLoteECaderno(ObjectId usuarioId, ObjectId cadernoId, String loteExclusaoId) {
-        if (loteExclusaoId == null) return 0;
+        if (loteExclusaoId == null) {
+            return 0;
+        }
         return collection.updateMany(
                 and(
                         eq("cadernoId", cadernoId),
@@ -244,14 +284,36 @@ public class NotaRepository {
         ).getModifiedCount();
     }
 
-    public List<Nota> listarLixeira(ObjectId usuarioId, Instant agora) {
+    public long restaurarPorLoteESecao(ObjectId usuarioId, ObjectId secaoId, String loteExclusaoId) {
+        if (loteExclusaoId == null) {
+            return 0;
+        }
+        return collection.updateMany(
+                and(
+                        eq("secaoId", secaoId),
+                        eq("usuarioId", usuarioId),
+                        eq("loteExclusaoId", loteExclusaoId)
+                ),
+                Updates.combine(
+                        Updates.unset("deletedAt"),
+                        Updates.unset("expiresAt"),
+                        Updates.unset("loteExclusaoId"),
+                        Updates.set("atualizadoEm", BsonDates.toBsonDate(Instant.now()))
+                )
+        ).getModifiedCount();
+    }
+
+    public long contarLixeira(ObjectId usuarioId, Instant agora) {
+        return collection.countDocuments(filtroLixeira(usuarioId, agora));
+    }
+
+    public List<Nota> listarLixeira(ObjectId usuarioId, Instant agora, int pagina, int tamanho) {
         List<Nota> lista = new ArrayList<>();
-        collection.find(and(
-                eq("usuarioId", usuarioId),
-                ne("deletedAt", null),
-                gt("expiresAt", BsonDates.toBsonDate(agora))
-        )).sort(Sorts.descending("deletedAt"))
-          .forEach(doc -> lista.add(paraEntidade(doc)));
+        collection.find(filtroLixeira(usuarioId, agora))
+                .sort(Sorts.orderBy(Sorts.descending("deletedAt"), Sorts.descending("_id")))
+                .skip(deslocamento(pagina, tamanho))
+                .limit(tamanho)
+                .forEach(doc -> lista.add(paraEntidade(doc)));
         return lista;
     }
 
@@ -261,10 +323,23 @@ public class NotaRepository {
         ).getDeletedCount();
     }
 
+    /** Purga definitiva por {@code expiresAt} em todos os tenants (D-06b). */
     public long purgarExpirados(Instant agora) {
         return collection.deleteMany(
                 and(ne("deletedAt", null), lte("expiresAt", BsonDates.toBsonDate(agora)))
         ).getDeletedCount();
+    }
+
+    private static Bson filtroLixeira(ObjectId usuarioId, Instant agora) {
+        return and(
+                eq("usuarioId", usuarioId),
+                ne("deletedAt", null),
+                gt("expiresAt", BsonDates.toBsonDate(agora))
+        );
+    }
+
+    private static int deslocamento(int pagina, int tamanho) {
+        return Math.max(0, (pagina - 1) * tamanho);
     }
 
     public Document paraDocumento(Nota n) {
@@ -273,13 +348,13 @@ public class NotaRepository {
                 .append("cadernoId", n.cadernoId())
                 .append("secaoId", n.secaoId())
                 .append("titulo", n.titulo())
-                .append("conteudoMarkdown", n.conteudoMarkdown() != null ? n.conteudoMarkdown() : "")
+                .append(CAMPO_CONTEUDO, n.conteudoMarkdown() != null ? n.conteudoMarkdown() : "")
                 .append("ordem", n.ordem())
                 .append("criadoEm", BsonDates.toBsonDate(n.criadoEm()))
                 .append("atualizadoEm", BsonDates.toBsonDate(n.atualizadoEm()));
 
-        if (n.origemTopicoId() != null) {
-            doc.append("origemTopicoId", n.origemTopicoId());
+        if (n.topicoOrigemId() != null) {
+            doc.append("topicoOrigemId", n.topicoOrigemId());
         }
         if (n.deletedAt() != null) {
             doc.append("deletedAt", BsonDates.toBsonDate(n.deletedAt()));
@@ -294,16 +369,18 @@ public class NotaRepository {
     }
 
     public Nota paraEntidade(Document doc) {
-        if (doc == null) return null;
+        if (doc == null) {
+            return null;
+        }
         return new Nota(
                 doc.getObjectId("_id"),
                 doc.getObjectId("usuarioId"),
                 doc.getObjectId("cadernoId"),
                 doc.getObjectId("secaoId"),
                 doc.getString("titulo"),
-                doc.getString("conteudoMarkdown"),
+                doc.getString(CAMPO_CONTEUDO),
                 doc.getInteger("ordem", 0),
-                doc.getString("origemTopicoId"),
+                doc.getString("topicoOrigemId"),
                 BsonDates.lerInstant(doc, "deletedAt"),
                 BsonDates.lerInstant(doc, "expiresAt"),
                 doc.getString("loteExclusaoId"),

@@ -1,49 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import {
-  FormModal,
-  Input,
-  ColorPickerPopover
-} from '@shared/design-system';
+import { FormModal, Input } from '@shared/design-system';
 import { Secao } from '../../types/nota';
 import styles from './SecaoModal.module.css';
 
 export interface SecaoModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSalvar: (dados: { titulo: string; cor?: string }) => Promise<void> | void;
+  onSalvar: (dados: { titulo: string }) => Promise<void> | void;
   secaoParaEditar?: Secao | null;
-  corSugerida?: string;
 }
 
+/**
+ * Criação/renomeação de seção.
+ *
+ * O contrato de seção não tem cor (a cor é atributo do caderno), então o formulário expõe apenas
+ * o título — o `ColorPickerPopover` legado saiu junto com o modelo antigo.
+ */
 export const SecaoModal: React.FC<SecaoModalProps> = ({
   isOpen,
   onClose,
   onSalvar,
-  secaoParaEditar,
-  corSugerida = '#0ea5e9'
+  secaoParaEditar
 }) => {
   const [titulo, setTitulo] = useState('');
-  const [cor, setCor] = useState(corSugerida);
   const [erroTitulo, setErroTitulo] = useState('');
   const [salvando, setSalvando] = useState(false);
-  const [popoverAberto, setPopoverAberto] = useState(false);
 
   useEffect(() => {
-    if (!isOpen) {
-      setPopoverAberto(false);
-      return;
-    }
-
-    if (secaoParaEditar) {
-      setTitulo(secaoParaEditar.titulo);
-      setCor(secaoParaEditar.cor || corSugerida);
-    } else {
-      setTitulo('');
-      setCor(corSugerida);
-    }
+    if (!isOpen) return;
+    setTitulo(secaoParaEditar?.titulo ?? '');
     setErroTitulo('');
-    setPopoverAberto(false);
-  }, [secaoParaEditar, isOpen, corSugerida]);
+  }, [isOpen, secaoParaEditar]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,56 +41,32 @@ export const SecaoModal: React.FC<SecaoModalProps> = ({
 
     try {
       setSalvando(true);
-      await onSalvar({
-        titulo: titulo.trim(),
-        cor
-      });
+      await onSalvar({ titulo: titulo.trim() });
       onClose();
     } finally {
       setSalvando(false);
     }
   };
 
-  const headerColorBadge = (
-    <ColorPickerPopover
-      color={cor}
-      onChangeColor={setCor}
-      title="Cor da Seção"
-      eyebrow="Divisória"
-      description="Escolha uma cor para esta seção divisória do caderno."
-      buttonSize={32}
-      swatchSize={20}
-      onOpenChange={setPopoverAberto}
-    />
-  );
-
   return (
     <FormModal
       isOpen={isOpen}
       onClose={onClose}
+      title={secaoParaEditar ? 'Renomear seção' : 'Nova seção'}
       onSubmit={handleSubmit}
-      title={secaoParaEditar ? 'Editar Seção' : 'Nova Seção'}
-      icon={headerColorBadge}
-      iconBadgeStyle={{
-        borderRadius: '50%',
-        backgroundColor: 'transparent',
-        borderColor: 'transparent'
-      }}
-      submitText={secaoParaEditar ? 'Salvar Alterações' : 'Criar Seção'}
       loading={salvando}
-      overflowVisible={true}
+      submitText={secaoParaEditar ? 'Salvar' : 'Criar seção'}
     >
-      <div className={`${styles.formBody} ${popoverAberto ? styles.formBodyOpen : ''}`}>
+      <div className={styles.formBody}>
         <Input
-          label="Título da Seção"
-          placeholder="Ex: Introdução, Conceitos, Fichamentos..."
+          label="Título da seção"
           value={titulo}
           onChange={(e) => {
             setTitulo(e.target.value);
-            if (erroTitulo) setErroTitulo('');
+            setErroTitulo('');
           }}
-          error={erroTitulo}
-          required
+          error={erroTitulo || undefined}
+          maxLength={120}
         />
       </div>
     </FormModal>

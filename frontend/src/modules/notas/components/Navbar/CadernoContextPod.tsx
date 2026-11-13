@@ -37,7 +37,7 @@ export const CadernoContextPod: React.FC<CadernoContextPodProps> = ({
     () =>
       cadernos.map((c) => ({
         value: c.id,
-        label: c.vinculadoATrilha ? `📚 ${c.titulo}` : c.titulo,
+        label: c.origemTrilhaId ? `📚 ${c.titulo}` : c.titulo,
         dotColor: c.cor || undefined
       })),
     [cadernos]
@@ -163,9 +163,14 @@ export const CadernoContextPod: React.FC<CadernoContextPodProps> = ({
 
       {/* Pílula identificadora se o caderno está vinculado a uma trilha */}
       {cadernoAtivo?.origemTrilhaId && (
-        <span className={styles.trilhaBadge}>
+        <span
+          className={styles.trilhaBadge}
+          title="Vinculado à trilha; use Sincronizar para atualizar nomes e novas disciplinas"
+        >
           <BookOpen size={11} aria-hidden="true" />
-          <span>Trilha Vinculada</span>
+          <span>
+            Trilha: {cadernoAtivo.trilhaNome?.trim() || 'vinculada'}
+          </span>
         </span>
       )}
 

@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.bson.Document;
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -31,6 +32,9 @@ import jakarta.inject.Inject;
  */
 @ApplicationScoped
 public class CadernoRepository {
+
+    /** Teto normativo da listagem de cadernos por usuário (D-29: 500 cadernos/usuário). */
+    public static final int LIMITE_LISTAGEM = 500;
 
     private final MongoCollection<Document> collection;
 
@@ -71,11 +75,6 @@ public class CadernoRepository {
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
 
-    public Optional<Caderno> buscarPorIdSemUsuario(ObjectId id) {
-        Document doc = collection.find(eq("_id", id)).first();
-        return Optional.ofNullable(doc).map(this::paraEntidade);
-    }
-
     public Optional<Caderno> buscarAtivoPorOrigemTrilha(ObjectId usuarioId, ObjectId origemTrilhaId) {
         Document doc = collection.find(and(
                 eq("usuarioId", usuarioId),
@@ -86,12 +85,28 @@ public class CadernoRepository {
     }
 
     public List<Caderno> listarAtivos(ObjectId usuarioId) {
+        return listarAtivos(usuarioId, null, LIMITE_LISTAGEM);
+    }
+
+    /**
+     * Cadernos ativos, opcionalmente filtrados pela trilha de origem (R9/D-29).
+     *
+     * <p>{@code origemTrilhaId} nulo ou ausente não filtra. O teto de {@value #LIMITE_LISTAGEM}
+     * é o limite normativo da listagem: cadernos são poucos por usuário (máximo 500) e a
+     * listagem não é paginada.</p>
+     */
+    public List<Caderno> listarAtivos(ObjectId usuarioId, ObjectId origemTrilhaId, int limite) {
         List<Caderno> lista = new ArrayList<>();
-        collection.find(and(
-                eq("usuarioId", usuarioId),
-                eq("deletedAt", null)
-        )).sort(Sorts.descending("atualizadoEm", "_id"))
-          .forEach(doc -> lista.add(paraEntidade(doc)));
+        List<Bson> predicados = new ArrayList<>();
+        predicados.add(eq("usuarioId", usuarioId));
+        predicados.add(eq("deletedAt", null));
+        if (origemTrilhaId != null) {
+            predicados.add(eq("origemTrilhaId", origemTrilhaId));
+        }
+        collection.find(and(predicados))
+                .sort(Sorts.orderBy(Sorts.descending("atualizadoEm"), Sorts.descending("_id")))
+                .limit(limite)
+                .forEach(doc -> lista.add(paraEntidade(doc)));
         return lista;
     }
 
@@ -101,9 +116,52 @@ public class CadernoRepository {
                 eq("usuarioId", usuarioId),
                 ne("deletedAt", null),
                 gt("expiresAt", BsonDates.toBsonDate(agora))
-        )).sort(Sorts.descending("deletedAt"))
+        )).sort(Sorts.orderBy(Sorts.descending("deletedAt"), Sorts.descending("_id")))
           .forEach(doc -> lista.add(paraEntidade(doc)));
         return lista;
+    }
+
+    public long contarLixeira(ObjectId usuarioId, Instant agora) {
+        return collection.countDocuments(and(
+                eq("usuarioId", usuarioId),
+                ne("deletedAt", null),
+                gt("expiresAt", BsonDates.toBsonDate(agora))
+        ));
+    }
+
+    public List<Caderno> listarLixeira(ObjectId usuarioId, Instant agora, int pagina, int tamanho) {
+        List<Caderno> lista = new ArrayList<>();
+        collection.find(and(
+                eq("usuarioId", usuarioId),
+                ne("deletedAt", null),
+                gt("expiresAt", BsonDates.toBsonDate(agora))
+        )).sort(Sorts.orderBy(Sorts.descending("deletedAt"), Sorts.descending("_id")))
+          .skip(Math.max(0, (pagina - 1) * tamanho))
+          .limit(tamanho)
+          .forEach(doc -> lista.add(paraEntidade(doc)));
+        return lista;
+    }
+
+    /** Cadernos ativos do usuário — usado no teto de 500 cadernos (D-29). */
+    public long contarAtivos(ObjectId usuarioId) {
+        return collection.countDocuments(and(
+                eq("usuarioId", usuarioId),
+                eq("deletedAt", null)
+        ));
+    }
+
+    /** Títulos de cadernos ativos — usado para desempatar "Restauradas (2)", "(3)"… (D-34). */
+    public List<String> titulosAtivos(ObjectId usuarioId) {
+        List<String> titulos = new ArrayList<>();
+        collection.find(and(eq("usuarioId", usuarioId), eq("deletedAt", null)))
+                .projection(new Document("titulo", 1))
+                .forEach(doc -> {
+                    String titulo = doc.getString("titulo");
+                    if (titulo != null) {
+                        titulos.add(titulo);
+                    }
+                });
+        return titulos;
     }
 
     public boolean moverParaLixeira(ObjectId usuarioId, ObjectId id, String loteExclusaoId, Instant agora, Instant expiresAt) {

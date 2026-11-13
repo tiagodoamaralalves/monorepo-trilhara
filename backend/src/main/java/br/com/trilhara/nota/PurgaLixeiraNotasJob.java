@@ -1,22 +1,25 @@
 package br.com.trilhara.nota;
 
 import java.time.Instant;
-import java.util.logging.Logger;
 
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+/**
+ * Disparo diário da purga da lixeira de Notas (D-34).
+ *
+ * <p>O job não faz a operação: delega a {@link NotaPurgaService}, que é a classe
+ * {@code @SystemScope} autorizada a varrer todos os tenants por {@code expiresAt} (D-06b).</p>
+ */
 @ApplicationScoped
 public class PurgaLixeiraNotasJob {
 
-    private static final Logger LOG = Logger.getLogger(PurgaLixeiraNotasJob.class.getName());
-
-    private final NotaService notaService;
+    private final NotaPurgaService purgaService;
 
     @Inject
-    public PurgaLixeiraNotasJob(NotaService notaService) {
-        this.notaService = notaService;
+    public PurgaLixeiraNotasJob(NotaPurgaService purgaService) {
+        this.purgaService = purgaService;
     }
 
     @Scheduled(cron = "{trilhara.jobs.purga-lixeira-notas.cron:0 30 3 * * ?}")
@@ -25,9 +28,6 @@ public class PurgaLixeiraNotasJob {
     }
 
     public int executarPurga(Instant agora) {
-        LOG.fine("Iniciando purga diária de itens expirados da lixeira de notas...");
-        int totalPurgados = notaService.purgarExpiradasGlobal(agora);
-        LOG.fine("Purga de lixeira de notas concluída. Itens removidos definitivamente: " + totalPurgados);
-        return totalPurgados;
+        return purgaService.purgarExpirados(agora);
     }
 }

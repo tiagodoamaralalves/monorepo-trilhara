@@ -270,3 +270,36 @@
 | Agrupamento existe uma única vez em `shared/agenda` | `rg "agruparAtrasadas" frontend/src -l` → 4 arquivos, todos em `shared/agenda`/teste | Coberto |
 | Gate comum | `docs/REVISAO-IMPLEMENTADA-R8.md` §5 | Coberto (backend em §6) |
 
+## K. Critérios específicos da R9 (F8: Notas)
+
+| Critério | Teste / comando | Status |
+|---|---|---|
+| Importar trilha já vinculada sem `reimportar=true` → `409 TRAIL_ALREADY_IMPORTED` com `errors.cadernoId` | `nota/NotaResourceTest#importarSemReimportarComVinculoExistenteRetorna409` | Coberto |
+| Reimportação mantém o caderno antigo, desvincula e cria novo com `titulo = trilha.nome` | `#reimportarDesvinculaAntigoECriaNovoComNomeDaTrilha` | Coberto |
+| Trilha de outro usuário → `404` (sem revelar existência) | `#importarTrilhaDeOutroUsuarioRetorna404` | Coberto |
+| Sincronização não cria nem altera páginas de seções existentes (RI-29) | `#sincronizarNaoCriaNotasEmSecoesExistentes` | Coberto |
+| Sincronização cria seção + páginas apenas para disciplina nova | `#sincronizarCriaSecaoParaDisciplinaNovaComPaginas` | Coberto |
+| Caderno sem origem → `400 VALIDATION_ERROR` com `errors.cadernoId` | `#sincronizarCadernoSemOrigemRetorna400ComCampo` | Coberto |
+| `impacto-exclusao` conta somente itens ativos | `#impactoExclusaoContaSoAtivos` | Coberto |
+| Lixeira paginada com `breadcrumb` e restauração de ancestrais do lote | `#lixeiraPaginadaRestauraAncestraisDoMesmoLote` | Coberto |
+| Restauração fora do prazo → `404 TRASH_ITEM_EXPIRED`; item nunca excluído → `404 NOT_FOUND` | `#restaurarForaDoPrazoRetorna404TrashItemExpired` | Coberto |
+| Ancestral purgado → "Restauradas" com `realocadaPara` | `#restaurarComCadernoPurgadoCriaCadernoESecaoRestauradas` | Coberto |
+| Snippet em texto puro ≤ 180 com `destaques` UTF-16 corretos sob acento | `#buscaRetornaSnippetTextoPuroComDestaques`; `NotaSnippetExtractorTest#deveExtrairSnippetComDestaqueDeTermoAcentuado`; `#snippetNuncaExcedeOLimite` | Coberto |
+| Busca ignora lixeira e outro usuário; query fraca → `400 INVALID_SEARCH_QUERY` | `#buscaNaoRetornaLixeiraNemOutroUsuario`; `NotaSnippetExtractorTest#deveRejeitarApenasStopWords` | Coberto |
+| Endpoint canônico de página; rota raiz de criação e leitura aninhada ausentes | `#endpointAninhadoDeNotaNaoExiste`; `#rotaDuplicadaDeCriacaoNaoExiste` | Coberto |
+| Seção de outro caderno no path → `404` | `#notaComSecaoDeOutroCadernoRetorna404` | Coberto |
+| Listagem de páginas paginada e sem `conteudoMarkdown` | `#listagemNaoContemConteudoMarkdown`; `#paginacaoInvalidaRetorna400` | Coberto |
+| Markdown > 512 KB ou com caractere de controle → `400 VALIDATION_ERROR` | `#markdownAcimaDe512KBRetorna400ValidationError`; `#markdownComCaractereDeControleRetorna400` | Coberto |
+| Teto de 500 cadernos → `409 RESOURCE_LIMIT_EXCEEDED` | `#limiteDe500CadernosRetorna409` | Coberto |
+| Filtro `?origemTrilhaId=` e `400 INVALID_IDENTIFIER` | `#filtroOrigemTrilhaId` | Coberto |
+| Caderno com zero seções ativas é estado válido | `#deveGerenciarCicloCompletoEPermitirCadernoComZeroSecoes`; `cadernoVazio.test.tsx` | Coberto |
+| Esvaziar lixeira e purga `@SystemScope` | `#esvaziarLixeiraEPurgar`; `nota/NotaPurgaService` | Coberto |
+| Autosave: debounce 800 ms, `seq`, `AbortController`, flush e rascunho só após 200 igual | `autosave.test.tsx` (11) | Coberto |
+| Recuperação de rascunho por diferença de conteúdo + aviso de versão do servidor | `recuperacaoRascunho.test.tsx` (6) | Coberto |
+| Busca no cliente: 2 alfanuméricos, 300 ms, `<mark>` por offsets, XSS como texto, 429 | `buscaModal.test.tsx` (8) | Coberto |
+| Preferência `trilhara:u:{id}:notas_ocultar_modal_importacao` + reimportação confirmada | `importacaoAutomatica.test.tsx` (4) | Coberto |
+| `SyncStatusBadge` com quatro estados e retry | `syncStatusBadge.test.tsx` (5) | Coberto |
+| Allowlist de protocolos de link no editor | `linkSeguro.test.ts` (6) | Coberto |
+| Repositórios de `nota` exigem `usuarioId` e não buscam sem ele | `arquitetura/TenantIsolationArchTest#repositoriosDeNotaExigemUsuarioId`; `#repositoriosDeNotaNaoBuscamSemUsuario` | Coberto |
+| Gate comum | `docs/REVISAO-IMPLEMENTADA-R9.md` §5 e §6 | Coberto; ressalva em §7 (achados herdados de R12/R13) |
+

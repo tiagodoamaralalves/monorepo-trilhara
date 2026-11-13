@@ -1,26 +1,21 @@
 package br.com.trilhara.nota;
 
-
-import java.net.URI;
-import java.util.List;
 import java.util.Map;
 
 import org.bson.types.ObjectId;
 
-import br.com.trilhara.auth.Autenticado;
 import br.com.trilhara.auth.AuthContext;
-import br.com.trilhara.shared.mongo.BsonIds;
+import br.com.trilhara.auth.Autenticado;
 import br.com.trilhara.nota.dto.AtualizarNotaRequest;
 import br.com.trilhara.nota.dto.BuscaNotasResponse;
-import br.com.trilhara.nota.dto.CriarNotaRequest;
 import br.com.trilhara.nota.dto.ExclusaoLixeiraResponse;
-import br.com.trilhara.nota.dto.ItemLixeiraResponse;
+import br.com.trilhara.nota.dto.LixeiraNotasResponse;
 import br.com.trilhara.nota.dto.NotaDetalheResponse;
 import br.com.trilhara.nota.dto.RestauracaoLixeiraResponse;
+import br.com.trilhara.shared.mongo.BsonIds;
 import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
-import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.DefaultValue;
@@ -32,8 +27,13 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
 
+/**
+ * Leitura canônica, atualização e exclusão de páginas, busca global e lixeira (D-30 a D-34).
+ *
+ * <p>A criação acontece apenas na rota aninhada por seção, em {@link CadernoResource}; não há
+ * {@code POST /api/notas} nem leitura aninhada de página (DC-12/D-32).</p>
+ */
 @Path("/api/notas")
 @Produces(MediaType.APPLICATION_JSON)
 @RequestScoped
@@ -50,29 +50,6 @@ public class NotaResource {
         return authContext.usuarioIdObjectId();
     }
 
-    @POST
-    @Consumes(MediaType.APPLICATION_JSON)
-    public Response criar(@Valid CriarNotaRequest request) {
-        String cadernoIdStr = request.obterCadernoId();
-        String secaoIdStr = request.secaoId();
-
-        if (cadernoIdStr == null || cadernoIdStr.isBlank()) {
-            throw new BadRequestException("O identificador do caderno é obrigatório.");
-        }
-        if (secaoIdStr == null || secaoIdStr.isBlank()) {
-            throw new BadRequestException("O identificador da seção é obrigatório.");
-        }
-
-        NotaDetalheResponse nota = notaService.criarNota(
-                usuarioId(),
-                BsonIds.parse(cadernoIdStr, "cadernoId"),
-                BsonIds.parse(secaoIdStr, "secaoId"),
-                request
-        );
-        URI location = URI.create("/api/notas/" + nota.id());
-        return Response.created(location).entity(nota).build();
-    }
-
     @GET
     @Path("/busca")
     public BuscaNotasResponse buscaGlobal(
@@ -84,7 +61,7 @@ public class NotaResource {
 
     @GET
     @Path("/lixeira")
-    public List<ItemLixeiraResponse> listarLixeira(
+    public LixeiraNotasResponse listarLixeira(
             @QueryParam("pagina") @DefaultValue("1") int pagina,
             @QueryParam("tamanho") @DefaultValue("50") int tamanho) {
         return notaService.listarLixeira(usuarioId(), pagina, tamanho);
@@ -98,12 +75,14 @@ public class NotaResource {
         return notaService.restaurarItem(usuarioId(), tipo, BsonIds.parse(id, "id"));
     }
 
+    /** Esvaziamento imediato da lixeira (D-34); a UI confirma com variante {@code danger}. */
     @DELETE
     @Path("/lixeira/esvaziar")
     public Map<String, Long> esvaziarLixeira() {
         return notaService.esvaziarLixeira(usuarioId());
     }
 
+    /** Endpoint canônico de leitura completa (D-32). */
     @GET
     @Path("/{id}")
     public NotaDetalheResponse buscar(@PathParam("id") String id) {
@@ -113,7 +92,8 @@ public class NotaResource {
     @PUT
     @Path("/{id}")
     @Consumes(MediaType.APPLICATION_JSON)
-    public NotaDetalheResponse atualizar(@PathParam("id") String id, @Valid AtualizarNotaRequest request) {
+    public NotaDetalheResponse atualizar(
+            @PathParam("id") String id, @Valid AtualizarNotaRequest request) {
         return notaService.atualizarNota(usuarioId(), BsonIds.parse(id, "id"), request);
     }
 

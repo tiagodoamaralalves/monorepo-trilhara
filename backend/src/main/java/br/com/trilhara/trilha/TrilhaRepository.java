@@ -318,7 +318,7 @@ public class TrilhaRepository {
                     Updates.combine(Updates.unset(CAMPO_ORIGEM_TRILHA_ID), Updates.unset(CAMPO_ORIGEM_DISCIPLINA_ID)));
         }
 
-        // 4. Desvincula notas
+        // 4. Desvincula notas (referência de origem da importação de trilha, D-29).
         if (topicoIds != null && !topicoIds.isEmpty()) {
             db.getCollection("notas").updateMany(
                     and(
@@ -327,11 +327,11 @@ public class TrilhaRepository {
                                     eq(CAMPO_USER_ID, usuarioId.toHexString())
                             ),
                             or(
-                                    in("origemTopicoId", topicoIds),
+                                    in("topicoOrigemId", topicoIds),
                                     eq(CAMPO_ORIGEM_TRILHA_ID, trilhaId.toHexString())
                             )
                     ),
-                    Updates.combine(Updates.unset(CAMPO_ORIGEM_TRILHA_ID), Updates.unset(CAMPO_ORIGEM_DISCIPLINA_ID), Updates.unset("origemTopicoId")));
+                    Updates.combine(Updates.unset(CAMPO_ORIGEM_TRILHA_ID), Updates.unset(CAMPO_ORIGEM_DISCIPLINA_ID), Updates.unset("topicoOrigemId")));
         }
     }
 

@@ -20,6 +20,7 @@ import {
 } from '@shared/design-system';
 import { TrilhaDetalheDTO, Disciplina } from '../types/trilhara';
 import { EstudosService } from '../services/estudosService';
+import { iniciarHandoffParaApp, obterUrlAppNotas } from '@shared/auth';
 import { DisciplinaPesoButton } from '../components/DisciplinaPesoButton/DisciplinaPesoButton';
 import { EmptyJourneyState } from '../components/EmptyJourneyState/EmptyJourneyState';
 import { DisciplinasTopicosModal } from '../components/DisciplinasTopicosModal/DisciplinasTopicosModal';
@@ -393,6 +394,25 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
     setModalTopicosAberto(true);
   };
 
+  /**
+   * "Abrir no Notas" (R3/R9): SSO para o app de Notas já filtrado pela trilha.
+   *
+   * O handoff leva o access token para o outro subdomínio; o parâmetro `origemTrilhaId` é o
+   * que `NotasApp` lê na carga inicial para listar só o caderno vinculado a esta trilha.
+   * Sem trilha carregada, o botão é inerte — não inventamos um ID.
+   */
+  const abrirNotasDaTrilha = async () => {
+    if (!trilha.id) return;
+    try {
+      const separador = obterUrlAppNotas().includes('?') ? '&' : '?';
+      const destino = `${obterUrlAppNotas()}${separador}origemTrilhaId=${encodeURIComponent(trilha.id)}`;
+      const urlComSessao = await iniciarHandoffParaApp(destino);
+      window.location.assign(urlComSessao);
+    } catch (err) {
+      toast.error(err instanceof Error ? err : 'Não foi possível abrir o app de Notas.');
+    }
+  };
+
   const salvarDisciplinasLote = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     let entradas: Array<{ nome: string; assuntos: string[] }>;
@@ -640,6 +660,13 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
               >
                 Adicionar em lote
               </Button>
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={abrirNotasDaTrilha}
+              >
+                Abrir no Notas
+              </Button>
             </div>
           }
         />
@@ -704,6 +731,9 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
               }}
             >
               Adicionar em lote
+            </Button>
+            <Button variant="secondary" size="md" onClick={abrirNotasDaTrilha}>
+              Abrir no Notas
             </Button>
           </div>
         }

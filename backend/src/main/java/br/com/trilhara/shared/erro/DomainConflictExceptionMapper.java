@@ -20,7 +20,8 @@ public class DomainConflictExceptionMapper implements ExceptionMapper<DomainConf
         ProblemDetails problem = ProblemDetailsFactory.criar(
                 exception.getCodigo(),
                 exception.getMessage(),
-                resolvePath(uriInfo));
+                resolvePath(uriInfo),
+                exception.getErrors());
 
         return Response.status(problem.status())
                 .type(ProblemDetails.MEDIA_TYPE)

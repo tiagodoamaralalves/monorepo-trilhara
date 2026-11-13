@@ -1,14 +1,14 @@
 package br.com.trilhara.nota;
 
-
 import org.bson.types.ObjectId;
 
-import br.com.trilhara.auth.Autenticado;
 import br.com.trilhara.auth.AuthContext;
-import br.com.trilhara.shared.mongo.BsonIds;
+import br.com.trilhara.auth.Autenticado;
 import br.com.trilhara.nota.dto.AtualizarSecaoRequest;
 import br.com.trilhara.nota.dto.ExclusaoLixeiraResponse;
+import br.com.trilhara.nota.dto.SecaoImpactoExclusaoResponse;
 import br.com.trilhara.nota.dto.SecaoResponse;
+import br.com.trilhara.shared.mongo.BsonIds;
 import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
@@ -46,8 +46,16 @@ public class SecaoResource {
     @PUT
     @Path("/{id}")
     @Consumes(MediaType.APPLICATION_JSON)
-    public SecaoResponse atualizar(@PathParam("id") String id, @Valid AtualizarSecaoRequest request) {
+    public SecaoResponse atualizar(
+            @PathParam("id") String id, @Valid AtualizarSecaoRequest request) {
         return notaService.atualizarSecao(usuarioId(), BsonIds.parse(id, "id"), request);
+    }
+
+    /** Contagens exibidas no {@code ConfirmDialog} antes de mover a seção para a lixeira (D-33). */
+    @GET
+    @Path("/{id}/impacto-exclusao")
+    public SecaoImpactoExclusaoResponse impactoExclusao(@PathParam("id") String id) {
+        return notaService.obterImpactoExclusaoSecao(usuarioId(), BsonIds.parse(id, "id"));
     }
 
     @DELETE

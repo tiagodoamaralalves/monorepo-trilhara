@@ -1,7 +1,6 @@
 package br.com.trilhara.nota;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -14,21 +13,45 @@ import org.bson.Document;
 import org.bson.types.ObjectId;
 
 import br.com.trilhara.nota.dto.CadernoResponse;
-import br.com.trilhara.nota.dto.SecaoResponse;
 import br.com.trilhara.nota.dto.SincronizacaoTrilhaResponse;
+import br.com.trilhara.shared.erro.CodigoErro;
+import br.com.trilhara.shared.erro.DomainConflictException;
+import br.com.trilhara.shared.erro.ValidationException;
 import br.com.trilhara.trilha.Disciplina;
 import br.com.trilhara.trilha.DisciplinaRepository;
 import br.com.trilhara.trilha.TopicoEmbutido;
 import br.com.trilhara.trilha.TrilhaRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.NotFoundException;
 
+/**
+ * Importação, reimportação e sincronização explícita de trilhas de Estudos (D-29).
+ *
+ * <p>Regras cravadas:</p>
+ * <ul>
+ *   <li>Importar sem {@code reimportar=true} quando já existe caderno ativo vinculado responde
+ *       {@code 409 TRAIL_ALREADY_IMPORTED} com {@code errors.cadernoId} — nunca cria
+ *       silenciosamente um segundo caderno;</li>
+ *   <li>Reimportar desvincula o caderno antigo (limpando {@code origemTrilhaId} e
+ *       {@code origemDisciplinaId} das seções dele) sem apagar conteúdo, e cria um novo caderno
+ *       com {@code titulo = trilha.nome} — sem sufixo de data;</li>
+ *   <li>Sincronizar renomeia caderno/seções vinculadas, cria seções com páginas vazias apenas
+ *       para disciplinas novas e desvincula disciplinas removidas. <strong>Nunca</strong> cria
+ *       nem altera notas de tópicos em seções existentes.</li>
+ * </ul>
+ *
+ * <p>Não há transação multi-documento: a importação grava caderno, seções e páginas em
+ * sequência. Uma falha no meio deixa um caderno parcial, identificável pelo próprio vínculo e
+ * recuperável pela reimportação — a operação é composta e o efeito parcial é esse, nunca
+ * atomicidade presumida.</p>
+ */
 @ApplicationScoped
 public class NotaSincronizacaoService {
 
     private static final String TEXTO_0284C7 = "#0284c7";
+    private static final String ERRO_CADERNO_NAO_ENCONTRADO = "Caderno não encontrado.";
+    private static final String CAMPO_CADERNO_ID = "cadernoId";
 
     private final CadernoRepository cadernoRepository;
     private final SecaoRepository secaoRepository;
@@ -50,16 +73,31 @@ public class NotaSincronizacaoService {
         this.trilhaRepository = trilhaRepository;
     }
 
-    public CadernoResponse importarTrilha(ObjectId usuarioId, ObjectId trilhaId) {
+    /**
+     * Importa (ou reimporta) uma trilha como caderno novo (D-29).
+     *
+     * @param reimportar quando {@code true}, desvincula o caderno ativo existente e cria outro;
+     *                   quando {@code false} e já existe vínculo ativo, responde 409
+     */
+    public CadernoResponse importarTrilha(ObjectId usuarioId, ObjectId trilhaId, boolean reimportar) {
         Document trilhaDoc = trilhaRepository.buscarEntidade(usuarioId, trilhaId)
                 .orElseThrow(() -> new NotFoundException("Trilha de estudo não encontrada."));
 
+        Optional<Caderno> cadernoVinculado = cadernoRepository.buscarAtivoPorOrigemTrilha(usuarioId, trilhaId);
+        if (cadernoVinculado.isPresent() && !reimportar) {
+            throw DomainConflictException.campo(
+                    CodigoErro.TRAIL_ALREADY_IMPORTED,
+                    "Esta trilha já possui um caderno vinculado. Use a reimportação para criar "
+                            + "uma nova cópia; o caderno atual será mantido e desvinculado.",
+                    CAMPO_CADERNO_ID,
+                    "Trilha já importada.");
+        }
+        cadernoVinculado.ifPresent(antigo -> desvincularCaderno(usuarioId, antigo));
+
         String nomeTrilha = trilhaDoc.getString("nome");
         String corTrilha = trilhaDoc.getString("cor");
-
-        desvincularCadernoExistenteSeHouver(usuarioId, trilhaId);
-
         Instant agora = Instant.now();
+
         Caderno novoCaderno = new Caderno(
                 new ObjectId(),
                 usuarioId,
@@ -76,18 +114,17 @@ public class NotaSincronizacaoService {
         cadernoRepository.inserir(novoCaderno);
 
         List<Disciplina> disciplinas = disciplinaRepository.listarPorTrilha(usuarioId, trilhaId);
-        List<SecaoResponse> secoesCriadas = new ArrayList<>();
-        long totalNotasCriadas = 0;
+        long totalPaginasCriadas = 0;
 
         for (int i = 0; i < disciplinas.size(); i++) {
-            Disciplina d = disciplinas.get(i);
+            Disciplina disciplina = disciplinas.get(i);
             Secao novaSecao = new Secao(
                     new ObjectId(),
                     usuarioId,
                     novoCaderno.id(),
-                    d.nome(),
-                    d.ordem() != null ? d.ordem() : i,
-                    d.id(),
+                    disciplina.nome(),
+                    disciplina.ordem() != null ? disciplina.ordem() : i,
+                    disciplina.id(),
                     null,
                     null,
                     null,
@@ -95,161 +132,33 @@ public class NotaSincronizacaoService {
                     agora
             );
             secaoRepository.inserir(novaSecao);
-
-            long notasNestaSecao = criarNotasParaTopicos(usuarioId, novoCaderno.id(), novaSecao.id(), d.topicos(), agora);
-            totalNotasCriadas += notasNestaSecao;
-            secoesCriadas.add(paraSecaoResponse(novaSecao, notasNestaSecao));
+            totalPaginasCriadas += criarNotasParaTopicos(
+                    usuarioId, novoCaderno.id(), novaSecao.id(), disciplina.topicos(), agora);
         }
 
-        return paraCadernoResponse(novoCaderno, secoesCriadas.size(), totalNotasCriadas, secoesCriadas);
-    }
-
-    private void desvincularCadernoExistenteSeHouver(ObjectId usuarioId, ObjectId trilhaId) {
-        Optional<Caderno> cadernoExistente = cadernoRepository.buscarAtivoPorOrigemTrilha(usuarioId, trilhaId);
-        if (cadernoExistente.isPresent()) {
-            Caderno antigo = cadernoExistente.get();
-            cadernoRepository.desvincularTrilha(usuarioId, trilhaId);
-            secaoRepository.desvincularOrigemDisciplinaPorCaderno(usuarioId, antigo.id());
-        }
-    }
-
-    public SincronizacaoTrilhaResponse sincronizarTrilha(ObjectId usuarioId, ObjectId cadernoId) {
-        Caderno caderno = cadernoRepository.buscarAtivo(usuarioId, cadernoId)
-                .orElseThrow(() -> new NotFoundException("Caderno não encontrado."));
-
-        if (caderno.origemTrilhaId() == null) {
-            throw new BadRequestException("O caderno selecionado não está vinculado a nenhuma trilha de estudo.");
-        }
-
-        ObjectId trilhaId = caderno.origemTrilhaId();
-        Optional<Document> trilhaOpt = trilhaRepository.buscarEntidade(usuarioId, trilhaId);
-
-        if (trilhaOpt.isEmpty()) {
-            cadernoRepository.desvincularTrilha(usuarioId, trilhaId);
-            secaoRepository.desvincularOrigemDisciplinaPorCaderno(usuarioId, cadernoId);
-            return new SincronizacaoTrilhaResponse(cadernoId.toHexString(), 0, 0, 0);
-        }
-
-        atualizarTituloCadernoSeMudou(caderno, trilhaOpt.get(), usuarioId);
-
-        List<Disciplina> disciplinasTrilha = disciplinaRepository.listarPorTrilha(usuarioId, trilhaId);
-        Map<ObjectId, Disciplina> disciplinasMap = new HashMap<>();
-        for (Disciplina d : disciplinasTrilha) {
-            disciplinasMap.put(d.id(), d);
-        }
-
-        ResultadoProcessamentoSecoes procSecoes = processarSecoesAtivas(usuarioId, cadernoId, disciplinasMap);
-        ResultadoCriacaoNovasSecoes criadas = criarSecoesParaNovasDisciplinas(
-                usuarioId, cadernoId, disciplinasTrilha, procSecoes.disciplinasJaPresentes());
-
-        return new SincronizacaoTrilhaResponse(
-                cadernoId.toHexString(),
-                criadas.secoesCriadas(),
-                criadas.paginasCriadas(),
-                procSecoes.secoesDesvinculadas()
+        return new CadernoResponse(
+                novoCaderno.idHex(),
+                novoCaderno.titulo(),
+                novoCaderno.cor(),
+                novoCaderno.icone(),
+                novoCaderno.origemTrilhaIdHex(),
+                nomeTrilha,
+                disciplinas.size(),
+                totalPaginasCriadas,
+                novoCaderno.criadoEm(),
+                novoCaderno.atualizadoEm()
         );
     }
 
-    private void atualizarTituloCadernoSeMudou(Caderno caderno, Document trilhaDoc, ObjectId usuarioId) {
-        String nomeAtualTrilha = trilhaDoc.getString("nome");
-        if (!Objects.equals(caderno.titulo(), nomeAtualTrilha)) {
-            Caderno renomeado = new Caderno(
-                    caderno.id(),
-                    usuarioId,
-                    nomeAtualTrilha,
-                    caderno.cor(),
-                    caderno.icone(),
-                    caderno.origemTrilhaId(),
-                    caderno.deletedAt(),
-                    caderno.expiresAt(),
-                    caderno.loteExclusaoId(),
-                    caderno.criadoEm(),
-                    Instant.now()
-            );
-            cadernoRepository.atualizar(renomeado);
-        }
-    }
-
-    private record ResultadoProcessamentoSecoes(Set<ObjectId> disciplinasJaPresentes, int secoesDesvinculadas) {
-    }
-
-    private ResultadoProcessamentoSecoes processarSecoesAtivas(
-            ObjectId usuarioId,
-            ObjectId cadernoId,
-            Map<ObjectId, Disciplina> disciplinasMap) {
-        List<Secao> secoesAtivas = secaoRepository.listarPorCaderno(usuarioId, cadernoId);
-        Set<ObjectId> disciplinasJaPresentes = new HashSet<>();
-        int secoesDesvinculadas = 0;
-
-        for (Secao secao : secoesAtivas) {
-            if (secao.origemDisciplinaId() != null) {
-                Disciplina disc = disciplinasMap.get(secao.origemDisciplinaId());
-                if (disc != null) {
-                    disciplinasJaPresentes.add(disc.id());
-                    atualizarTituloSecaoSeMudou(usuarioId, secao, disc.nome());
-                } else {
-                    secaoRepository.desvincularOrigemDisciplina(usuarioId, secao.id());
-                    secoesDesvinculadas++;
-                }
-            }
-        }
-        return new ResultadoProcessamentoSecoes(disciplinasJaPresentes, secoesDesvinculadas);
-    }
-
-    private void atualizarTituloSecaoSeMudou(ObjectId usuarioId, Secao secao, String nomeDisciplina) {
-        if (!Objects.equals(secao.titulo(), nomeDisciplina)) {
-            Secao atualizada = new Secao(
-                    secao.id(),
-                    usuarioId,
-                    secao.cadernoId(),
-                    nomeDisciplina,
-                    secao.ordem(),
-                    secao.origemDisciplinaId(),
-                    secao.deletedAt(),
-                    secao.expiresAt(),
-                    secao.loteExclusaoId(),
-                    secao.criadoEm(),
-                    Instant.now()
-            );
-            secaoRepository.atualizar(atualizada);
-        }
-    }
-
-    private record ResultadoCriacaoNovasSecoes(int secoesCriadas, int paginasCriadas) {
-    }
-
-    private ResultadoCriacaoNovasSecoes criarSecoesParaNovasDisciplinas(
-            ObjectId usuarioId,
-            ObjectId cadernoId,
-            List<Disciplina> disciplinasTrilha,
-            Set<ObjectId> disciplinasJaPresentes) {
-        Instant agora = Instant.now();
-        int secoesCriadas = 0;
-        int paginasCriadas = 0;
-
-        for (Disciplina disc : disciplinasTrilha) {
-            if (!disciplinasJaPresentes.contains(disc.id())) {
-                int proximaOrdem = secaoRepository.proximaOrdem(usuarioId, cadernoId);
-                Secao novaSecao = new Secao(
-                        new ObjectId(),
-                        usuarioId,
-                        cadernoId,
-                        disc.nome(),
-                        proximaOrdem,
-                        disc.id(),
-                        null,
-                        null,
-                        null,
-                        agora,
-                        agora
-                );
-                secaoRepository.inserir(novaSecao);
-                secoesCriadas++;
-
-                paginasCriadas += criarNotasParaTopicos(usuarioId, cadernoId, novaSecao.id(), disc.topicos(), agora);
-            }
-        }
-        return new ResultadoCriacaoNovasSecoes(secoesCriadas, paginasCriadas);
+    /**
+     * Desvincula o caderno de uma trilha preservando todo o conteúdo (D-29): o caderno deixa de
+     * referenciar a trilha e suas seções perdem {@code origemDisciplinaId}. As notas permanecem
+     * intactas, e a referência de origem de tópico não é tocada aqui — ela só é limpada quando
+     * a trilha é excluída.
+     */
+    private void desvincularCaderno(ObjectId usuarioId, Caderno caderno) {
+        cadernoRepository.desvincularTrilha(usuarioId, caderno.origemTrilhaId());
+        secaoRepository.desvincularOrigemDisciplinaPorCaderno(usuarioId, caderno.id());
     }
 
     private int criarNotasParaTopicos(
@@ -261,7 +170,6 @@ public class NotaSincronizacaoService {
         if (topicos == null || topicos.isEmpty()) {
             return 0;
         }
-
         for (int j = 0; j < topicos.size(); j++) {
             TopicoEmbutido topico = topicos.get(j);
             Nota novaNota = new Nota(
@@ -284,38 +192,159 @@ public class NotaSincronizacaoService {
         return topicos.size();
     }
 
-    private SecaoResponse paraSecaoResponse(Secao s, long totalNotas) {
-        return new SecaoResponse(
-                s.idHex(),
-                s.usuarioIdHex(),
-                s.cadernoIdHex(),
-                s.titulo(),
-                s.ordem(),
-                s.origemDisciplinaIdHex(),
-                totalNotas,
-                s.criadoEm(),
-                s.atualizadoEm()
+    /**
+     * Sincronização explícita (D-29): renomeia o caderno e as seções vinculadas, cria seções com
+     * uma página vazia por tópico apenas para disciplinas novas, e desvincula seções de
+     * disciplinas removidas. Páginas de seções existentes nunca são criadas nem alteradas.
+     */
+    public SincronizacaoTrilhaResponse sincronizarTrilha(ObjectId usuarioId, ObjectId cadernoId) {
+        Caderno caderno = cadernoRepository.buscarAtivo(usuarioId, cadernoId)
+                .orElseThrow(() -> new NotFoundException(ERRO_CADERNO_NAO_ENCONTRADO));
+
+        if (caderno.origemTrilhaId() == null) {
+            throw new ValidationException(
+                    CAMPO_CADERNO_ID, "Caderno não vinculado a uma trilha.");
+        }
+
+        ObjectId trilhaId = caderno.origemTrilhaId();
+        Optional<Document> trilhaOpt = trilhaRepository.buscarEntidade(usuarioId, trilhaId);
+
+        if (trilhaOpt.isEmpty()) {
+            // A trilha foi excluída em Estudos: preserva caderno e páginas, remove as origens.
+            desvincularCaderno(usuarioId, caderno);
+            return new SincronizacaoTrilhaResponse(cadernoId.toHexString(), 0, 0, 0, 0);
+        }
+
+        atualizarTituloCadernoSeMudou(caderno, trilhaOpt.get(), usuarioId);
+
+        List<Disciplina> disciplinasTrilha = disciplinaRepository.listarPorTrilha(usuarioId, trilhaId);
+        Map<ObjectId, Disciplina> disciplinasMap = new HashMap<>();
+        for (Disciplina disciplina : disciplinasTrilha) {
+            disciplinasMap.put(disciplina.id(), disciplina);
+        }
+
+        ResultadoProcessamentoSecoes processadas =
+                processarSecoesAtivas(usuarioId, cadernoId, disciplinasMap);
+        ResultadoCriacaoNovasSecoes criadas = criarSecoesParaNovasDisciplinas(
+                usuarioId, cadernoId, disciplinasTrilha, processadas.disciplinasJaPresentes());
+
+        return new SincronizacaoTrilhaResponse(
+                cadernoId.toHexString(),
+                criadas.secoesCriadas(),
+                processadas.secoesRenomeadas(),
+                processadas.secoesDesvinculadas(),
+                criadas.paginasCriadas()
         );
     }
 
-    private CadernoResponse paraCadernoResponse(
-            Caderno c,
-            long totalSecoes,
-            long totalNotas,
-            List<SecaoResponse> secoes) {
-        return new CadernoResponse(
-                c.idHex(),
-                c.usuarioIdHex(),
-                c.titulo(),
-                c.cor(),
-                c.icone(),
-                c.origemTrilhaIdHex(),
-                c.origemTrilhaId() != null,
-                totalSecoes,
-                totalNotas,
-                secoes,
-                c.criadoEm(),
-                c.atualizadoEm()
+    private void atualizarTituloCadernoSeMudou(Caderno caderno, Document trilhaDoc, ObjectId usuarioId) {
+        String nomeAtualTrilha = trilhaDoc.getString("nome");
+        if (Objects.equals(caderno.titulo(), nomeAtualTrilha)) {
+            return;
+        }
+        Caderno renomeado = new Caderno(
+                caderno.id(),
+                usuarioId,
+                nomeAtualTrilha,
+                caderno.cor(),
+                caderno.icone(),
+                caderno.origemTrilhaId(),
+                caderno.deletedAt(),
+                caderno.expiresAt(),
+                caderno.loteExclusaoId(),
+                caderno.criadoEm(),
+                Instant.now()
         );
+        cadernoRepository.atualizar(renomeado);
+    }
+
+    private record ResultadoProcessamentoSecoes(
+            Set<ObjectId> disciplinasJaPresentes, int secoesRenomeadas, int secoesDesvinculadas) {
+    }
+
+    private ResultadoProcessamentoSecoes processarSecoesAtivas(
+            ObjectId usuarioId, ObjectId cadernoId, Map<ObjectId, Disciplina> disciplinasMap) {
+        List<Secao> secoesAtivas = secaoRepository.listarPorCaderno(usuarioId, cadernoId);
+        Set<ObjectId> disciplinasJaPresentes = new HashSet<>();
+        int secoesRenomeadas = 0;
+        int secoesDesvinculadas = 0;
+
+        for (Secao secao : secoesAtivas) {
+            if (secao.origemDisciplinaId() == null) {
+                // Seção criada localmente pelo usuário: permanece intocada.
+                continue;
+            }
+            Disciplina disciplina = disciplinasMap.get(secao.origemDisciplinaId());
+            if (disciplina != null) {
+                disciplinasJaPresentes.add(disciplina.id());
+                if (atualizarTituloSecaoSeMudou(usuarioId, secao, disciplina.nome())) {
+                    secoesRenomeadas++;
+                }
+            } else {
+                secaoRepository.desvincularOrigemDisciplina(usuarioId, secao.id());
+                secoesDesvinculadas++;
+            }
+        }
+        return new ResultadoProcessamentoSecoes(
+                disciplinasJaPresentes, secoesRenomeadas, secoesDesvinculadas);
+    }
+
+    private boolean atualizarTituloSecaoSeMudou(ObjectId usuarioId, Secao secao, String nomeDisciplina) {
+        if (Objects.equals(secao.titulo(), nomeDisciplina)) {
+            return false;
+        }
+        Secao atualizada = new Secao(
+                secao.id(),
+                usuarioId,
+                secao.cadernoId(),
+                nomeDisciplina,
+                secao.ordem(),
+                secao.origemDisciplinaId(),
+                secao.deletedAt(),
+                secao.expiresAt(),
+                secao.loteExclusaoId(),
+                secao.criadoEm(),
+                Instant.now()
+        );
+        secaoRepository.atualizar(atualizada);
+        return true;
+    }
+
+    private record ResultadoCriacaoNovasSecoes(int secoesCriadas, int paginasCriadas) {
+    }
+
+    private ResultadoCriacaoNovasSecoes criarSecoesParaNovasDisciplinas(
+            ObjectId usuarioId,
+            ObjectId cadernoId,
+            List<Disciplina> disciplinasTrilha,
+            Set<ObjectId> disciplinasJaPresentes) {
+        Instant agora = Instant.now();
+        int secoesCriadas = 0;
+        int paginasCriadas = 0;
+
+        for (Disciplina disciplina : disciplinasTrilha) {
+            if (disciplinasJaPresentes.contains(disciplina.id())) {
+                continue;
+            }
+            int proximaOrdem = secaoRepository.proximaOrdem(usuarioId, cadernoId);
+            Secao novaSecao = new Secao(
+                    new ObjectId(),
+                    usuarioId,
+                    cadernoId,
+                    disciplina.nome(),
+                    proximaOrdem,
+                    disciplina.id(),
+                    null,
+                    null,
+                    null,
+                    agora,
+                    agora
+            );
+            secaoRepository.inserir(novaSecao);
+            secoesCriadas++;
+            paginasCriadas += criarNotasParaTopicos(
+                    usuarioId, cadernoId, novaSecao.id(), disciplina.topicos(), agora);
+        }
+        return new ResultadoCriacaoNovasSecoes(secoesCriadas, paginasCriadas);
     }
 }

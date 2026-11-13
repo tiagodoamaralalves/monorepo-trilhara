@@ -8,7 +8,9 @@ import static com.mongodb.client.model.Filters.ne;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.bson.Document;
@@ -31,6 +33,9 @@ import jakarta.inject.Inject;
  */
 @ApplicationScoped
 public class SecaoRepository {
+
+    /** Teto normativo de seções por caderno (D-29: 500 seções/caderno). */
+    public static final int LIMITE_LISTAGEM = 500;
 
     private final MongoCollection<Document> collection;
 
@@ -71,18 +76,24 @@ public class SecaoRepository {
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
 
-    public Optional<Secao> buscarPorIdSemUsuario(ObjectId secaoId) {
-        Document doc = collection.find(eq("_id", secaoId)).first();
-        return Optional.ofNullable(doc).map(this::paraEntidade);
+    public List<Secao> listarPorCaderno(ObjectId usuarioId, ObjectId cadernoId) {
+        return listarPorCaderno(usuarioId, cadernoId, LIMITE_LISTAGEM);
     }
 
-    public List<Secao> listarPorCaderno(ObjectId usuarioId, ObjectId cadernoId) {
+    /**
+     * Seções ativas do caderno, com teto normativo de 500 (D-29).
+     *
+     * <p>A ordenação usa {@code ordem} e {@code _id} como desempate estável, para que duas
+     * leituras concorrentes não troquem a posição de seções com a mesma ordem.</p>
+     */
+    public List<Secao> listarPorCaderno(ObjectId usuarioId, ObjectId cadernoId, int limite) {
         List<Secao> lista = new ArrayList<>();
         collection.find(and(
                 eq("usuarioId", usuarioId),
                 eq("cadernoId", cadernoId),
                 eq("deletedAt", null)
-        )).sort(Sorts.ascending("ordem", "criadoEm"))
+        )).sort(Sorts.orderBy(Sorts.ascending("ordem"), Sorts.ascending("criadoEm"), Sorts.ascending("_id")))
+          .limit(limite)
           .forEach(doc -> lista.add(paraEntidade(doc)));
         return lista;
     }
@@ -187,9 +198,72 @@ public class SecaoRepository {
                 eq("usuarioId", usuarioId),
                 ne("deletedAt", null),
                 gt("expiresAt", BsonDates.toBsonDate(agora))
-        )).sort(Sorts.descending("deletedAt"))
+        )).sort(Sorts.orderBy(Sorts.descending("deletedAt"), Sorts.descending("_id")))
           .forEach(doc -> lista.add(paraEntidade(doc)));
         return lista;
+    }
+
+    public long contarLixeira(ObjectId usuarioId, Instant agora) {
+        return collection.countDocuments(and(
+                eq("usuarioId", usuarioId),
+                ne("deletedAt", null),
+                gt("expiresAt", BsonDates.toBsonDate(agora))
+        ));
+    }
+
+    public List<Secao> listarLixeira(ObjectId usuarioId, Instant agora, int pagina, int tamanho) {
+        List<Secao> lista = new ArrayList<>();
+        collection.find(and(
+                eq("usuarioId", usuarioId),
+                ne("deletedAt", null),
+                gt("expiresAt", BsonDates.toBsonDate(agora))
+        )).sort(Sorts.orderBy(Sorts.descending("deletedAt"), Sorts.descending("_id")))
+          .skip(Math.max(0, (pagina - 1) * tamanho))
+          .limit(tamanho)
+          .forEach(doc -> lista.add(paraEntidade(doc)));
+        return lista;
+    }
+
+    /** Seções ativas do caderno — usado no teto de 500 seções (D-29). */
+    public long contarAtivas(ObjectId usuarioId, ObjectId cadernoId) {
+        return collection.countDocuments(and(
+                eq("usuarioId", usuarioId),
+                eq("cadernoId", cadernoId),
+                eq("deletedAt", null)
+        ));
+    }
+
+    /** Contagem de seções ativas por caderno em uma agregação — evita N+1 (D-29). */
+    public Map<ObjectId, Long> contarPorCadernos(ObjectId usuarioId, List<ObjectId> cadernoIds) {
+        Map<ObjectId, Long> contagens = new HashMap<>();
+        if (cadernoIds == null || cadernoIds.isEmpty()) {
+            return contagens;
+        }
+        collection.aggregate(List.of(
+                new Document("$match", new Document("usuarioId", usuarioId)
+                        .append("cadernoId", new Document("$in", cadernoIds))
+                        .append("deletedAt", null)),
+                new Document("$group", new Document("_id", "$cadernoId")
+                        .append("total", new Document("$sum", 1)))
+        )).forEach(doc -> contagens.put(doc.getObjectId("_id"), ((Number) doc.get("total")).longValue()));
+        return contagens;
+    }
+
+    /** Títulos de seções ativas do caderno — desempate de "Restauradas (2)", "(3)"… (D-34). */
+    public List<String> titulosAtivosPorCaderno(ObjectId usuarioId, ObjectId cadernoId) {
+        List<String> titulos = new ArrayList<>();
+        collection.find(and(
+                eq("usuarioId", usuarioId),
+                eq("cadernoId", cadernoId),
+                eq("deletedAt", null)
+        )).projection(new Document("titulo", 1))
+          .forEach(doc -> {
+              String titulo = doc.getString("titulo");
+              if (titulo != null) {
+                  titulos.add(titulo);
+              }
+          });
+        return titulos;
     }
 
     public long esvaziarLixeira(ObjectId usuarioId) {

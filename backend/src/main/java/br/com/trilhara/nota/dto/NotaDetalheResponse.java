@@ -3,17 +3,19 @@ package br.com.trilhara.nota.dto;
 import java.time.Instant;
 
 /**
- * DTO completo da nota incluindo o conteudoMarkdown.
+ * Página de uma seção (D-29/D-30).
+ *
+ * <p>É o formato exclusivo de {@code GET|PUT /api/notas/{notaId}} (endpoint canônico de
+ * leitura — D-32). O endpoint aninhado de leitura de nota foi removido.</p>
  */
 public record NotaDetalheResponse(
-    String id,
-    String usuarioId,
-    String cadernoId,
-    String secaoId,
-    String titulo,
-    String conteudoMarkdown,
-    int ordem,
-    String origemTopicoId,
-    Instant criadoEm,
-    Instant atualizadoEm
-) {}
+        String id,
+        String cadernoId,
+        String secaoId,
+        String titulo,
+        String conteudoMarkdown,
+        int ordem,
+        String topicoOrigemId,
+        Instant criadoEm,
+        Instant atualizadoEm) {
+}
