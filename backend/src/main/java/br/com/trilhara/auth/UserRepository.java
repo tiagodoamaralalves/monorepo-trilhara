@@ -78,6 +78,22 @@ public class UserRepository {
         return usuarios.countDocuments(eq("email", emailNormalizado)) > 0;
     }
 
+    /**
+     * {@code true} quando a conta possui o checkpoint {@code exclusaoConta} (D-35).
+     *
+     * <p>Leitura pontual e projetada: o record {@link Usuario} não carrega o subdocumento para
+     * não alterar o contrato de domínio nem os ~20 call sites de {@code new Usuario(...)}.</p>
+     */
+    public boolean estaEmExclusao(String id) {
+        if (id == null || !ObjectId.isValid(id)) {
+            return false;
+        }
+        Document doc = usuarios.find(eq("_id", new ObjectId(id)))
+                .projection(new Document("exclusaoConta", 1))
+                .first();
+        return doc != null && doc.get("exclusaoConta") != null;
+    }
+
     public List<Usuario> listar(int pagina, int tamanho) {
         List<Usuario> lista = new ArrayList<>();
         usuarios.find().sort(Sorts.descending("criadoEm"))

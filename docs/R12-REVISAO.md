@@ -160,7 +160,7 @@ Helper único `classificarErro(e: unknown): 'rede' | 'autenticacao' | 'nao-encon
 - Exclusão e restauração de lista/caderno/seção respeitam lotes de exclusão, itens previamente excluídos isoladamente e descendentes já purgados.
 - Scheduler push não processa o mesmo item em paralelo; expirados não são enviados; falhas transitórias respeitam janela e backoff, reconhecendo que o provedor não garante exactly-once.
 - Frontend instala runner automatizado Vitest + React Testing Library + jsdom em F0; cada critério de UI deste documento/plano tem teste de componente ou serviço executável por `npm test`, além de `npm run build`.
-- Conta excluída retorna 202 depois de aceitar operação autenticada; worker conclui exclusão das 18 coleções sem deixar órfãos, mesmo com falhas injetadas em qualquer etapa.
+- Conta excluída retorna 202 depois de aceitar operação autenticada; worker conclui exclusão das 18 coleções filhas privadas (mais `usuarios` por último, 20 coleções no total conforme D-08) sem deixar órfãos, mesmo com falhas injetadas em qualquer etapa.
 
 ---
 

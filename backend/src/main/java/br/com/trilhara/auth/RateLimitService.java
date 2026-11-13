@@ -15,6 +15,10 @@ public class RateLimitService {
 
     private static final int LIMITE_CHAVES = 10_000;
 
+    /** D-45: exclusão de conta / verificação de senha — 5 tentativas por 15 minutos/usuário. */
+    private static final int LIMITE_EXCLUSAO_CONTA = 5;
+    private static final long JANELA_EXCLUSAO_CONTA_SEGUNDOS = 15 * 60;
+
     private final Map<String, Deque<Instant>> janelasPorChave = new ConcurrentHashMap<>();
     private final int maxTentativasLogin;
     private final int maxTentativasCadastro;
@@ -55,6 +59,19 @@ public class RateLimitService {
         registrarEVerificar("confirmacao:ip:" + normalizar(ip), maxTentativasCadastro);
     }
 
+    /**
+     * D-45: {@code DELETE /api/auth/conta} e qualquer verificação de senha nesse fluxo são
+     * limitados a <strong>5 tentativas por 15 minutos por usuário</strong>, independentes da
+     * janela global de login/cadastro.
+     *
+     * <p>Protege a senha atual contra brute-force por meio do endpoint de exclusão, que aceita
+     * reautenticação server-side.</p>
+     */
+    public void verificarLimiteExclusaoConta(String usuarioId) {
+        registrarEVerificar("exclusao-conta:usuario:" + normalizar(usuarioId), LIMITE_EXCLUSAO_CONTA,
+                JANELA_EXCLUSAO_CONTA_SEGUNDOS);
+    }
+
     public void limparTentativasLogin(String ip, String emailNormalizado) {
         if (emailNormalizado != null && !emailNormalizado.isBlank()) {
             janelasPorChave.remove("login:email:" + emailNormalizado);
@@ -66,8 +83,13 @@ public class RateLimitService {
     }
 
     private void registrarEVerificar(String chave, int limiteMaximo) {
+        registrarEVerificar(chave, limiteMaximo, janelaSegundos);
+    }
+
+    /** Variante com janela própria por chave (D-45 exige 15 min para exclusão de conta). */
+    private void registrarEVerificar(String chave, int limiteMaximo, long janelaDaChaveSegundos) {
         Instant agora = Instant.now();
-        Instant corte = agora.minusSeconds(janelaSegundos);
+        Instant corte = agora.minusSeconds(janelaDaChaveSegundos);
         if (janelasPorChave.size() >= LIMITE_CHAVES) {
             janelasPorChave.entrySet().removeIf(e -> {
                 Deque<Instant> q = e.getValue();
@@ -78,7 +100,7 @@ public class RateLimitService {
             if (janelasPorChave.size() >= LIMITE_CHAVES && !janelasPorChave.containsKey(chave)) {
                 throw new RateLimitExceededException(
                         "Muitas requisições simultâneas no sistema. Aguarde alguns instantes antes de tentar novamente.",
-                        janelaSegundos);
+                        janelaDaChaveSegundos);
             }
         }
 
@@ -90,11 +112,12 @@ public class RateLimitService {
             if (fila.size() >= limiteMaximo) {
                 throw new RateLimitExceededException(
                         "Muitas tentativas em sequência. Aguarde alguns instantes antes de tentar novamente.",
-                        janelaSegundos);
+                        janelaDaChaveSegundos);
             }
             fila.addLast(agora);
         }
     }
+
 
     private static String normalizar(String valor) {
         return valor == null || valor.isBlank() ? "desconhecido" : valor.trim().toLowerCase();

@@ -1,6 +1,6 @@
 import { ApiError, request, tentarRenovarToken } from './api';
 import { registrarFalha } from '../diagnostico';
-import { AuthStorage, limparDadosLocaisDoUsuario } from './authStorage';
+import { AuthStorage } from './authStorage';
 import {
   AuthResponse,
   CadastroPayload,
@@ -157,26 +157,34 @@ export const AuthService = {
     }
   },
 
-  async excluirConta(payload: { senha: string; confirmacao?: string; idempotencyKey?: string }): Promise<{ operationId: string; estado: string }> {
-    const usuarioAtual = AuthStorage.obterUsuario();
-    const idempotencyKey = payload.idempotencyKey || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `idemp-${Date.now()}`);
-    const resposta = await request<{ operationId: string; estado: string }>('/auth/conta', {
+  /**
+   * Solicita a exclusão definitiva da conta (D-35).
+   *
+   * <p>A chave de idempotência vai <strong>somente</strong> no cabeçalho `Idempotency-Key`.
+   * `semRefresh` impede que o 401 pós-202 seja tratado como "sessão expirada": depois do aceite
+   * as credenciais já foram revogadas, então o 401 significa "exclusão em andamento".</p>
+   */
+  async excluirConta(payload: {
+    senha: string;
+    confirmacao?: string;
+    idempotencyKey?: string;
+  }): Promise<{ operationId: string; estado: string }> {
+    const idempotencyKey =
+      payload.idempotencyKey ||
+      (typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `idemp-${Date.now()}`);
+    return request<{ operationId: string; estado: string }>('/auth/conta', {
       method: 'DELETE',
+      semRefresh: true,
       headers: {
         'Idempotency-Key': idempotencyKey
       },
       body: JSON.stringify({
         senha: payload.senha,
-        confirmacao: payload.confirmacao || 'EXCLUIR MINHA CONTA',
-        idempotencyKey
+        confirmacao: payload.confirmacao || 'EXCLUIR MINHA CONTA'
       })
     });
-    if (usuarioAtual?.id) {
-      limparDadosLocaisDoUsuario(usuarioAtual.id);
-    } else {
-      AuthStorage.limparSessao();
-    }
-    return resposta;
   }
 };
 

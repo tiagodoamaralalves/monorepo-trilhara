@@ -12,6 +12,8 @@ export interface ApiErrorDetalhes {
   instance?: string;
   correlationId?: string;
   data?: unknown;
+  /** Valor numérico de `Retry-After` quando o servidor informar (429). */
+  retryAfterSeconds?: number;
 }
 
 /**
@@ -30,6 +32,8 @@ export class ApiError extends Error {
   readonly title?: string;
   readonly instance?: string;
   readonly correlationId?: string;
+  /** Segundos informados em `Retry-After` (429), quando presentes (D-04/D-45). */
+  readonly retryAfterSeconds?: number;
 
   constructor(detalhes: ApiErrorDetalhes) {
     super(detalhes.detail);
@@ -43,6 +47,7 @@ export class ApiError extends Error {
     this.title = detalhes.title;
     this.instance = detalhes.instance;
     this.correlationId = detalhes.correlationId;
+    this.retryAfterSeconds = detalhes.retryAfterSeconds;
   }
 }
 
@@ -72,6 +77,23 @@ const ROTAS_AUTH_PUBLICAS = new Set([
   '/auth/resetar-senha',
   '/auth/handoff/consume'
 ]);
+
+/** Opções adicionais do cliente HTTP que não pertencem a `RequestInit`. */
+export interface OpcoesRequisicao extends RequestInit {
+  /**
+   * Não tenta renovar o token nem dispara `AUTH_REQUIRED_EVENT` no 401.
+   *
+   * Usado exclusivamente por `DELETE /api/auth/conta` (D-35): depois do 202 as credenciais já
+   * foram revogadas, então o 401 significa "exclusão em andamento" — nunca "sessão expirada".
+   */
+  semRefresh?: boolean;
+}
+
+function parseRetryAfter(valor: string | null): number | undefined {
+  if (!valor) return undefined;
+  const segundos = Number.parseInt(valor, 10);
+  return Number.isFinite(segundos) && segundos >= 0 ? segundos : undefined;
+}
 
 let refreshPromiseEmAndamento: Promise<AuthResponse> | null = null;
 
@@ -116,7 +138,7 @@ export async function tentarRenovarToken(): Promise<AuthResponse> {
 
 export async function request<T>(
   path: string,
-  options: RequestInit = {},
+  options: OpcoesRequisicao = {},
   tentativaAposRefresh = false
 ): Promise<T> {
   const url = path.startsWith('http') ? path : `/api${path}`;
@@ -138,8 +160,10 @@ export async function request<T>(
   }
 
   try {
+    const semRefresh = options.semRefresh === true;
+    const { semRefresh: _ignorar, ...opcoesFetch } = options;
     const res = await fetch(url, {
-      ...options,
+      ...opcoesFetch,
       headers,
       credentials: options.credentials || 'include'
     });
@@ -147,7 +171,8 @@ export async function request<T>(
     if (
       res.status === 401 &&
       !tentativaAposRefresh &&
-      !ehRotaAuthPublica
+      !ehRotaAuthPublica &&
+      !semRefresh
     ) {
       let renovou = false;
       try {
@@ -210,6 +235,7 @@ export async function request<T>(
         title: errorTitle,
         instance: errorInstance,
         correlationId: res.headers.get('X-Correlation-ID') ?? undefined,
+        retryAfterSeconds: parseRetryAfter(res.headers.get('Retry-After')),
         data: errorData
       });
     }

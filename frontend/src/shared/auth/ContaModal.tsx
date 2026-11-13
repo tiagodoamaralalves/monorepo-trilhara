@@ -1,8 +1,32 @@
 import React, { useContext, useState } from 'react';
 import { AlertTriangle, ShieldAlert, Trash2 } from 'lucide-react';
 import { Button, Input, Modal, ConfirmContext } from '../design-system';
+import { ApiError } from './api';
 import { UsuarioAutenticado } from './types';
 import styles from './ContaModal.module.css';
+
+/** Mensagens inline do fluxo de exclusão (D-35). */
+function mensagemDeErro(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.status === 401) {
+      return 'Senha atual incorreta.';
+    }
+    if (err.status === 429) {
+      const espera = err.retryAfterSeconds;
+      return espera && espera > 0
+        ? `Muitas tentativas. Tente novamente em ${espera} segundos.`
+        : 'Muitas tentativas. Aguarde alguns instantes antes de tentar novamente.';
+    }
+    if (err.status === 409) {
+      return 'Já existe uma exclusão desta conta em andamento.';
+    }
+    return err.detail;
+  }
+  if (err instanceof Error) {
+    return err.message;
+  }
+  return 'Ocorreu um erro ao processar a exclusão da conta. Verifique sua senha.';
+}
 
 export interface ContaModalProps {
   isOpen: boolean;
@@ -76,11 +100,7 @@ export const ContaModal: React.FC<ContaModalProps> = ({
       }
       handleClose();
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setErro(err.message);
-      } else {
-        setErro('Ocorreu um erro ao processar a exclusão da conta. Verifique sua senha.');
-      }
+      setErro(mensagemDeErro(err));
     } finally {
       setCarregando(false);
     }

@@ -17,7 +17,6 @@ export interface NavbarProps {
   onAbrirEditarTrilha: () => void;
   onAbrirNovaTrilha?: () => void;
   onLogout?: () => void;
-  onAbrirConta?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -29,8 +28,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSelecionarTrilha,
   onAbrirEditarTrilha,
   onAbrirNovaTrilha,
-  onLogout,
-  onAbrirConta
+  onLogout
 }) => {
   const timer = useStudyTimer();
   const isTimerRunning = timer.running || timer.breakSeconds > 0;
@@ -64,7 +62,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           : null
       }
       onLogout={onLogout}
-      onOpenAccount={onAbrirConta}
       contextSlot={
         <TrilhaPod
           trilhas={trilhas}

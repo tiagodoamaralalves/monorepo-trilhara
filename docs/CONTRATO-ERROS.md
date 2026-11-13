@@ -34,6 +34,31 @@ media type. Corpo:
 | 404 | inexistente **ou** de outro tenant (nunca revela existência) |
 | 400 × 404 | ID fora do formato hexadecimal de 24 caracteres é `400 INVALID_IDENTIFIER`; ID válido e inexistente é `404 NOT_FOUND` |
 
+## Exceção documentada: `202` de exclusão de conta (D-35a)
+
+`DELETE /api/auth/conta` **não** é um endpoint de erro, mas sua resposta de sucesso é o único
+`2xx` do produto com media type explicitamente fixado e forma própria:
+
+```http
+HTTP/1.1 202 Accepted
+Content-Type: application/json
+
+{ "operationId": "9f2c…", "estado": "PENDENTE" }
+```
+
+- O corpo **não** é Problem Details: não possui `type`, `title`, `status`, `detail` nem `code`.
+- `estado ∈ {PENDENTE, EM_ANDAMENTO, RETENTANDO_LENTO}`. Não existe estado terminal observável:
+  ao concluir, o documento de `usuarios` já foi removido e a conclusão fica registrada apenas em
+  log/métrica.
+- `Idempotency-Key` é **obrigatório** (cabeçalho, nunca corpo): ausência → `400
+  IDEMPOTENCY_KEY_REQUIRED`; mesma chave com payload funcional diferente → `409
+  IDEMPOTENCY_KEY_CONFLICT`.
+- Senha atual inválida → `401 UNAUTHORIZED` sem efeito colateral; mais de 5 tentativas em 15 min
+  por usuário → `429 RATE_LIMITED` com `Retry-After`.
+- Depois do `202`, qualquer rota autenticada do usuário responde `401 UNAUTHORIZED` (conta em
+  exclusão), inclusive um retry do próprio `DELETE` **sem** `Idempotency-Key`.
+
+
 ## Catálogo
 
 | HTTP | `code` | `type` | Uso |

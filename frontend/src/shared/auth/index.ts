@@ -8,3 +8,4 @@ export * from './AuthModal';
 export * from './ContaModal';
 export * from './AuthView';
 export * from './sso';
+export * from './redirecionamentoConta';

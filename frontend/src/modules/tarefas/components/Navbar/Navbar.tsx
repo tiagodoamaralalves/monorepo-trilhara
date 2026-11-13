@@ -31,7 +31,6 @@ export interface NavbarProps {
   onAbrirNovaTarefa: () => void;
   onAbrirLogin?: () => void;
   onLogout?: () => void;
-  onAbrirConta?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -51,8 +50,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNavegar,
   onAbrirNovaTarefa,
   onAbrirLogin,
-  onLogout,
-  onAbrirConta
+  onLogout
 }) => {
   return (
     <AppSidebar<FiltroVisualizacao>
@@ -73,7 +71,6 @@ export const Navbar: React.FC<NavbarProps> = ({
       }
       onLogout={onLogout}
       onLogin={onAbrirLogin}
-      onOpenAccount={onAbrirConta}
       contextSlot={
         <TarefaContextPod
           onAbrirNovaTarefa={onAbrirNovaTarefa}

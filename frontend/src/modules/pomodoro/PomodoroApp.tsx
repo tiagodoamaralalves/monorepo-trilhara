@@ -18,6 +18,8 @@ import {
 import {
   Button,
   Checkbox,
+  ContaMenuButton,
+  AvisoContaExcluida,
   FormModal,
   Input,
   Modal,
@@ -1090,6 +1092,7 @@ export default function PomodoroApp() {
         </div>
 
         <div className={styles.headerTopActions}>
+          {isAuthenticated && <ContaMenuButton variant="header" />}
           {!isAuthenticated && (
             <Button
               type="button"
@@ -1362,6 +1365,7 @@ export default function PomodoroApp() {
         <aside className={styles.agendaColumn} aria-label="Agenda do dia">
           {!isAuthenticated ? (
             <div className={styles.visitorCard}>
+              <AvisoContaExcluida />
               <div className={styles.visitorIconWrapper}>
                 <ListTodo size={28} />
               </div>

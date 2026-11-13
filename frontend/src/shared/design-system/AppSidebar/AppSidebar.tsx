@@ -13,6 +13,7 @@ import { SidebarBrand, SidebarUser, SidebarNavItemConfig } from './types';
 import { SidebarContext } from './SidebarContext';
 import { SidebarNavItem } from './SidebarNavItem';
 import { AppSwitcher } from '../AppSwitcher/AppSwitcher';
+import { ContaMenuButton } from '../ContaMenuButton/ContaMenuButton';
 import { ModuloApp } from '../../auth/sso';
 import styles from './AppSidebar.module.css';
 
@@ -23,7 +24,6 @@ export interface AppSidebarProps<TId extends string = string> {
   showAppSwitcher?: boolean;
   onLogout?: () => void;
   onLogin?: () => void;
-  onOpenAccount?: () => void;
   storageKey?: string;
   contextSlot?: React.ReactNode;
   navLabel?: string;
@@ -47,7 +47,6 @@ export const AppSidebar = <TId extends string = string>({
   showAppSwitcher = true,
   onLogout,
   onLogin,
-  onOpenAccount,
   storageKey = 'trilhara_sidebar_collapsed',
   contextSlot,
   navLabel,
@@ -174,25 +173,13 @@ export const AppSidebar = <TId extends string = string>({
 
           {user ? (
             <div className={`${styles.userPod} ${collapsed ? styles.userPodCollapsed : ''}`}>
-              <div
-                className={styles.userAvatar}
-                aria-hidden="true"
-                onClick={onOpenAccount}
-                style={onOpenAccount ? { cursor: 'pointer' } : undefined}
-                title={onOpenAccount ? 'Gerenciar minha conta' : undefined}
-              >
-                {user.nome.trim().charAt(0).toUpperCase()}
-              </div>
+              <ContaMenuButton
+                variant="sidebar"
+                nome={user.nome}
+                collapsed={collapsed}
+              />
               {!collapsed && (
-                <div
-                  className={styles.userInfo}
-                  onClick={onOpenAccount}
-                  style={onOpenAccount ? { cursor: 'pointer' } : undefined}
-                  role={onOpenAccount ? 'button' : undefined}
-                  tabIndex={onOpenAccount ? 0 : undefined}
-                  onKeyDown={onOpenAccount ? (e) => { if (e.key === 'Enter' || e.key === ' ') onOpenAccount(); } : undefined}
-                  title={onOpenAccount ? 'Gerenciar minha conta' : undefined}
-                >
+                <div className={styles.userInfo}>
                   <span className={styles.userName} title={user.nome}>
                     {user.nome}
                   </span>
@@ -248,6 +235,8 @@ export const AppSidebar = <TId extends string = string>({
           )}
 
           {mobileControlsSlot}
+
+          {user && <ContaMenuButton variant="header" />}
 
           {!user && onLogin && (
             <button

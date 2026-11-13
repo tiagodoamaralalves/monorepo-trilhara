@@ -17,6 +17,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import br.com.trilhara.auth.TokenService.TokenInvalidoException;
+import br.com.trilhara.shared.Pseudonimo;
 import jakarta.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped
@@ -67,14 +68,16 @@ public class RefreshTokenService {
                     .orElseThrow(() -> new TokenInvalidoException("Refresh token inválido."));
 
             Instant agora = Instant.now();
+            String pseudoConta = Pseudonimo.de(atual.usuarioId());
+            String pseudoSessao = Pseudonimo.de(atual.familiaId());
 
             if (atual.estaRevogado()) {
                 if (gracePeriodSeconds > 0
                         && "ROTACIONADO".equals(atual.motivoRevogacao())
                         && atual.revogadoEm() != null
                         && Math.abs(Duration.between(atual.revogadoEm(), agora).toSeconds()) <= gracePeriodSeconds) {
-                    LOG.infof("Grace period multi-aba de refresh token acionado para usuarioId=%s, familiaId=%s, ip=%s.",
-                            atual.usuarioId(), atual.familiaId(), ip);
+                    LOG.infof("event=REFRESH_GRACE_PERIOD conta=%s sessao=%s ip=%s",
+                            pseudoConta, pseudoSessao, ip);
                     return criarEPersistirToken(
                             atual.usuarioId(),
                             atual.familiaId(),
@@ -83,8 +86,8 @@ public class RefreshTokenService {
                             agora);
                 }
 
-                LOG.warnf("ALERTA DE SEGURANCA: Reutilizacao de refresh token detectada para usuarioId=%s, familiaId=%s, ip=%s. Revogando toda a familia de sessao.",
-                        atual.usuarioId(), atual.familiaId(), ip);
+                LOG.warnf("event=REFRESH_TOKEN_REUSO conta=%s sessao=%s ip=%s",
+                        pseudoConta, pseudoSessao, ip);
                 repository.revogarFamilia(atual.familiaId(), agora, "REUSO_DETECTADO");
                 throw new TokenInvalidoException("Sessão invalidada por segurança devido a reutilização de token.");
             }

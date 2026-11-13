@@ -31,7 +31,7 @@ import {
   EDITAIS_VITRINE_FALLBACK,
   importarOuClonarEdital
 } from './data/catalogoVitrine';
-import { PageBanner, useToast } from '@shared/design-system';
+import { AvisoContaExcluida, PageBanner, useToast } from '@shared/design-system';
 import { BarChart2, BookOpen, Calendar } from 'lucide-react';
 import { EmptyJourneyState } from './components/EmptyJourneyState/EmptyJourneyState';
 import styles from './App.module.css';
@@ -106,7 +106,7 @@ function atualizarUrlPagina(pagina: PaginaAtiva): void {
 
 export default function EstudosApp() {
   const toast = useToast();
-  const { usuario, isAuthenticated, carregando: verificandoSessao, logout, setUsuario, abrirContaModal } = useAuth();
+  const { usuario, isAuthenticated, carregando: verificandoSessao, logout, setUsuario } = useAuth();
   const [pendingEdital, setPendingEdital] = useState<EditalResumo | null>(null);
   const [abrirModalNovoAposAuth, setAbrirModalNovoAposAuth] = useState(false);
 
@@ -511,15 +511,18 @@ export default function EstudosApp() {
 
     const modoAuth: AuthMode = paginaAtiva === 'cadastro' ? 'cadastro' : 'login';
     return (
-      <AuthView
-        mode={modoAuth}
-        onAlternarModo={(novoModo) => {
-          if (novoModo === 'login' || novoModo === 'cadastro') {
-            navegar(novoModo);
-          }
-        }}
-        onAutenticado={(u, m) => void handleAutenticadoComSucesso(u, m)}
-      />
+      <>
+        <AvisoContaExcluida />
+        <AuthView
+          mode={modoAuth}
+          onAlternarModo={(novoModo) => {
+            if (novoModo === 'login' || novoModo === 'cadastro') {
+              navegar(novoModo);
+            }
+          }}
+          onAutenticado={(u, m) => void handleAutenticadoComSucesso(u, m)}
+        />
+      </>
     );
   }
 
@@ -538,7 +541,6 @@ export default function EstudosApp() {
         }}
         onAbrirNovaTrilha={abrirNovaTrilha}
         onLogout={() => void handleLogout()}
-        onAbrirConta={abrirContaModal}
       />
 
       {/* Conteúdo da Página */}

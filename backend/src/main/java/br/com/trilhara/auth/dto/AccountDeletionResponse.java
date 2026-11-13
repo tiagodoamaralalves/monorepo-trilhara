@@ -7,6 +7,6 @@ public record AccountDeletionResponse(
         @Schema(description = "Identificador opaco da operação de exclusão", required = true)
         String operationId,
 
-        @Schema(description = "Estado da operação de exclusão (ex: PENDENTE, PROCESSANDO, CONCLUIDO, FALHA)", required = true)
+        @Schema(description = "Estado da operação (PENDENTE, EM_ANDAMENTO ou RETENTANDO_LENTO)", required = true)
         String estado) {
 }

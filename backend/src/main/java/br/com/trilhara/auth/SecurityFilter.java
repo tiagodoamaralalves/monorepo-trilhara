@@ -156,6 +156,20 @@ public class SecurityFilter implements ContainerRequestFilter, ContainerResponse
                     return true;
                 }
             }
+            // D-35: conta com exclusão em andamento é 401 em qualquer rota. A única exceção é o
+            // retry do próprio DELETE /api/auth/conta com Idempotency-Key, que devolve 202 com o
+            // mesmo operationId (o cliente não precisa repetir quando já não tem sessão).
+            if (userRepository.estaEmExclusao(usuario.id())) {
+                String path = requestContext.getUriInfo() != null ? requestContext.getUriInfo().getPath() : "";
+                boolean isRetryExclusao = (path.endsWith("/auth/conta") || path.endsWith("/conta"))
+                        && "DELETE".equalsIgnoreCase(requestContext.getMethod())
+                        && requestContext.getHeaderString("Idempotency-Key") != null
+                        && !requestContext.getHeaderString("Idempotency-Key").isBlank();
+                if (!isRetryExclusao) {
+                    abortarNaoAutorizado(requestContext, "Conta em processo de exclusão.");
+                    return true;
+                }
+            }
             if (senhaAlteradaDepoisDaEmissao(claims, usuario)) {
                 abortarNaoAutorizado(requestContext, "Sessão expirada devido a alteração de credenciais.");
                 return true;

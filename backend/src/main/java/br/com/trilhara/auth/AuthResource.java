@@ -29,6 +29,8 @@ import br.com.trilhara.auth.dto.RefreshTokenRequest;
 import br.com.trilhara.auth.dto.ResetarSenhaRequest;
 import br.com.trilhara.auth.dto.SessaoAtivaResponse;
 import br.com.trilhara.auth.dto.UsuarioResponse;
+import br.com.trilhara.shared.erro.CodigoErro;
+import br.com.trilhara.shared.erro.DomainConflictException;
 import io.vertx.ext.web.RoutingContext;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -310,22 +312,30 @@ public class AuthResource {
     @DELETE
     @Path("/conta")
     @Autenticado
-    @Operation(summary = "Solicita a exclusão definitiva da conta do usuário em todas as 18 coleções privadas")
-    @APIResponse(responseCode = "202", description = "Exclusão aceita e em processamento assíncrono")
-    @APIResponse(responseCode = "400", description = "Confirmação textual inválida ou parâmetros ausentes")
+    @Operation(summary = "Solicita a exclusão definitiva da conta do usuário nas 18 coleções privadas")
+    @APIResponse(responseCode = "202", description = "Exclusão aceita e em processamento assíncrono (application/json)")
+    @APIResponse(responseCode = "400", description = "Chave de idempotência ausente ou confirmação textual inválida")
     @APIResponse(responseCode = "401", description = "Senha incorreta ou usuário não autenticado")
+    @APIResponse(responseCode = "409", description = "Chave de idempotência já usada com outro payload funcional")
+    @APIResponse(responseCode = "429", description = "Muitas tentativas de exclusão para esta conta")
     public Response excluirConta(
             @Valid ExcluirContaRequest request,
             @HeaderParam("Idempotency-Key") String idempotencyKeyHeader,
             @Context HttpHeaders headers) {
-        String usuarioId = authContext.usuarioId();
-        String idempotencyKey = idempotencyKeyHeader != null && !idempotencyKeyHeader.isBlank()
-                ? idempotencyKeyHeader.trim()
-                : (request != null ? request.idempotencyKey() : null);
+        if (idempotencyKeyHeader == null || idempotencyKeyHeader.isBlank()) {
+            throw new DomainConflictException(
+                    CodigoErro.IDEMPOTENCY_KEY_REQUIRED,
+                    "O cabeçalho Idempotency-Key é obrigatório para solicitar a exclusão da conta.");
+        }
 
-        AccountDeletionResponse resposta = accountDeletionService.solicitarExclusao(usuarioId, request, idempotencyKey);
+        String idempotencyKey = idempotencyKeyHeader.trim();
+        String usuarioId = authContext.usuarioId();
+
+        AccountDeletionResponse resposta = accountDeletionService.solicitarExclusao(
+                usuarioId, request, idempotencyKey);
         String host = extrairHost(headers);
         return Response.status(Response.Status.ACCEPTED)
+                .type(MediaType.APPLICATION_JSON)
                 .entity(resposta)
                 .header(HttpHeaders.SET_COOKIE, construirCookieExpirado(host))
                 .header(HttpHeaders.SET_COOKIE, construirCookieSessionStateExpirado(host))

@@ -2,7 +2,8 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { AuthStorage, AUTH_CHANGE_EVENT, AUTH_CONTA_EXCLUIDA_EVENT, limparDadosLocaisDoUsuario } from './authStorage';
 import { AuthService } from './authService';
 import { consumirHandoffSsoDaUrl } from './sso';
-import { AUTH_REQUIRED_EVENT } from './api';
+import { redirecionarAposExclusaoDeConta } from './redirecionamentoConta';
+import { ApiError, AUTH_REQUIRED_EVENT } from './api';
 import { AuthModal } from './AuthModal';
 import { ContaModal } from './ContaModal';
 import { AuthResponse, CadastroPayload, LoginPayload, UsuarioAutenticado } from './types';
@@ -161,13 +162,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const excluirConta = useCallback(async (senha: string): Promise<{ operationId: string; estado: string }> => {
     const u = usuario || AuthStorage.obterUsuario();
-    const res = await AuthService.excluirConta({ senha, confirmacao: 'EXCLUIR MINHA CONTA' });
-    if (u?.id) {
-      limparDadosLocaisDoUsuario(u.id);
+    const haviaSessao = Boolean(AuthStorage.obterAccessToken());
+    try {
+      const res = await AuthService.excluirConta({ senha, confirmacao: 'EXCLUIR MINHA CONTA' });
+      if (u?.id) {
+        // Limpeza local + broadcast `CONTA_EXCLUIDA` para as demais abas da origem.
+        limparDadosLocaisDoUsuario(u.id);
+      } else {
+        AuthStorage.limparSessao();
+      }
+      setUsuario(null);
+      setIsContaModalOpen(false);
+      redirecionarAposExclusaoDeConta();
+      return res;
+    } catch (err) {
+      // 401 sem sessão em memória = "exclusão em andamento" (as credenciais já foram
+      // revogadas no primeiro aceite); com sessão = senha atual incorreta (erro inline).
+      if (err instanceof ApiError && err.status === 401 && !haviaSessao) {
+        if (u?.id) {
+          limparDadosLocaisDoUsuario(u.id);
+        }
+        setUsuario(null);
+        setIsContaModalOpen(false);
+        redirecionarAposExclusaoDeConta();
+      }
+      throw err;
     }
-    setUsuario(null);
-    setIsContaModalOpen(false);
-    return res;
   }, [usuario]);
 
   useEffect(() => {

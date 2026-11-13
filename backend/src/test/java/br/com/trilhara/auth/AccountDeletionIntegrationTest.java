@@ -6,13 +6,18 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 
 import org.bson.Document;
 import org.bson.types.ObjectId;
@@ -21,23 +26,44 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 
+import br.com.trilhara.shared.mongo.ColecaoTrilhara;
+import br.com.trilhara.support.CapturadorDeLogs;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import jakarta.inject.Inject;
 
+/**
+ * R10 — exclusão de conta nas 18 coleções filhas privadas (D-08/D-35).
+ *
+ * <p>As fixtures são dirigidas por {@link ColecaoTrilhara#filhasPrivadas()}: o mapa de
+ * populadores precisa cobrir <strong>exatamente</strong> as 18 coleções filhas, e o teste falha
+ * se uma fixture for esquecida (risco apontado no relato da F9).</p>
+ */
 @QuarkusTest
+@DisplayName("R10 - Exclusão de conta e isolamento ponta a ponta")
 class AccountDeletionIntegrationTest {
 
     private static final String CONTA_ENDPOINT = "/api/auth/conta";
+    private static final String SENHA = "Senh@Forte2026!";
+
+    /** Populadores por coleção filha; validados contra o enum em {@link #popularColecoesFilhas}. */
+    private static final Map<ColecaoTrilhara, BiConsumer<MongoDatabase, Document>> POPULADORES =
+            FixturesConta.populadores();
 
     @Inject
     AccountDeletionService accountDeletionService;
+
+    @Inject
+    FaultInjectorExclusaoContaControlavel faultInjector;
 
     @Inject
     MongoClient mongoClient;
@@ -57,249 +83,420 @@ class AccountDeletionIntegrationTest {
     @Inject
     SecurityFilter securityFilter;
 
-    private ObjectId editalTesteId = null;
-
     @BeforeEach
     void setup() {
         rateLimitService.limparTudo();
         securityFilter.setStrictMode(false);
-        accountDeletionService.setHookFalha(null);
-        getDatabase().getCollection("editais").deleteMany(Filters.eq("status", "PUBLICADO"));
+        faultInjector.limpar();
+        getDatabase().getCollection(ColecaoTrilhara.EDITAIS.nome()).deleteMany(Filters.empty());
+        // Neutraliza checkpoints de exclusão deixados por testes anteriores: o worker varre
+        // todas as contas com `exclusaoConta`, não só as criadas por este teste.
+        getDatabase().getCollection(ColecaoTrilhara.USUARIOS.nome()).updateMany(
+                Filters.exists("exclusaoConta", true),
+                Updates.combine(
+                        Updates.unset("exclusaoConta"),
+                        Updates.set("ativo", true)));
     }
 
     @AfterEach
     void tearDown() {
-        accountDeletionService.setHookFalha(null);
-        if (editalTesteId != null) {
-            getDatabase().getCollection("editais").deleteOne(Filters.eq("_id", editalTesteId));
-            editalTesteId = null;
-        }
-        getDatabase().getCollection("editais").deleteMany(Filters.eq("status", "PUBLICADO"));
+        faultInjector.limpar();
+        getDatabase().getCollection(ColecaoTrilhara.EDITAIS.nome()).deleteMany(Filters.empty());
     }
 
-    private MongoDatabase getDatabase() {
-        return mongoClient.getDatabase(databaseName);
-    }
+    // ── 1. Cobertura total das 18 filhas + isolamento ────────────────────────────────────
 
     @Test
-    @DisplayName("Critérios 1, 2 e 3: Popula 18 coleções privadas para usuarioA e usuarioB, exclui conta de usuarioA e atesta isolamento e limpeza total")
-    void deveExcluirContaEmTodasAs18ColecoesPrivadasSemAfetarOutrosUsuariosOuEditais() throws Exception {
-        ObjectId usuarioAId = new ObjectId();
-        ObjectId usuarioBId = new ObjectId();
+    @DisplayName("exclui as 18 coleções filhas, isola outro usuário e preserva o catálogo de editais")
+    void excluiTodasAsColecoesPrivadasEIsolaOutrosUsuariosEEdital() {
+        ObjectId usuarioA = new ObjectId();
+        ObjectId usuarioB = new ObjectId();
+        String senhaHash = passwordService.gerarHash(SENHA);
 
-        String emailA = "usuarioA_" + UUID.randomUUID() + "@exemplo.com";
-        String emailB = "usuarioB_" + UUID.randomUUID() + "@exemplo.com";
-        String senhaPura = "Senh@Forte2026!";
-        String senhaHash = passwordService.gerarHash(senhaPura);
+        popularColecoesFilhas(usuarioA, senhaHash);
+        popularColecoesFilhas(usuarioB, senhaHash);
+        getDatabase().getCollection(ColecaoTrilhara.EDITAIS.nome()).insertOne(new Document()
+                .append("_id", new ObjectId())
+                .append("titulo", "Edital Concurso Nacional")
+                .append("status", "PUBLICADA")
+                .append("esfera", "FEDERAL")
+                .append("atualizadoEm", new Date()));
+        long editaisIniciais = getDatabase().getCollection(ColecaoTrilhara.EDITAIS.nome()).countDocuments();
 
-        // 1. Popula documentos para usuarioA e usuarioB nas 18 coleções privadas e catálogo de editais
-        popular18ColecoesPrivadas(usuarioAId, emailA, senhaHash);
-        popular18ColecoesPrivadas(usuarioBId, emailB, senhaHash);
-        popularEdital();
-
-        // Assegura pré-condição: contagem > 0 para ambos em todas as 17 filhas e 1 em usuarios
-        for (String colecao : AccountDeletionService.COLECOES_FILHAS) {
-            assertTrue(getDatabase().getCollection(colecao).countDocuments(Filters.eq("usuarioId", usuarioAId)) > 0,
-                    "Pré-condição falhou: usuarioA deveria ter doc na coleção " + colecao);
-            assertTrue(getDatabase().getCollection(colecao).countDocuments(Filters.eq("usuarioId", usuarioBId)) > 0,
-                    "Pré-condição falhou: usuarioB deveria ter doc na coleção " + colecao);
+        for (String colecao : ColecaoTrilhara.nomesFilhasPrivadas()) {
+            assertTrue(contar(usuarioA, colecao) > 0, "Fixture ausente para usuarioA em " + colecao);
+            assertTrue(contar(usuarioB, colecao) > 0, "Fixture ausente para usuarioB em " + colecao);
         }
-        assertEquals(1, getDatabase().getCollection("usuarios").countDocuments(Filters.eq("_id", usuarioAId)));
-        assertEquals(1, getDatabase().getCollection("usuarios").countDocuments(Filters.eq("_id", usuarioBId)));
-        long totalEditaisInicial = getDatabase().getCollection("editais").countDocuments();
-        assertTrue(totalEditaisInicial > 0, "Pré-condição falhou: catálogo de editais deve possuir ao menos 1 item");
 
-        // Gera token de autenticação JWT para usuarioA
-        Usuario usuarioA = new Usuario(
-                usuarioAId.toHexString(),
-                "Usuario A",
-                emailA,
-                senhaHash,
-                List.of(Role.USER),
-                true,
-                true,
-                0,
-                null,
-                null,
-                Instant.now(),
-                Instant.now()
-        );
-        String tokenA = tokenService.gerarAccessToken(usuarioA);
-        String idempotencyKey = "idemp-" + UUID.randomUUID();
+        String tokenA = tokenService.gerarAccessToken(usuarioDe(usuarioA, senhaHash));
 
-        // 2. Executa DELETE /api/auth/conta como usuarioA
-        Response deleteResponse = given()
+        Response resposta = given()
                 .header("Authorization", "Bearer " + tokenA)
-                .header("Idempotency-Key", idempotencyKey)
+                .header("Idempotency-Key", "idem-" + UUID.randomUUID())
                 .contentType(ContentType.JSON)
-                .body("""
-                        {
-                          "senha": "%s",
-                          "confirmacao": "EXCLUIR MINHA CONTA"
-                        }
-                        """.formatted(senhaPura))
+                .body(corpoExclusao())
                 .when()
                 .delete(CONTA_ENDPOINT)
                 .then()
                 .statusCode(202)
                 .body("operationId", notNullValue())
-                .body("estado", equalTo("PENDENTE"))
+                .body("estado", equalTo(AccountDeletionService.ESTADO_PENDENTE))
                 .extract().response();
 
-        List<String> setCookies = deleteResponse.headers().getValues("Set-Cookie");
-        assertTrue(setCookies.stream().anyMatch(c -> c.contains("trilhara_rt=") && c.contains("Max-Age=0")),
-                "Deveria invalidar o cookie trilhara_rt");
-        assertTrue(setCookies.stream().anyMatch(c -> c.contains("trilhara_session_state=") && c.contains("Max-Age=0")),
-                "Deveria invalidar o cookie trilhara_session_state");
+        List<String> cookies = resposta.headers().getValues("Set-Cookie");
+        assertTrue(cookies.stream().anyMatch(c -> c.contains("trilhara_rt=") && c.contains("Max-Age=0")),
+                "O cookie trilhara_rt deveria ser expirado");
+        assertTrue(cookies.stream().anyMatch(c -> c.contains("trilhara_session_state=") && c.contains("Max-Age=0")),
+                "O cookie trilhara_session_state deveria ser expirado");
 
-        String operationId = deleteResponse.path("operationId");
-        assertNotNull(operationId);
+        assertEquals(1, accountDeletionService.processarExclusoesPendentes(),
+                "O worker deveria concluir a exclusão de uma conta");
 
-        // Aguarda conclusão assíncrona do worker
-        aguardarExclusaoConcluida(usuarioAId, Duration.ofSeconds(10));
-
-        // 3. Verifica nominalmente nas 18 coleções privadas que countDocuments para usuarioA é 0
-        for (String colecao : AccountDeletionService.COLECOES_FILHAS) {
-            long countA = getDatabase().getCollection(colecao).countDocuments(Filters.eq("usuarioId", usuarioAId));
-            assertEquals(0, countA, "Coleção privada " + colecao + " ainda possui dados de usuarioA!");
+        for (String colecao : ColecaoTrilhara.nomesFilhasPrivadas()) {
+            assertEquals(0, contar(usuarioA, colecao),
+                    "A coleção privada " + colecao + " ainda possui dados de usuarioA");
+            assertTrue(contar(usuarioB, colecao) > 0,
+                    "Os dados de usuarioB foram afetados em " + colecao);
         }
-        long countUserA = getDatabase().getCollection("usuarios").countDocuments(Filters.eq("_id", usuarioAId));
-        assertEquals(0, countUserA, "Coleção usuarios ainda possui o documento raiz de usuarioA!");
+        assertEquals(0, getDatabase().getCollection(ColecaoTrilhara.USUARIOS.nome())
+                .countDocuments(Filters.eq("_id", usuarioA)));
+        assertEquals(1, getDatabase().getCollection(ColecaoTrilhara.USUARIOS.nome())
+                .countDocuments(Filters.eq("_id", usuarioB)));
+        assertEquals(editaisIniciais,
+                getDatabase().getCollection(ColecaoTrilhara.EDITAIS.nome()).countDocuments(),
+                "O catálogo público de editais não pode ser alterado");
+    }
 
-        // Verifica que todos os documentos do usuarioB e o catálogo de editais permanecem intactos
-        for (String colecao : AccountDeletionService.COLECOES_FILHAS) {
-            long countB = getDatabase().getCollection(colecao).countDocuments(Filters.eq("usuarioId", usuarioBId));
-            assertTrue(countB > 0, "Documentos do usuarioB foram indevidamente alterados na coleção " + colecao);
+    // ── 2. Falha injetada em cada coleção filha ─────────────────────────────────────────
+
+    @ParameterizedTest(name = "falha em {0} retoma sem órfãos")
+    @EnumSource(value = ColecaoTrilhara.class, names = {
+            "REFRESH_TOKENS", "TOKENS_RECUPERACAO_SENHA", "TOKENS_CONFIRMACAO_EMAIL",
+            "TOKENS_HANDOFF_SSO", "TRILHAS", "DISCIPLINAS", "PROGRESSO_TOPICOS", "CRONOGRAMAS",
+            "BLOCOS_CRONOGRAMA", "SESSOES", "LISTAS_TAREFAS", "SERIES_RECORRENTES", "TAREFAS",
+            "CADERNOS", "SECOES", "NOTAS", "PUSH_SUBSCRIPTIONS", "LEMBRETES_PUSH"
+    })
+    void falhaInjetadaEmCadaColecaoRetomaSemOrfaos(ColecaoTrilhara colecaoComFalha) {
+        ObjectId usuario = new ObjectId();
+        popularColecoesFilhas(usuario, passwordService.gerarHash(SENHA));
+
+        faultInjector.falharNa(colecaoComFalha);
+        assertFalse(accountDeletionService.executarLimpezaUsuario(usuario, "OP-FALHA"),
+                "A limpeza deveria falhar em " + colecaoComFalha.nome());
+
+        Document checkpoint = getDatabase().getCollection(ColecaoTrilhara.USUARIOS.nome())
+                .find(Filters.eq("_id", usuario)).first();
+        assertNotNull(checkpoint, "O documento raiz precisa permanecer para a retomada");
+        Document exclusao = checkpoint.get("exclusaoConta", Document.class);
+        assertNotNull(exclusao);
+        assertEquals(colecaoComFalha.nome(), exclusao.getString("erroColecao"));
+        assertNotNull(exclusao.getDate("proximaTentativa"));
+
+        // Enquanto a falha persistir, a conta não é concluída.
+        assertEquals(0, accountDeletionService.processarExclusoesPendentes());
+
+        // Removida a falha, o worker retoma do checkpoint e não deixa órfãos.
+        faultInjector.limpar();
+        forcarRetentativaImediata(usuario);
+        assertEquals(1, accountDeletionService.processarExclusoesPendentes());
+
+        for (String colecao : ColecaoTrilhara.nomesFilhasPrivadas()) {
+            assertEquals(0, contar(usuario, colecao), "Órfão em " + colecao);
         }
-        long countUserB = getDatabase().getCollection("usuarios").countDocuments(Filters.eq("_id", usuarioBId));
-        assertEquals(1, countUserB, "Documento de usuarioB na coleção usuarios foi indevidamente removido");
+        assertNull(getDatabase().getCollection(ColecaoTrilhara.USUARIOS.nome())
+                .find(Filters.eq("_id", usuario)).first(), "O documento raiz deveria ser removido");
+    }
 
-        long totalEditaisFinal = getDatabase().getCollection("editais").countDocuments();
-        assertEquals(totalEditaisInicial, totalEditaisFinal, "Catálogo de editais foi alterado!");
+    // ── 3. Backoff e ausência de estado terminal silencioso ─────────────────────────────
+
+    @Test
+    @DisplayName("após 5 falhas entra em RETENTANDO_LENTO, não conclui e agenda retentativa horária")
+    void apos5FalhasEntraEmRetentandoLentoENaoConclui() {
+        ObjectId usuario = new ObjectId();
+        popularColecoesFilhas(usuario, passwordService.gerarHash(SENHA));
+
+        faultInjector.falharNa(ColecaoTrilhara.NOTAS);
+        for (int tentativa = 1; tentativa <= 5; tentativa++) {
+            accountDeletionService.executarLimpezaUsuario(usuario, "OP-LENTO");
+        }
+
+        Document checkpoint = getDatabase().getCollection(ColecaoTrilhara.USUARIOS.nome())
+                .find(Filters.eq("_id", usuario)).first();
+        assertNotNull(checkpoint, "Nenhum estado terminal silencioso: a conta precisa sobreviver");
+        Document exclusao = checkpoint.get("exclusaoConta", Document.class);
+
+        assertEquals(AccountDeletionService.ESTADO_RETENTANDO_LENTO, exclusao.getString("estado"));
+        assertEquals(5, exclusao.getInteger("tentativas"));
+        Date proxima = exclusao.getDate("proximaTentativa");
+        assertNotNull(proxima);
+        assertTrue(proxima.toInstant().isAfter(Instant.now().plus(Duration.ofMinutes(50))),
+                "Em RETENTANDO_LENTO a próxima tentativa é horária, não imediata");
+
+        assertEquals(0, accountDeletionService.processarExclusoesPendentes(),
+                "O job não pode concluir antes do horário agendado");
     }
 
     @Test
-    @DisplayName("Critério 4: Injeta falha em cada uma das coleções e atesta que o worker retoma sem deixar órfãos e sem reautenticação")
-    void deveRetomarExclusaoAposFalhasEmCadaColecaoSemDeixarOrfaos() {
-        // Percorre nominalmente as 17 coleções filhas simulando falha em cada uma
-        for (String colecaoComFalha : AccountDeletionService.COLECOES_FILHAS) {
-            ObjectId usuarioId = new ObjectId();
-            String email = "falha_" + colecaoComFalha + "_" + UUID.randomUUID() + "@exemplo.com";
-            String senhaHash = passwordService.gerarHash("Senh@Forte2026!");
+    @DisplayName("retomada após RETENTANDO_LENTO conclui a exclusão sem órfãos")
+    void retomadaAposRetentandoLentoConcluiSemOrfaos() {
+        ObjectId usuario = new ObjectId();
+        popularColecoesFilhas(usuario, passwordService.gerarHash(SENHA));
 
-            popular18ColecoesPrivadas(usuarioId, email, senhaHash);
-
-            // Injeta falha na coleção alvo
-            accountDeletionService.setHookFalha((col, uId) -> {
-                if (col.equals(colecaoComFalha) && uId.equals(usuarioId)) {
-                    throw new RuntimeException("FALHA INJETADA DE TESTE NA COLECAO: " + col);
-                }
-            });
-
-            String operationId = "OP-FAIL-" + UUID.randomUUID();
-
-            // Dispara limpeza; deve capturar a falha e persistir o estado no documento usuarios
-            boolean executouComSucesso = accountDeletionService.executarLimpezaUsuario(usuarioId, operationId);
-            assertFalse(executouComSucesso, "Limpeza deveria ter falhado na coleção " + colecaoComFalha);
-
-            // Documento usuarios deve persistir com estado FALHA e erroColecao registrado
-            Document userDoc = getDatabase().getCollection("usuarios").find(Filters.eq("_id", usuarioId)).first();
-            assertNotNull(userDoc, "Documento usuarios não deve ser removido após falha intermediária!");
-            Document excDoc = userDoc.get("exclusaoConta", Document.class);
-            assertNotNull(excDoc);
-            assertEquals("FALHA", excDoc.getString("estado"));
-            assertEquals(colecaoComFalha, excDoc.getString("erroColecao"));
-
-            // Remove o hook de falha
-            accountDeletionService.setHookFalha(null);
-
-            // Retoma a exclusão sem credenciais ou nova autenticação
-            int reconciliadas = accountDeletionService.processarExclusoesPendentes();
-            assertTrue(reconciliadas >= 1, "Deveria ter reconciliado e concluído a exclusão da conta interrompida.");
-
-            // Verifica nominalmente que todas as 18 coleções foram limpas para usuarioId
-            for (String colecao : AccountDeletionService.COLECOES_FILHAS) {
-                long count = getDatabase().getCollection(colecao).countDocuments(Filters.eq("usuarioId", usuarioId));
-                assertEquals(0, count, "Coleção " + colecao + " possui dados órfãos após retomada!");
-            }
-            long countUsuario = getDatabase().getCollection("usuarios").countDocuments(Filters.eq("_id", usuarioId));
-            assertEquals(0, countUsuario, "Documento raiz na coleção usuarios permaneceu órfão após retomada!");
+        faultInjector.falharNa(ColecaoTrilhara.SECOES);
+        for (int tentativa = 1; tentativa <= 5; tentativa++) {
+            accountDeletionService.executarLimpezaUsuario(usuario, "OP-RETOMA");
         }
+
+        faultInjector.limpar();
+        forcarRetentativaImediata(usuario);
+        assertEquals(1, accountDeletionService.processarExclusoesPendentes());
+
+        for (String colecao : ColecaoTrilhara.nomesFilhasPrivadas()) {
+            assertEquals(0, contar(usuario, colecao), "Órfão em " + colecao);
+        }
+        assertNull(getDatabase().getCollection(ColecaoTrilhara.USUARIOS.nome())
+                .find(Filters.eq("_id", usuario)).first());
     }
 
+    // ── 4. Contrato HTTP e privacidade ──────────────────────────────────────────────────
+
     @Test
-    @DisplayName("Validações de segurança: rejeita senha incorreta e confirmação textual inválida")
-    void deveRejeitarSenhaIncorretaEConfirmacaoInvalida() {
-        ObjectId usuarioId = new ObjectId();
-        String email = "seguranca_" + UUID.randomUUID() + "@exemplo.com";
-        String senhaCorreta = "Senh@Correta2026!";
-        String senhaHash = passwordService.gerarHash(senhaCorreta);
+    @DisplayName("sem Idempotency-Key responde 400 IDEMPOTENCY_KEY_REQUIRED")
+    void semIdempotencyKeyRetorna400() {
+        ObjectId usuario = new ObjectId();
+        String senhaHash = passwordService.gerarHash(SENHA);
+        popularColecoesFilhas(usuario, senhaHash);
+        String token = tokenService.gerarAccessToken(usuarioDe(usuario, senhaHash));
 
-        popular18ColecoesPrivadas(usuarioId, email, senhaHash);
-
-        Usuario usuario = new Usuario(
-                usuarioId.toHexString(),
-                "Usuario Seguranca",
-                email,
-                senhaHash,
-                List.of(Role.USER),
-                true,
-                true,
-                0,
-                null,
-                null,
-                Instant.now(),
-                Instant.now()
-        );
-        String token = tokenService.gerarAccessToken(usuario);
-
-        // 1. Senha incorreta -> 401
         given()
                 .header("Authorization", "Bearer " + token)
                 .contentType(ContentType.JSON)
+                .body(corpoExclusao())
+                .when()
+                .delete(CONTA_ENDPOINT)
+                .then()
+                .statusCode(400)
+                .body("code", equalTo("IDEMPOTENCY_KEY_REQUIRED"));
+
+        assertEquals(1, getDatabase().getCollection(ColecaoTrilhara.USUARIOS.nome())
+                .countDocuments(Filters.eq("_id", usuario)));
+    }
+
+    @Test
+    @DisplayName("senha inválida responde 401 e não produz efeito")
+    void senhaInvalidaRetorna401ESemEfeito() {
+        ObjectId usuario = new ObjectId();
+        String senhaHash = passwordService.gerarHash(SENHA);
+        popularColecoesFilhas(usuario, senhaHash);
+        String token = tokenService.gerarAccessToken(usuarioDe(usuario, senhaHash));
+
+        given()
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", "idem-" + UUID.randomUUID())
+                .contentType(ContentType.JSON)
                 .body("""
-                        {
-                          "senha": "SenhaErrada!",
-                          "confirmacao": "EXCLUIR MINHA CONTA"
-                        }
+                        {"senha": "SenhaErrada123!", "confirmacao": "EXCLUIR MINHA CONTA"}
                         """)
                 .when()
                 .delete(CONTA_ENDPOINT)
                 .then()
                 .statusCode(401);
 
-        // 2. Confirmação textual inválida -> 400
-        given()
-                .header("Authorization", "Bearer " + token)
-                .contentType(ContentType.JSON)
-                .body("""
-                        {
-                          "senha": "%s",
-                          "confirmacao": "sim, quero excluir"
-                        }
-                        """.formatted(senhaCorreta))
-                .when()
-                .delete(CONTA_ENDPOINT)
-                .then()
-                .statusCode(400);
-
-        // Limpeza após teste de validação
-        accountDeletionService.executarLimpezaUsuario(usuarioId, "CLEANUP");
+        Document doc = getDatabase().getCollection(ColecaoTrilhara.USUARIOS.nome())
+                .find(Filters.eq("_id", usuario)).first();
+        assertNotNull(doc, "O usuário não pode ser removido");
+        assertNull(doc.get("exclusaoConta"), "Senha inválida não pode registrar solicitação");
+        assertEquals(Boolean.TRUE, doc.getBoolean("ativo"), "A conta não pode ser desativada");
+        for (String colecao : ColecaoTrilhara.nomesFilhasPrivadas()) {
+            assertTrue(contar(usuario, colecao) > 0, "Nenhum dado pode ser removido em " + colecao);
+        }
     }
 
     @Test
-    @DisplayName("Idempotência: requisições repetidas com a mesma chave retornam 202 com mesmo operationId")
-    void deveGarantirIdempotenciaComMesmaChave() {
-        ObjectId usuarioId = new ObjectId();
-        String email = "idemp_" + UUID.randomUUID() + "@exemplo.com";
-        String senha = "Senh@Forte2026!";
-        String senhaHash = passwordService.gerarHash(senha);
+    @DisplayName("confirmação em minúsculas responde 400 VALIDATION_ERROR com errors.confirmacao")
+    void confirmacaoEmMinusculasRetorna400() {
+        ObjectId usuario = new ObjectId();
+        String senhaHash = passwordService.gerarHash(SENHA);
+        popularColecoesFilhas(usuario, senhaHash);
+        String token = tokenService.gerarAccessToken(usuarioDe(usuario, senhaHash));
 
-        popular18ColecoesPrivadas(usuarioId, email, senhaHash);
+        given()
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", "idem-" + UUID.randomUUID())
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"senha": "%s", "confirmacao": "excluir minha conta"}
+                        """.formatted(SENHA))
+                .when()
+                .delete(CONTA_ENDPOINT)
+                .then()
+                .statusCode(400)
+                .body("code", equalTo("VALIDATION_ERROR"))
+                .body("errors.confirmacao", notNullValue());
+    }
 
-        Usuario usuario = new Usuario(
-                usuarioId.toHexString(),
-                "Usuario Idempotencia",
+    @Test
+    @DisplayName("o 202 usa application/json e não Problem Details")
+    void respostaNaoEhProblemJson() {
+        ObjectId usuario = new ObjectId();
+        String senhaHash = passwordService.gerarHash(SENHA);
+        popularColecoesFilhas(usuario, senhaHash);
+        String token = tokenService.gerarAccessToken(usuarioDe(usuario, senhaHash));
+
+        Response resposta = given()
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", "idem-" + UUID.randomUUID())
+                .contentType(ContentType.JSON)
+                .body(corpoExclusao())
+                .when()
+                .delete(CONTA_ENDPOINT)
+                .then()
+                .statusCode(202)
+                .extract().response();
+
+        assertTrue(resposta.contentType().toLowerCase().startsWith("application/json"),
+                "O 202 deveria ser application/json, veio: " + resposta.contentType());
+        assertFalse(resposta.contentType().contains("problem+json"));
+        assertNotNull(resposta.path("operationId"));
+        assertNotNull(resposta.path("estado"));
+        assertNull(resposta.path("type"), "O corpo de sucesso não carrega campos de Problem Details");
+        assertNull(resposta.path("title"));
+        assertNull(resposta.path("code"));
+    }
+
+    @Test
+    @DisplayName("retry com a mesma chave devolve 202 com o mesmo operationId")
+    void retryComMesmaChaveRetorna202ComMesmoOperationId() {
+        ObjectId usuario = new ObjectId();
+        String senhaHash = passwordService.gerarHash(SENHA);
+        popularColecoesFilhas(usuario, senhaHash);
+        String token = tokenService.gerarAccessToken(usuarioDe(usuario, senhaHash));
+        String chave = "idem-" + UUID.randomUUID();
+
+        String opId1 = given()
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", chave)
+                .contentType(ContentType.JSON)
+                .body(corpoExclusao())
+                .when().delete(CONTA_ENDPOINT)
+                .then().statusCode(202).extract().path("operationId");
+
+        String opId2 = given()
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", chave)
+                .contentType(ContentType.JSON)
+                .body(corpoExclusao())
+                .when().delete(CONTA_ENDPOINT)
+                .then().statusCode(202).extract().path("operationId");
+
+        assertEquals(opId1, opId2, "A mesma chave deve devolver o mesmo operationId");
+    }
+
+    @Test
+    @DisplayName("outra chave para a mesma conta já em exclusão responde 409")
+    void outraChaveRetorna409() {
+        ObjectId usuario = new ObjectId();
+        String senhaHash = passwordService.gerarHash(SENHA);
+        popularColecoesFilhas(usuario, senhaHash);
+        String token = tokenService.gerarAccessToken(usuarioDe(usuario, senhaHash));
+
+        given()
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", "idem-" + UUID.randomUUID())
+                .contentType(ContentType.JSON)
+                .body(corpoExclusao())
+                .when().delete(CONTA_ENDPOINT)
+                .then().statusCode(202);
+
+        given()
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", "outra-" + UUID.randomUUID())
+                .contentType(ContentType.JSON)
+                .body(corpoExclusao())
+                .when().delete(CONTA_ENDPOINT)
+                .then().statusCode(409)
+                .body("code", equalTo("IDEMPOTENCY_KEY_CONFLICT"));
+    }
+
+    @Test
+    @DisplayName("após o 202, qualquer rota autenticada responde 401")
+    void pos202QualquerRotaRetorna401() {
+        ObjectId usuario = new ObjectId();
+        String senhaHash = passwordService.gerarHash(SENHA);
+        popularColecoesFilhas(usuario, senhaHash);
+        String token = tokenService.gerarAccessToken(usuarioDe(usuario, senhaHash));
+
+        given()
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", "idem-" + UUID.randomUUID())
+                .contentType(ContentType.JSON)
+                .body(corpoExclusao())
+                .when().delete(CONTA_ENDPOINT)
+                .then().statusCode(202);
+
+        given().header("Authorization", "Bearer " + token)
+                .when().get("/api/auth/me")
+                .then().statusCode(401);
+        given().header("Authorization", "Bearer " + token)
+                .when().get("/api/trilhas")
+                .then().statusCode(401);
+        given().header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body(corpoExclusao())
+                .when().delete(CONTA_ENDPOINT)
+                .then().statusCode(401);
+    }
+
+    @Test
+    @DisplayName("nenhum log da exclusão contém usuarioId, e-mail ou nome")
+    void logsNaoContemUsuarioId() {
+        ObjectId usuario = new ObjectId();
+        String senhaHash = passwordService.gerarHash(SENHA);
+        String email = "log_" + UUID.randomUUID() + "@exemplo.com";
+        popularColecoesFilhas(usuario, senhaHash, email);
+        String token = tokenService.gerarAccessToken(usuarioDe(usuario, senhaHash, email));
+
+        try (CapturadorDeLogs logs = CapturadorDeLogs.iniciar()) {
+            given()
+                    .header("Authorization", "Bearer " + token)
+                    .header("Idempotency-Key", "idem-" + UUID.randomUUID())
+                    .contentType(ContentType.JSON)
+                    .body(corpoExclusao())
+                    .when().delete(CONTA_ENDPOINT)
+                    .then().statusCode(202);
+
+            accountDeletionService.processarExclusoesPendentes();
+
+            String capturado = logs.textoCompleto();
+            assertFalse(capturado.contains(usuario.toHexString()),
+                    "O hex de usuarioId não pode aparecer em log");
+            assertFalse(capturado.contains(email), "O e-mail não pode aparecer em log");
+            assertFalse(capturado.contains("Usuário Teste"), "O nome não pode aparecer em log");
+        }
+    }
+
+    private MongoDatabase getDatabase() {
+        return mongoClient.getDatabase(databaseName);
+    }
+
+    /** Fixtures dirigidas pelo enum: falha se faltar populador para alguma filha privada. */
+    private void popularColecoesFilhas(ObjectId usuarioId, String senhaHash) {
+        popularColecoesFilhas(usuarioId, senhaHash,
+                "usuario_" + usuarioId.toHexString() + "@exemplo.com");
+    }
+
+    private void popularColecoesFilhas(ObjectId usuarioId, String senhaHash, String email) {
+        FixturesConta.popularColecoesFilhas(getDatabase(), usuarioId, senhaHash, email);
+    }
+
+    private static Usuario usuarioDe(ObjectId id, String senhaHash) {
+        return usuarioDe(id, senhaHash, "usuario_" + id.toHexString() + "@exemplo.com");
+    }
+
+    private static Usuario usuarioDe(ObjectId id, String senhaHash, String email) {
+        return new Usuario(
+                id.toHexString(),
+                "Usuário Teste",
                 email,
                 senhaHash,
                 List.of(Role.USER),
@@ -309,249 +506,25 @@ class AccountDeletionIntegrationTest {
                 null,
                 null,
                 Instant.now(),
-                Instant.now()
-        );
-        String token = tokenService.gerarAccessToken(usuario);
-        String chaveIdempotencia = "idem-key-" + UUID.randomUUID();
-
-        // Injeta falha temporária para impedir conclusão imediata no worker
-        accountDeletionService.setHookFalha((col, uId) -> {
-            if (uId.equals(usuarioId)) {
-                throw new RuntimeException("Pausa para teste de idempotencia");
-            }
-        });
-
-        Response resp1 = given()
-                .header("Authorization", "Bearer " + token)
-                .header("Idempotency-Key", chaveIdempotencia)
-                .contentType(ContentType.JSON)
-                .body("""
-                        {
-                          "senha": "%s",
-                          "confirmacao": "EXCLUIR MINHA CONTA"
-                        }
-                        """.formatted(senha))
-                .when()
-                .delete(CONTA_ENDPOINT)
-                .then()
-                .statusCode(202)
-                .extract().response();
-
-        String opId1 = resp1.path("operationId");
-
-        Response resp2 = given()
-                .header("Authorization", "Bearer " + token)
-                .header("Idempotency-Key", chaveIdempotencia)
-                .contentType(ContentType.JSON)
-                .body("""
-                        {
-                          "senha": "%s",
-                          "confirmacao": "EXCLUIR MINHA CONTA"
-                        }
-                        """.formatted(senha))
-                .when()
-                .delete(CONTA_ENDPOINT)
-                .then()
-                .statusCode(202)
-                .extract().response();
-
-        String opId2 = resp2.path("operationId");
-        assertEquals(opId1, opId2, "Idempotency-Key deve retornar o mesmo operationId");
-
-        // Limpeza final
-        accountDeletionService.setHookFalha(null);
-        accountDeletionService.executarLimpezaUsuario(usuarioId, opId1);
+                Instant.now());
     }
 
-    private void aguardarExclusaoConcluida(ObjectId usuarioId, Duration timeout) {
-        long limite = System.currentTimeMillis() + timeout.toMillis();
-        while (System.currentTimeMillis() < limite) {
-            long restante = getDatabase().getCollection("usuarios").countDocuments(Filters.eq("_id", usuarioId));
-            if (restante == 0) {
-                return;
-            }
-            java.util.concurrent.locks.LockSupport.parkNanos(100_000_000L);
-        }
-        throw new AssertionError("Tempo limite excedido aguardando conclusão da exclusão de conta para: " + usuarioId);
+    private static String corpoExclusao() {
+        return """
+                {"senha": "%s", "confirmacao": "EXCLUIR MINHA CONTA"}
+                """.formatted(SENHA);
     }
 
-    private void popular18ColecoesPrivadas(ObjectId usuarioId, String email, String senhaHash) {
-        MongoDatabase db = getDatabase();
-        Date agora = Date.from(Instant.now());
-
-        // 1. refresh_tokens
-        db.getCollection("refresh_tokens").insertOne(new Document()
-                .append("tokenHash", UUID.randomUUID().toString())
-                .append("usuarioId", usuarioId)
-                .append("familiaId", UUID.randomUUID().toString())
-                .append("criadoEm", agora)
-                .append("expiraEm", Date.from(Instant.now().plusSeconds(3600))));
-
-        // 2. tokens_recuperacao_senha
-        db.getCollection("tokens_recuperacao_senha").insertOne(new Document()
-                .append("tokenHash", UUID.randomUUID().toString())
-                .append("usuarioId", usuarioId)
-                .append("ip", "127.0.0.1")
-                .append("criadoEm", agora)
-                .append("expiraEm", Date.from(Instant.now().plusSeconds(3600))));
-
-        // 3. tokens_confirmacao_email
-        db.getCollection("tokens_confirmacao_email").insertOne(new Document()
-                .append("tokenHash", UUID.randomUUID().toString())
-                .append("usuarioId", usuarioId)
-                .append("email", email)
-                .append("criadoEm", agora)
-                .append("expiraEm", Date.from(Instant.now().plusSeconds(3600))));
-
-        // 4. tokens_handoff_sso (D-08)
-        db.getCollection("tokens_handoff_sso").insertOne(new Document()
-                .append("_id", new ObjectId())
-                .append("usuarioId", usuarioId)
-                .append("codigoHash", UUID.randomUUID().toString())
-                .append("origemDestino", "http://localhost:5174/")
-                .append("criadoEm", agora)
-                .append("expiraEm", Date.from(Instant.now().plusSeconds(60)))
-                .append("consumidoEm", null));
-
-        // 5. lembretes_push
-        db.getCollection("lembretes_push").insertOne(new Document()
-                .append("usuarioId", usuarioId)
-                .append("tarefaId", new ObjectId())
-                .append("estado", "AGENDADO")
-                .append("instanteEntregaUtc", agora));
-
-        // 5. push_subscriptions
-        db.getCollection("push_subscriptions").insertOne(new Document()
-                .append("usuarioId", usuarioId)
-                .append("endpoint", "https://push.example.com/" + UUID.randomUUID())
-                .append("p256dh", "dummy-p256dh")
-                .append("auth", "dummy-auth"));
-
-        // 6. blocos_cronograma
-        ObjectId trilhaId = new ObjectId();
-        ObjectId cronogramaId = new ObjectId();
-        db.getCollection("blocos_cronograma").insertOne(new Document()
-                .append("usuarioId", usuarioId)
-                .append("trilhaId", trilhaId)
-                .append("cronogramaId", cronogramaId)
-                .append("versaoGeracao", 1)
-                .append("data", "2026-11-10")
-                .append("ordem", 0)
-                .append("concluido", false));
-
-        // 7. cronogramas
-        db.getCollection("cronogramas").insertOne(new Document()
-                .append("_id", cronogramaId)
-                .append("usuarioId", usuarioId)
-                .append("trilhaId", trilhaId)
-                .append("modalidade", "CICLO")
-                .append("ativo", true));
-
-        // 8. progresso_topicos
-        db.getCollection("progresso_topicos").insertOne(new Document()
-                .append("usuarioId", usuarioId)
-                .append("trilhaId", trilhaId)
-                .append("topicoId", "topico-1")
-                .append("concluido", true));
-
-        // 9. disciplinas
-        ObjectId disciplinaId = new ObjectId();
-        db.getCollection("disciplinas").insertOne(new Document()
-                .append("_id", disciplinaId)
-                .append("usuarioId", usuarioId)
-                .append("trilhaId", trilhaId)
-                .append("nome", "Direito Constitucional")
-                .append("ordem", 0));
-
-        // 10. sessoes
-        db.getCollection("sessoes").insertOne(new Document()
-                .append("usuarioId", usuarioId)
-                .append("trilhaId", trilhaId)
-                .append("disciplinaId", disciplinaId)
-                .append("duracaoSegundos", 1500)
-                .append("dataSessao", "2026-11-10")
-                .append("criadoEm", agora));
-
-        // 11. trilhas
-        db.getCollection("trilhas").insertOne(new Document()
-                .append("_id", trilhaId)
-                .append("usuarioId", usuarioId)
-                .append("nome", "Trilha Auditor Fiscal")
-                .append("atualizadoEm", agora));
-
-        // 12. tarefas
-        ObjectId listaId = new ObjectId();
-        ObjectId serieId = new ObjectId();
-        db.getCollection("tarefas").insertOne(new Document()
-                .append("usuarioId", usuarioId)
-                .append("listaId", listaId)
-                .append("serieId", serieId)
-                .append("titulo", "Estudar Direito Tributário")
-                .append("concluido", false)
-                .append("ordem", 0));
-
-        // 13. series_recorrentes
-        db.getCollection("series_recorrentes").insertOne(new Document()
-                .append("_id", serieId)
-                .append("usuarioId", usuarioId)
-                .append("titulo", "Série Semanal de Revisão")
-                .append("ativa", true));
-
-        // 14. listas_tarefas
-        db.getCollection("listas_tarefas").insertOne(new Document()
-                .append("_id", listaId)
-                .append("usuarioId", usuarioId)
-                .append("nome", "Tarefas da Semana")
-                .append("ordem", 0));
-
-        // 15. notas
-        ObjectId cadernoId = new ObjectId();
-        ObjectId secaoId = new ObjectId();
-        db.getCollection("notas").insertOne(new Document()
-                .append("usuarioId", usuarioId)
-                .append("cadernoId", cadernoId)
-                .append("secaoId", secaoId)
-                .append("titulo", "Resumo de Tributos")
-                .append("conteudoMarkdown", "# Resumo"));
-
-        // 16. secoes
-        db.getCollection("secoes").insertOne(new Document()
-                .append("_id", secaoId)
-                .append("usuarioId", usuarioId)
-                .append("cadernoId", cadernoId)
-                .append("nome", "Direito Tributário")
-                .append("ordem", 0));
-
-        // 17. cadernos
-        db.getCollection("cadernos").insertOne(new Document()
-                .append("_id", cadernoId)
-                .append("usuarioId", usuarioId)
-                .append("nome", "Meu Caderno de Estudos")
-                .append("atualizadoEm", agora));
-
-        // 18. usuarios
-        db.getCollection("usuarios").insertOne(new Document()
-                .append("_id", usuarioId)
-                .append("nome", "Usuário Teste")
-                .append("email", email)
-                .append("senhaHash", senhaHash)
-                .append("roles", List.of("USER"))
-                .append("ativo", true)
-                .append("emailVerificado", true)
-                .append("criadoEm", agora)
-                .append("atualizadoEm", agora));
+    /** Zera o backoff para exercitar a retomada sem esperar o intervalo configurado. */
+    private void forcarRetentativaImediata(ObjectId usuario) {
+        getDatabase().getCollection(ColecaoTrilhara.USUARIOS.nome()).updateOne(
+                Filters.eq("_id", usuario),
+                Updates.set("exclusaoConta.proximaTentativa", new Date(0)));
     }
 
-    private void popularEdital() {
-        MongoDatabase db = getDatabase();
-        if (editalTesteId == null) {
-            editalTesteId = new ObjectId();
-            db.getCollection("editais").insertOne(new Document()
-                    .append("_id", editalTesteId)
-                    .append("titulo", "Edital Concurso Nacional")
-                    .append("status", "PUBLICADA")
-                    .append("esfera", "FEDERAL")
-                    .append("atualizadoEm", new Date()));
-        }
+    private long contar(ObjectId usuarioId, String colecao) {
+        return getDatabase().getCollection(colecao)
+                .countDocuments(Filters.eq("usuarioId", usuarioId));
     }
 }
+

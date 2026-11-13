@@ -14,13 +14,10 @@ public record ExcluirContaRequest(
 
         @Schema(description = "Confirmação textual explícita de intenção ('EXCLUIR MINHA CONTA')", required = true)
         @NotBlank(message = "A confirmação textual de intenção é obrigatória.")
-        String confirmacao,
-
-        @Schema(description = "Chave de idempotência da solicitação", required = false)
-        String idempotencyKey) {
+        String confirmacao) {
 
     @Override
     public String toString() {
-        return "ExcluirContaRequest[senha=[PROTECTED], confirmacao=" + confirmacao + ", idempotencyKey=" + idempotencyKey + "]";
+        return "ExcluirContaRequest[senha=[PROTECTED], confirmacao=" + confirmacao + "]";
     }
 }

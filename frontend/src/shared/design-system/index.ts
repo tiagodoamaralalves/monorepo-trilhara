@@ -29,4 +29,6 @@ export * from './ColorPickerPopover/colorUtils';
 export * from './GlobalSessionModal';
 export * from './SectionErrorCard';
 export * from './SyncStatusBadge';
+export * from './ContaMenuButton/ContaMenuButton';
+export * from './AvisoContaExcluida/AvisoContaExcluida';
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { BookMarked, ChevronLeft, FileText, Folder, Plus, Trash2 } from 'lucide-react';
-import { Button, EmptyState, useConfirm, useToast } from '@shared/design-system';
+import { AvisoContaExcluida, Button, EmptyState, useConfirm, useToast } from '@shared/design-system';
 import { useAuth, AuthView, request } from '@shared/auth';
 
 import { Caderno, Nota, NotaMetadata, Secao } from './types/nota';
@@ -42,7 +42,7 @@ function obterOrigemTrilhaInicial(): string | null {
 function NotasApp() {
   const toast = useToast();
   const { confirm } = useConfirm();
-  const { usuario, isAuthenticated, carregando, logout, abrirContaModal } = useAuth();
+  const { usuario, isAuthenticated, carregando, logout } = useAuth();
   const [telaAuth, setTelaAuth] = useState<AuthScreen>(obterTelaAuthInicial);
 
   const [cadernos, setCadernos] = useState<Caderno[]>([]);
@@ -570,10 +570,13 @@ function NotasApp() {
       );
     }
     return (
-      <LandingView
-        onLogin={() => alternarTelaAuth('login')}
-        onCriarConta={() => alternarTelaAuth('cadastro')}
-      />
+      <>
+        <AvisoContaExcluida />
+        <LandingView
+          onLogin={() => alternarTelaAuth('login')}
+          onCriarConta={() => alternarTelaAuth('cadastro')}
+        />
+      </>
     );
   }
 
@@ -623,7 +626,6 @@ function NotasApp() {
         onAbrirLixeira={() => setModalLixeiraAberto(true)}
         onAbrirLogin={() => alternarTelaAuth('login')}
         onLogout={logout}
-        onAbrirConta={abrirContaModal}
         onCollapsedChange={setSidebarCollapsed}
       />
 

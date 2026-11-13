@@ -19,6 +19,7 @@ import br.com.trilhara.auth.dto.RecuperarSenhaRequest;
 import br.com.trilhara.auth.dto.ResetarSenhaRequest;
 import br.com.trilhara.auth.dto.SessaoAtivaResponse;
 import br.com.trilhara.auth.dto.UsuarioResponse;
+import br.com.trilhara.shared.Pseudonimo;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.NotAuthorizedException;
@@ -94,7 +95,7 @@ public class AuthService {
 
         emailService.enviarEmailConfirmacao(criado.email(), criado.nome(), tokenPuro, baseUrl);
 
-        LOG.infof("Novo usuario cadastrado com sucesso: usuarioId=%s", criado.id());
+        LOG.infof("event=USER_REGISTERED conta=%s", Pseudonimo.de(criado.id()));
         return emitirRespostaAutenticacao(criado, userAgent, ip);
     }
 
@@ -119,13 +120,13 @@ public class AuthService {
 
         if (!usuario.ativo()) {
             passwordService.simularVerificacaoConstante(request.senha());
-            LOG.warnf("Tentativa de login em conta desativada: usuarioId=%s, ip=%s", usuario.id(), ip);
+            LOG.warnf("event=LOGIN_CONTA_DESATIVADA conta=%s ip=%s", Pseudonimo.de(usuario.id()), ip);
             throw criarExcecaoNaoAutorizado(MENSAGEM_CREDENCIAIS_INVALIDAS);
         }
 
         if (usuario.estaBloqueado(agora)) {
             long segundosRestantes = Math.max(1, agora.until(usuario.bloqueadoAte(), ChronoUnit.SECONDS));
-            LOG.warnf("Tentativa de login em conta bloqueada por brute-force: usuarioId=%s, ip=%s", usuario.id(), ip);
+            LOG.warnf("event=LOGIN_CONTA_BLOQUEADA conta=%s ip=%s", Pseudonimo.de(usuario.id()), ip);
             throw new RateLimitService.RateLimitExceededException(
                     "Conta temporariamente bloqueada devido a múltiplas tentativas de login malsucedidas. Tente novamente mais tarde.",
                     segundosRestantes);
@@ -136,7 +137,7 @@ public class AuthService {
             Usuario atualizado = userService.registrarFalhaLogin(usuario, agora);
             if (atualizado.estaBloqueado(agora)) {
                 long segundosRestantes = Math.max(1, agora.until(atualizado.bloqueadoAte(), ChronoUnit.SECONDS));
-                LOG.warnf("Conta bloqueada apos multiplas falhas de login: usuarioId=%s, ip=%s", usuario.id(), ip);
+                LOG.warnf("event=CONTA_BLOQUEADA_BRUTE_FORCE conta=%s ip=%s", Pseudonimo.de(usuario.id()), ip);
                 throw new RateLimitService.RateLimitExceededException(
                         "Conta temporariamente bloqueada devido a múltiplas tentativas de login malsucedidas. Tente novamente mais tarde.",
                         segundosRestantes);
@@ -146,7 +147,7 @@ public class AuthService {
 
         Usuario usuarioLimpo = userService.registrarSucessoLogin(usuario, agora);
         rateLimitService.limparTentativasLogin(ip, emailNormalizado);
-        LOG.infof("Login realizado com sucesso: usuarioId=%s, ip=%s", usuarioLimpo.id(), ip);
+        LOG.infof("event=LOGIN_SUCESSO conta=%s ip=%s", Pseudonimo.de(usuarioLimpo.id()), ip);
 
         return emitirRespostaAutenticacao(usuarioLimpo, userAgent, ip);
     }
@@ -213,7 +214,7 @@ public class AuthService {
 
         userService.atualizarSenha(usuario, request.novaSenha());
         refreshTokenService.revogarTodasSessoesDoUsuario(usuario.id(), "SENHA_ALTERADA");
-        LOG.infof("Senha alterada e sessoes revogadas com sucesso: usuarioId=%s", usuario.id());
+        LOG.infof("event=SENHA_ALTERADA conta=%s", Pseudonimo.de(usuario.id()));
     }
 
     /**
@@ -249,7 +250,7 @@ public class AuthService {
                 agora.plus(expiracaoResetMinutos, ChronoUnit.MINUTES),
                 null);
         tokenRecuperacaoRepository.inserir(tokenRecuperacao);
-        LOG.infof("Token de recuperacao de senha emitido: usuarioId=%s", usuario.id());
+        LOG.infof("event=TOKEN_RECUPERACAO_EMITIDO conta=%s", Pseudonimo.de(usuario.id()));
         return Optional.of(tokenPuro);
     }
 
@@ -279,7 +280,7 @@ public class AuthService {
         }
         userService.atualizarSenha(usuario, request.novaSenha());
         refreshTokenService.revogarTodasSessoesDoUsuario(usuario.id(), "RESET_SENHA");
-        LOG.infof("Senha redefinida via token unico e sessoes revogadas: usuarioId=%s", usuario.id());
+        LOG.infof("event=SENHA_REDEFINIDA conta=%s", Pseudonimo.de(usuario.id()));
     }
 
     public Usuario confirmarEmail(String tokenPuro) {
@@ -299,8 +300,9 @@ public class AuthService {
         }
 
         tokenConfirmacaoEmailRepository.marcarConfirmado(token.id(), agora);
+        String contaPseudonimo = Pseudonimo.de(token.usuarioId());
         Usuario atualizado = userService.marcarEmailVerificado(token.usuarioId());
-        LOG.infof("E-mail verificado com sucesso para usuarioId=%s", token.usuarioId());
+        LOG.infof("event=EMAIL_VERIFICADO conta=%s", contaPseudonimo);
         return atualizado;
     }
 
@@ -338,7 +340,7 @@ public class AuthService {
         tokenConfirmacaoEmailRepository.inserir(novoToken);
 
         emailService.enviarEmailConfirmacao(usuario.email(), usuario.nome(), tokenPuro, baseUrl);
-        LOG.infof("Novo token de confirmacao de e-mail enviado: usuarioId=%s", usuario.id());
+        LOG.infof("event=TOKEN_CONFIRMACAO_EMAIL_ENVIADO conta=%s", Pseudonimo.de(usuario.id()));
     }
 
     public AuthResponse autenticarPorUsuarioId(String usuarioId, String userAgent, String ip) {

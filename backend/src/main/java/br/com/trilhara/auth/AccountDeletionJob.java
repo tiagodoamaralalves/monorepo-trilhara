@@ -18,12 +18,17 @@ public class AccountDeletionJob {
         this.accountDeletionService = accountDeletionService;
     }
 
-    @Scheduled(every = "{trilhara.jobs.account-deletion.every:5m}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    /**
+     * Retomada periódica (D-35b): a cada 30 s o job varre as contas em exclusão cujo
+     * {@code proximaTentativa} já venceu. O backoff (1 s→30 s nas tentativas rápidas, 1 h em
+     * {@code RETENTANDO_LENTO}) é decidido por {@code proximaTentativa}, portanto o intervalo
+     * curto do job não acelera as retentativas.
+     */
+    @Scheduled(every = "{trilhara.jobs.account-deletion.every:30s}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     public void reconciliarExclusoesInterrompidas() {
-        LOG.debug("Iniciando varredura periódica de exclusões de conta pendentes...");
         int processadas = accountDeletionService.processarExclusoesPendentes();
         if (processadas > 0) {
-            LOG.infof("Varredura de exclusões pendentes concluiu a limpeza de %d conta(s).", processadas);
+            LOG.infof("event=ACCOUNT_DELETION_SWEEP processadas=%d", processadas);
         }
     }
 }

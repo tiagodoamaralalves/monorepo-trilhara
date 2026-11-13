@@ -14,7 +14,7 @@
 
 | # | Critério de aceite | Teste(s) automatizado(s) | Status |
 |---|---|---|---|
-| A1 | Usuário A nunca acessa, altera ou exclui dados do usuário B por ID conhecido | `security/AuthorizationByOwnerTest` (13, anti-IDOR ⇒ 404); `test/fase9ExclusaoConta.test.tsx` | Coberto |
+| A1 | Usuário A nunca acessa, altera ou exclui dados do usuário B por ID conhecido | `security/AuthorizationByOwnerTest` (13, anti-IDOR ⇒ 404); `auth/AccountDeletionIntegrationTest#excluiTodasAsColecoesPrivadasEIsolaOutrosUsuariosEEdital` (B intacto nas 18 filhas); `test/authExclusaoConta.test.ts` | Coberto |
 | A2 | Datas de calendário não mudam entre navegador/backend; 21h–23h59 em `America/Sao_Paulo` usam a data local via `X-Timezone`; instantes em BSON Date | `shared/TimezoneContextTest` (6); `shared/mongo/BsonRoundTripTest` (7); `test/sessaoNormalizada.test.ts` | Coberto |
 | A3 | Trilha grande não exige transferir disciplinas/tópicos ao listar Hub | `trilha/TrilhaNormalizadaIntegrationTest` (17, inclui `deveCriarTrilhaERetornarResumoSemArrayDeTopicosNoHub`) | Parcial — falta assert de payload/`explain` em trilha de 2.000 tópicos; `MongoExplainBenchmarkTest` é opt-in. **R3:** o resumo não tem mais `disciplinas`/`progresso` no contrato |
 | A4 | Marcar/desmarcar tópico afeta somente aquele progresso e agregados | `trilha/TrilhaNormalizadaIntegrationTest#deveRetornar404AoMarcarProgressoDeTopicoDeOutraTrilha`; `test/topicoOtimista.test.tsx` | **Coberto na R3** — inclui isolamento por trilha no path e rollback otimista |
@@ -37,7 +37,7 @@
 | A22 | Exclusão/restauração de lista/caderno/seção respeitam lotes e descendentes já purgados | `tarefa/ListaTarefasResourceTest` (1) | **Sem teste** — R7 |
 | A23 | Scheduler push não processa o mesmo item em paralelo; expirados não enviados; backoff | `push/PushDeliverySchedulerTest` (3); `push/LembretePushLifecycleTest` (4); `push/LembretePushCalculatorTest` (3) | Coberto |
 | A24 | Frontend com Vitest + RTL + jsdom; cada critério de UI tem teste executável por `npm test` + `npm run build` | 14 arquivos / 109 testes; `npm run build` verde | Coberto |
-| A25 | Conta excluída retorna 202 e worker conclui as 18 coleções sem órfãos, mesmo com falha injetada | `auth/AccountDeletionIntegrationTest` (4, inclui `deveRetomarExclusaoAposFalhasEmCadaColecaoSemDeixarOrfaos`) | **Parcial com risco** — as 3 coleções fora do inventário (`handoff_tokens`, `operacoes_concluir_atrasados`, `planejamento_ciclo`) **não** são purgadas (REVISAO §5 I-3) |
+| A25 | Conta excluída retorna 202 e worker conclui as 18 coleções sem órfãos, mesmo com falha injetada | `auth/AccountDeletionIntegrationTest` (29: `excluiTodasAsColecoesPrivadasEIsolaOutrosUsuariosEEdital`, `falhaInjetadaEmCadaColecaoRetomaSemOrfaos` parametrizado por **18** filhas, `apos5FalhasEntraEmRetentandoLentoENaoConclui`, `retomadaAposRetentandoLentoConcluiSemOrfaos`, `logsNaoContemUsuarioId`, `semIdempotencyKeyRetorna400`, `senhaInvalidaRetorna401ESemEfeito`, `respostaNaoEhProblemJson`); `test/contaModal.test.tsx`; `test/authExclusaoConta.test.ts` | **Coberto na R10** — fixtures dirigidas por `ColecaoTrilhara.filhasPrivadas()` (faltar fixture falha o teste), hook de produção removido em favor de `FaultInjectorExclusaoConta`, estado terminal `FALHA` substituído por `RETENTANDO_LENTO` com retentativa horária, logs pseudonimizados |
 | A26 | IDs HTTP: malformado → 400 `INVALID_IDENTIFIER`; inexistente/outro tenant → 404 | `shared/InvalidIdentifierTest` (3: 400 + `errors[trilhaId]`, 404, 401); `shared/ProblemDetailsCatalogoTest` (4); `shared/mongo/BsonRoundTripTest` (2, `BsonIds.parse`) | **Coberto (R1)** — `toObjectIdOrNotFound` removido; `BsonIds.parse` é a única conversão |
 | A27 | Erros RFC 9457 (`application/problem+json` + `type/title/status/detail/instance/code`) sem vazar detalhe interno | `shared/ProblemDetailsCatalogoTest` (4, varre os 22 códigos); `shared/ProblemDetailsMapperTest` (6); `shared/DuplicateKeyMapperTest` (3); `shared/CorrelationIdFilterTest` (3) | **Coberto (R1)** — `ProblemDetailsFactory` é o único construtor |
 | A29 | Mass assignment: `usuarioId`/`criadoEm` no body → 400 `VALIDATION_ERROR` com `errors[prop]` | `shared/MassAssignmentTest` (3) | **Coberto (R1)** — `quarkus.jackson.fail-on-unknown-properties=true` |
@@ -302,4 +302,38 @@
 | Allowlist de protocolos de link no editor | `linkSeguro.test.ts` (6) | Coberto |
 | Repositórios de `nota` exigem `usuarioId` e não buscam sem ele | `arquitetura/TenantIsolationArchTest#repositoriosDeNotaExigemUsuarioId`; `#repositoriosDeNotaNaoBuscamSemUsuario` | Coberto |
 | Gate comum | `docs/REVISAO-IMPLEMENTADA-R9.md` §5 e §6 | Coberto; ressalva em §7 (achados herdados de R12/R13) |
+
+
+## L. Critérios específicos da R10 (F9: exclusão de conta e isolamento ponta a ponta)
+
+| Critério | Teste / comando | Status |
+|---|---|---|
+| `DELETE /api/auth/conta` exige `Idempotency-Key` no cabeçalho | `auth/AccountDeletionIntegrationTest#semIdempotencyKeyRetorna400` (`400 IDEMPOTENCY_KEY_REQUIRED`) | Coberto |
+| Chave no corpo não existe; header é o único canal | `test/authExclusaoConta.test.ts#envia Idempotency-Key no cabeçalho e não duplica a chave no corpo` | Coberto |
+| Frase de confirmação exata (sensível a caixa) | `#confirmacaoEmMinusculasRetorna400` (`VALIDATION_ERROR` + `errors.confirmacao`) | Coberto |
+| Senha inválida → `401` sem efeito colateral | `#senhaInvalidaRetorna401ESemEfeito` (nenhum documento removido, `ativo=true`, sem `exclusaoConta`) | Coberto |
+| Rate limit D-45 de 5/15 min por usuário | `RateLimitService.verificarLimiteExclusaoConta` + `RateLimitExceptionMapper` (`429` + `Retry-After`) | Coberto por implementação; `429` fim-a-fim exercitado no cliente por `test/contaModal.test.tsx#exibe o tempo de espera quando o servidor responde 429` |
+| `202` é `application/json` com `{operationId, estado}`, não Problem Details | `#respostaNaoEhProblemJson` | Coberto |
+| Repetição com a mesma chave devolve o mesmo `operationId` | `#retryComMesmaChaveRetorna202ComMesmoOperationId` | Coberto |
+| Mesma chave com payload diferente / outra chave → `409 IDEMPOTENCY_KEY_CONFLICT` | `#outraChaveRetorna409`; `AccountDeletionService.calcularHashPayload` | Coberto |
+| Cookies `trilhara_rt` e `trilhara_session_state` expirados (`Max-Age=0`) | `#excluiTodasAsColecoesPrivadasEIsolaOutrosUsuariosEEdital` | Coberto |
+| As 18 filhas privadas (incluindo `tokens_handoff_sso`) são purgadas | `#excluiTodasAsColecoesPrivadasEIsolaOutrosUsuariosEEdital` (laço em `nomesFilhasPrivadas()`) | Coberto |
+| Fixture ausente para qualquer filha falha o teste (guarda do D-08) | `FixturesConta.validarCobertura()` invocado por `popularColecoesFilhas` | Coberto |
+| Outro usuário e o catálogo `editais` permanecem intactos | `#excluiTodasAsColecoesPrivadasEIsolaOutrosUsuariosEEdital` | Coberto |
+| `usuarios` é removido por último, após contagem zero nas filhas | `AccountDeletionService.executarLimpezaUsuario` (verificação antes do `deleteOne`) | Coberto |
+| Falha injetada em cada uma das 18 filhas retoma sem órfãos | `#falhaInjetadaEmCadaColecaoRetomaSemOrfaos` (`@EnumSource` com as 18) | Coberto |
+| Hook de falha não existe em produção | `grep -rn "testFailOnCollectionHook\|setHookFalha\|HookFalhaExclusao" backend/src` → 0; `FaultInjectorExclusaoContaNoOp` é o bean padrão | Coberto |
+| Após 5 tentativas → `RETENTANDO_LENTO`, sem concluir, retentativa horária | `#apos5FalhasEntraEmRetentandoLentoENaoConclui` (`estado`, `tentativas=5`, `proximaTentativa > +50min`) | Coberto |
+| Retomada a partir de `RETENTANDO_LENTO` conclui sem órfãos | `#retomadaAposRetentandoLentoConcluiSemOrfaos` | Coberto |
+| Métrica `trilhara_account_deletion_stuck` incrementada ao esgotar as tentativas rápidas | `AccountDeletionService.registrarFalha` (`Counter.increment`) + `LOG.errorf(event=ACCOUNT_DELETION_STUCK)` | Coberto por implementação; registry Prometheus não exposto (ver §7.2 do relatório R10) |
+| Logs da exclusão sem `usuarioId`, e-mail ou nome | `#logsNaoContemUsuarioId` (`CapturadorDeLogs`) | Coberto |
+| Nenhum log do backend contém `usuarioId` | `grep -rn "usuarioId" backend/src/main --include=*.java \| grep -i "log\."` → 0 | Coberto |
+| Conta em exclusão → `401` em qualquer rota; retry do `DELETE` com chave → `202` | `#pos202QualquerRotaRetorna401`; `SecurityFilter.autenticarSeNecessario` + `UserRepository.estaEmExclusao` | Coberto |
+| Frontend: botão habilitado só com senha e a frase exata | `test/contaModal.test.tsx` (4 casos) | Coberto |
+| Frontend: 401 → erro inline; 429 → tempo de espera | `test/contaModal.test.tsx#exibe "Senha atual incorreta."…`; `#exibe o tempo de espera…` | Coberto |
+| Frontend: 202 → limpeza de `trilhara:u:{id}:*`, broadcast `CONTA_EXCLUIDA` e redirecionamento | `test/authExclusaoConta.test.ts` (8 casos) | Coberto |
+| Frontend: entrada de Conta centralizada nos 4 módulos (inclui Pomodoro) | `test/appSidebarConta.test.tsx` (7 casos); `ContaMenuButton` no `AppSidebar` e no header do Pomodoro | Coberto |
+| Entrada de Conta não é mais propagada por prop entre apps | `grep -rn "onAbrirConta\|onOpenAccount" frontend/src --include=*.tsx` → só `ContaMenuButton` | Coberto |
+| Mensagem normativa "Sua conta está sendo excluída…" na tela pública | `test/authExclusaoConta.test.ts` + `AvisoContaExcluida` nos 4 módulos | Coberto |
+| Gate comum | `docs/REVISAO-IMPLEMENTADA-R10.md` §5 e §6 | Coberto; ressalva em §7 (14 achados herdados de R12/R13) |
 

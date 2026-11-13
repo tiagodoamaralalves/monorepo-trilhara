@@ -31,7 +31,8 @@ import {
   useToast,
   Badge,
   SectionErrorCard,
-  useGlobalSessionModal
+  useGlobalSessionModal,
+  AvisoContaExcluida
 } from '@shared/design-system';
 import { useAuth, AuthView, AuthMode } from '@shared/auth';
 import { request } from '@shared/auth/api';
@@ -101,7 +102,7 @@ const OPCOES_ORDENACAO = [
 function TarefasApp() {
   const toast = useToast();
   const { confirm } = useConfirm();
-  const { usuario, isAuthenticated, carregando, logout, abrirContaModal } = useAuth();
+  const { usuario, isAuthenticated, carregando, logout } = useAuth();
   const [telaAuth, setTelaAuth] = useState<AuthScreen>(obterTelaAuthInicial);
   const { abrirModal: abrirModalSessao } = useGlobalSessionModal();
   const {
@@ -791,10 +792,13 @@ function TarefasApp() {
     }
 
     return (
-      <LandingView
-        onLogin={() => alternarTelaAuth('login')}
-        onCriarConta={() => alternarTelaAuth('cadastro')}
-      />
+      <>
+        <AvisoContaExcluida />
+        <LandingView
+          onLogin={() => alternarTelaAuth('login')}
+          onCriarConta={() => alternarTelaAuth('cadastro')}
+        />
+      </>
     );
   }
 
@@ -848,7 +852,6 @@ function TarefasApp() {
           await logout();
           toast.info('Você saiu da sua conta.');
         }}
-        onAbrirConta={abrirContaModal}
       />
 
       {/* ── ÁREA PRINCIPAL DE CONTEÚDO ── */}
