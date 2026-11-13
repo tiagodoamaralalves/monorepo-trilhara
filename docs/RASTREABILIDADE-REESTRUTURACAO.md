@@ -7,6 +7,7 @@
 > fase indicada). Atualizada a cada revisão.
 >
 > Baseline de referência: backend 144 testes / frontend 109 testes (R0).
+> **R12:** backend 350+ testes / **frontend 57 arquivos e 438 testes**.
 
 ---
 
@@ -29,12 +30,12 @@
 | A13 | Tarefas/notas em lixeira restauradas no prazo/contexto originais; purgadas após o prazo | `TarefaIntegrationTest#restaurarTarefaComListaNaLixeiraRestauraSoContainer`; `#restaurarTarefaComListaPurgadaRetornaFlag`; `#purgaDeListaMoveSeriesParaListaGeral`; `test/lixeiraTarefas.test.tsx` (5) | **Coberto na R7** — restauração só do container, flag de realocação e purga de 30 dias |
 | A14 | Logout/troca de conta sincronizam via `storage`/`BroadcastChannel`; entre subdomínios validação server-side ao focar; timers só na mesma origem | `test/sso.test.ts` (6); `fase5GlobalSessionTimer.test.tsx`; `appSwitcher.test.tsx` (6) | Parcial — sem teste de `BroadcastChannel` entre subdomínios |
 | A15 | Falha de serviço aparece como erro recuperável (`SectionErrorCard`/`SyncStatusBadge`), nunca como "sem dados" | `test/fase7IntegracaoDiaria.test.tsx`; `fase8Notas.test.tsx` | Parcial — `SyncStatusBadge` sem teste dedicado |
-| A16 | WCAG 2.2 AA (focus trap, `aria-live`, alvos mínimos, `scroll-padding-bottom`) nos 4 módulos | `test/fase11Accessibility.test.tsx` (9) | Coberto |
+| A16 | WCAG 2.2 AA (focus trap, `aria-live`, alvos mínimos, `scroll-padding-bottom`) nos 4 módulos | `test/a11y/modaisFoco.test.tsx` (6); `cronometrosLiveRegions.test.tsx` (2); `alvosToque.test.tsx` (8); `scrollPaddingBottomNav.test.tsx` (4); `reducedMotion.test.tsx` (7); `contrasteTokens.test.ts` (96) | **Coberto na R12** — a F11 provava a11y com mock de JSX e leitura de texto do CSS; a R12 passou a exercitar os componentes reais, tokens por componente e contraste calculado nos dois temas |
 | A18 | Listas paginadas com ordenação estável (`_id` desempate) e filtro de tenant; erro de uma fonte não remove dados da outra | `AuthorizationByOwnerTest`; `CronogramaNormalizadoIntegrationTest`; `test/fase7IntegracaoDiaria.test.tsx` | **Coberto na R5** — `tamanho` máx. de blocos agora é 100 com `400 INVALID_PAGINATION` |
 | A19 | Alternar cronograma ativo mostra versão anterior ou nova completa, nunca staging incompleto | `PublicacaoCronogramaFaultInjectionTest#falhaNaEtapa1..6_leitorVeVersaoAnteriorOuNovaCompleta` | **Coberto na R5** |
 | A20 | Geração de cronograma com falha injetada em cada etapa; lease expirado não publica | `PublicacaoCronogramaFaultInjectionTest` (7: 6 etapas + `leaseExpiradoNaoPublica`) | **Coberto na R5** — `FaultInjector` só no classpath de teste |
 | A21 | Materialização recorrente idempotente sob concorrência; casos diário/semanal/mensal em virada de ano/ISO/meses curtos | `tarefa/Fase6RecorrenciaEngineTest` (5) | Parcial — falta caso virada de ano/semana ISO |
-| A22 | Exclusão/restauração de lista/caderno/seção respeitam lotes e descendentes já purgados | `tarefa/ListaTarefasResourceTest` (1) | **Sem teste** — R7 |
+| A22 | Exclusão/restauração de lista/caderno/seção respeitam lotes e descendentes já purgados | `tarefa/ListaTarefasResourceTest` (1); `nota/NotaResourceTest#lixeiraPaginadaRestauraAncestraisDoMesmoLote`; `#loteRespeitaItensJaExcluidosEDescendentesPurgados` | **Coberto na R12** — o novo caso prova os três cenários do critério: item já excluído isoladamente mantém o lote original, descendente já purgado não é ressuscitado e a página ativa volta com o caderno |
 | A23 | Scheduler push não processa o mesmo item em paralelo; expirados não enviados; backoff | `push/PushDeliverySchedulerTest` (6: `doisWorkersNaoProcessamOMesmoItem`, `atrasoMaiorQue15MinExpiraSemEnviar`, `falhaTransitoriaRespeitaJanela`, `falhaSemTempoNaJanelaTerminaEmFalhaFinal`, `gone410RemoveInscricao`, `ttl900NoEnvio`); `push/LembretePushFilaFiltroTest` (3); `push/LembretePushLifecycleTest` (9); `push/LembretePushCalculatorTest` (5); `push/WebPushCriptografiaTest` (4); `push/PushPayloadFactoryTest` (6); `push/PushResourceTest` (7) | **Coberto na R11** — modelo versionado por D-36a, claim atômico com `leaseToken`/`leaseAte`, backoff derivado de `atualizadoEm`, payload cifrado RFC 8291 e `url` absoluta com allowlist. Execução dos 3 arquivos `@QuarkusTest` pendente de ambiente com Mongo (ver §0 do relatório R11) |
 | A24 | Frontend com Vitest + RTL + jsdom; cada critério de UI tem teste executável por `npm test` + `npm run build` | 14 arquivos / 109 testes; `npm run build` verde | Coberto |
 | A25 | Conta excluída retorna 202 e worker conclui as 18 coleções sem órfãos, mesmo com falha injetada | `auth/AccountDeletionIntegrationTest` (29: `excluiTodasAsColecoesPrivadasEIsolaOutrosUsuariosEEdital`, `falhaInjetadaEmCadaColecaoRetomaSemOrfaos` parametrizado por **18** filhas, `apos5FalhasEntraEmRetentandoLentoENaoConclui`, `retomadaAposRetentandoLentoConcluiSemOrfaos`, `logsNaoContemUsuarioId`, `semIdempotencyKeyRetorna400`, `senhaInvalidaRetorna401ESemEfeito`, `respostaNaoEhProblemJson`); `test/contaModal.test.tsx`; `test/authExclusaoConta.test.ts` | **Coberto na R10** — fixtures dirigidas por `ColecaoTrilhara.filhasPrivadas()` (faltar fixture falha o teste), hook de produção removido em favor de `FaultInjectorExclusaoConta`, estado terminal `FALHA` substituído por `RETENTANDO_LENTO` com retentativa horária, logs pseudonimizados |
@@ -367,4 +368,34 @@
 | Manifest PWA com `display: standalone` e vinculo no `index.html` | `manifestPwa.test.ts` (3) | **Executado e verde** |
 | ArchUnit: repositorios `..push..` exigem `usuarioId`; scheduler e `@SystemScope` | `TenantIsolationArchTest#repositoriosDePushExigemUsuarioId`; `#schedulerDePushExigeSystemScope` | Escrito (execucao pendente de Mongo) |
 | Gate comum | `docs/REVISAO-IMPLEMENTADA-R11.md` secao 0 | Frontend verde; backend bloqueado por Mongo |
+
+
+---
+
+## N. Critérios específicos da R12 (F11: UX/Design System, acessibilidade e rastreabilidade)
+
+| Critério | Teste / comando | Status |
+|---|---|---|
+| `scripts/verificar-legado.sh` verde (11 achados → 0) | `bash scripts/verificar-legado.sh` → exit 0 | **Coberto na R12** |
+| Testes sem prefixo de fase (D-43) | `src/test/a11y/modaisFoco.test.tsx`, `cronometrosLiveRegions.test.tsx`, `tarefasDominio.test.ts`; gate `E3b-arquivos-por-fase` = 0 | **Coberto na R12** |
+| Fuso no catálogo de editais (nunca `LocalDate.now()` implícito) | `edital/EditalResourceTest`; `EditalService` injeta `TimezoneContext` | **Coberto na R12** |
+| Alvos de toque por token, sem seletor global | `alvosToque.test.tsx` (8) — tokens `--target-min`/`--target-min-touch`, ausência do seletor global, `Button`/`IconButton`/`Checkbox` | **Coberto na R12** |
+| `scroll-padding-bottom` só com a barra inferior presente | `scrollPaddingBottomNav.test.tsx` (4) — `body[data-bottom-nav='true']`, breakpoint 960px, limpeza no unmount | **Coberto na R12** |
+| `useReducedMotion` desliga a alternância do título | `reducedMotion.test.tsx` (7) — `matchMedia` true/false/ausente, título estático, restauração no foco | **Coberto na R12** |
+| Contraste de tokens WCAG AA nos dois temas | `contrasteTokens.test.ts` (96) — 4.5:1 texto, 3:1 UI, `--text-soft`/`--primary`/`--red-text`/`--on-primary-solid`/`--border-control` corrigidos | **Coberto na R12** |
+| Anti-IDOR por allowlist, com guard de classificação total | `security/RotasPrivadasClassificacaoTest` (3) + `AuthorizationByOwnerTest#auditarRotaDaAllowlist` (56 casos) + `#auditarListagemSemId` (4) | **Coberto na R12** — rota nova sem caso quebra o build |
+| Benchmark lê o plano **vencedor** e arquiva relatório | `benchmark/MongoExplainBenchmarkTest` (10); `docs/benchmarks/explain-2026-11-13.md` | **Coberto na R12** — 10/10 IXSCAN no índice canônico |
+| Matriz sem linhas "Sem teste" | `grep -c "Sem teste" docs/RASTREABILIDADE-REESTRUTURACAO.md` → 0 | **Coberto na R12** |
+
+## O. Decisões com efeito comportamental → teste nomeado
+
+| Decisão | Regra | Teste(s) |
+|---|---|---|
+| D-37 | Estados de interface (skeleton 200 ms, vazio só com 2xx, erro com retry) | `designSystemEstados.test.tsx`; `useRecurso.test.tsx`; `hub.test.tsx`; `dashboard.test.tsx`; `cadernoVazio.test.tsx`; `agendaHoje.test.tsx` |
+| D-38 | Ação destrutiva com confirmação, foco no botão seguro | `toastConfirm.test.tsx`; `excluirTrilha.test.tsx`; `modaisFoco.test.tsx` |
+| D-40 | Teclado e ARIA (Dialog, Menu Button, Tabs, Listbox) | `modaisFoco.test.tsx`; `appSwitcher.test.tsx`; `a11y/*.axe` |
+| D-43 | Nenhum teste removido sem equivalente; sem prefixo de fase | Gate `E3b-arquivos-por-fase` = 0; contagem 324 → 438 no frontend |
+| D-06 | Toda leitura/escrita com `usuarioId`; outro tenant → 404 | `AuthorizationByOwnerTest` (70 casos); `TenantIsolationArchTest` |
+| D-08 | 18 coleções filhas privadas + `usuarios` por último | `AccountDeletionIntegrationTest` (29) |
+| D-36 | Push versionado por `(tarefaId, versaoAgendamento)` | `LembretePushLifecycleTest` (9); `PushResourceTest` (7) |
 

@@ -149,7 +149,7 @@
 
 .successText { color: var(--green); }
 .warningText { color: var(--yellow); }
-.errorText { color: var(--red); }
+.errorText { color: var(--red-text); }
 .neutralText { color: var(--text-soft); }
 
 @media (max-width: 520px) {
@@ -285,7 +285,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  color: var(--red);
+  color: var(--red-text);
   font-size: 13px;
 }
 

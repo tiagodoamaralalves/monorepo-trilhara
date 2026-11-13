@@ -49,6 +49,17 @@ ALLOWLIST=(
   "backend/src/main/java/br/com/trilhara/shared/mongo/MongoIndexInitializer.java"
   # Comentário de documentação citando a remoção do fallback "local".
   "backend/src/main/java/br/com/trilhara/shared/UsuarioAtual.java"
+  # R12: catálogo público de editais é persistido como BSON explícito
+  # (Document.parse/readValue sobre o JSON do próprio documento), não é
+  # serialização de DTO de domínio por reflexão; o filtro usa o Clock local
+  # injetado via TimezoneContext (ver EditalService).
+  "backend/src/main/java/br/com/trilhara/edital/EditalRepository.java"
+  # R12: payload do provedor de e-mail (Resend) é JSON de transporte externo e
+  # não serializa entidade do domínio.
+  "backend/src/main/java/br/com/trilhara/auth/EmailService.java"
+  # R12: "Ciclo 1 de 4" do Pomodoro é o termo do produto (D-21), não o conceito
+  # de "planejamento-ciclo" removido pela reestruturação.
+  "frontend/src/modules/pomodoro/PomodoroApp.tsx"
 )
 
 # Código de teste: o Anexo C permite console.* em teste. A renomeação dos testes

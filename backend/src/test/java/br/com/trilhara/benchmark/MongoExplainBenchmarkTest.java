@@ -9,16 +9,19 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.io.IOException;
 
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import com.mongodb.client.MongoClient;
@@ -39,7 +42,8 @@ import jakarta.inject.Inject;
 @QuarkusTest
 @Tag("benchmark")
 @EnabledIfSystemProperty(named = "benchmark", matches = "true")
-@DisplayName("FASE 11 - Benchmark de Índices e ExecutionStats no MongoDB 7 (Perfil Opt-in)")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@DisplayName("R12 - Benchmark de Índices e ExecutionStats no MongoDB 7 (Perfil Opt-in)")
 public class MongoExplainBenchmarkTest {
 
     private static final Logger LOG = Logger.getLogger(MongoExplainBenchmarkTest.class);
@@ -56,6 +60,10 @@ public class MongoExplainBenchmarkTest {
     private ObjectId cadernoId;
     private ObjectId secaoId;
     private final List<ObjectId> disciplinasIds = new ArrayList<>();
+    private final RelatorioBenchmark relatorio = new RelatorioBenchmark();
+
+    /** Repetições por consulta para p50/p95 estáveis. */
+    private static final int REPETICOES = 20;
 
     @BeforeEach
     void setupCargaSintetica() {
@@ -259,42 +267,75 @@ public class MongoExplainBenchmarkTest {
         return getDatabase().runCommand(explainCmd);
     }
 
-    private boolean contemStageOuIndice(Document doc, String termo) {
-        if (doc == null) return false;
-        String json = doc.toJson().toUpperCase();
-        return json.contains(termo.toUpperCase());
+    /**
+     * Executa o `explain` {@link #REPETICOES} vezes e devolve a primeira leitura do plano
+     * vencedor + as latências observadas (para p50/p95).
+     */
+    private PlanoVencedor medir(String colecao, Document filtro, Document sort, Integer limit) {
+        List<Long> latencias = new ArrayList<>(REPETICOES);
+        PlanoVencedor plano = null;
+        for (int i = 0; i < REPETICOES; i++) {
+            PlanoVencedor atual = PlanoVencedor.de(executarExplain(colecao, filtro, sort, limit));
+            if (plano == null) {
+                plano = atual;
+            }
+            latencias.add(atual.tempoMs());
+        }
+        this.ultimasLatencias = latencias;
+        return plano;
     }
 
+    private List<Long> ultimasLatencias = List.of();
+
+    // ─── Consultas críticas (R12) ───────────────────────────────────────────
+    // Cada teste mede 20 repetições, arquiva o plano vencedor no relatório e
+    // assevera o índice por IGUALDADE (não por substring): um COLLSCAN
+    // vencedor com o índice apenas num plano rejeitado falha aqui.
+    // ────────────────────────────────────────────────────────────────────────
+
     @Test
-    @DisplayName("Benchmark 1: Consulta de Blocos por data e status com 8.784 blocos utiliza IXSCAN idx_blocos_cronograma_usuarioId_data_concluido")
+    @DisplayName("1. Blocos do dia (Hoje) usam idx_blocos_cronograma_usuarioId_data_concluido")
     void benchmarkBlocosCronogramaPorDataEConcluido() {
         Document filtro = new Document("usuarioId", benchmarkUserId)
                 .append("data", "2026-06-15")
                 .append("concluido", false);
 
-        Document explain = executarExplain("blocos_cronograma", filtro, null, 24);
-        Document executionStats = explain.get("executionStats", Document.class);
-        assertNotNull(executionStats, "executionStats deve estar presente");
+        PlanoVencedor plano = medir("blocos_cronograma", filtro, null, 24);
+        LOG.infof("[BENCHMARK-BLOCOS] %s", plano);
 
-        long totalDocsExamined = executionStats.get("totalDocsExamined", Number.class).longValue();
-        long totalKeysExamined = executionStats.get("totalKeysExamined", Number.class).longValue();
-        long nReturned = executionStats.get("nReturned", Number.class).longValue();
-        long executionTimeMillis = executionStats.get("executionTimeMillis", Number.class).longValue();
+        assertTrue(plano.usaIndice("idx_blocos_cronograma_usuarioId_data_concluido"),
+                "Plano vencedor deveria ser IXSCAN no índice canônico de blocos: " + plano);
+        assertTrue(plano.docsExaminados() <= 24,
+                "Docs examinados deve ser seletivo (<= 24): " + plano.docsExaminados());
 
-        LOG.infof("[BENCHMARK-BLOCOS] docs=%d, keys=%d, returned=%d, time=%dms",
-                totalDocsExamined, totalKeysExamined, nReturned, executionTimeMillis);
-
-        // Deve usar IXSCAN no índice idx_blocos_cronograma_usuarioId_data_concluido
-        assertTrue(contemStageOuIndice(explain, "IXSCAN"), "Plano de consulta deve utilizar IXSCAN");
-        assertTrue(contemStageOuIndice(explain, "idx_blocos_cronograma_usuarioId_data_concluido"),
-                "Deve utilizar o índice idx_blocos_cronograma_usuarioId_data_concluido");
-
-        // docs examined não pode exceder as 24 ocorrências retornadas (alta seletividade)
-        assertTrue(totalDocsExamined <= 24, "Docs examinados deve ser altamente seletivo (<= 24)");
+        relatorio.registrar("Blocos do dia (Hoje)", "idx_blocos_cronograma_usuarioId_data_concluido",
+                plano, ultimasLatencias);
     }
 
     @Test
-    @DisplayName("Benchmark 2: Paginação de Sessões em massa de 2.190 registros utiliza IXSCAN ordenado idx_sessoes_usuarioId_trilhaId_dataSessao_criadoEm_id")
+    @DisplayName("2. Lista virtual de blocos usa o índice por trilha/cronograma/versão")
+    void benchmarkListaVirtualBlocos() {
+        Document filtro = new Document("usuarioId", benchmarkUserId)
+                .append("trilhaId", trilhaId)
+                .append("cronogramaId", cronogramaId)
+                .append("versaoGeracao", 1)
+                .append("concluido", false);
+        Document sort = new Document("data", 1).append("_id", 1);
+
+        PlanoVencedor plano = medir("blocos_cronograma", filtro, sort, 50);
+        LOG.infof("[BENCHMARK-LISTA-VIRTUAL] %s", plano);
+
+        assertTrue(plano.usaIndice(
+                "idx_blocos_cronograma_usuarioId_trilhaId_cronogramaId_versaoGeracao_concluido_data"),
+                "Lista virtual deveria usar o índice por trilha/cronograma/versão: " + plano);
+
+        relatorio.registrar("Lista virtual de blocos",
+                "idx_blocos_cronograma_usuarioId_trilhaId_cronogramaId_versaoGeracao_concluido_data",
+                plano, ultimasLatencias);
+    }
+
+    @Test
+    @DisplayName("3. Paginação de sessões usa IXSCAN ordenado idx_sessoes_usuarioId_trilhaId_dataSessao_criadoEm_id")
     void benchmarkPaginacaoSessoes() {
         Document filtro = new Document("usuarioId", benchmarkUserId)
                 .append("trilhaId", trilhaId);
@@ -302,89 +343,154 @@ public class MongoExplainBenchmarkTest {
                 .append("criadoEm", -1)
                 .append("_id", -1);
 
-        Document explain = executarExplain("sessoes", filtro, sort, 20);
-        Document executionStats = explain.get("executionStats", Document.class);
-        assertNotNull(executionStats);
+        PlanoVencedor plano = medir("sessoes", filtro, sort, 20);
+        LOG.infof("[BENCHMARK-SESSOES] %s", plano);
 
-        long totalDocsExamined = executionStats.get("totalDocsExamined", Number.class).longValue();
-        long totalKeysExamined = executionStats.get("totalKeysExamined", Number.class).longValue();
-        long nReturned = executionStats.get("nReturned", Number.class).longValue();
+        assertTrue(plano.usaIndice("idx_sessoes_usuarioId_trilhaId_dataSessao_criadoEm_id"),
+                "Histórico de sessões deveria usar o índice de ordenação estável: " + plano);
+        assertTrue(plano.docsExaminados() <= 20,
+                "Página de 20 não deveria examinar mais de 20 documentos: " + plano.docsExaminados());
 
-        LOG.infof("[BENCHMARK-SESSOES] docs=%d, keys=%d, returned=%d", totalDocsExamined, totalKeysExamined, nReturned);
-
-        assertTrue(contemStageOuIndice(explain, "IXSCAN"), "Paginação de sessões deve usar IXSCAN");
-        assertTrue(contemStageOuIndice(explain, "idx_sessoes_usuarioId_trilhaId_dataSessao_criadoEm_id"),
-                "Deve usar o índice de ordenação estável das sessões");
-
-        // O índice composto cobre a ordenação: docs examinados deve ser exatamente igual ao limit solicitado (20)
-        assertTrue(totalDocsExamined <= 20, "Docs examinados não deve exceder o tamanho da página (20)");
+        relatorio.registrar("Histórico de sessões (paginação)",
+                "idx_sessoes_usuarioId_trilhaId_dataSessao_criadoEm_id", plano, ultimasLatencias);
     }
 
     @Test
-    @DisplayName("Benchmark 3: Listagem de disciplinas ordenadas utiliza IXSCAN idx_disciplinas_usuarioId_trilhaId_ordem")
+    @DisplayName("4. Estatísticas agregadas por período usam IXSCAN (nunca COLLSCAN)")
+    void benchmarkEstatisticas() {
+        Document filtro = new Document("usuarioId", benchmarkUserId)
+                .append("trilhaId", trilhaId)
+                .append("deletedAt", null)
+                .append("dataSessao", new Document("$gte", "2026-01-01").append("$lte", "2026-12-31"));
+
+        PlanoVencedor plano = medir("sessoes", filtro, null, null);
+        LOG.infof("[BENCHMARK-ESTATISTICAS] %s", plano);
+
+        assertTrue("IXSCAN".equals(plano.estagio()),
+                "Agregação por período deveria usar índice (IXSCAN), não COLLSCAN: " + plano);
+
+        relatorio.registrar("Estatísticas da trilha (período)",
+                "idx_sessoes_usuarioId_trilhaId_disciplinaId_dataSessao", plano, ultimasLatencias);
+    }
+
+    @Test
+    @DisplayName("5. Listagem de disciplinas ordenadas usa idx_disciplinas_usuarioId_trilhaId_ordem")
     void benchmarkDisciplinasOrdenadas() {
         Document filtro = new Document("usuarioId", benchmarkUserId)
                 .append("trilhaId", trilhaId);
         Document sort = new Document("ordem", 1);
 
-        Document explain = executarExplain("disciplinas", filtro, sort, null);
-        Document executionStats = explain.get("executionStats", Document.class);
-        assertNotNull(executionStats);
+        PlanoVencedor plano = medir("disciplinas", filtro, sort, null);
+        LOG.infof("[BENCHMARK-DISCIPLINAS] %s", plano);
 
-        long totalDocsExamined = executionStats.get("totalDocsExamined", Number.class).longValue();
-        long nReturned = executionStats.get("nReturned", Number.class).longValue();
+        assertTrue(plano.usaIndice("idx_disciplinas_usuarioId_trilhaId_ordem"),
+                "Listagem de disciplinas deveria usar o índice por ordem: " + plano);
+        assertEquals(20, plano.docsExaminados(),
+                "Docs examinados deve conferir com as 20 disciplinas da trilha: " + plano.docsExaminados());
 
-        LOG.infof("[BENCHMARK-DISCIPLINAS] docs=%d, returned=%d", totalDocsExamined, nReturned);
-
-        assertTrue(contemStageOuIndice(explain, "IXSCAN"), "Listagem de disciplinas deve usar IXSCAN");
-        assertTrue(contemStageOuIndice(explain, "idx_disciplinas_usuarioId_trilhaId_ordem"),
-                "Deve utilizar idx_disciplinas_usuarioId_trilhaId_ordem");
-        assertEquals(20, totalDocsExamined, "Docs examinados deve conferir com as 20 disciplinas da trilha");
+        relatorio.registrar("Disciplinas da trilha (ordenadas)",
+                "idx_disciplinas_usuarioId_trilhaId_ordem", plano, ultimasLatencias);
     }
 
     @Test
-    @DisplayName("Benchmark 4: Busca textual em notas ($text) utiliza índice de texto sem supor estágio universal")
+    @DisplayName("6. Listagem de notas por seção usa idx_notas_usuarioId_secaoId_deletedAt_ordem")
+    void benchmarkListagemNotas() {
+        Document filtro = new Document("usuarioId", benchmarkUserId)
+                .append("secaoId", secaoId)
+                .append("deletedAt", null);
+        Document sort = new Document("ordem", 1);
+
+        PlanoVencedor plano = medir("notas", filtro, sort, null);
+        LOG.infof("[BENCHMARK-NOTAS] %s", plano);
+
+        assertTrue(plano.usaIndice("idx_notas_usuarioId_secaoId_deletedAt_ordem"),
+                "Listagem de notas deveria usar o índice por seção: " + plano);
+
+        relatorio.registrar("Páginas da seção (Notas)",
+                "idx_notas_usuarioId_secaoId_deletedAt_ordem", plano, ultimasLatencias);
+    }
+
+
+    @Test
+    @DisplayName("7. Busca textual em notas ($text) usa o índice de texto idx_notas_usuarioId_deletedAt_text")
     void benchmarkBuscaTextualNotas() {
         Document filtro = new Document("usuarioId", benchmarkUserId)
                 .append("deletedAt", null)
                 .append("$text", new Document("$search", "jurisprudência"));
 
-        Document explain = executarExplain("notas", filtro, null, 10);
-        Document executionStats = explain.get("executionStats", Document.class);
-        assertNotNull(executionStats);
+        PlanoVencedor plano = medir("notas", filtro, null, 10);
+        LOG.infof("[BENCHMARK-NOTAS-TEXT] %s", plano);
 
-        long nReturned = executionStats.get("nReturned", Number.class).longValue();
-        long executionTimeMillis = executionStats.get("executionTimeMillis", Number.class).longValue();
+        // No MongoDB 7 o índice de texto vence como IXSCAN com o nome do índice de texto
+        // (ou como TextNode em versões/planos que expõem TEXT_MATCH).
+        boolean usaTexto = plano.usaIndice("idx_notas_usuarioId_deletedAt_text")
+                || (plano.indice() != null && plano.indice().contains("_text"))
+                || (plano.estagio() != null && plano.estagio().startsWith("TEXT"));
+        assertTrue(usaTexto, "Busca textual deveria usar o índice de texto: " + plano);
 
-        LOG.infof("[BENCHMARK-NOTAS-TEXT] returned=%d, time=%dms", nReturned, executionTimeMillis);
-
-        // Conforme requisito da Fase 11: verificar estágio ou índice de texto suportado pelo MongoDB 7 (TEXT, TEXT_MATCH ou nome do índice)
-        boolean usaIndiceTexto = contemStageOuIndice(explain, "TEXT")
-                || contemStageOuIndice(explain, "idx_notas_usuarioId_deletedAt_text")
-                || contemStageOuIndice(explain, "TEXT_MATCH")
-                || contemStageOuIndice(explain, "TEXT_OR");
-
-        assertTrue(usaIndiceTexto, "Busca textual deve ativar o plano de índice text do MongoDB 7");
+        relatorio.registrar("Busca textual em notas ($text)",
+                "idx_notas_usuarioId_deletedAt_text", plano, ultimasLatencias);
     }
 
     @Test
-    @DisplayName("Benchmark 5: Consulta de Tarefas de Hoje utiliza índice composto idx_tarefas_usuarioId_deletedAt_concluida_dataVencimento")
+    @DisplayName("8. Tarefas de Hoje usam idx_tarefas_usuarioId_deletedAt_concluida_dataVencimento")
     void benchmarkTarefasHoje() {
+        // Fixture coerente com o índice: o repositório sempre filtra deletedAt.
         Document filtro = new Document("usuarioId", benchmarkUserId)
-                .append("concluido", false)
+                .append("deletedAt", null)
+                .append("concluida", false)
                 .append("dataVencimento", "2026-01-01");
 
-        Document explain = executarExplain("tarefas", filtro, null, 50);
-        Document executionStats = explain.get("executionStats", Document.class);
-        assertNotNull(executionStats);
+        PlanoVencedor plano = medir("tarefas", filtro, null, 50);
+        LOG.infof("[BENCHMARK-TAREFAS] %s", plano);
 
-        long totalDocsExamined = executionStats.get("totalDocsExamined", Number.class).longValue();
-        long nReturned = executionStats.get("nReturned", Number.class).longValue();
+        assertTrue(plano.usaIndice("idx_tarefas_usuarioId_deletedAt_concluida_dataVencimento"),
+                "Tarefas de Hoje deveriam usar o índice composto: " + plano);
 
-        LOG.infof("[BENCHMARK-TAREFAS] docs=%d, returned=%d", totalDocsExamined, nReturned);
+        relatorio.registrar("Tarefas de Hoje",
+                "idx_tarefas_usuarioId_deletedAt_concluida_dataVencimento", plano, ultimasLatencias);
+    }
 
-        assertTrue(contemStageOuIndice(explain, "IXSCAN"), "Consulta de tarefas hoje deve utilizar IXSCAN");
-        assertTrue(contemStageOuIndice(explain, "idx_tarefas_usuarioId_deletedAt_concluida_dataVencimento"),
-                "Deve utilizar idx_tarefas_usuarioId_deletedAt_concluida_dataVencimento");
+    @Test
+    @DisplayName("9. Lixeira de tarefas usa IXSCAN em idx_tarefas_usuarioId_deletedAt_concluida_dataVencimento")
+    void benchmarkLixeiraTarefas() {
+        Document filtro = new Document("usuarioId", benchmarkUserId)
+                .append("deletedAt", new Document("$ne", null));
+
+        PlanoVencedor plano = medir("tarefas", filtro, null, 50);
+        LOG.infof("[BENCHMARK-LIXEIRA-TAREFAS] %s", plano);
+
+        assertTrue("IXSCAN".equals(plano.estagio()),
+                "Lixeira de tarefas deveria usar IXSCAN: " + plano);
+
+        relatorio.registrar("Lixeira de tarefas",
+                "idx_tarefas_usuarioId_deletedAt_concluida_dataVencimento", plano, ultimasLatencias);
+    }
+
+    @Test
+    @DisplayName("10. Lixeira de notas usa idx_notas_usuarioId_cadernoId_deletedAt")
+    void benchmarkLixeiraNotas() {
+        Document filtro = new Document("usuarioId", benchmarkUserId)
+                .append("cadernoId", cadernoId)
+                .append("deletedAt", new Document("$ne", null));
+
+        PlanoVencedor plano = medir("notas", filtro, null, 50);
+        LOG.infof("[BENCHMARK-LIXEIRA-NOTAS] %s", plano);
+
+        assertTrue("IXSCAN".equals(plano.estagio()),
+                "Lixeira de notas deveria usar IXSCAN: " + plano);
+
+        relatorio.registrar("Lixeira de notas", "idx_notas_usuarioId_cadernoId_deletedAt",
+                plano, ultimasLatencias);
+    }
+
+    /** Arquiva `docs/benchmarks/explain-AAAA-MM-DD.md` ao fim de TODA a execução (R12). */
+    @AfterAll
+    void arquivarRelatorio() throws IOException {
+        if (relatorio.possuiRegistros()) {
+            relatorio.gravar();
+            LOG.infof("[BENCHMARK-RELATORIO] arquivado em %s", RelatorioBenchmark.destinoPadrao());
+        }
     }
 }
+

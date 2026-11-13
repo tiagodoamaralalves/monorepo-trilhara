@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test;
  * {@code TRILHARA_RAIZ}, exportada por {@code scripts/env-gate.sh}.</p>
  */
 @DisplayName("R0 - Inventário executável de rotas JAX-RS (*Resource)")
-class RotasInventarioTest {
+public class RotasInventarioTest {
 
     private static final Pattern PATH_CLASSE =
             Pattern.compile("@Path\\(\\s*\"([^\"]+)\"\\s*\\)");
@@ -41,7 +41,7 @@ class RotasInventarioTest {
     private static final Pattern VERBO =
             Pattern.compile("@(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\\b");
 
-    private static Path diretorioFontes() {
+    public static Path diretorioFontes() {
         List<Path> candidatos = new ArrayList<>();
         candidatos.add(Paths.get(System.getProperty("user.dir"), "src", "main", "java"));
         String raiz = System.getenv("TRILHARA_RAIZ");
@@ -79,7 +79,7 @@ class RotasInventarioTest {
         return base.equals("/") ? sub : base + sub;
     }
 
-    static List<String> inventariarRotas(Path base) throws IOException {
+    public static List<String> inventariarRotas(Path base) throws IOException {
         List<Path> recursos;
         try (Stream<Path> s = Files.walk(base)) {
             recursos = s.filter(p -> p.getFileName().toString().endsWith("Resource.java"))

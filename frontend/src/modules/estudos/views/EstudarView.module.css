@@ -212,7 +212,7 @@
 }
 
 .validationError {
-  color: var(--red);
+  color: var(--red-text);
   font-size: 12px;
 }
 

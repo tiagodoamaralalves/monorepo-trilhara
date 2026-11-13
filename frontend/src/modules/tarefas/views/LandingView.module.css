@@ -276,7 +276,7 @@
 
 .badgeHigh {
   background: var(--red-bg);
-  color: var(--red);
+  color: var(--red-text);
   border: 1px solid var(--red-border);
 }
 

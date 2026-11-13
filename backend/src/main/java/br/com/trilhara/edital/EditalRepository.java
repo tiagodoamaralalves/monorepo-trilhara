@@ -76,7 +76,7 @@ public class EditalRepository {
         return listar(filtros, page, size);
     }
 
-    public Pagina<Edital> listarPublicos(FiltroPublico filtro) {
+    public Pagina<Edital> listarPublicos(FiltroPublico filtro, LocalDate hojeLocal) {
         List<Bson> filtros = new ArrayList<>();
         filtros.add(eq(CAMPO_STATUS, StatusEdital.PUBLICADA.name()));
         FiltroEditalPublico criterios = filtro.criterios();
@@ -96,7 +96,7 @@ public class EditalRepository {
                     regex(CAMPO_BANCA, termo, "i")));
         }
         if (Boolean.TRUE.equals(criterios.emAndamento())) {
-            filtros.add(gt("dataProva", LocalDate.now().toString()));
+            filtros.add(gt("dataProva", hojeLocal.toString()));
         }
         return listar(filtros, filtro.paginacao().page(), filtro.paginacao().size());
     }

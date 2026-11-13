@@ -27,7 +27,7 @@
 }
 
 .success .icon { color: var(--green); }
-.error .icon { color: var(--red); }
+.error .icon { color: var(--red-text); }
 .warning .icon { color: var(--yellow); }
 .info .icon { color: var(--primary-light); }
 

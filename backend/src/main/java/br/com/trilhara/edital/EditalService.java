@@ -9,6 +9,8 @@ import jakarta.validation.Validator;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.NotFoundException;
 
+import br.com.trilhara.shared.TimezoneContext;
+
 @ApplicationScoped
 public class EditalService {
 
@@ -16,10 +18,12 @@ public class EditalService {
 
     private final EditalRepository repository;
     private final Validator validator;
+    private final TimezoneContext timezoneContext;
 
-    public EditalService(EditalRepository repository, Validator validator) {
+    public EditalService(EditalRepository repository, Validator validator, TimezoneContext timezoneContext) {
         this.repository = repository;
         this.validator = validator;
+        this.timezoneContext = timezoneContext;
     }
 
     public Edital criar(Edital recebido) {
@@ -109,7 +113,7 @@ public class EditalService {
         }
         EditalRepository.FiltroPublico consulta = new EditalRepository.FiltroPublico(
                 esfera, filtro, filtro.paginacao());
-        Pagina<Edital> pagina = repository.listarPublicos(consulta);
+        Pagina<Edital> pagina = repository.listarPublicos(consulta, timezoneContext.hojeLocal());
         return new Pagina<>(pagina.itens().stream().map(EditalPublico::de).toList(),
                 filtro.paginacao().page(), filtro.paginacao().size(), pagina.total());
     }

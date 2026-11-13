@@ -6,6 +6,7 @@
  */
 
 import { registrarFalha } from '@shared/diagnostico';
+import { alertarTitulo, preferenciaMovimentoReduzido } from './alertaTitulo';
 
 const CHAVE_ALARME_SOM = 'trilhara_alarme_som';
 const CHAVE_ALARME_NOTIF = 'trilhara_alarme_notif';
@@ -86,40 +87,8 @@ class SoundEngine {
 
 const soundEngine = new SoundEngine();
 
-let titleInterval: number | null = null;
-let originalTitle = typeof document !== 'undefined' ? document.title : '';
-
 function alertarAbaNavegador(mensagem: string) {
-  if (typeof document === 'undefined') return;
-  if (titleInterval) {
-    clearInterval(titleInterval);
-    titleInterval = null;
-  }
-
-  originalTitle = document.title;
-  let alternar = false;
-  let iteracoes = 0;
-
-  titleInterval = window.setInterval(() => {
-    document.title = alternar ? `⏰ ${mensagem}` : originalTitle;
-    alternar = !alternar;
-    iteracoes++;
-    if (iteracoes > 24) {
-      if (titleInterval) clearInterval(titleInterval);
-      titleInterval = null;
-      document.title = originalTitle;
-    }
-  }, 900);
-
-  const limparAoFocar = () => {
-    if (titleInterval) {
-      clearInterval(titleInterval);
-      titleInterval = null;
-    }
-    document.title = originalTitle;
-    window.removeEventListener('focus', limparAoFocar);
-  };
-  window.addEventListener('focus', limparAoFocar);
+  alertarTitulo(mensagem, { reduzirMovimento: preferenciaMovimentoReduzido() });
 }
 
 export const AlarmService = {

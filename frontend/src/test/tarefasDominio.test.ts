@@ -9,7 +9,7 @@ vi.mock('../modules/tarefas/services/api', () => ({
 
 import { request } from '../modules/tarefas/services/api';
 
-describe('FASE 6 - Tarefas Manuais, Recorrência e Lixeira (Frontend)', () => {
+describe('Tarefas manuais, recorrência e lixeira (serviço de tarefas)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

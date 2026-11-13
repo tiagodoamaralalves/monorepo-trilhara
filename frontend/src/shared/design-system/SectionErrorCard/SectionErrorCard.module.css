@@ -20,7 +20,7 @@
 }
 
 .icon {
-  color: var(--red);
+  color: var(--red-text);
   flex-shrink: 0;
 }
 

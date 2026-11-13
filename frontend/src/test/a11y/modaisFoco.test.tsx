@@ -1,15 +1,25 @@
 import { useState } from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Modal } from '../shared/design-system/Modal/Modal';
-import { FormModal } from '../shared/design-system/FormModal/FormModal';
-import { ConfirmProvider, useConfirm } from '../shared/design-system/ConfirmDialog/ConfirmDialog';
-import { SyncStatusBadge } from '../shared/design-system/SyncStatusBadge/SyncStatusBadge';
-import { GlobalSessionModal } from '../shared/design-system/GlobalSessionModal/GlobalSessionModal';
-import { GlobalSessionModalProvider, useGlobalSessionModal } from '../shared/design-system/GlobalSessionModal/GlobalSessionModalContext';
-import { ToastProvider } from '../shared/design-system/Toast/Toast';
-import { AuthContext, AuthContextValue } from '../shared/auth/AuthContext';
-import { StudyTimerProvider } from '../shared/timers/estudoTimer';
+import { Modal } from '../../shared/design-system/Modal/Modal';
+import { FormModal } from '../../shared/design-system/FormModal/FormModal';
+import { ConfirmProvider, useConfirm } from '../../shared/design-system/ConfirmDialog/ConfirmDialog';
+import { GlobalSessionModal } from '../../shared/design-system/GlobalSessionModal/GlobalSessionModal';
+import {
+  GlobalSessionModalProvider,
+  useGlobalSessionModal
+} from '../../shared/design-system/GlobalSessionModal/GlobalSessionModalContext';
+import { ToastProvider } from '../../shared/design-system/Toast/Toast';
+import { AuthContext, AuthContextValue } from '../../shared/auth/AuthContext';
+import { StudyTimerProvider } from '../../shared/timers/estudoTimer';
+
+/**
+ * Acessibilidade dos modais (D-40 / WCAG 2.2 SC 2.1.2 e 2.4.3).
+ *
+ * Cobre *focus trap*, fechamento por `Escape` bloqueado durante salvamento e
+ * devolução determinística de foco ao elemento disparador em `Modal`,
+ * `FormModal`, `ConfirmDialog` e `GlobalSessionModal`.
+ */
 
 const mockAuthValue = (usuarioId: string): AuthContextValue => ({
   usuario: {
@@ -42,7 +52,6 @@ const mockAuthValue = (usuarioId: string): AuthContextValue => ({
   setUsuario: vi.fn()
 });
 
-// Componente auxiliar para teste de foco e fechamento do Modal
 const ModalHarness: React.FC<{ isSaving?: boolean }> = ({ isSaving = false }) => {
   const [open, setOpen] = useState(false);
   return (
@@ -63,7 +72,6 @@ const ModalHarness: React.FC<{ isSaving?: boolean }> = ({ isSaving = false }) =>
   );
 };
 
-// Componente auxiliar para teste de FormModal
 const FormModalHarness: React.FC<{ loading: boolean }> = ({ loading }) => {
   const [open, setOpen] = useState(true);
   return (
@@ -80,7 +88,6 @@ const FormModalHarness: React.FC<{ loading: boolean }> = ({ loading }) => {
   );
 };
 
-// Componente auxiliar para teste de ConfirmDialog
 const ConfirmHarness: React.FC = () => {
   const confirm = useConfirm();
   const [resultado, setResultado] = useState<string>('pendente');
@@ -103,7 +110,6 @@ const ConfirmHarness: React.FC = () => {
   );
 };
 
-// Componente auxiliar para teste de GlobalSessionModal
 const GlobalSessionHarness: React.FC = () => {
   const { abrirModal } = useGlobalSessionModal();
 
@@ -125,14 +131,13 @@ const GlobalSessionHarness: React.FC = () => {
   );
 };
 
-describe('FASE 11 — Auditoria e Testes Automatizados de Acessibilidade (WCAG 2.2 Level AA)', () => {
-
+describe('Acessibilidade dos modais — focus trap, Escape e restauração de foco', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('1. Focus Trap, Fechamento por Escape e Restauração de Foco em Modal', () => {
-    it('deve fechar Modal com tecla Escape quando isSaving == false e restaurar foco ao disparador', () => {
+  describe('Modal: fechamento por Escape e restauração de foco', () => {
+    it('fecha com Escape quando isSaving == false e devolve o foco ao disparador', () => {
       render(<ModalHarness isSaving={false} />);
 
       const triggerBtn = screen.getByTestId('open-modal-btn');
@@ -142,31 +147,25 @@ describe('FASE 11 — Auditoria e Testes Automatizados de Acessibilidade (WCAG 2
       fireEvent.click(triggerBtn);
       expect(screen.getByRole('dialog')).toBeInTheDocument();
 
-      // Pressionar Escape fecha o modal
       fireEvent.keyDown(window, { key: 'Escape' });
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
-      // Foco deve ser restaurado ao elemento disparador
       expect(document.activeElement).toBe(triggerBtn);
     });
 
-    it('NÃO deve fechar Modal com tecla Escape quando isSaving == true', () => {
+    it('NÃO fecha com Escape quando isSaving == true', () => {
       render(<ModalHarness isSaving={true} />);
 
-      const triggerBtn = screen.getByTestId('open-modal-btn');
-      fireEvent.click(triggerBtn);
+      fireEvent.click(screen.getByTestId('open-modal-btn'));
       expect(screen.getByRole('dialog')).toBeInTheDocument();
 
-      // Pressionar Escape deve ser bloqueado enquanto salvando
       fireEvent.keyDown(window, { key: 'Escape' });
       expect(screen.getByRole('dialog')).toBeInTheDocument();
 
-      // Botão fechar deve estar desabilitado
-      const closeBtn = screen.getByRole('button', { name: /fechar/i });
-      expect(closeBtn).toBeDisabled();
+      expect(screen.getByRole('button', { name: /fechar/i })).toBeDisabled();
     });
 
-    it('deve manter o foco preso dentro do Modal ao navegar com tecla Tab (Focus Trap)', () => {
+    it('mantém o foco preso dentro do Modal ao navegar com Tab e Shift+Tab', () => {
       render(<ModalHarness isSaving={false} />);
 
       fireEvent.click(screen.getByTestId('open-modal-btn'));
@@ -181,39 +180,35 @@ describe('FASE 11 — Auditoria e Testes Automatizados de Acessibilidade (WCAG 2
       const firstElement = focusable[0];
       const lastElement = focusable[focusable.length - 1];
 
-      // Foco no último elemento e pressiona Tab -> deve ciclar para o primeiro
       lastElement.focus();
       expect(document.activeElement).toBe(lastElement);
 
       fireEvent.keyDown(window, { key: 'Tab', shiftKey: false });
       expect(document.activeElement).toBe(firstElement);
 
-      // Foco no primeiro elemento e pressiona Shift+Tab -> deve ciclar para o último
       firstElement.focus();
       fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
       expect(document.activeElement).toBe(lastElement);
     });
   });
 
-  describe('2. FormModal e propagação de isSaving={isLoading}', () => {
-    it('deve impedir fechamento por Escape quando FormModal está salvando (isLoading == true)', () => {
+  describe('FormModal: propagação de isSaving={isLoading}', () => {
+    it('impede fechamento por Escape enquanto salva (isLoading == true)', () => {
       const { rerender } = render(<FormModalHarness loading={true} />);
 
       expect(screen.getByRole('dialog')).toBeInTheDocument();
 
-      // Escape não fecha quando salvando
       fireEvent.keyDown(window, { key: 'Escape' });
       expect(screen.getByRole('dialog')).toBeInTheDocument();
 
-      // Rerender com loading=false permite fechar
       rerender(<FormModalHarness loading={false} />);
       fireEvent.keyDown(window, { key: 'Escape' });
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });
 
-  describe('3. ConfirmDialog: Focus restoration e Escape', () => {
-    it('deve fechar ConfirmDialog com Escape cancelando a operação e restaurando o foco', async () => {
+  describe('ConfirmDialog: cancelamento por Escape e restauração de foco', () => {
+    it('fecha com Escape, resolve como cancelado e devolve o foco ao disparador', async () => {
       render(
         <ConfirmProvider>
           <ConfirmHarness />
@@ -226,7 +221,6 @@ describe('FASE 11 — Auditoria e Testes Automatizados de Acessibilidade (WCAG 2
 
       expect(screen.getByText('Confirmação Crítica')).toBeInTheDocument();
 
-      // Pressiona Escape para cancelar
       fireEvent.keyDown(window, { key: 'Escape' });
       await act(async () => {});
 
@@ -236,8 +230,8 @@ describe('FASE 11 — Auditoria e Testes Automatizados de Acessibilidade (WCAG 2
     });
   });
 
-  describe('4. GlobalSessionModal: Focus Trap, Restauração de Foco e Bloqueio de Escape ao Salvar', () => {
-    it('deve abrir GlobalSessionModal, fechar com Escape e restaurar foco ao triggerElement', async () => {
+  describe('GlobalSessionModal: focus trap e restauração de foco', () => {
+    it('abre, fecha com Escape e devolve o foco ao triggerElement', async () => {
       render(
         <ToastProvider>
           <ConfirmProvider>
@@ -259,7 +253,6 @@ describe('FASE 11 — Auditoria e Testes Automatizados de Acessibilidade (WCAG 2
       const dialog = screen.getByRole('dialog', { name: /registrar sessão manual/i });
       expect(dialog).toBeInTheDocument();
 
-      // Pressiona Escape
       fireEvent.keyDown(window, { key: 'Escape' });
       await act(async () => {});
 
@@ -267,71 +260,5 @@ describe('FASE 11 — Auditoria e Testes Automatizados de Acessibilidade (WCAG 2
       expect(document.activeElement).toBe(openBtn);
     });
   });
-
-  describe('5. Semântica de Acessibilidade dos Cronômetros e Badges (role=timer, aria-live)', () => {
-    it('SyncStatusBadge deve possuir role="status" e aria-live="polite"', () => {
-      const { rerender } = render(<SyncStatusBadge status="salvando" />);
-      const badge = screen.getByRole('status');
-
-      expect(badge).toBeInTheDocument();
-      expect(badge).toHaveAttribute('aria-live', 'polite');
-      expect(badge.textContent).toContain('Salvando...');
-
-      rerender(<SyncStatusBadge status="salvo" />);
-      expect(badge).toHaveAttribute('aria-live', 'polite');
-      expect(badge.textContent).toContain('Salvo');
-    });
-
-    it('Cronômetros de foco devem possuir role="timer" e aria-live="off" nos dígitos para não poluir leitores de tela', () => {
-      const mockTimerDisplay = (
-        <div>
-          <div role="status" aria-live="polite">
-            Foco Ativo
-          </div>
-          <div role="timer" aria-live="off" data-testid="cronometro-digitos">
-            25:00
-          </div>
-          <div role="status" aria-live="polite" data-testid="break-banner">
-            Pausa curta
-          </div>
-        </div>
-      );
-
-      render(mockTimerDisplay);
-
-      const timerDigits = screen.getByTestId('cronometro-digitos');
-      expect(timerDigits).toHaveAttribute('role', 'timer');
-      expect(timerDigits).toHaveAttribute('aria-live', 'off');
-
-      const breakBanner = screen.getByTestId('break-banner');
-      expect(breakBanner).toHaveAttribute('role', 'status');
-      expect(breakBanner).toHaveAttribute('aria-live', 'polite');
-    });
-  });
-
-  describe('6. Tokens e Estilos WCAG 2.2 AA (Área Mínima de Toque, Mobile Scroll-Padding e Reduced Motion)', () => {
-    it('deve conter as regras globais de CSS para SC 2.5.8 (24x24px desktop, 40x40px touch, scroll-padding 88px e prefers-reduced-motion)', async () => {
-      // Inspeciona o arquivo index.css para atestar a presença das diretivas estritas de WCAG 2.2 AA
-      const fs = await import('fs');
-      const path = await import('path');
-      const cssContent = fs.readFileSync(path.resolve(__dirname, '../shared/styles/index.css'), 'utf-8');
-
-      // 1. SC 2.5.8 Desktop: min-width: 24px; min-height: 24px
-      expect(cssContent).toContain('min-width: 24px');
-      expect(cssContent).toContain('min-height: 24px');
-
-      // 2. SC 2.5.8 Mobile / Pointer Coarse: min-width: 40px; min-height: 40px
-      expect(cssContent).toContain('@media (pointer: coarse)');
-      expect(cssContent).toContain('min-width: 40px');
-      expect(cssContent).toContain('min-height: 40px');
-
-      // 3. Scroll padding bottom para evitar sobreposição da barra inferior fixa mobile
-      expect(cssContent).toContain('scroll-padding-bottom: 88px');
-
-      // 4. Suporte a prefers-reduced-motion
-      expect(cssContent).toContain('@media (prefers-reduced-motion: reduce)');
-      expect(cssContent).toContain('animation-duration: 0.01ms !important');
-      expect(cssContent).toContain('transition-duration: 0.01ms !important');
-    });
-  });
 });
+

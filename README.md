@@ -117,19 +117,17 @@ npm run build
 
 ## 6. Benchmark de Performance e Índices (`explain("executionStats")`)
 
-A FASE 11 inclui um teste sintético opt-in que injeta carga representativa (2.190 sessões/ano, trilha com 2.000 tópicos, cronograma de 8.784 blocos e 300 páginas de notas em Markdown) e audita o plano de execução das consultas críticas no MongoDB 7:
+Teste sintético opt-in com carga representativa (2.190 sessões/ano, trilha com 20 disciplinas e 2.000 tópicos, cronograma de 8.784 blocos e 300 páginas de notas em Markdown). Ele agora lê o **plano vencedor** (`queryPlanner.winningPlan`) e arquiva um relatório datado:
 
 ```bash
 cd backend
 ./mvnw test -Dtest=MongoExplainBenchmarkTest -Dbenchmark=true
+# → docs/benchmarks/explain-AAAA-MM-DD.md
 ```
 
-Resultados avaliados pelo benchmark:
-- **Blocos de Cronograma**: Confirma estágio `IXSCAN` no índice composto `idx_blocos_usuario_data_concluido` com alta seletividade (`docsExamined <= 24`).
-- **Paginação de Sessões**: Confirma estágio `IXSCAN` no índice composto `idx_sessoes_usuario_trilha_data_criado_id` com exame restrito ao limite de página (`docsExamined <= 20`).
-- **Disciplinas Ordenadas**: Confirma estágio `IXSCAN` utilizando `idx_disciplinas_usuario_trilha_ordem`.
-- **Busca Textual em Notas**: Confirma utilização do índice de texto (`$text`) do MongoDB 7 com prefixo estrito `(usuarioId, deletedAt)`.
-- **Tarefas de Hoje**: Confirma utilização de `idx_tarefas_usuario_deleted_concluida_vencimento`.
+O relatório traz, por consulta, índice vencedor, estágio, `keysExamined`, `docsExamined`, `nReturned` e latência **p50/p95** (20 repetições). Consultas cobertas: blocos do dia, lista virtual de blocos, histórico de sessões, estatísticas da trilha, disciplinas ordenadas, listagem de notas, busca `$text`, tarefas de hoje, lixeira de tarefas e lixeira de notas.
+
+> A assertiva é por **igualdade** no índice vencedor, não por substring: um `COLLSCAN` vencedor com o índice aparecendo apenas num plano rejeitado falha o teste.
 
 ---
 
@@ -137,5 +135,8 @@ Resultados avaliados pelo benchmark:
 
 - **Focus Trap & Restauração de Foco**: Todos os modais (`Modal`, `FormModal`, `ConfirmDialog`, `GlobalSessionModal`) prendem o foco via tecla Tab, fecham com tecla Escape (bloqueado quando salvando) e devolvem o foco ao disparador.
 - **Cronômetros**: Dígitos numéricos utilizam `role="timer"` e `aria-live="off"` para não sobrecarregar leitores de tela a cada segundo; transições de ciclo e badges utilizam `aria-live="polite"`.
-- **Alvos de Toque (SC 2.5.8)**: Alvo mínimo de 24x24px no desktop e 40x40px em telas sensíveis ao toque (`@media (pointer: coarse)`).
-- **Sensibilidade a Movimento**: Desativação e redução de animações e transições sob `@media (prefers-reduced-motion: reduce)`.
+- **Alvos de Toque (SC 2.5.8)**: tokens `--target-min` (24px) e `--target-min-touch` (40px em `pointer: coarse`) aplicados **por componente** (`Button`, `IconButton`, `Checkbox`, itens de lista/menu) e pelo utilitário `.alvo-toque`. Não há regra global sobre `input`/`a` genéricos, que distorcia caixas de 20px e links inline.
+- **Barra inferior fixa (SC 2.4.11)**: `scroll-padding-bottom` só é aplicado quando `body[data-bottom-nav='true']` — atributo definido pela `AppSidebar` no mesmo breakpoint da barra (960px), com `calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + 16px)`.
+- **Sensibilidade a Movimento**: `useReducedMotion()` (matchMedia) desliga as animações dirigidas por JS. Com `prefers-reduced-motion: reduce`, o título da aba recebe a mensagem **estática** (informa sem piscar) e é restaurado ao focar a janela.
+- **Contraste de Tokens**: `contrasteTokens.test.ts` calcula a razão WCAG dos pares declarados nos temas `dark` e `light` (texto ≥ 4.5:1, UI/gráfico ≥ 3:1). Os tokens foram recalibrados: `--text-soft`, `--primary` (claro), `--green-text`/`--yellow` (claro), `--red-text` e `--on-primary-solid` (escuro), mais o novo `--border-control`.
+

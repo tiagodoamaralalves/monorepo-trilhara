@@ -512,7 +512,7 @@
 }
 
 .logoutBtn:hover {
-  color: var(--red);
+  color: var(--red-text);
   background: var(--red-bg);
   border-color: var(--red-border);
 }

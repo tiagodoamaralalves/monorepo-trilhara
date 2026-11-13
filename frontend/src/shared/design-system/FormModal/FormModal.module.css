@@ -9,6 +9,6 @@
   border: 1px solid var(--red-border);
   border-radius: var(--radius-sm);
   background: var(--red-bg);
-  color: var(--red);
+  color: var(--red-text);
   font-size: 13px;
 }

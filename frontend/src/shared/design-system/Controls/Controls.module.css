@@ -43,11 +43,11 @@
   box-shadow: 0 0 0 3px var(--primary-bg);
 }
 
-.invalid { border-color: var(--red); }
+.invalid { border-color: var(--red-text); }
 .help,
 .error { font-size: 12px; line-height: 1.4; }
 .help { color: var(--text-soft); }
-.error { color: var(--red); }
+.error { color: var(--red-text); }
 
 .switch {
   display: inline-flex;

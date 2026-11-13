@@ -30,7 +30,7 @@ import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 
 @QuarkusTest
-@DisplayName("FASE 11 - Auditoria de Autorização por Proprietário (Anti-IDOR / 404 Sem Vazar Existência)")
+@DisplayName("R12 - Auditoria de Autorização por Proprietário (Anti-IDOR / 404 sem vazar existência)")
 public class AuthorizationByOwnerTest {
 
     @Inject
@@ -84,6 +84,7 @@ public class AuthorizationByOwnerTest {
         tokenB = tokenService.gerarAccessToken(usuarioB);
 
         popularRecursosUsuarioA();
+        disciplinaCorpoId = disciplinaAId.toHexString();
     }
 
     private Usuario criarUsuario(ObjectId id, String email) {
@@ -694,4 +695,160 @@ public class AuthorizationByOwnerTest {
                 .countDocuments(new Document("usuarioId", usuarioAId).append("endpoint", pushEndpointA));
         assertEquals(1, countA, "Inscrição push de Usuario A não pode ter sido removida!");
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // R12 — Casos dirigidos pela allowlist (RI-39)
+    // ─────────────────────────────────────────────────────────────────────
+
+    /** Substitui os marcadores da allowlist pelos IDs reais do usuário A. */
+    private String resolver(String caminho) {
+        return caminho
+                .replace("{tipo}", "nota")
+                .replace("{trilhaA}", trilhaAId.toHexString())
+                .replace("{disciplinaA}", disciplinaAId.toHexString())
+                .replace("{topicoA}", topicoAId)
+                .replace("{cronogramaA}", cronogramaAId.toHexString())
+                .replace("{blocoA}", blocoAId.toHexString())
+                .replace("{sessaoA}", sessaoAId.toHexString())
+                .replace("{listaA}", listaTarefasAId.toHexString())
+                .replace("{serieA}", serieRecorrenteAId.toHexString())
+                .replace("{tarefaA}", tarefaAId.toHexString())
+                .replace("{subtarefaA}", tarefaAId.toHexString())
+                .replace("{cadernoA}", cadernoAId.toHexString())
+                .replace("{secaoA}", secaoAId.toHexString())
+                .replace("{notaA}", notaAId.toHexString());
+    }
+
+    static java.util.stream.Stream<org.junit.jupiter.params.provider.Arguments> casosAllowlist() {
+        return RotasPrivadas.casos();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest(name = "[{index}] {4}")
+    @org.junit.jupiter.params.provider.MethodSource("casosAllowlist")
+    @DisplayName("R12 — Toda rota privada da allowlist: B usando IDs de A recebe 404 (nunca 200/204/403/500)")
+    void auditarRotaDaAllowlist(String metodo, String caminho, boolean comCorpo,
+                                int statusEsperado, String descricao) {
+        io.restassured.specification.RequestSpecification requisicao = given()
+                .header("Authorization", "Bearer " + tokenB);
+
+        if (comCorpo) {
+            // Corpo estruturalmente válido: sem ele a validação de entrada responderia 400
+            // antes de o filtro de tenant ser exercitado, e o teste não provaria o 404.
+            requisicao = requisicao.contentType(ContentType.JSON).body(corpoPara(caminho));
+        }
+
+        // Registrar sessão exige Idempotency-Key no cabeçalho, validado ANTES do tenant.
+        if (caminho.contains("/sessoes") && !caminho.contains("/sessoes/")) {
+            requisicao = requisicao.header("Idempotency-Key", UUID.randomUUID().toString());
+        }
+
+        int status = requisicao
+                .when()
+                .request(metodo, resolver(caminho))
+                .then()
+                .extract()
+                .statusCode();
+
+        assertEquals(statusEsperado, status,
+                descricao + " — " + metodo + " " + resolver(caminho)
+                        + " deveria responder " + statusEsperado + " para o usuário B");
+    }
+
+    /** Corpo mínimo válido por família de rota (evita 400 de validação antes do tenant). */
+    private String corpoPara(String caminho) {
+        if (caminho.contains("/blocos/concluir-atrasados")) {
+            // ConcluirAtrasadosRequest exige operationId (UUID) — chave de idempotência.
+            return "{\"operationId\":\"" + java.util.UUID.randomUUID() + "\"}";
+        }
+        if (caminho.contains("/sessoes") && caminho.contains("/sessoes/")) {
+            // AtualizarSessaoRequest: duracaoSegundos entre 60 e 86400.
+            return "{\"duracaoSegundos\":1800,\"questoes\":10,\"acertos\":8}";
+        }
+        if (caminho.contains("/sessoes")) {
+            // RegistrarSessaoRequest: disciplinaId, dataSessao e duracaoSegundos (>= 60).
+            // A data precisa ser passada: o serviço rejeita sessão futura com 400.
+            return "{\"disciplinaId\":\"" + disciplinaCorpoId + "\",\"duracaoSegundos\":1800,"
+                    + "\"dataSessao\":\"2024-01-10\",\"questoes\":10,\"acertos\":8}";
+        }
+        if (caminho.contains("/cronogramas")) {
+            // Criar/AtualizarCronogramaRequest: modalidade, duracaoBlocoMinutos (30..240),
+            // dataInicio e disciplinasParticipantesIds (@NotEmpty).
+            return "{\"modalidade\":\"SEQUENCIAL\",\"duracaoBlocoMinutos\":50,"
+                    + "\"tipoPeriodo\":\"DIARIO\",\"dataInicio\":\"2026-11-10\","
+                    + "\"dataFim\":\"2026-12-10\",\"diasAtivosSemana\":[1,2,3,4,5],"
+                    + "\"blocosPorDia\":2,"
+                    + "\"disciplinasParticipantesIds\":[\"" + disciplinaCorpoId + "\"]}";
+        }
+        if (caminho.contains("/conclusao")) {
+            // AtualizarConclusaoBlocoRequest: campo `concluido` (bloco), `concluida` (tarefa).
+            return caminho.contains("/blocos/")
+                    ? "{\"concluido\":true}"
+                    : "{\"concluida\":true}";
+        }
+        if (caminho.contains("/disciplinas/reordenar")) {
+            return "{\"disciplinaIds\":[]}";
+        }
+        if (caminho.contains("/disciplinas")) {
+            return "{\"nome\":\"Disciplina Invasora\",\"cor\":\"#FF0000\",\"peso\":2}";
+        }
+        if (caminho.contains("/topicos/")) {
+            return "{\"concluido\":true}";
+        }
+        if (caminho.contains("/secoes/") && caminho.endsWith("/notas")) {
+            return "{\"titulo\":\"Nota Invasora\",\"conteudoMarkdown\":\"x\"}";
+        }
+        if (caminho.contains("/secoes")) {
+            return "{\"titulo\":\"Seção Invasora\",\"cor\":\"#6366F1\"}";
+        }
+        if (caminho.contains("/cadernos")) {
+            return "{\"titulo\":\"Caderno Invasor\",\"cor\":\"#EF4444\"}";
+        }
+        if (caminho.contains("/listas-tarefas")) {
+            return "{\"nome\":\"Lista Invasora\",\"cor\":\"#10B981\"}";
+        }
+        if (caminho.contains("/series-recorrentes")) {
+            return "{\"titulo\":\"Série Invasora\",\"frequencia\":\"MENSAL\",\"intervalo\":1}";
+        }
+        if (caminho.contains("/subtarefas")) {
+            return "{\"concluida\":true}";
+        }
+        if (caminho.contains("/tarefas")) {
+            return "{\"titulo\":\"Tarefa Invasora\"}";
+        }
+        if (caminho.contains("/notas")) {
+            return "{\"titulo\":\"Nota Invasora\",\"conteudoMarkdown\":\"x\"}";
+        }
+        return "{\"nome\":\"Invasao\",\"cargo\":\"X\",\"banca\":\"FGV\"}";
+    }
+
+    /** Preenchido no setup: disciplina pertencente à trilha do usuário A. */
+    private String disciplinaCorpoId;
+
+    @org.junit.jupiter.params.ParameterizedTest(name = "[{index}] {0}")
+    @org.junit.jupiter.params.provider.MethodSource("listagensSemId")
+    @DisplayName("R12 — Listagens sem ID: B não recebe nenhum item de A")
+    void auditarListagemSemId(String rota, String marcadorTituloDeA) {
+        String corpo = given()
+                .header("Authorization", "Bearer " + tokenB)
+                .when()
+                .get(rota)
+                .then()
+                .statusCode(200)
+                .extract()
+                .asString();
+
+        org.junit.jupiter.api.Assertions.assertFalse(
+                corpo.contains(marcadorTituloDeA),
+                "Usuário B recebeu dado de A em " + rota + ": " + marcadorTituloDeA);
+    }
+
+    static java.util.stream.Stream<org.junit.jupiter.params.provider.Arguments> listagensSemId() {
+        return java.util.stream.Stream.of(
+                org.junit.jupiter.params.provider.Arguments.of("/api/trilhas", "Trilha Auditoria A"),
+                org.junit.jupiter.params.provider.Arguments.of("/api/tarefas", "Tarefa Confidencial A"),
+                org.junit.jupiter.params.provider.Arguments.of("/api/cadernos", "Caderno Privado A"),
+                org.junit.jupiter.params.provider.Arguments.of("/api/listas-tarefas", "Lista Pessoal A")
+        );
+    }
 }
+

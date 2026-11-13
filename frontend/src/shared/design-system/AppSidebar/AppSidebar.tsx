@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   LogIn,
   LogOut,
@@ -71,6 +71,36 @@ export const AppSidebar = <TId extends string = string>({
   });
 
   const { isLight, toggleTheme } = useTheme();
+
+  /**
+   * Sinaliza no `<body>` que a barra inferior fixa está presente (apenas no
+   * breakpoint mobile de 960px, o mesmo de `.mobileBottomNav`). O CSS global usa
+   * `body[data-bottom-nav='true']` para aplicar `scroll-padding-bottom`; sem o
+   * atributo não há padding fantasma em desktop (WCAG 2.2 SC 2.4.11).
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return;
+    }
+    const media = window.matchMedia('(max-width: 960px)');
+    const aplicar = () => {
+      document.body.dataset.bottomNav = media.matches ? 'true' : 'false';
+    };
+    aplicar();
+
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', aplicar);
+      return () => {
+        media.removeEventListener('change', aplicar);
+        delete document.body.dataset.bottomNav;
+      };
+    }
+    media.addListener(aplicar);
+    return () => {
+      media.removeListener(aplicar);
+      delete document.body.dataset.bottomNav;
+    };
+  }, []);
 
   const handleToggleCollapsed = () => {
     setCollapsed((prev) => {

@@ -113,6 +113,12 @@
                 <version>${compiler-plugin.version}</version>
                 <configuration>
                     <parameters>true</parameters>
+                    <!-- R12: o padrão do Maven só compila **/*Test.java em src/test/java,
+                         o que deixaria de fora fixtures compartilhadas como RotasPrivadas
+                         (allowlist do teste anti-IDOR). Inclui todo o diretório de teste. -->
+                    <testIncludes>
+                        <testInclude>**/*.java</testInclude>
+                    </testIncludes>
                 </configuration>
             </plugin>
             <plugin>

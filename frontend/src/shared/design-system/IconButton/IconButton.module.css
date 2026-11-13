@@ -1,0 +1,70 @@
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  /* Alvo mínimo por token (SC 2.5.8): 24px no desktop, 40px em pointer: coarse. */
+  min-inline-size: var(--target-min);
+  min-block-size: var(--target-min);
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.iconButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.iconButton:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Variantes */
+.ghost:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-subtle-hover);
+}
+
+.surface {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.surface:hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+}
+
+.danger:hover:not(:disabled) {
+  color: var(--red-text);
+  background: var(--red-bg);
+  border-color: var(--red-border);
+}
+
+.selected {
+  color: var(--primary-light);
+  background: var(--primary-bg);
+}
+
+/* Tamanhos do glifo (o alvo continua vindo de --target-min) */
+.sm .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.md .icon {
+  width: 20px;
+  height: 20px;
+}

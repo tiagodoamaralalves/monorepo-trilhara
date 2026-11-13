@@ -12,6 +12,7 @@ import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
@@ -968,5 +969,84 @@ class NotaResourceTest {
                 .then().statusCode(200).body("totalItens", equalTo(0));
 
         assertTrue(purgaLixeiraNotasJob.executarPurga(Instant.now()) >= 0);
+    }
+
+    @Test
+    @DisplayName("R12.1 Lote de exclusão respeita itens já excluídos isoladamente e descendentes já purgados")
+    void loteRespeitaItensJaExcluidosEDescendentesPurgados() {
+        String cadernoId = criarCaderno(tokenUsuarioA, "Caderno Lote Misto");
+        String secaoId = primeiraSecao(tokenUsuarioA, cadernoId);
+
+        String notaIsolada = criarNota(tokenUsuarioA, cadernoId, secaoId, "Excluída antes", "a");
+        String notaPurgada = criarNota(tokenUsuarioA, cadernoId, secaoId, "Já purgada", "b");
+        String notaAtiva = criarNota(tokenUsuarioA, cadernoId, secaoId, "Ainda ativa", "c");
+
+        // 1) Uma página já estava na lixeira com lote próprio (exclusão isolada anterior).
+        String loteIsolado = given()
+                .header("Authorization", "Bearer " + tokenUsuarioA)
+                .pathParam("id", notaIsolada)
+                .when().delete(NOTA)
+                .then().statusCode(200)
+                .extract().path("loteExclusaoId");
+
+        // 2) Outra página é excluída e tem os descendentes purgados fisicamente (fora do prazo).
+        given()
+                .header("Authorization", "Bearer " + tokenUsuarioA)
+                .pathParam("id", notaPurgada)
+                .when().delete(NOTA)
+                .then().statusCode(200);
+
+        mongoClient.getDatabase(databaseName).getCollection("notas").updateOne(
+                new Document("_id", new ObjectId(notaPurgada)),
+                new Document("$set", new Document("expiresAt",
+                        java.util.Date.from(Instant.now().minus(40, ChronoUnit.DAYS)))));
+
+        // 3) Excluir o caderno inteiro cria um novo lote.
+        String loteCaderno = given()
+                .header("Authorization", "Bearer " + tokenUsuarioA)
+                .pathParam("id", cadernoId)
+                .when().delete(CADERNO)
+                .then().statusCode(200)
+                .body("tipo", equalTo("CADERNO"))
+                .body("loteExclusaoId", notNullValue())
+                .extract().path("loteExclusaoId");
+
+        // O item já excluído isoladamente mantém o lote ORIGINAL (não é reatribuído).
+        String lotePersistido = mongoClient.getDatabase(databaseName)
+                .getCollection("notas")
+                .find(new Document("_id", new ObjectId(notaIsolada)))
+                .first()
+                .getString("loteExclusaoId");
+        assertEquals(loteIsolado, lotePersistido,
+                "Item previamente excluído não pode trocar de lote na exclusão em cascata");
+
+        // O caderno e a página ainda ativa entram no lote novo.
+        assertEquals(loteCaderno, mongoClient.getDatabase(databaseName)
+                        .getCollection("cadernos")
+                        .find(new Document("_id", new ObjectId(cadernoId)))
+                        .first()
+                        .getString("loteExclusaoId"),
+                "O caderno deve carregar o lote da exclusão em cascata");
+        assertEquals(loteCaderno, mongoClient.getDatabase(databaseName)
+                        .getCollection("notas")
+                        .find(new Document("_id", new ObjectId(notaAtiva)))
+                        .first()
+                        .getString("loteExclusaoId"),
+                "A página ativa deve entrar no lote da cascata");
+
+        // Restaurar o caderno não ressuscita o descendente já purgado nem move o isolado.
+        given()
+                .header("Authorization", "Bearer " + tokenUsuarioA)
+                .pathParam("tipo", "caderno")
+                .pathParam("id", cadernoId)
+                .when().post(NOTAS + "/lixeira/{tipo}/{id}/restaurar")
+                .then().statusCode(200);
+
+        assertTrue(notaRepository.buscarAtiva(usuarioAId, new ObjectId(notaAtiva)).isPresent(),
+                "Página ativa deve voltar junto com o caderno");
+        assertTrue(notaRepository.buscarAtiva(usuarioAId, new ObjectId(notaPurgada)).isEmpty(),
+                "Página já purgada não pode ser ressuscitada pela restauração do lote");
+        assertTrue(notaRepository.buscarAtiva(usuarioAId, new ObjectId(notaIsolada)).isEmpty(),
+                "Página com lote próprio só volta pela sua própria restauração");
     }
 }
