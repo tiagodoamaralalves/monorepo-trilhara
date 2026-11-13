@@ -45,29 +45,3 @@ export function criarGradeSemana(inicioISO: string): Date[] {
     return dia;
   });
 }
-
-function formatarDataBR(dataISO?: string | null): string {
-  if (!dataISO) return '';
-  const [y, m, d] = dataISO.split('-');
-  return `${d}/${m}/${y}`;
-}
-
-export function formatarDataRelativa(dataISO: string): { label: string; isAtrasada: boolean } {
-  const hoje = hojeISO();
-  if (dataISO === hoje) {
-    return { label: 'Hoje', isAtrasada: false };
-  }
-  const amanha = adicionarDias(hoje, 1);
-  if (dataISO === amanha) {
-    return { label: 'Amanhã', isAtrasada: false };
-  }
-  const ontem = adicionarDias(hoje, -1);
-  if (dataISO === ontem) {
-    return { label: 'Ontem', isAtrasada: true };
-  }
-  if (dataISO < hoje) {
-    return { label: `Atrasada (${formatarDataBR(dataISO)})`, isAtrasada: true };
-  }
-  return { label: formatarDataBR(dataISO), isAtrasada: false };
-}
-

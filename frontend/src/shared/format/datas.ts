@@ -70,3 +70,25 @@ export function diasAte(dataISO?: string | null, hoje: string = hojeISO()): numb
   const msBase = Date.UTC(base.ano, base.mes - 1, base.dia);
   return Math.round((msAlvo - msBase) / 86_400_000);
 }
+
+/**
+ * Rótulo relativo de vencimento usado em listas de tarefas.
+ *
+ * `Hoje`, `Amanhã`, `Ontem`, `Atrasada (dd/mm/aaaa)` ou a data curta. Nunca constrói
+ * `Date` a partir da string, evitando deslocamento de fuso (D-42).
+ */
+export function descreverDataRelativa(
+  dataISO: string,
+  hoje: string = hojeISO()
+): { label: string; isAtrasada: boolean } {
+  if (dataISO === hoje) return { label: 'Hoje', isAtrasada: false };
+
+  const diferenca = diasAte(dataISO, hoje);
+  if (diferenca === 1) return { label: 'Amanhã', isAtrasada: false };
+  if (diferenca === -1) return { label: 'Ontem', isAtrasada: true };
+  if (diferenca !== null && diferenca < 0) {
+    return { label: `Atrasada (${formatarDataCurta(dataISO)})`, isAtrasada: true };
+  }
+  return { label: formatarDataCurta(dataISO), isAtrasada: false };
+}
+

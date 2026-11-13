@@ -12,7 +12,6 @@ import {
   Folder,
   ArrowUpDown,
   Trash2,
-  AlertTriangle,
   RotateCcw,
   Repeat,
   Check,
@@ -36,7 +35,8 @@ import {
 } from '@shared/design-system';
 import { useAuth, AuthView, AuthMode } from '@shared/auth';
 import { request } from '@shared/auth/api';
-import { useAgendaHoje } from '@shared/services/agendaHojeService';
+import { AgendaHoje, TarefaAgendaItem, useAgendaHoje } from '@shared/agenda';
+import { hojeISO } from '@shared/format';
 import {
   BlocoCronogramaItemDTO,
   BlocoHojeDTO,
@@ -47,7 +47,6 @@ import type { Pagina } from '@shared/contracts';
 
 import { Navbar } from './components/Navbar/Navbar';
 import { TrilhaComCronogramaInfo } from './components/Navbar/MinhasListasNav';
-import { TaskItem } from './components/TaskItem/TaskItem';
 import { TaskModal, SalvarTarefaPayload } from './components/TaskModal/TaskModal';
 import { ListaModal } from './components/ListaModal/ListaModal';
 import { ConfiguracaoLembreteModal } from './components/ConfiguracaoLembreteModal/ConfiguracaoLembreteModal';
@@ -65,8 +64,8 @@ import {
   LixeiraTarefasDTO
 } from './types/tarefa';
 import { TarefaService } from './services/tarefaService';
-import { hojeISO } from './utils/date';
 import styles from './App.module.css';
+
 
 type AuthScreen = 'none' | 'login' | 'cadastro' | 'recuperar';
 type Ordenacao = 'vencimento' | 'prioridade' | 'manual';
@@ -105,7 +104,12 @@ function TarefasApp() {
   const { usuario, isAuthenticated, carregando, logout, abrirContaModal } = useAuth();
   const [telaAuth, setTelaAuth] = useState<AuthScreen>(obterTelaAuthInicial);
   const { abrirModal: abrirModalSessao } = useGlobalSessionModal();
-  const { dados: agendaHoje, carregando: carregandoAgenda, recarregar: recarregarAgenda, notificarMudanca } = useAgendaHoje();
+  const {
+    dados: agendaHoje,
+    recarregarTarefas: recarregarAgendaTarefas,
+    recarregarBlocos: recarregarAgendaBlocos,
+    notificarMudanca
+  } = useAgendaHoje();
 
   // Estados de dados
   const [tarefasManuais, setTarefasManuais] = useState<Tarefa[]>([]);
@@ -117,7 +121,6 @@ function TarefasApp() {
 
   // Visão Hoje
   const [, setDadosHoje] = useState<TarefasHojeDTO | null>(null);
-  const [expansoresAtrasadas, setExpansoresAtrasadas] = useState<Record<string, boolean>>({});
 
   // FASE 7: Trilhas de Estudo com cronograma ativo e Listas Virtuais
   const [trilhasComCronograma, setTrilhasComCronograma] = useState<TrilhaComCronogramaInfo[]>([]);
@@ -125,6 +128,8 @@ function TarefasApp() {
   const [blocosTrilha, setBlocosTrilha] = useState<BlocoCronogramaItemDTO[]>([]);
   const [paginaBlocos, setPaginaBlocos] = useState<number>(1);
   const [totalPaginasBlocos, setTotalPaginasBlocos] = useState<number>(1);
+  /** RI-27: contagem exata de blocos atrasados, vinda de `totalItens` (não da página). */
+  const [totalAtrasados, setTotalAtrasados] = useState<number>(0);
   // D-28: paginação de tarefas (50/100) com "Carregar mais".
   const [paginaTarefas, setPaginaTarefas] = useState<number>(1);
   const [totalPaginasTarefas, setTotalPaginasTarefas] = useState<number>(1);
@@ -225,11 +230,20 @@ function TarefasApp() {
       setCarregandoBlocos(true);
       setErroBlocos(null);
       try {
-        const res = await request<Pagina<BlocoCronogramaItemDTO>>(
-          `/trilhas/${encodeURIComponent(trilha.id)}/cronogramas/${encodeURIComponent(
-            trilha.cronogramaAtivoId
-          )}/blocos?concluido=false&pagina=${pagina}&tamanho=50`
-        );
+        const base = `/trilhas/${encodeURIComponent(trilha.id)}/cronogramas/${encodeURIComponent(
+          trilha.cronogramaAtivoId
+        )}/blocos`;
+
+        // RI-27: a contagem N vem de `totalItens` com `tamanho=1`, nunca da página carregada.
+        const [res, contagem] = await Promise.all([
+          request<Pagina<BlocoCronogramaItemDTO>>(
+            `${base}?concluido=false&pagina=${pagina}&tamanho=50`
+          ),
+          request<Pagina<BlocoCronogramaItemDTO>>(
+            `${base}?concluido=false&statusData=ATRASADO&pagina=1&tamanho=1`
+          )
+        ]);
+
         if (pagina === 1) {
           setBlocosTrilha(res.itens || []);
         } else {
@@ -237,6 +251,7 @@ function TarefasApp() {
         }
         setPaginaBlocos(res.pagina || pagina);
         setTotalPaginasBlocos(res.totalPaginas || 1);
+        setTotalAtrasados(contagem.totalItens ?? 0);
       } catch (err) {
         setErroBlocos(err instanceof Error ? err : new Error(String(err)));
       } finally {
@@ -252,6 +267,7 @@ function TarefasApp() {
     } else {
       setBlocosTrilha([]);
       setErroBlocos(null);
+      setTotalAtrasados(0);
     }
   }, [trilhaAtivaId, carregarBlocosTrilha]);
 
@@ -260,55 +276,66 @@ function TarefasApp() {
     return trilhasComCronograma.find((t) => t.id === trilhaAtivaId) || null;
   }, [trilhasComCronograma, trilhaAtivaId]);
 
-  const blocosAtrasadosTrilha = useMemo(() => {
-    return blocosTrilha.filter((b) => b.statusData === 'ATRASADO');
-  }, [blocosTrilha]);
-
   // Concluir todas as atrasadas da trilha sem salvar sessão
   const handleConcluirTodasAtrasadasSemSalvar = async () => {
-    if (!trilhaAtiva || blocosAtrasadosTrilha.length === 0) return;
-    const totalAtrasadas = blocosAtrasadosTrilha.length;
+    if (!trilhaAtiva || totalAtrasados === 0) return;
 
     const confirmed = await confirm({
       title: 'Concluir blocos atrasados',
-      description: `Deseja concluir ${totalAtrasadas} blocos atrasados desta trilha sem registrar sessão de estudo? Esta ação não pode ser desfeita.`,
+      description: `Deseja concluir ${totalAtrasados} blocos atrasados desta trilha sem registrar sessão de estudo? Esta ação não pode ser desfeita.`,
       confirmText: 'Concluir atrasados',
       variant: 'danger'
     });
 
     if (!confirmed) return;
 
-    try {
+    const url = `/trilhas/${encodeURIComponent(trilhaAtiva.id)}/cronogramas/${encodeURIComponent(
+      trilhaAtiva.cronogramaAtivoId
+    )}/blocos/concluir-atrasados`;
+
+    const executarLote = async () => {
       setConcluindoAtrasados(true);
-      const opId =
-        typeof crypto !== 'undefined' && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `op-${Date.now()}`;
-      const res = await request<ConcluirAtrasadosResponse>(
-        `/trilhas/${encodeURIComponent(trilhaAtiva.id)}/cronogramas/${encodeURIComponent(
-          trilhaAtiva.cronogramaAtivoId
-        )}/blocos/concluir-atrasados`,
-        {
+      try {
+        const opId =
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `op-${Date.now()}`;
+        const res = await request<ConcluirAtrasadosResponse>(url, {
           method: 'POST',
           body: JSON.stringify({ operationId: opId })
-        }
-      );
+        });
 
-      if (res.falhas && res.falhas.length > 0) {
-        toast.warning(
-          `Foram concluídos ${res.totalConcluidos} de ${res.totalProcessados} blocos. ${res.falhas.length} falharam.`
-        );
-      } else {
-        toast.success(`${res.totalConcluidos} blocos atrasados concluídos com sucesso!`);
+        if (res.falhas && res.falhas.length > 0) {
+          // Resultado parcial: sucesso/falha por bloco, com retry explícito (sem sessão).
+          toast.warning(
+            `${res.totalConcluidos} concluídos, ${res.falhas.length} falharam`,
+            { acao: { rotulo: 'Tentar novamente', aoAcionar: () => void executarLote() } }
+          );
+        } else {
+          toast.success(`${res.totalConcluidos} blocos atrasados concluídos com sucesso!`);
+        }
+
+        await carregarBlocosTrilha(1);
+        notificarMudanca();
+      } catch (err) {
+        toast.error(err instanceof Error ? err : 'Falha ao concluir blocos atrasados.');
+      } finally {
+        setConcluindoAtrasados(false);
       }
-      await carregarBlocosTrilha(1);
-      notificarMudanca();
-    } catch (err) {
-      toast.error(err instanceof Error ? err : 'Falha ao concluir blocos atrasados.');
-    } finally {
-      setConcluindoAtrasados(false);
-    }
+    };
+
+    await executarLote();
   };
+
+  /**
+   * D-48: o bloco pertence a uma versão substituída do cronograma. A lista e a agenda são
+   * recarregadas com toast normativo; nenhuma sessão é reenviada.
+   */
+  const tratarBlocoObsoleto = useCallback(() => {
+    toast.info('O cronograma foi atualizado. A lista foi recarregada.');
+    void carregarBlocosTrilha(1);
+    notificarMudanca();
+  }, [carregarBlocosTrilha, notificarMudanca, toast]);
 
   // Concluir bloco abrindo GlobalSessionModal (FASE 7)
   const handleConcluirBloco = (bloco: BlocoCronogramaItemDTO | BlocoHojeDTO) => {
@@ -324,6 +351,7 @@ function TarefasApp() {
       trilhaNome: trilhaNome || trilhaAtiva?.nome,
       disciplinaNome: bloco.disciplinaNome,
       disciplinaCor: bloco.disciplinaCor,
+      onBlocoObsoleto: tratarBlocoObsoleto,
       onSuccess: () => {
         if (trilhaAtivaId) {
           setBlocosTrilha((prev) => prev.filter((b) => b.id !== blocoId));
@@ -1042,14 +1070,14 @@ function TarefasApp() {
               <div className={styles.virtualListTopBar}>
                 <div className={styles.virtualListTitleGroup}>
                   <h3 className={styles.virtualListTitle}>
-                    Blocos do Cronograma Ativo ({blocosTrilha.length} pendentes)
+                    Blocos do Cronograma Ativo ({blocosTrilha.length} nesta página)
                   </h3>
                   <p className={styles.virtualListSubtitle}>
                     Acompanhamento direto do cronograma de estudos. Concluir um bloco registra sua sessão de estudo.
                   </p>
                 </div>
 
-                {blocosAtrasadosTrilha.length > 0 && (
+                {totalAtrasados > 0 && (
                   <Button
                     type="button"
                     variant="danger"
@@ -1057,7 +1085,7 @@ function TarefasApp() {
                     onClick={handleConcluirTodasAtrasadasSemSalvar}
                     loading={concluindoAtrasados}
                   >
-                    Concluir todas as atrasadas sem salvar ({blocosAtrasadosTrilha.length})
+                    Concluir todas as atrasadas sem salvar ({totalAtrasados})
                   </Button>
                 )}
               </div>
@@ -1143,232 +1171,22 @@ function TarefasApp() {
             <div>
               <QuickAddTask onAdicionar={handleCriarTarefaRapida} />
 
-              {/* Seção 1: Atrasadas (com agrupamento por série) */}
-              {agendaHoje?.erroTarefas ? (
-                <SectionErrorCard
-                  titulo="Erro ao carregar tarefas atrasadas"
-                  descricao={agendaHoje.erroTarefas.message}
-                  onRetry={recarregarAgenda}
-                  recarregando={carregandoAgenda}
-                />
-              ) : (agendaHoje?.atrasadasAgrupadas || []).length > 0 ? (
-                <div style={{ marginBottom: '24px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                    <AlertTriangle size={18} style={{ color: 'var(--danger, #ef4444)' }} />
-                    <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--danger, #ef4444)' }}>
-                      Atrasadas ({agendaHoje?.atrasadas.length || 0})
-                    </h3>
-                  </div>
+              <AgendaHoje
+                modo="tarefas"
+                dados={agendaHoje}
+                onAlternarTarefa={handleAlternarTarefa}
+                onConcluirBloco={handleConcluirBloco}
+                onRetryTarefas={recarregarAgendaTarefas}
+                onRetryBlocos={recarregarAgendaBlocos}
+                onEditarTarefa={(t) => {
+                  setTarefaEditando(t as Tarefa);
+                  setModalAberto(true);
+                }}
+                onExcluirTarefa={(t) => handleExcluirTarefa(t as Tarefa)}
+                onPularTarefa={handlePularTarefa}
+                onAlternarSubtarefa={handleAlternarSubtarefa}
+              />
 
-                  <div className={styles.taskList}>
-                    {(agendaHoje?.atrasadasAgrupadas || []).map(({ principal, anteriores }) => {
-                      const serieKey = principal.serieId || principal.id;
-                      const expandido = Boolean(expansoresAtrasadas[serieKey]);
-
-                      return (
-                        <div key={principal.id}>
-                          <TaskItem
-                            tarefa={principal as Tarefa}
-                            onAlternar={handleAlternarTarefa}
-                            onEditar={(t) => {
-                              setTarefaEditando(t);
-                              setModalAberto(true);
-                            }}
-                            onExcluir={handleExcluirTarefa}
-                            onPular={handlePularTarefa}
-                            onAlternarSubtarefa={handleAlternarSubtarefa}
-                          />
-
-                          {anteriores.length > 0 && (
-                            <div style={{ paddingLeft: '32px', marginTop: '4px' }}>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setExpansoresAtrasadas((prev) => ({
-                                    ...prev,
-                                    [serieKey]: !prev[serieKey]
-                                  }))
-                                }
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  color: 'var(--primary-light, #38bdf8)',
-                                  fontSize: '0.85rem',
-                                  fontWeight: 600,
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px'
-                                }}
-                              >
-                                {expandido ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                                <span>
-                                  {expandido
-                                    ? 'Ocultar ocorrências anteriores'
-                                    : `+ ${anteriores.length} ocorrência(s) anterior(es) atrasada(s)`}
-                                </span>
-                              </button>
-
-                              {expandido && (
-                                <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                  {anteriores.map((ant) => (
-                                    <TaskItem
-                                      key={ant.id}
-                                      tarefa={ant as Tarefa}
-                                      onAlternar={handleAlternarTarefa}
-                                      onEditar={(t) => {
-                                        setTarefaEditando(t);
-                                        setModalAberto(true);
-                                      }}
-                                      onExcluir={handleExcluirTarefa}
-                                      onPular={handlePularTarefa}
-                                      onAlternarSubtarefa={handleAlternarSubtarefa}
-                                    />
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : null}
-
-              {/* Seção 2: Hoje */}
-              <div style={{ marginBottom: '24px' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '8px' }}>
-                  Hoje
-                </h3>
-
-                {/* Subdivisão 1: Blocos de Estudo de Hoje */}
-                {agendaHoje?.erroEstudos ? (
-                  <SectionErrorCard
-                    titulo="Erro ao carregar blocos de estudos"
-                    descricao={agendaHoje.erroEstudos.message}
-                    onRetry={recarregarAgenda}
-                    recarregando={carregandoAgenda}
-                  />
-                ) : (agendaHoje?.blocosHoje || []).length > 0 ? (
-                  <div style={{ marginBottom: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                      <BookOpen size={15} style={{ color: 'var(--primary-light)' }} />
-                      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-mid)' }}>
-                        Blocos de Estudo ({agendaHoje?.blocosHoje.length})
-                      </h4>
-                    </div>
-
-                    <div className={styles.taskList}>
-                      {agendaHoje?.blocosHoje.map((bloco) => (
-                        <div key={bloco.blocoId || bloco.id} className={styles.blocoItemRow}>
-                          <div className={styles.blocoItemContent}>
-                            <button
-                              type="button"
-                              className={styles.blocoCheckBtn}
-                              onClick={() => handleConcluirBloco(bloco)}
-                              title="Concluir bloco e registrar sessão"
-                              aria-label={`Concluir bloco de ${bloco.disciplinaNome}`}
-                            >
-                              <Check size={14} />
-                            </button>
-                            <div className={styles.blocoDetails}>
-                              <DisciplineLabel
-                                name={bloco.disciplinaNome}
-                                color={bloco.disciplinaCor}
-                              />
-                              {bloco.trilhaNome && (
-                                <span className={styles.blocoTrilhaPill}>
-                                  <BookOpen size={11} />
-                                  <span>{bloco.trilhaNome}</span>
-                                </span>
-                              )}
-                              <span className={styles.blocoMeta}>
-                                <span>{bloco.duracaoMinutos} min</span>
-                              </span>
-                            </div>
-                          </div>
-                          <Badge variant="warning">Hoje</Badge>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                {/* Subdivisão 2: Tarefas Manuais de Hoje */}
-                {agendaHoje?.erroTarefas ? (
-                  <SectionErrorCard
-                    titulo="Erro ao carregar tarefas de hoje"
-                    descricao={agendaHoje.erroTarefas.message}
-                    onRetry={recarregarAgenda}
-                    recarregando={carregandoAgenda}
-                  />
-                ) : (agendaHoje?.tarefasHoje || []).length > 0 ? (
-                  <div>
-                    {(agendaHoje?.blocosHoje || []).length > 0 && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                        <ListTodo size={15} style={{ color: 'var(--primary-light)' }} />
-                        <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-mid)' }}>
-                          Tarefas Manuais ({agendaHoje?.tarefasHoje.length})
-                        </h4>
-                      </div>
-                    )}
-
-                    <div className={styles.taskList}>
-                      {agendaHoje?.tarefasHoje.map((tarefa) => (
-                        <TaskItem
-                          key={tarefa.id}
-                          tarefa={tarefa as Tarefa}
-                          onAlternar={handleAlternarTarefa}
-                          onEditar={(t) => {
-                            setTarefaEditando(t);
-                            setModalAberto(true);
-                          }}
-                          onExcluir={handleExcluirTarefa}
-                          onPular={handlePularTarefa}
-                          onAlternarSubtarefa={handleAlternarSubtarefa}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ) : !agendaHoje?.blocosHoje?.length && !agendaHoje?.erroEstudos && !agendaHoje?.erroTarefas ? (
-                  <p style={{ color: 'var(--text-muted, #9ca3af)', fontSize: '0.9rem', marginBottom: '16px' }}>
-                    Nenhuma tarefa ou bloco de estudo com vencimento para hoje.
-                  </p>
-                ) : null}
-              </div>
-
-              {/* Seção 3: Sem Data */}
-              {agendaHoje?.erroTarefas ? (
-                <SectionErrorCard
-                  titulo="Erro ao carregar tarefas sem data"
-                  descricao={agendaHoje.erroTarefas.message}
-                  onRetry={recarregarAgenda}
-                  recarregando={carregandoAgenda}
-                />
-              ) : (agendaHoje?.semData || []).length > 0 ? (
-                <div style={{ marginBottom: '24px' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '8px' }}>
-                    Sem Data ({agendaHoje?.semData.length || 0})
-                  </h3>
-                  <div className={styles.taskList}>
-                    {agendaHoje?.semData.map((tarefa) => (
-                      <TaskItem
-                        key={tarefa.id}
-                        tarefa={tarefa as Tarefa}
-                        onAlternar={handleAlternarTarefa}
-                        onEditar={(t) => {
-                          setTarefaEditando(t);
-                          setModalAberto(true);
-                        }}
-                        onExcluir={handleExcluirTarefa}
-                        onPular={handlePularTarefa}
-                        onAlternarSubtarefa={handleAlternarSubtarefa}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : null}
             </div>
           ) : (
             /* ── VISUALIZAÇÃO PADRÃO (LISTA / FILTRO) ── */
@@ -1397,15 +1215,15 @@ function TarefasApp() {
               {tarefasPendentes.length > 0 ? (
                 <div className={styles.taskList}>
                   {tarefasPendentes.map((tarefa) => (
-                    <TaskItem
+                    <TarefaAgendaItem
                       key={tarefa.id}
                       tarefa={tarefa}
                       onAlternar={handleAlternarTarefa}
                       onEditar={(t) => {
-                        setTarefaEditando(t);
+                        setTarefaEditando(t as Tarefa);
                         setModalAberto(true);
                       }}
-                      onExcluir={handleExcluirTarefa}
+                      onExcluir={(t) => handleExcluirTarefa(t as Tarefa)}
                       onPular={handlePularTarefa}
                       onAlternarSubtarefa={handleAlternarSubtarefa}
                     />
@@ -1470,15 +1288,15 @@ function TarefasApp() {
                   {mostrarConcluidas && (
                     <div className={styles.taskList}>
                       {tarefasConcluidas.map((tarefa) => (
-                        <TaskItem
+                        <TarefaAgendaItem
                           key={tarefa.id}
                           tarefa={tarefa}
                           onAlternar={handleAlternarTarefa}
                           onEditar={(t) => {
-                            setTarefaEditando(t);
+                            setTarefaEditando(t as Tarefa);
                             setModalAberto(true);
                           }}
-                          onExcluir={handleExcluirTarefa}
+                          onExcluir={(t) => handleExcluirTarefa(t as Tarefa)}
                           onPular={handlePularTarefa}
                           onAlternarSubtarefa={handleAlternarSubtarefa}
                         />

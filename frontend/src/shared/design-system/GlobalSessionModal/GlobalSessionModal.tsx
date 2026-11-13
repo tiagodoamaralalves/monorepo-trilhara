@@ -335,6 +335,28 @@ export const GlobalSessionModal: React.FC = () => {
     [errosCampo]
   );
 
+  /**
+   * D-48: 404 ao concluir bloco significa que o cronograma foi regenerado e aquele bloco
+   * pertence a uma versão substituída. Recarrega lista/agenda e avisa; a sessão já salva
+   * nunca é reenviada e nenhum retry é oferecido.
+   *
+   * @returns `true` quando a falha era de bloco obsoleto e já foi tratada.
+   */
+  const tratarBlocoObsoleto = useCallback(
+    (falha: unknown): boolean => {
+      if (classificarErro(falha) !== 'nao-encontrado') return false;
+
+      publicar('AGENDA_INVALIDADA', null);
+      setBlocoPendente(false);
+      setSujo(false);
+      toast.info('O cronograma foi atualizado. A lista foi recarregada.');
+      params?.onBlocoObsoleto?.();
+      fecharAgora();
+      return true;
+    },
+    [fecharAgora, params, toast]
+  );
+
   const sucessoFinalizado = useCallback(
     (sessao: SessaoRegistradaDTO | undefined, blocoConcluido: boolean) => {
       setSessaoSalva(true);
@@ -362,6 +384,7 @@ export const GlobalSessionModal: React.FC = () => {
       params.onSuccess?.(undefined, true);
       fecharAgora();
     } catch (falha) {
+      if (tratarBlocoObsoleto(falha)) return;
       tratarErro(falha);
       const mensagem = falha instanceof Error ? falha.message : 'Erro ao concluir bloco.';
       toast.error(mensagem);
@@ -386,6 +409,7 @@ export const GlobalSessionModal: React.FC = () => {
         sucessoFinalizado(sessaoId ? ({ id: sessaoId } as SessaoRegistradaDTO) : undefined, true);
       } catch (falha) {
         setBlocoPendente(true);
+        if (tratarBlocoObsoleto(falha)) return;
         tratarErro(falha);
         toast.error(falha instanceof Error ? falha.message : 'Erro ao concluir bloco.');
       } finally {
@@ -531,6 +555,8 @@ export const GlobalSessionModal: React.FC = () => {
             true
           );
         } else {
+          // D-48: bloco de versão substituída — recarrega e encerra sem reenviar a sessão.
+          if (resultado.erro && tratarBlocoObsoleto(resultado.erro)) return;
           setBlocoPendente(true);
           if (resultado.erro) tratarErro(resultado.erro);
         }

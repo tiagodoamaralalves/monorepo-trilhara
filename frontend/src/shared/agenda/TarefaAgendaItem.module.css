@@ -1,3 +1,4 @@
+/* Item único de tarefa manual da Visão Hoje (Tarefas + Pomodoro). */
 .item {
   display: flex;
   align-items: center;
@@ -17,6 +18,21 @@
   transform: translateY(-1px);
 }
 
+.compacta {
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.compacta:hover {
+  transform: none;
+}
+
+.selecionado {
+  border-color: var(--primary);
+  background: var(--primary-bg);
+}
+
 .concluida {
   opacity: 0.65;
   background: var(--bg-elevated);
@@ -27,10 +43,6 @@
   opacity: 0.85;
 }
 
-.cicloItem {
-  border-left: 3px solid var(--purple, #8b5cf6);
-}
-
 .left {
   display: flex;
   align-items: flex-start;
@@ -39,8 +51,17 @@
   min-width: 0;
 }
 
+.compacta .left {
+  gap: 8px;
+  align-items: center;
+}
+
 .checkboxWrapper {
   padding-top: 2px;
+}
+
+.compacta .checkboxWrapper {
+  padding-top: 0;
 }
 
 .info {
@@ -49,6 +70,10 @@
   gap: 5px;
   flex: 1;
   min-width: 0;
+}
+
+.compacta .info {
+  gap: 2px;
 }
 
 .titleRow {
@@ -66,6 +91,14 @@
   word-break: break-word;
 }
 
+.compacta .title {
+  font-size: 12.5px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .titleButton {
   padding: 0;
   border: 0;
@@ -74,6 +107,7 @@
   text-align: left;
   font: inherit;
   cursor: pointer;
+  max-width: 100%;
 }
 
 .titleButton:focus-visible {
@@ -106,16 +140,9 @@
   padding-top: 2px;
 }
 
-.disciplinaTag {
-  display: inline-flex;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--primary-light);
-  background: var(--primary-bg);
-  padding: 1px 7px;
-  border-radius: var(--radius-pill);
-  border: 1px solid transparent;
+.compacta .metaRow {
+  gap: 6px;
+  padding-top: 0;
 }
 
 .subtaskProgress {
@@ -128,6 +155,8 @@
   background: var(--surface-2);
   padding: 2px 7px;
   border-radius: var(--radius-pill);
+  border: 0;
+  cursor: pointer;
 }
 
 .subtaskAllDone {
@@ -142,6 +171,7 @@
   font-size: 11.5px;
   font-weight: 500;
   color: var(--text-mid);
+  font-variant-numeric: tabular-nums;
 }
 
 .metaDate {
@@ -149,10 +179,34 @@
   font-weight: 600;
   color: var(--text-soft);
   margin-left: auto;
+  font-variant-numeric: tabular-nums;
 }
 
 .dateAtrasada {
   color: var(--red, #ef4444);
+}
+
+.subtarefas {
+  margin-top: 8px;
+  padding-left: 8px;
+  border-left: 2px solid var(--border-subtle, #e5e7eb);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.subtarefa {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: inherit;
+}
+
+.subtarefaConcluida {
+  color: var(--text-muted, #9ca3af);
+  text-decoration: line-through;
 }
 
 .actions {
@@ -189,13 +243,19 @@
   --icon-hover-color: var(--red, #ef4444);
 }
 
-.lockBadge {
-  color: var(--text-soft);
-  display: flex;
-  align-items: center;
-  padding: 4px;
+/* WCAG 2.2 SC 2.5.8 / alvo ampliado em telas touch. */
+@media (pointer: coarse) {
+  .actionBtn {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+  }
 }
 
-.cycleIcon {
-  margin-right: 4px;
+@media (prefers-reduced-motion: reduce) {
+  .item,
+  .item:hover {
+    transform: none;
+    transition: none;
+  }
 }

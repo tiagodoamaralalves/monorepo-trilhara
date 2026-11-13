@@ -11,12 +11,7 @@ import {
   Settings,
   Square,
   Timer,
-  Check,
-  BookOpen,
   ListTodo,
-  AlertTriangle,
-  ChevronDown,
-  ChevronRight,
   X,
   LogIn
 } from 'lucide-react';
@@ -29,17 +24,13 @@ import {
   PageBanner,
   Switch,
   ThemeToggle,
-  Badge,
-  DisciplineLabel,
-  SectionErrorCard,
   useGlobalSessionModal,
-  useToast,
-  EmptyState
+  useToast
 } from '@shared/design-system';
 import { formatarRelogio as formatarSegundos } from '@shared/format';
 import { registrarFalha } from '@shared/diagnostico';
 import { useAuth } from '@shared/auth';
-import { useAgendaHoje } from '@shared/services/agendaHojeService';
+import { AgendaHoje, useAgendaHoje } from '@shared/agenda';
 import { assinar, publicar } from '@shared/sync/barramento';
 import { BlocoHojeDTO } from '@shared/contracts/domainContracts';
 import { TarefaService } from '../tarefas/services/tarefaService';
@@ -238,24 +229,164 @@ export function getPomodoroTimerStorageKey(usuarioId?: string | null): string {
   return usuarioId ? `trilhara:u:${usuarioId}:pomodoro_timer` : 'trilhara:anon:pomodoro_timer';
 }
 
+/** Foco atual do Pomodoro: apenas identificador e tipo, nunca o título (item pode sumir). */
+export interface FocoPomodoroPersistido {
+  tipo: 'TAREFA' | 'BLOCO';
+  id: string;
+}
+
+/** Chave do foco atual, escopada por conta (D-46). Visitante não persiste foco. */
+export function getPomodoroFocoStorageKey(usuarioId?: string | null): string | null {
+  return usuarioId ? `trilhara:u:${usuarioId}:pomodoro_foco` : null;
+}
+
+function lerFocoPomodoro(usuarioId?: string | null): FocoPomodoroPersistido | null {
+  if (typeof window === 'undefined') return null;
+  const chave = getPomodoroFocoStorageKey(usuarioId);
+  if (!chave) return null;
+  try {
+    const bruto = window.localStorage.getItem(chave);
+    if (!bruto) return null;
+    const valor = JSON.parse(bruto) as Partial<FocoPomodoroPersistido> | null;
+    if (!valor || typeof valor.id !== 'string' || !valor.id) return null;
+    if (valor.tipo !== 'TAREFA' && valor.tipo !== 'BLOCO') return null;
+    return { tipo: valor.tipo, id: valor.id };
+  } catch {
+    return null;
+  }
+}
+
+function salvarFocoPomodoro(
+  usuarioId: string | null | undefined,
+  foco: FocoPomodoroPersistido | null
+): void {
+  if (typeof window === 'undefined') return;
+  const chave = getPomodoroFocoStorageKey(usuarioId);
+  if (!chave) return;
+  try {
+    if (!foco) {
+      window.localStorage.removeItem(chave);
+      return;
+    }
+    window.localStorage.setItem(chave, JSON.stringify(foco));
+  } catch {
+    // Storage restrito: o foco permanece apenas em memória.
+  }
+}
+
+
 export default function PomodoroApp() {
   const toast = useToast();
   const { usuario, isAuthenticated, abrirAuthModal } = useAuth();
   const { abrirModal: abrirModalSessao } = useGlobalSessionModal();
-  const { dados: agendaHoje, carregando: carregandoAgenda, recarregar: recarregarAgenda, notificarMudanca } = useAgendaHoje();
-  const [focoItem, setFocoItem] = useState<{ tipo: 'TAREFA' | 'BLOCO'; id: string; titulo: string } | null>(null);
-  const [expansoresAtrasadas, setExpansoresAtrasadas] = useState<Record<string, boolean>>({});
+  const {
+    dados: agendaHoje,
+    carregando: carregandoAgenda,
+    recarregar: recarregarAgenda,
+    recarregarTarefas: recarregarAgendaTarefas,
+    recarregarBlocos: recarregarAgendaBlocos,
+    notificarMudanca
+  } = useAgendaHoje();
 
   const usuarioId = usuario?.id || null;
   const usuarioIdRef = useRef<string | null>(usuarioId);
 
-  const handleConcluirTarefa = async (tarefaId: string) => {
+  /**
+   * "Foco atual" é apenas contexto visual (§8): persistimos somente `{ tipo, id }` em
+   * `trilhara:u:{id}:pomodoro_foco` e derivamos o título da agenda. Se o item sumir, o foco
+   * é ignorado e a chave removida.
+   */
+  const [focoPersistido, setFocoPersistido] = useState<FocoPomodoroPersistido | null>(() =>
+    lerFocoPomodoro(usuarioId)
+  );
+
+  const definirFoco = (foco: { tipo: 'TAREFA' | 'BLOCO'; id: string }) => {
+    setFocoPersistido(foco);
+    salvarFocoPomodoro(usuarioId, foco);
+  };
+
+  const limparFoco = () => {
+    setFocoPersistido(null);
+    salvarFocoPomodoro(usuarioId, null);
+  };
+
+  // Troca de conta/exclusão: nada do foco anterior é reaproveitado (D-46).
+  const usuarioAnteriorRef = useRef<string | null>(usuarioId);
+  useEffect(() => {
+    if (usuarioAnteriorRef.current === usuarioId) return;
+    usuarioAnteriorRef.current = usuarioId;
+    setFocoPersistido(lerFocoPomodoro(usuarioId));
+  }, [usuarioId]);
+
+  useEffect(() => {
+    const aoEncerrar = () => {
+      setFocoPersistido(null);
+    };
+    window.addEventListener('trilhara:logout', aoEncerrar);
+    window.addEventListener('trilhara:conta-excluida', aoEncerrar);
+    return () => {
+      window.removeEventListener('trilhara:logout', aoEncerrar);
+      window.removeEventListener('trilhara:conta-excluida', aoEncerrar);
+    };
+  }, []);
+
+  const focoItem = useMemo((): { tipo: 'TAREFA' | 'BLOCO'; id: string; titulo: string } | null => {
+    const foco = focoPersistido;
+    if (!foco || !agendaHoje) return null;
+
+    if (foco.tipo === 'TAREFA') {
+      const tarefa = [
+        ...agendaHoje.tarefasHoje,
+        ...agendaHoje.atrasadas,
+        ...agendaHoje.semData
+      ].find((item) => item.id === foco.id);
+      return tarefa ? { tipo: 'TAREFA', id: foco.id, titulo: tarefa.titulo } : null;
+    }
+
+    const bloco = agendaHoje.blocosHoje.find(
+      (item) => (item.blocoId || item.id) === foco.id
+    );
+    return bloco
+      ? {
+          tipo: 'BLOCO',
+          id: foco.id,
+          titulo: `${bloco.disciplinaNome} (${bloco.trilhaNome || 'Estudos'})`
+        }
+      : null;
+  }, [agendaHoje, focoPersistido]);
+
+  // Item do foco sumiu (concluído, removido ou cronograma regenerado): ignora e limpa.
+  useEffect(() => {
+    if (!focoPersistido) return;
+    if (focoItem) return;
+    if (!agendaHoje) return;
+    setFocoPersistido(null);
+    salvarFocoPomodoro(usuarioId, null);
+  }, [agendaHoje, focoItem, focoPersistido, usuarioId]);
+
+  /**
+   * Concluir tarefa manual **não** pausa o timer nem abre o modal de sessão (§8).
+   */
+  const handleConcluirTarefa = async (tarefaId: string, concluida = true) => {
     try {
-      await TarefaService.alternarConclusao(tarefaId, true);
-      if (focoItem?.id === tarefaId) setFocoItem(null);
+      await TarefaService.alternarConclusao(tarefaId, concluida);
+      if (focoPersistido?.tipo === 'TAREFA' && focoPersistido.id === tarefaId) limparFoco();
       notificarMudanca();
     } catch {
       toast.error('Não foi possível concluir a tarefa.');
+    }
+  };
+
+  const handleAlternarSubtarefa = async (
+    tarefaId: string,
+    subtarefaId: string,
+    concluida: boolean
+  ) => {
+    try {
+      await TarefaService.alternarSubtarefa(tarefaId, subtarefaId, concluida);
+      notificarMudanca();
+    } catch {
+      toast.error('Não foi possível atualizar a subtarefa.');
     }
   };
 
@@ -270,12 +401,17 @@ export default function PomodoroApp() {
       trilhaNome: bloco.trilhaNome,
       disciplinaNome: bloco.disciplinaNome,
       disciplinaCor: bloco.disciplinaCor,
+      onBlocoObsoleto: () => {
+        toast.info('O cronograma foi atualizado. A lista foi recarregada.');
+        recarregarAgenda();
+      },
       onSuccess: () => {
-        if (focoItem?.id === (bloco.blocoId)) setFocoItem(null);
+        if (focoPersistido?.tipo === 'BLOCO' && focoPersistido.id === bloco.blocoId) limparFoco();
         notificarMudanca();
       }
     });
   };
+
 
   const estadoInicialRef = useRef<EstadoPomodoroPersistido | null>(null);
   if (estadoInicialRef.current === null) {
@@ -1224,389 +1360,70 @@ export default function PomodoroApp() {
 
         {/* Coluna 2: Espelho da Visão Hoje (FASE 7) */}
         <aside className={styles.agendaColumn} aria-label="Agenda do dia">
-            {!isAuthenticated ? (
-              <div className={styles.visitorCard}>
-                <div className={styles.visitorIconWrapper}>
-                  <ListTodo size={28} />
-                </div>
-                <h3 className={styles.visitorTitle}>Organize seus estudos e tarefas</h3>
-                <p className={styles.visitorDescription}>
-                  Entre na sua conta para acompanhar tarefas diárias, blocos de cronograma e sincronizar suas sessões de foco.
-                </p>
+          {!isAuthenticated ? (
+            <div className={styles.visitorCard}>
+              <div className={styles.visitorIconWrapper}>
+                <ListTodo size={28} />
+              </div>
+              <h3 className={styles.visitorTitle}>Entre para ver suas tarefas de hoje</h3>
+              <p className={styles.visitorDescription}>
+                Acompanhe tarefas diárias, blocos de cronograma e sincronize suas sessões de foco.
+              </p>
+              <Button type="button" variant="primary" size="md" onClick={abrirAuthModal}>
+                Entrar na conta
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className={styles.agendaHeader}>
+                <h3 className={styles.agendaTitle}>Agenda de Hoje</h3>
                 <Button
                   type="button"
-                  variant="primary"
-                  size="md"
-                  onClick={abrirAuthModal}
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  onClick={recarregarAgenda}
+                  loading={carregandoAgenda}
+                  title="Atualizar agenda"
+                  aria-label="Atualizar agenda"
                 >
-                  Entrar na conta
+                  <RotateCcw size={14} />
                 </Button>
               </div>
-            ) : (
-              <>
-                <div className={styles.agendaHeader}>
-                  <h3 className={styles.agendaTitle}>Agenda de Hoje</h3>
-                  <Button
+
+              {focoItem && (
+                <div className={styles.focoItemCard}>
+                  <div className={styles.focoItemInfo}>
+                    <span className={styles.focoItemTag}>Foco Selecionado</span>
+                    <span className={styles.focoItemTitulo}>{focoItem.titulo}</span>
+                  </div>
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    iconOnly
-                    onClick={recarregarAgenda}
-                    loading={carregandoAgenda}
-                    title="Atualizar agenda"
-                    aria-label="Atualizar agenda"
+                    className={styles.removerFocoBtn}
+                    onClick={limparFoco}
+                    title="Desmarcar foco"
+                    aria-label="Desmarcar foco"
                   >
-                    <RotateCcw size={14} />
-                  </Button>
+                    <X size={14} />
+                  </button>
                 </div>
+              )}
 
-                {/* Destaque do Foco Selecionado */}
-                {focoItem && (
-                  <div className={styles.focoItemCard}>
-                    <div className={styles.focoItemInfo}>
-                      <span className={styles.focoItemTag}>Foco Selecionado</span>
-                      <span className={styles.focoItemTitulo}>{focoItem.titulo}</span>
-                    </div>
-                    <button
-                      type="button"
-                      className={styles.removerFocoBtn}
-                      onClick={() => setFocoItem(null)}
-                      title="Desmarcar foco"
-                      aria-label="Desmarcar foco"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                )}
-
-                {/* Seção 1: Atrasadas */}
-                {agendaHoje?.erroTarefas ? (
-                  <SectionErrorCard
-                    titulo="Erro ao carregar atrasadas"
-                    descricao={agendaHoje.erroTarefas.message}
-                    onRetry={recarregarAgenda}
-                    recarregando={carregandoAgenda}
-                  />
-                ) : (agendaHoje?.atrasadasAgrupadas || []).length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <AlertTriangle size={15} style={{ color: 'var(--danger, #ef4444)' }} />
-                      <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--danger, #ef4444)', margin: 0 }}>
-                        Atrasadas ({agendaHoje?.atrasadas.length || 0})
-                      </h4>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {(agendaHoje?.atrasadasAgrupadas || []).map(({ principal, anteriores }) => {
-                        const isFocado = focoItem?.id === principal.id;
-                        const serieKey = principal.serieId || principal.id;
-                        const expandido = Boolean(expansoresAtrasadas[serieKey]);
-
-                        return (
-                          <div key={principal.id}>
-                            <div className={`${styles.agendaItemRow} ${isFocado ? styles.agendaItemFocado : ''}`}>
-                              <button
-                                type="button"
-                                className={styles.agendaCheckBtn}
-                                onClick={() => handleConcluirTarefa(principal.id)}
-                                title="Concluir tarefa"
-                                aria-label={`Concluir tarefa ${principal.titulo}`}
-                              >
-                                <Check size={12} />
-                              </button>
-
-                              <button
-                                type="button"
-                                className={styles.agendaItemContent}
-                                onClick={() =>
-                                  setFocoItem({
-                                    tipo: 'TAREFA',
-                                    id: principal.id,
-                                    titulo: principal.titulo
-                                  })
-                                }
-                              >
-                                <span className={styles.agendaItemTitulo} title={principal.titulo}>
-                                  {principal.titulo}
-                                </span>
-                              </button>
-
-                              <Badge variant="danger">Atrasada</Badge>
-                            </div>
-
-                            {anteriores.length > 0 && (
-                              <div style={{ paddingLeft: '28px', marginTop: '2px' }}>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setExpansoresAtrasadas((prev) => ({
-                                      ...prev,
-                                      [serieKey]: !prev[serieKey]
-                                    }))
-                                  }
-                                  style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: 'var(--primary-light, #38bdf8)',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 600,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '3px',
-                                    padding: '2px 0'
-                                  }}
-                                >
-                                  {expandido ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                                  <span>
-                                    {expandido
-                                      ? 'Ocultar anteriores'
-                                      : `+ ${anteriores.length} anterior(es)`}
-                                  </span>
-                                </button>
-
-                                {expandido && (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-                                    {anteriores.map((ant) => (
-                                      <div
-                                        key={ant.id}
-                                        className={`${styles.agendaItemRow} ${
-                                          focoItem?.id === ant.id ? styles.agendaItemFocado : ''
-                                        }`}
-                                      >
-                                        <button
-                                          type="button"
-                                          className={styles.agendaCheckBtn}
-                                          onClick={() => handleConcluirTarefa(ant.id)}
-                                          title="Concluir tarefa"
-                                        >
-                                          <Check size={12} />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className={styles.agendaItemContent}
-                                          onClick={() =>
-                                            setFocoItem({
-                                              tipo: 'TAREFA',
-                                              id: ant.id,
-                                              titulo: ant.titulo
-                                            })
-                                          }
-                                        >
-                                          <span className={styles.agendaItemTitulo} title={ant.titulo}>
-                                            {ant.titulo}
-                                          </span>
-                                        </button>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : null}
-
-                {/* Seção 2: Hoje */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {/* Subdivisão 1: Blocos de Estudo */}
-                  {agendaHoje?.erroEstudos ? (
-                    <SectionErrorCard
-                      titulo="Erro ao carregar blocos de estudos"
-                      descricao={agendaHoje.erroEstudos.message}
-                      onRetry={recarregarAgenda}
-                      recarregando={carregandoAgenda}
-                    />
-                  ) : (agendaHoje?.blocosHoje || []).length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <BookOpen size={14} style={{ color: 'var(--primary-light)' }} />
-                        <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-mid)', margin: 0 }}>
-                          Blocos de Estudo ({agendaHoje?.blocosHoje.length})
-                        </h4>
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {agendaHoje?.blocosHoje.map((bloco) => {
-                          const blocoId = bloco.blocoId || '';
-                          const isFocado = focoItem?.id === blocoId;
-
-                          return (
-                            <div
-                              key={blocoId}
-                              className={`${styles.agendaItemRow} ${isFocado ? styles.agendaItemFocado : ''}`}
-                            >
-                              <button
-                                type="button"
-                                className={styles.agendaCheckBtn}
-                                onClick={() => handleConcluirBloco(bloco)}
-                                title="Concluir bloco e registrar sessão"
-                                aria-label={`Concluir bloco de ${bloco.disciplinaNome}`}
-                              >
-                                <Check size={12} />
-                              </button>
-
-                              <button
-                                type="button"
-                                className={styles.agendaItemContent}
-                                onClick={() =>
-                                  setFocoItem({
-                                    tipo: 'BLOCO',
-                                    id: blocoId,
-                                    titulo: `${bloco.disciplinaNome} (${bloco.trilhaNome || 'Estudos'})`
-                                  })
-                                }
-                              >
-                                <DisciplineLabel
-                                  name={bloco.disciplinaNome}
-                                  color={bloco.disciplinaCor}
-                                />
-                                <span style={{ fontSize: '11px', color: 'var(--text-soft)' }}>
-                                  {bloco.duracaoMinutos}m
-                                </span>
-                              </button>
-
-                              <Badge variant="warning">Hoje</Badge>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {/* Subdivisão 2: Tarefas Manuais */}
-                  {agendaHoje?.erroTarefas ? (
-                    <SectionErrorCard
-                      titulo="Erro ao carregar tarefas de hoje"
-                      descricao={agendaHoje.erroTarefas.message}
-                      onRetry={recarregarAgenda}
-                      recarregando={carregandoAgenda}
-                    />
-                  ) : (agendaHoje?.tarefasHoje || []).length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <ListTodo size={14} style={{ color: 'var(--primary-light)' }} />
-                        <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-mid)', margin: 0 }}>
-                          Tarefas Manuais ({agendaHoje?.tarefasHoje.length})
-                        </h4>
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {agendaHoje?.tarefasHoje.map((tarefa) => {
-                          const isFocado = focoItem?.id === tarefa.id;
-
-                          return (
-                            <div
-                              key={tarefa.id}
-                              className={`${styles.agendaItemRow} ${isFocado ? styles.agendaItemFocado : ''}`}
-                            >
-                              <button
-                                type="button"
-                                className={styles.agendaCheckBtn}
-                                onClick={() => handleConcluirTarefa(tarefa.id)}
-                                title="Concluir tarefa"
-                                aria-label={`Concluir tarefa ${tarefa.titulo}`}
-                              >
-                                <Check size={12} />
-                              </button>
-
-                              <button
-                                type="button"
-                                className={styles.agendaItemContent}
-                                onClick={() =>
-                                  setFocoItem({
-                                    tipo: 'TAREFA',
-                                    id: tarefa.id,
-                                    titulo: tarefa.titulo
-                                  })
-                                }
-                              >
-                                <span className={styles.agendaItemTitulo} title={tarefa.titulo}>
-                                  {tarefa.titulo}
-                                </span>
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-
-                {/* Seção 3: Sem Data */}
-                {agendaHoje?.erroTarefas ? (
-                  <SectionErrorCard
-                    titulo="Erro ao carregar tarefas sem data"
-                    descricao={agendaHoje.erroTarefas.message}
-                    onRetry={recarregarAgenda}
-                    recarregando={carregandoAgenda}
-                  />
-                ) : (agendaHoje?.semData || []).length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-mid)', margin: 0 }}>
-                      Sem Data ({agendaHoje?.semData.length})
-                    </h4>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {agendaHoje?.semData.map((tarefa) => {
-                        const isFocado = focoItem?.id === tarefa.id;
-
-                        return (
-                          <div
-                            key={tarefa.id}
-                            className={`${styles.agendaItemRow} ${isFocado ? styles.agendaItemFocado : ''}`}
-                          >
-                            <button
-                              type="button"
-                              className={styles.agendaCheckBtn}
-                              onClick={() => handleConcluirTarefa(tarefa.id)}
-                              title="Concluir tarefa"
-                              aria-label={`Concluir tarefa ${tarefa.titulo}`}
-                            >
-                              <Check size={12} />
-                            </button>
-
-                            <button
-                              type="button"
-                              className={styles.agendaItemContent}
-                              onClick={() =>
-                                setFocoItem({
-                                  tipo: 'TAREFA',
-                                  id: tarefa.id,
-                                  titulo: tarefa.titulo
-                                })
-                              }
-                            >
-                              <span className={styles.agendaItemTitulo} title={tarefa.titulo}>
-                                {tarefa.titulo}
-                              </span>
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : null}
-
-                {/* Estado vazio quando não houver itens em nenhuma seção */}
-                {!(agendaHoje?.atrasadas?.length) &&
-                  !(agendaHoje?.blocosHoje?.length) &&
-                  !(agendaHoje?.tarefasHoje?.length) &&
-                  !(agendaHoje?.semData?.length) &&
-                  !agendaHoje?.erroEstudos &&
-                  !agendaHoje?.erroTarefas && (
-                    <EmptyState
-                      icone={<Check size={20} />}
-                      titulo="Tudo em dia por hoje"
-                      descricao="Nenhuma tarefa ou bloco pendente para hoje."
-                    />
-                  )}
-              </>
-            )}
-          </aside>
+              <AgendaHoje
+                modo="pomodoro"
+                dados={agendaHoje}
+                onAlternarTarefa={handleConcluirTarefa}
+                onConcluirBloco={handleConcluirBloco}
+                onRetryTarefas={recarregarAgendaTarefas}
+                onRetryBlocos={recarregarAgendaBlocos}
+                recarregando={carregandoAgenda}
+                onAlternarSubtarefa={handleAlternarSubtarefa}
+                foco={focoItem ? { tipo: focoItem.tipo, id: focoItem.id } : null}
+                onDefinirFoco={(foco) => definirFoco(foco)}
+              />
+            </>
+          )}
+        </aside>
         </div>
       </section>
 

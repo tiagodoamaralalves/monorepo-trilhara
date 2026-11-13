@@ -7,7 +7,6 @@ import type {
   RegistrarSessaoPayload,
   SessaoRegistradaDTO,
   BlocoHojeDTO,
-  ItemAgendaHojeDTO,
   SyncStatusState
 } from '../shared/contracts';
 
@@ -164,14 +163,6 @@ describe('Frontend API e Contratos Base (FASE 0)', () => {
       concluido: false
     };
     expect(bloco.concluido).toBe(false);
-
-    const agendaManual: ItemAgendaHojeDTO = {
-      tipo: 'MANUAL',
-      tarefaId: 'tar-1',
-      titulo: 'Ler resumo',
-      concluida: false
-    };
-    expect(agendaManual.tipo).toBe('MANUAL');
 
     const statusSync: SyncStatusState = 'salvo';
     expect(statusSync).toBe('salvo');

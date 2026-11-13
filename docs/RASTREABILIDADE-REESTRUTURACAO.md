@@ -19,8 +19,8 @@
 | A3 | Trilha grande não exige transferir disciplinas/tópicos ao listar Hub | `trilha/TrilhaNormalizadaIntegrationTest` (17, inclui `deveCriarTrilhaERetornarResumoSemArrayDeTopicosNoHub`) | Parcial — falta assert de payload/`explain` em trilha de 2.000 tópicos; `MongoExplainBenchmarkTest` é opt-in. **R3:** o resumo não tem mais `disciplinas`/`progresso` no contrato |
 | A4 | Marcar/desmarcar tópico afeta somente aquele progresso e agregados | `trilha/TrilhaNormalizadaIntegrationTest#deveRetornar404AoMarcarProgressoDeTopicoDeOutraTrilha`; `test/topicoOtimista.test.tsx` | **Coberto na R3** — inclui isolamento por trilha no path e rollback otimista |
 | A5 | Regenerar cronograma substitui blocos via `versaoGeracao`/`versaoAtiva`, mantém sessões/progresso; concorrência nunca deixa dois ativos | `cronograma/CronogramaNormalizadoIntegrationTest` (8, inclui `deveCoordenarConcorrenciaComLockAtomicoNaTrilha`) + índice parcial único `idx_cronogramas_usuario_trilha_ativo_unique` | **Coberto na R5** — contador atômico `trilha.proximaVersaoCronograma`, fencing no ponteiro e `duplicateModalityNaoAlteraBlocos` |
-| A6 | Tarefas/Pomodoro mostram as mesmas tarefas manuais Hoje + blocos do dia; nenhum bloco é gravado como tarefa | `test/fase7IntegracaoDiaria.test.tsx` (9); `tarefa/TarefaIntegrationTest` (16); `test/tarefasHoje.test.tsx` (5) | **Coberto na R7** — Hoje devolve só `PENDENTE`, sem blocos |
-| A7 | Concluir manual nunca cria sessão; concluir bloco abre o modal global; cancelar não conclui | `test/globalSessionModal.test.tsx` (10); `test/sessaoGlobalService.test.ts` (5); `fase7IntegracaoDiaria.test.tsx` (9) | **Coberto na R6** — cancelar mantém o timer pausado e não conclui o bloco |
+| A6 | Tarefas/Pomodoro mostram as mesmas tarefas manuais Hoje + blocos do dia; nenhum bloco é gravado como tarefa | `test/agendaHojeService.test.ts` (19); `test/agendaHoje.test.tsx` (10); `tarefa/TarefaIntegrationTest` (16); `test/tarefasHoje.test.tsx` (5); `test/listaVirtual.test.tsx` (5) | **Coberto na R8** — renderização única em `shared/agenda/AgendaHoje.tsx`, ordens normativas em `ordenarAgenda.ts`, agrupamento único em `agruparAtrasadasPorSerie.ts` |
+| A7 | Concluir manual nunca cria sessão; concluir bloco abre o modal global; cancelar não conclui | `test/globalSessionModal.test.tsx` (10); `test/sessaoGlobalService.test.ts` (5); `test/agendaHoje.test.tsx` (10); `test/pomodoroAgenda.test.tsx` (4) | **Coberto na R8** — `concluirTarefaManualNaoAbreModalEChamaAcaoDeTarefas`, `concluirBlocoChamaHandlerDeBlocoDireto` e `concluirTarefaNaoPausaOTimerNemAbreModal` |
 | A8 | Retry após timeout não duplica sessão nem conclusão | `sessao/SessaoNormalizadaIntegrationTest` (9) + índice único `idx_sessoes_usuario_chaveIdempotencia_unique` | Parcial — falta retry concorrente com `operationId` repetido em `concluir-atrasados` |
 | A9 | Sessão de 95s persiste `duracaoSegundos=95` e soma 95s; estatísticas conferem; editar/excluir recalcula | `sessao/SessaoNormalizadaIntegrationTest`; `test/sessaoNormalizada.test.ts` (6) | Coberto |
 | A10 | Remover disciplina preserva histórico por padrão e permite apagar sessões/métricas explicitamente | `trilha/TrilhaNormalizadaIntegrationTest#deveRetornar409SeLeaseOcupadoAoExcluirDisciplina`; `sessao/SessaoNormalizadaIntegrationTest` | Coberto (R3 adicionou a guarda de lease na exclusão) |
@@ -246,3 +246,27 @@
 | Repositórios de `tarefa` exigem `usuarioId` (D-06a) | `arquitetura/TenantIsolationArchTest#repositoriosDeTarefaExigemUsuarioId` | Coberto |
 | Grep do critério R7 §4 zerado | `grep -rn "usaPadraoGlobalLembrete\|dataTermino\|lista padr" backend frontend` → 0 | Coberto |
 | Gate comum verde | `docs/REVISAO-IMPLEMENTADA-R7.md` §5 | Coberto |
+
+## J. Critérios específicos da R8 (F7: Visão Hoje compartilhada, listas virtuais e Pomodoro)
+
+| Critério | Teste / comando | Status |
+|---|---|---|
+| Estado por `usuarioId` com reset em logout, exclusão e troca de conta (D-46) | `test/agendaHojeService.test.ts#trocaDeContaZeraEstadoSemItensDaContaAnterior`; `#novaAssinaturaNuncaRecebeDadosDeOutraConta`; `#contaExcluidaZeraEstadoDaConta` | Coberto |
+| Visitante não dispara requisição na Visão Hoje | `#visitanteSemUsuarioNaoTemAgendaDerivada`; `pomodoroAgenda.test.tsx#visitanteVeCardEEntrarNaContaAbreAuthModal`; `listaVirtual.test.tsx` | Coberto |
+| Virada de `hojeLocal` descarta o dia anterior e recarrega uma vez | `#viradaDeHojeLocalDescartaEstadoDoDiaAnteriorERecarrega` | Coberto |
+| Throttle de 5 s em `focus`/`visibilitychange` | `#throttleDeCincoSegundosEvitaRajadasDeRequisicoes` (fake timers) | Coberto |
+| Ordens normativas das três seções com desempate por `id` | `#ordenaAtrasadasPorDataPrioridadeOrdemComIdComoDesempate`; `#ordenaTarefasDeHojeComHorarioNuloPorUltimo`; `#ordenaSemDataPorPrioridadeDescEOrdemAsc`; `#ordenaBlocosDeHojePorTrilhaOrdemEBlocoId`; `#derivaAtrasadasHojeESemDataNasOrdensNormativas` | Coberto |
+| Agrupamento único de atrasadas por série (D-23) sob a mais recente | `#agrupaSerieSobOcorrenciaMaisRecenteComAnterioresAscendentes`; `#tarefaDesvinculadaDaSerieNaoEhAgrupada`; `agendaHoje.test.tsx#atrasadasAgrupadasExibemExpansorDeOcorrenciasAnteriores` | Coberto |
+| Falha parcial preserva a fonte sadia e o retry é isolado | `#falhaDeBlocosMantemTarefasEErroBlocos`; `#falhaDeTarefasMantemBlocosEErroTarefas`; `#retryRecarregaSomenteAFonteComFalha`; `#retryDeTarefasNaoRecarregaBlocos` | Coberto |
+| `SectionErrorCard variant="inline"` apenas no subgrupo afetado | `agendaHoje.test.tsx#erroDeBlocosRenderizaSectionErrorCardInlineSomenteNoSubgrupoBlocos`; `#erroDeTarefasRenderizaInlineEmAtrasadasTarefasDeHojeESemData` | Coberto |
+| Skeleton `row` ×3 por seção após 200 ms | `agendaHoje.test.tsx#exibe skeleton row após 200 ms por seção no carregamento inicial` | Coberto |
+| Vazio total → `EmptyState` do Anexo B | `agendaHoje.test.tsx#tudoVazioExibeEmptyStateTudoEmDiaPorHoje`; `tarefasHoje.test.tsx` | Coberto |
+| Concluir manual não abre modal; concluir bloco abre `BLOCO_DIRETO` | `agendaHoje.test.tsx#concluirTarefaManualNaoAbreModalEChamaAcaoDeTarefas`; `#concluirBlocoChamaHandlerDeBlocoDireto`; `pomodoroAgenda.test.tsx#concluirTarefaNaoPausaOTimerNemAbreModal` | Coberto |
+| Contagem N da lista virtual vem de `totalItens` (`statusData=ATRASADO&tamanho=1`) | `listaVirtual.test.tsx#contagemDeAtrasadasUsaTotalItensComTamanhoUm` | Coberto |
+| "Carregar mais" e resultado parcial do lote com retry | `listaVirtual.test.tsx#carregarMaisAcrescentaAProximaPaginaDeBlocos`; `#resultadoParcialDoLoteExibeToastComTentarNovamente` | Coberto |
+| Blocos não expõem editar/excluir e filtros gerais não renderizam blocos | `listaVirtual.test.tsx#blocosDaListaVirtualNaoExpoemEditarNemExcluir`; `#filtrosGeraisNaoRenderizamBlocos` | Coberto |
+| Foco do Pomodoro persiste só `{tipo,id}` e é ignorado se o item sumir | `pomodoroAgenda.test.tsx#focoAtualPersisteSomenteIdETipoNaChaveDaConta`; `#focoEhDescartadoQuandoOItemSomeDaAgenda` | Coberto |
+| `ItemAgendaHojeDTO` resolvido (removido) | `grep -rn "ItemAgendaHojeDTO" frontend/src` → 0 | Coberto |
+| Agrupamento existe uma única vez em `shared/agenda` | `rg "agruparAtrasadas" frontend/src -l` → 4 arquivos, todos em `shared/agenda`/teste | Coberto |
+| Gate comum | `docs/REVISAO-IMPLEMENTADA-R8.md` §5 | Coberto (backend em §6) |
+

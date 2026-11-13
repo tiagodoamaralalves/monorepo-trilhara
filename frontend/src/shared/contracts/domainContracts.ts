@@ -36,6 +36,12 @@ export interface GlobalSessionModalOpenParams {
   disciplinaNome?: string;
   disciplinaCor?: string;
   onSuccess?: (sessao?: SessaoRegistradaDTO, blocoConcluido?: boolean) => void;
+  /**
+   * D-48: chamado quando a conclusão do bloco responde 404 (bloco de versão substituída).
+   * O chamador recarrega lista/agenda e mostra o toast normativo; a sessão já salva **não**
+   * é reenviada.
+   */
+  onBlocoObsoleto?: () => void;
   triggerElement?: HTMLElement | null;
 }
 
@@ -143,35 +149,6 @@ export interface BlocoHojeDTO {
   concluido: boolean;
   statusData?: 'HOJE' | 'hoje' | string;
 }
-
-/**
- * Item da agenda de Hoje: união discriminada entre tarefa manual e bloco de cronograma.
- */
-export type ItemAgendaHojeDTO =
-  | {
-      tipo: 'MANUAL';
-      tarefaId: string;
-      titulo: string;
-      concluida: boolean;
-      prioridade?: 'BAIXA' | 'MEDIA' | 'ALTA' | 'URGENTE';
-      dataVencimento?: string | null;
-      ordem?: number;
-      listaId?: string;
-    }
-  | {
-      tipo: 'BLOCO_CRONOGRAMA';
-      blocoId: string;
-      trilhaId: string;
-      cronogramaId: string;
-      disciplinaId: string;
-      disciplinaNome: string;
-      disciplinaCor: string;
-      trilhaNome?: string;
-      data: string;
-      ordem: number;
-      duracaoMinutos: number;
-      concluido: boolean;
-    };
 
 /**
  * Estado do badge de sincronização do Notas (autosave / rascunho local).
