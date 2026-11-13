@@ -54,11 +54,13 @@ public class SerieRecorrenteRepository {
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
 
-    public Optional<SerieRecorrente> buscarPorOperationId(ObjectId usuarioId, String operationId) {
-        if (operationId == null || operationId.isBlank()) {
+    public Optional<SerieRecorrente> buscarPorOrigemOperacaoId(ObjectId usuarioId, String origemOperacaoId) {
+        if (origemOperacaoId == null || origemOperacaoId.isBlank()) {
             return Optional.empty();
         }
-        Document doc = collection.find(and(eq("usuarioId", usuarioId), eq("operationId", operationId))).first();
+        Document doc = collection.find(and(
+                eq("usuarioId", usuarioId),
+                eq("origemOperacaoId", origemOperacaoId))).first();
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
 
@@ -71,6 +73,16 @@ public class SerieRecorrenteRepository {
         )).sort(Sorts.descending("criadoEm"))
           .forEach(doc -> resultado.add(paraEntidade(doc)));
         return resultado;
+    }
+
+    /** Séries ativas vinculadas a uma lista (impacto de exclusão, D-33). */
+    public long contarAtivasPorLista(ObjectId usuarioId, ObjectId listaId) {
+        return collection.countDocuments(and(
+                eq("usuarioId", usuarioId),
+                eq("listaId", listaId),
+                eq("deletedAt", null),
+                eq("ativa", true)
+        ));
     }
 
     public List<SerieRecorrente> listarTodas(ObjectId usuarioId) {
@@ -117,9 +129,9 @@ public class SerieRecorrenteRepository {
         ).getModifiedCount() > 0;
     }
 
-    public long desvincularLista(ObjectId listaId) {
+    public long desvincularLista(ObjectId usuarioId, ObjectId listaId) {
         return collection.updateMany(
-                eq("listaId", listaId),
+                and(eq("usuarioId", usuarioId), eq("listaId", listaId)),
                 Updates.combine(
                         Updates.unset("listaId"),
                         Updates.set("atualizadoEm", BsonDates.toBsonDate(Instant.now()))
@@ -204,15 +216,15 @@ public class SerieRecorrenteRepository {
         doc.put("totalGeradas", s.totalGeradas());
         doc.put("ativa", s.ativa());
 
+        doc.put("modoLembrete", s.modoLembrete().name());
         if (s.lembreteMinutosAntes() != null) {
             doc.put("lembreteMinutosAntes", s.lembreteMinutosAntes());
         }
-        doc.put("usaPadraoGlobalLembrete", s.usaPadraoGlobalLembrete());
         if (s.fusoAgendamento() != null) {
             doc.put("fusoAgendamento", s.fusoAgendamento());
         }
-        if (s.operationId() != null) {
-            doc.put("operationId", s.operationId());
+        if (s.origemOperacaoId() != null) {
+            doc.put("origemOperacaoId", s.origemOperacaoId());
         }
         if (s.deletedAt() != null) {
             doc.put("deletedAt", BsonDates.toBsonDate(s.deletedAt()));
@@ -267,10 +279,10 @@ public class SerieRecorrenteRepository {
                 BsonDates.lerLocalDate(doc, "geradoAte"),
                 doc.getInteger("totalGeradas", 0),
                 Boolean.TRUE.equals(doc.getBoolean("ativa", true)),
+                ModoLembrete.fromString(doc.getString("modoLembrete")),
                 doc.getInteger("lembreteMinutosAntes"),
-                Boolean.TRUE.equals(doc.getBoolean("usaPadraoGlobalLembrete", false)),
                 doc.getString("fusoAgendamento"),
-                doc.getString("operationId"),
+                doc.getString("origemOperacaoId"),
                 BsonDates.lerInstant(doc, "deletedAt"),
                 BsonDates.lerInstant(doc, "expiresAt"),
                 doc.getString("loteExclusaoId"),

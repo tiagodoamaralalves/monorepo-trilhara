@@ -11,6 +11,7 @@ import org.jboss.logging.Logger;
 
 import br.com.trilhara.auth.UserRepository;
 import br.com.trilhara.shared.TimezoneContext;
+import br.com.trilhara.tarefa.ModoLembrete;
 import br.com.trilhara.tarefa.Tarefa;
 import br.com.trilhara.tarefa.TarefaRepository;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -43,8 +44,8 @@ public class LembretePushService {
      */
     public Optional<LembretePush> agendarOuAtualizarLembrete(
             Tarefa tarefa,
+            ModoLembrete modoLembreteOverride,
             Integer lembreteMinutosAntesOverride,
-            Boolean usaPadraoGlobalOverride,
             String fusoAgendamentoOverride) {
 
         if (tarefa == null || tarefa.id() == null) {
@@ -56,7 +57,7 @@ public class LembretePushService {
             return Optional.empty();
         }
 
-        Integer minutosAntes = resolverMinutosAntes(tarefa, lembreteMinutosAntesOverride, usaPadraoGlobalOverride);
+        Integer minutosAntes = resolverMinutosAntes(tarefa, modoLembreteOverride, lembreteMinutosAntesOverride);
         if (minutosAntes == null || minutosAntes < 0) {
             lembretePushRepository.cancelarPorTarefa(tarefa.usuarioId(), tarefa.id());
             return Optional.empty();
@@ -109,17 +110,23 @@ public class LembretePushService {
         return tarefa.concluida() || "CONCLUIDA".equalsIgnoreCase(tarefa.estado()) || tarefa.deletedAt() != null;
     }
 
-    private Integer resolverMinutosAntes(Tarefa tarefa, Integer lembreteMinutosAntesOverride, Boolean usaPadraoGlobalOverride) {
-        boolean usaPadrao = usaPadraoGlobalOverride != null
-                ? usaPadraoGlobalOverride
-                : tarefa.usaPadraoGlobalLembrete();
-        if (usaPadrao) {
-            return userRepository.obterPadraoLembreteMinutos(tarefa.usuarioId());
-        }
-        if (lembreteMinutosAntesOverride != null) {
-            return lembreteMinutosAntesOverride;
-        }
-        return tarefa.lembreteMinutosAntes();
+    /**
+     * Resolve os minutos de antecedência (D-26).
+     *
+     * <p>{@code HERDAR} consulta a preferência global do usuário no momento do agendamento;
+     * {@code SEM_ALERTA} devolve {@code null} (nenhum push); {@code PERSONALIZADO} usa o
+     * deslocamento gravado na tarefa.</p>
+     */
+    private Integer resolverMinutosAntes(
+            Tarefa tarefa, ModoLembrete modoLembreteOverride, Integer lembreteMinutosAntesOverride) {
+        ModoLembrete modo = modoLembreteOverride != null ? modoLembreteOverride : tarefa.modoLembrete();
+        return switch (modo) {
+            case SEM_ALERTA -> null;
+            case PERSONALIZADO -> lembreteMinutosAntesOverride != null
+                    ? lembreteMinutosAntesOverride
+                    : tarefa.lembreteMinutosAntes();
+            case HERDAR -> userRepository.obterPadraoLembreteMinutos(tarefa.usuarioId());
+        };
     }
 
     private ZoneId resolverZoneId(Tarefa tarefa, String fusoAgendamentoOverride) {
@@ -158,7 +165,7 @@ public class LembretePushService {
 
     /**
      * Atualiza a preferência global do usuário e recalcula lembretes PENDENTES
-     * exclusivamente das tarefas herdeiras (usaPadraoGlobalLembrete == true).
+     * exclusivamente das tarefas herdeiras ({@code modoLembrete == HERDAR}, D-26).
      */
     public long atualizarPreferenciaGlobal(ObjectId usuarioId, int novoPadraoMinutos) {
         userRepository.salvarPadraoLembreteMinutos(usuarioId, novoPadraoMinutos);
@@ -189,7 +196,7 @@ public class LembretePushService {
                     lembretePushRepository.atualizarPendente(existente.get().id(), novoInstante, novoPadraoMinutos);
                     recalculados++;
                 } else if (existente.isEmpty()) {
-                    agendarOuAtualizarLembrete(t, novoPadraoMinutos, true, zoneId.getId());
+                    agendarOuAtualizarLembrete(t, ModoLembrete.PERSONALIZADO, novoPadraoMinutos, zoneId.getId());
                     recalculados++;
                 }
             } catch (Exception e) {

@@ -19,10 +19,9 @@ export interface AgendaHojeData {
   // Seção 1: Atrasadas
   atrasadas: TarefaDTO[];
   atrasadasAgrupadas: GrupoAtrasadas[];
-  // Seção 2: Hoje
+  // Seção 2: Hoje — D-23: somente pendentes; concluídas ficam em "Concluídas"
   blocosHoje: BlocoHojeDTO[];
   tarefasHoje: TarefaDTO[];
-  tarefasConcluidasHoje: TarefaDTO[];
   // Seção 3: Sem Data
   semData: TarefaDTO[];
   // Resiliência a falhas parciais
@@ -295,10 +294,6 @@ class AgendaHojeManager {
       return (a.ordem ?? 0) - (b.ordem ?? 0);
     });
 
-    const tarefasConcluidasHoje = (tarefasHojeDTO?.hoje || []).filter(
-      (t) => t.concluida || t.estado === 'CONCLUIDA'
-    );
-
     // ── SEÇÃO 3: SEM DATA ──
     // Apenas tarefas manuais pendentes com dataVencimento == null
     const semDataPendentes = (tarefasHojeDTO?.semData || []).filter(
@@ -316,7 +311,6 @@ class AgendaHojeManager {
       atrasadasAgrupadas,
       blocosHoje: blocosHojePendentes,
       tarefasHoje: tarefasHojePendentes,
-      tarefasConcluidasHoje,
       semData: semDataPendentes,
       erroEstudos,
       erroTarefas

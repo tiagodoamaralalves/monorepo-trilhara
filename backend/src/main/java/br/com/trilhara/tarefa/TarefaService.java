@@ -8,15 +8,24 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.bson.types.ObjectId;
+
+import com.mongodb.MongoWriteException;
 
 import br.com.trilhara.push.InvalidLocalDatetimeException;
 import br.com.trilhara.push.LembretePushCalculator;
 import br.com.trilhara.push.LembretePushService;
 import br.com.trilhara.shared.TimezoneContext;
+import br.com.trilhara.shared.erro.CodigoErro;
+import br.com.trilhara.shared.erro.ProblemDetails;
+import br.com.trilhara.shared.erro.ProblemDetailsFactory;
+import br.com.trilhara.shared.erro.TrashItemExpiredException;
+import br.com.trilhara.shared.erro.ValidationException;
 import br.com.trilhara.shared.mongo.BsonDates;
 import br.com.trilhara.shared.mongo.BsonIds;
 import br.com.trilhara.tarefa.RegraRecorrenciaValidator.ParametrosRegraRecorrencia;
@@ -27,8 +36,11 @@ import br.com.trilhara.tarefa.dto.CriarListaTarefasRequest;
 import br.com.trilhara.tarefa.dto.CriarSerieRecorrenteRequest;
 import br.com.trilhara.tarefa.dto.CriarTarefaRequest;
 import br.com.trilhara.tarefa.dto.ExclusaoListaResponse;
-import br.com.trilhara.tarefa.dto.LixeiraTarefasResponse;
+import br.com.trilhara.tarefa.dto.ListaImpactoExclusaoResponse;
 import br.com.trilhara.tarefa.dto.ListaTarefasResponse;
+import br.com.trilhara.tarefa.dto.LixeiraTarefasResponse;
+import br.com.trilhara.tarefa.dto.PaginaTarefasDTO;
+import br.com.trilhara.tarefa.dto.RestauracaoTarefaResponse;
 import br.com.trilhara.tarefa.dto.SerieRecorrenteResponse;
 import br.com.trilhara.tarefa.dto.SubtarefaDTO;
 import br.com.trilhara.tarefa.dto.TarefaResponse;
@@ -36,6 +48,8 @@ import br.com.trilhara.tarefa.dto.TarefasHojeResponse;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response;
 
 @ApplicationScoped
 public class TarefaService {
@@ -59,8 +73,8 @@ public class TarefaService {
             String horario,
             int ordem,
             List<Subtarefa> subtarefas,
+            ModoLembrete modoLembrete,
             Integer lembreteMinutosAntes,
-            boolean usaPadraoGlobalLembrete,
             String fusoAgendamento) {
     }
 
@@ -82,11 +96,11 @@ public class TarefaService {
             LocalDate dataFim,
             Integer maxOcorrencias,
             boolean ativa,
+            ModoLembrete modoLembrete,
             Integer lembrete,
-            boolean usaPadrao,
             String fuso,
             List<Subtarefa> modelo,
-            String operationId) {
+            String origemOperacaoId) {
     }
 
     private static final String ERRO_LISTA_INFORMADA_INEXISTENTE_OU_NA_LIXEIRA = "A lista informada não existe ou está na lixeira.";
@@ -98,6 +112,17 @@ public class TarefaService {
     private static final String CAMPO_SERIE_ID = "serieId";
     private static final String CAMPO_TAREFA_ID = "tarefaId";
     private static final String CAMPO_USUARIO_ID = "usuarioId";
+
+    /** D-28: {@code GET /api/tarefas} e a lixeira usam 50 como default e 100 como máximo. */
+    private static final int TAMANHO_PADRAO_LISTAGEM = 50;
+    private static final int TAMANHO_MAXIMO_LISTAGEM = 100;
+    private static final Set<String> FILTROS_LISTAGEM = Set.of("TODAS", "FUTURO", "CONCLUIDAS");
+    /** D-26: {@code PERSONALIZADO} aceita apenas estes deslocamentos. */
+    private static final Set<Integer> MINUTOS_LEMBRETE_PERMITIDOS = Set.of(0, 5, 15, 30, 60);
+
+    /** Par de paginação já validado contra a norma do endpoint. */
+    private record PaginacaoValidada(int pagina, int tamanho) {
+    }
 
     private final ListaTarefasRepository listaRepository;
     private final SerieRecorrenteRepository serieRepository;
@@ -245,6 +270,23 @@ public class TarefaService {
         return paraListaResponse(restaurada, total);
     }
 
+    /** D-33: contagens para o {@code ConfirmDialog} de exclusão da lista. */
+    public ListaImpactoExclusaoResponse obterImpactoExclusaoLista(String listaIdStr, String usuarioIdStr) {
+        ObjectId usuarioId = validarObjectId(usuarioIdStr, CAMPO_USUARIO_ID);
+        ObjectId listaId = validarObjectId(listaIdStr, CAMPO_LISTA_ID);
+
+        ListaTarefas lista = listaRepository.buscar(usuarioId, listaId)
+                .filter(l -> l.deletedAt() == null)
+                .orElseThrow(() -> new NotFoundException(ERRO_LISTA_NAO_ENCONTRADA_OU_INACESSIVEL));
+
+        long ativas = tarefaRepository.contarPorListaPorConclusao(usuarioId, listaId, false);
+        long concluidas = tarefaRepository.contarPorListaPorConclusao(usuarioId, listaId, true);
+        long series = serieRepository.contarAtivasPorLista(usuarioId, listaId);
+
+        return new ListaImpactoExclusaoResponse(
+                lista.id().toHexString(), lista.nome(), ativas, concluidas, series);
+    }
+
     // =========================================================================
     // TAREFAS MANUAIS E OCORRÊNCIAS
     // =========================================================================
@@ -258,6 +300,7 @@ public class TarefaService {
         ObjectId listaId = validarEResolverListaId(usuarioId, request.listaId());
         LocalDate dataVencimento = BsonDates.toLocalDate(request.dataVencimento());
         validarGapDst(dataVencimento, request.horario(), request.fusoAgendamento());
+        validarPreferenciaLembrete(request.modoLembrete(), request.lembreteMinutosAntes());
 
         PrioridadeTarefa prioridade = PrioridadeTarefa.fromString(request.prioridade());
         int ordem = request.ordem() != null ? request.ordem() : tarefaRepository.proximaOrdem(usuarioId, listaId);
@@ -281,8 +324,8 @@ public class TarefaService {
                 null,
                 ordem,
                 subtarefas,
+                request.modoLembrete(),
                 request.lembreteMinutosAntes(),
-                Boolean.TRUE.equals(request.usaPadraoGlobalLembrete()),
                 request.fusoAgendamento(),
                 null,
                 null,
@@ -294,16 +337,33 @@ public class TarefaService {
         tarefaRepository.inserir(tarefa);
         lembretePushService.agendarOuAtualizarLembrete(
                 tarefa,
+                request.modoLembrete(),
                 request.lembreteMinutosAntes(),
-                request.usaPadraoGlobalLembrete(),
                 request.fusoAgendamento()
         );
         return paraTarefaResponse(tarefa);
     }
 
-    public List<TarefaResponse> listarTarefas(String usuarioIdStr, FiltroTarefas filtro) {
+    /**
+     * Listagem paginada (D-28) de tarefas manuais. {@code filtro} aceita apenas
+     * {@code TODAS|FUTURO|CONCLUIDAS}; qualquer outro valor é {@code 400 VALIDATION_ERROR}.
+     * Nunca retorna blocos de cronograma (§7.4).
+     */
+    public PaginaTarefasDTO listarTarefas(
+            String usuarioIdStr, FiltroTarefas filtro, Integer paginaParam, Integer tamanhoParam) {
         ObjectId usuarioId = validarObjectId(usuarioIdStr, CAMPO_USUARIO_ID);
         LocalDate hojeLocal = timezoneContext.hojeLocal();
+
+        String filtroNome = filtro != null && filtro.filtro() != null && !filtro.filtro().isBlank()
+                ? filtro.filtro().trim().toUpperCase(Locale.ROOT)
+                : null;
+        if (filtroNome != null && !FILTROS_LISTAGEM.contains(filtroNome)) {
+            throw new ValidationException("filtro", "Valor inválido. Use TODAS, FUTURO ou CONCLUIDAS.");
+        }
+
+        PaginacaoValidada paginacao = validarPaginacao(paginaParam, tamanhoParam, TAMANHO_PADRAO_LISTAGEM);
+        int pagina = paginacao.pagina();
+        int tamanho = paginacao.tamanho();
 
         String dataFimStr = filtro != null ? filtro.dataFim() : null;
         LocalDate dataFimBusca = BsonDates.toLocalDate(dataFimStr);
@@ -313,7 +373,8 @@ public class TarefaService {
         boolean apenasSemLista = false;
         String listaIdStr = filtro != null ? filtro.listaId() : null;
         if (listaIdStr != null && !listaIdStr.isBlank()) {
-            if ("sem_lista".equalsIgnoreCase(listaIdStr) || "null".equalsIgnoreCase(listaIdStr) || "geral".equalsIgnoreCase(listaIdStr)) {
+            if ("sem_lista".equalsIgnoreCase(listaIdStr) || "null".equalsIgnoreCase(listaIdStr)
+                    || "geral".equalsIgnoreCase(listaIdStr)) {
                 apenasSemLista = true;
             } else {
                 listaId = validarObjectId(listaIdStr, CAMPO_LISTA_ID);
@@ -322,14 +383,27 @@ public class TarefaService {
 
         LocalDate data = filtro != null ? BsonDates.toLocalDate(filtro.data()) : null;
         LocalDate dataInicio = filtro != null ? BsonDates.toLocalDate(filtro.dataInicio()) : null;
-        Boolean concluida = filtro != null ? filtro.concluida() : null;
-        String estado = filtro != null ? filtro.estado() : null;
-        String termoFiltro = filtro != null ? filtro.filtro() : null;
 
-        List<Tarefa> tarefas = tarefaRepository.listar(
-                usuarioId, listaId, apenasSemLista, data, dataInicio, dataFimBusca, concluida, estado, termoFiltro);
+        var resultado = tarefaRepository.listarPaginado(new TarefaRepository.FiltroPaginacaoTarefas(
+                usuarioId,
+                listaId,
+                apenasSemLista,
+                data,
+                dataInicio,
+                dataFimBusca,
+                filtro != null ? filtro.concluida() : null,
+                filtro != null ? filtro.estado() : null,
+                filtroNome,
+                hojeLocal,
+                pagina,
+                tamanho));
 
-        return tarefas.stream().map(this::paraTarefaResponse).toList();
+        return new PaginaTarefasDTO(
+                resultado.itens().stream().map(this::paraTarefaResponse).toList(),
+                resultado.pagina(),
+                resultado.tamanho(),
+                resultado.totalItens(),
+                resultado.totalPaginas());
     }
 
     public TarefaResponse buscarTarefa(String tarefaIdStr, String usuarioIdStr) {
@@ -347,13 +421,19 @@ public class TarefaService {
             String tarefaIdStr,
             AtualizarTarefaRequest request,
             String escopoParam,
-            String usuarioIdStr) {
+            String usuarioIdStr,
+            String origemOperacaoId) {
         ObjectId usuarioId = validarObjectId(usuarioIdStr, CAMPO_USUARIO_ID);
         ObjectId tarefaId = validarObjectId(tarefaIdStr, CAMPO_TAREFA_ID);
 
-        Tarefa existente = tarefaRepository.buscar(usuarioId, tarefaId)
-                .filter(t -> t.deletedAt() == null)
-                .orElseThrow(() -> new NotFoundException(ERRO_TAREFA_NAO_ENCONTRADA_OU_INACESSIVEL));
+        Optional<Tarefa> localizada = tarefaRepository.buscar(usuarioId, tarefaId)
+                .filter(t -> t.deletedAt() == null);
+        if (localizada.isEmpty()) {
+            // D-24.4: reenvio de ESTA_E_FUTURAS depois de a âncora ser substituída.
+            return resolverResultadoIdempotente(usuarioId, origemOperacaoId)
+                    .orElseThrow(() -> new NotFoundException(ERRO_TAREFA_NAO_ENCONTRADA_OU_INACESSIVEL));
+        }
+        Tarefa existente = localizada.get();
 
         DadosEdicaoTarefa dados = extrairDadosEdicao(usuarioId, existente, request);
         validarGapDst(dados.dataVencimento(), dados.horario(), dados.fusoAgendamento());
@@ -361,14 +441,37 @@ public class TarefaService {
         if (existente.serieId() != null && !existente.desvinculadaDaSerie()) {
             String escopoStr = request.escopo() != null ? request.escopo() : escopoParam;
             EscopoRecorrencia escopo = EscopoRecorrencia.fromString(escopoStr);
+            if (escopo == null) {
+                // D-24: em tarefa recorrente o escopo é obrigatório e nunca é adivinhado.
+                throw new ValidationException(
+                        "escopo",
+                        "O escopo é obrigatório para tarefa recorrente. Use ESTA, ESTA_E_FUTURAS ou TODA_A_SERIE.");
+            }
 
             if (escopo == EscopoRecorrencia.ESTA_E_FUTURAS) {
-                return atualizarOcorrenciaEstaEFuturas(usuarioId, existente, request, dados);
+                if (origemOperacaoId == null || origemOperacaoId.isBlank()) {
+                    // D-24.4: toda edição ESTA_E_FUTURAS é idempotente por Idempotency-Key.
+                    var problem = ProblemDetailsFactory.criar(
+                            CodigoErro.IDEMPOTENCY_KEY_REQUIRED,
+                            "O cabeçalho Idempotency-Key é obrigatório para editar esta e as próximas ocorrências.",
+                            null);
+                    throw new WebApplicationException(
+                            Response.status(problem.status())
+                                    .type(ProblemDetails.MEDIA_TYPE)
+                                    .entity(problem)
+                                    .build());
+                }
+                return atualizarOcorrenciaEstaEFuturas(usuarioId, existente, dados, origemOperacaoId.trim());
             }
             if (escopo == EscopoRecorrencia.TODA_A_SERIE) {
                 atualizarRegraSeriePorOcorrencia(usuarioId, existente, dados);
             }
             return atualizarOcorrenciaEsta(usuarioId, existente, dados);
+        }
+
+        if (escopoParam != null && !escopoParam.isBlank()) {
+            // D-24: escopo é proibido em tarefa avulsa.
+            throw new ValidationException("escopo", "Tarefa avulsa não aceita escopo de recorrência.");
         }
 
         return atualizarTarefaManual(usuarioId, existente, dados);
@@ -386,22 +489,59 @@ public class TarefaService {
         LocalDate dataVencimento = request.dataVencimento() != null ? BsonDates.toLocalDate(request.dataVencimento()) : existente.dataVencimento();
         String horario = request.horario() != null ? request.horario() : existente.horario();
         int ordem = request.ordem() != null ? request.ordem() : existente.ordem();
+        ModoLembrete modoLembrete = request.modoLembrete() != null ? request.modoLembrete() : existente.modoLembrete();
         Integer lembrete = request.lembreteMinutosAntes() != null ? request.lembreteMinutosAntes() : existente.lembreteMinutosAntes();
-        boolean usaPadrao = request.usaPadraoGlobalLembrete() != null ? request.usaPadraoGlobalLembrete() : existente.usaPadraoGlobalLembrete();
         String fuso = request.fusoAgendamento() != null ? request.fusoAgendamento() : existente.fusoAgendamento();
         List<Subtarefa> subtarefas = request.subtarefas() != null ? converterSubtarefas(request.subtarefas()) : existente.subtarefas();
 
-        return new DadosEdicaoTarefa(listaId, titulo, descricao, prioridade, dataVencimento, horario, ordem, subtarefas, lembrete, usaPadrao, fuso);
+        validarPreferenciaLembrete(modoLembrete, lembrete);
+
+        return new DadosEdicaoTarefa(
+                listaId, titulo, descricao, prioridade, dataVencimento, horario, ordem, subtarefas,
+                modoLembrete, lembrete, fuso);
     }
 
+    /**
+     * Edição no escopo {@code ESTA_E_FUTURAS} (D-24.3).
+     *
+     * <p>Operação composta sem transação multi-documento. Ordem e estados intermediários:</p>
+     * <ol>
+     *   <li>encerra a série original em {@code alvo - 1} (idempotente);</li>
+     *   <li>remove definitivamente as pendentes <strong>não desvinculadas</strong> com data
+     *       original {@code >= alvo} — elas serão regeneradas pela nova série;</li>
+     *   <li>cria (ou reencontra, por {@code origemOperacaoId}) a nova série com
+     *       {@code dataInicio = alvo} e materializa a janela.</li>
+     * </ol>
+     *
+     * <p>Falha entre 1 e 3 deixa a série cortada sem sucessora: repetir a chamada com o mesmo
+     * {@code Idempotency-Key} converge, porque o corte é idempotente e a série nova é
+     * encontrada por {@code origemOperacaoId} antes de ser criada. Um {@code E11000} do índice
+     * único parcial significa que outra execução venceu a corrida — o registro é relido e a
+     * resposta é a mesma (200), nunca 500.</p>
+     */
     private TarefaResponse atualizarOcorrenciaEstaEFuturas(
             ObjectId usuarioId,
             Tarefa existente,
-            AtualizarTarefaRequest request,
-            DadosEdicaoTarefa dados) {
+            DadosEdicaoTarefa dados,
+            String origemOperacaoId) {
         LocalDate alvo = existente.dataOriginalOcorrencia();
         SerieRecorrente serieOriginal = serieRepository.buscar(usuarioId, existente.serieId())
                 .orElseThrow(() -> new NotFoundException("Série recorrente de origem não encontrada."));
+
+        // Retry: a série sucessora já existe para esta operação — devolve o mesmo resultado.
+        Optional<SerieRecorrente> jaAplicada = serieRepository
+                .buscarPorOrigemOperacaoId(usuarioId, origemOperacaoId);
+        if (jaAplicada.isPresent()) {
+            SerieRecorrente serieExistente = jaAplicada.get();
+            return tarefaRepository.buscarPorOcorrencia(usuarioId, serieExistente.id(), alvo)
+                    .map(this::paraTarefaResponse)
+                    .orElseGet(() -> {
+                        recorrenciaEngine.expandirSerie(serieExistente, timezoneContext.hojeLocal(), null);
+                        return tarefaRepository.buscarPorOcorrencia(usuarioId, serieExistente.id(), alvo)
+                                .map(this::paraTarefaResponse)
+                                .orElseGet(() -> paraTarefaResponse(existente));
+                    });
+        }
 
         LocalDate corte = alvo.minusDays(1);
         boolean serieAtiva = !corte.isBefore(serieOriginal.dataInicio());
@@ -412,55 +552,59 @@ public class TarefaService {
                 serieOriginal.diasDaSemana(), serieOriginal.modoMensal(), serieOriginal.diaDoMes(),
                 serieOriginal.ordinalSemana(), serieOriginal.diaSemanaOrdinal(), VALOR_EM_DATA,
                 serieOriginal.dataInicio(), corte, null, corte, serieOriginal.totalGeradas(),
-                serieAtiva, serieOriginal.lembreteMinutosAntes(), serieOriginal.usaPadraoGlobalLembrete(),
-                serieOriginal.fusoAgendamento(), serieOriginal.operationId(), serieOriginal.deletedAt(),
+                serieAtiva, serieOriginal.modoLembrete(), serieOriginal.lembreteMinutosAntes(),
+                serieOriginal.fusoAgendamento(), serieOriginal.origemOperacaoId(), serieOriginal.deletedAt(),
                 serieOriginal.expiresAt(), serieOriginal.loteExclusaoId(), serieOriginal.criadoEm(), Instant.now()
         );
         serieRepository.atualizar(serieCortada);
 
+        // Preserva as ocorrências editadas individualmente (desvinculadaDaSerie = true).
         tarefaRepository.removerPendentesFuturas(usuarioId, serieOriginal.id(), alvo);
 
-        String opId = request.operationId();
-        SerieRecorrente novaSerie = null;
-        if (opId != null && !opId.isBlank()) {
-            novaSerie = serieRepository.buscarPorOperationId(usuarioId, opId).orElse(null);
-        }
+        SerieRecorrente novaSerie = new SerieRecorrente(
+                new ObjectId(),
+                usuarioId,
+                dados.listaId(),
+                dados.titulo(),
+                dados.descricao(),
+                dados.prioridade(),
+                dados.horario(),
+                dados.subtarefas(),
+                serieOriginal.frequencia(),
+                serieOriginal.intervalo(),
+                serieOriginal.diasDaSemana(),
+                serieOriginal.modoMensal(),
+                serieOriginal.diaDoMes(),
+                serieOriginal.ordinalSemana(),
+                serieOriginal.diaSemanaOrdinal(),
+                serieOriginal.tipoTermino(),
+                alvo,
+                serieOriginal.dataFim(),
+                serieOriginal.maxOcorrencias(),
+                null,
+                0,
+                true,
+                dados.modoLembrete(),
+                dados.lembreteMinutosAntes(),
+                dados.fusoAgendamento(),
+                origemOperacaoId,
+                null,
+                null,
+                null,
+                Instant.now(),
+                Instant.now()
+        );
 
-        if (novaSerie == null) {
-            novaSerie = new SerieRecorrente(
-                    new ObjectId(),
-                    usuarioId,
-                    dados.listaId(),
-                    dados.titulo(),
-                    dados.descricao(),
-                    dados.prioridade(),
-                    dados.horario(),
-                    dados.subtarefas(),
-                    serieOriginal.frequencia(),
-                    serieOriginal.intervalo(),
-                    serieOriginal.diasDaSemana(),
-                    serieOriginal.modoMensal(),
-                    serieOriginal.diaDoMes(),
-                    serieOriginal.ordinalSemana(),
-                    serieOriginal.diaSemanaOrdinal(),
-                    serieOriginal.tipoTermino(),
-                    alvo,
-                    serieOriginal.dataFim(),
-                    serieOriginal.maxOcorrencias(),
-                    null,
-                    0,
-                    true,
-                    dados.lembreteMinutosAntes(),
-                    dados.usaPadraoGlobalLembrete(),
-                    dados.fusoAgendamento(),
-                    opId,
-                    null,
-                    null,
-                    null,
-                    Instant.now(),
-                    Instant.now()
-            );
+        try {
             serieRepository.inserir(novaSerie);
+        } catch (MongoWriteException e) {
+            if (e.getError().getCode() != 11000) {
+                throw e;
+            }
+            // Outra execução com a mesma Idempotency-Key venceu a corrida.
+            novaSerie = serieRepository.buscarPorOrigemOperacaoId(usuarioId, origemOperacaoId)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Conflito de idempotência sem série correspondente para a operação informada."));
         }
 
         LocalDate hojeLocal = timezoneContext.hojeLocal();
@@ -481,8 +625,8 @@ public class TarefaService {
                     serieOriginal.ordinalSemana(), serieOriginal.diaSemanaOrdinal(), serieOriginal.tipoTermino(),
                     serieOriginal.dataInicio(), serieOriginal.dataFim(), serieOriginal.maxOcorrencias(),
                     serieOriginal.geradoAte(), serieOriginal.totalGeradas(), serieOriginal.ativa(),
-                    dados.lembreteMinutosAntes(), dados.usaPadraoGlobalLembrete(), dados.fusoAgendamento(),
-                    serieOriginal.operationId(), serieOriginal.deletedAt(),
+                    dados.modoLembrete(), dados.lembreteMinutosAntes(), dados.fusoAgendamento(),
+                    serieOriginal.origemOperacaoId(), serieOriginal.deletedAt(),
                     serieOriginal.expiresAt(), serieOriginal.loteExclusaoId(), serieOriginal.criadoEm(), Instant.now()
             );
             serieRepository.atualizar(atualizadaSerie);
@@ -507,8 +651,8 @@ public class TarefaService {
                 existente.concluidaEm(),
                 dados.ordem(),
                 dados.subtarefas(),
+                dados.modoLembrete(),
                 dados.lembreteMinutosAntes(),
-                dados.usaPadraoGlobalLembrete(),
                 dados.fusoAgendamento(),
                 existente.deletedAt(),
                 existente.expiresAt(),
@@ -520,8 +664,8 @@ public class TarefaService {
         tarefaRepository.atualizar(atualizada);
         lembretePushService.agendarOuAtualizarLembrete(
                 atualizada,
+                atualizada.modoLembrete(),
                 atualizada.lembreteMinutosAntes(),
-                atualizada.usaPadraoGlobalLembrete(),
                 atualizada.fusoAgendamento()
         );
         return paraTarefaResponse(atualizada);
@@ -545,8 +689,8 @@ public class TarefaService {
                 existente.concluidaEm(),
                 dados.ordem(),
                 dados.subtarefas(),
+                dados.modoLembrete(),
                 dados.lembreteMinutosAntes(),
-                dados.usaPadraoGlobalLembrete(),
                 dados.fusoAgendamento(),
                 existente.deletedAt(),
                 existente.expiresAt(),
@@ -558,8 +702,8 @@ public class TarefaService {
         tarefaRepository.atualizar(atualizada);
         lembretePushService.agendarOuAtualizarLembrete(
                 atualizada,
+                atualizada.modoLembrete(),
                 atualizada.lembreteMinutosAntes(),
-                atualizada.usaPadraoGlobalLembrete(),
                 atualizada.fusoAgendamento()
         );
         return paraTarefaResponse(atualizada);
@@ -579,8 +723,15 @@ public class TarefaService {
 
         if (existente.serieId() != null && !existente.desvinculadaDaSerie()) {
             EscopoRecorrencia escopo = EscopoRecorrencia.fromString(escopoParam);
+            if (escopo == null) {
+                // D-24: em tarefa recorrente o escopo é obrigatório e nunca é adivinhado.
+                throw new ValidationException(
+                        "escopo",
+                        "O escopo é obrigatório para tarefa recorrente. Use ESTA, ESTA_E_FUTURAS ou TODA_A_SERIE.");
+            }
 
             if (escopo == EscopoRecorrencia.ESTA_E_FUTURAS) {
+                // D-24.2: encerra a série em alvo - 1 e manda as pendentes >= alvo para a lixeira.
                 LocalDate alvo = existente.dataOriginalOcorrencia();
                 SerieRecorrente serieOriginal = serieRepository.buscar(usuarioId, existente.serieId())
                         .orElseThrow(() -> new NotFoundException("Série recorrente de origem não encontrada."));
@@ -594,17 +745,19 @@ public class TarefaService {
                         serieOriginal.diasDaSemana(), serieOriginal.modoMensal(), serieOriginal.diaDoMes(),
                         serieOriginal.ordinalSemana(), serieOriginal.diaSemanaOrdinal(), VALOR_EM_DATA,
                         serieOriginal.dataInicio(), corte, null, corte, serieOriginal.totalGeradas(),
-                        serieAtiva, serieOriginal.lembreteMinutosAntes(), serieOriginal.usaPadraoGlobalLembrete(),
-                        serieOriginal.fusoAgendamento(), serieOriginal.operationId(), serieOriginal.deletedAt(),
+                        serieAtiva, serieOriginal.modoLembrete(), serieOriginal.lembreteMinutosAntes(),
+                        serieOriginal.fusoAgendamento(), serieOriginal.origemOperacaoId(), serieOriginal.deletedAt(),
                         serieOriginal.expiresAt(), serieOriginal.loteExclusaoId(), serieOriginal.criadoEm(), Instant.now()
                 );
                 serieRepository.atualizar(serieCortada);
 
-                tarefaRepository.removerPendentesFuturas(usuarioId, serieOriginal.id(), alvo);
+                tarefaRepository.moverPendentesAPartirParaLixeira(
+                        usuarioId, serieOriginal.id(), alvo, loteExclusaoId, agora, expiresAt);
                 return;
             }
 
             if (escopo == EscopoRecorrencia.TODA_A_SERIE) {
+                // D-24.1: concluídas preservadas intactas (serieId e dataOriginalOcorrencia).
                 serieRepository.moverParaLixeira(usuarioId, existente.serieId(), loteExclusaoId, agora, expiresAt);
                 tarefaRepository.moverPendentesSerieParaLixeira(usuarioId, existente.serieId(), loteExclusaoId, agora, expiresAt);
                 return;
@@ -613,6 +766,11 @@ public class TarefaService {
             tarefaRepository.moverParaLixeira(usuarioId, tarefaId, loteExclusaoId, agora, expiresAt);
             lembretePushService.cancelarLembrete(usuarioId, tarefaId);
             return;
+        }
+
+        if (escopoParam != null && !escopoParam.isBlank()) {
+            // D-24: escopo é proibido em tarefa avulsa.
+            throw new ValidationException("escopo", "Tarefa avulsa não aceita escopo de recorrência.");
         }
 
         tarefaRepository.moverParaLixeira(usuarioId, tarefaId, loteExclusaoId, agora, expiresAt);
@@ -648,8 +806,8 @@ public class TarefaService {
                 concluidaEm,
                 existente.ordem(),
                 existente.subtarefas(),
+                existente.modoLembrete(),
                 existente.lembreteMinutosAntes(),
-                existente.usaPadraoGlobalLembrete(),
                 existente.fusoAgendamento(),
                 existente.deletedAt(),
                 existente.expiresAt(),
@@ -664,8 +822,8 @@ public class TarefaService {
         } else {
             lembretePushService.agendarOuAtualizarLembrete(
                     atualizada,
+                    atualizada.modoLembrete(),
                     atualizada.lembreteMinutosAntes(),
-                    atualizada.usaPadraoGlobalLembrete(),
                     atualizada.fusoAgendamento()
             );
         }
@@ -716,8 +874,8 @@ public class TarefaService {
                 existente.concluidaEm(),
                 existente.ordem(),
                 novasSubtarefas,
+                existente.modoLembrete(),
                 existente.lembreteMinutosAntes(),
-                existente.usaPadraoGlobalLembrete(),
                 existente.fusoAgendamento(),
                 existente.deletedAt(),
                 existente.expiresAt(),
@@ -755,8 +913,8 @@ public class TarefaService {
                 null,
                 existente.ordem(),
                 existente.subtarefas(),
+                existente.modoLembrete(),
                 existente.lembreteMinutosAntes(),
-                existente.usaPadraoGlobalLembrete(),
                 existente.fusoAgendamento(),
                 existente.deletedAt(),
                 existente.expiresAt(),
@@ -787,6 +945,7 @@ public class TarefaService {
         LocalDate dataInicio = BsonDates.toLocalDate(request.dataInicio());
         LocalDate dataFim = BsonDates.toLocalDate(request.dataFim());
         PrioridadeTarefa prioridade = PrioridadeTarefa.fromString(request.prioridade());
+        validarPreferenciaLembrete(request.modoLembrete(), request.lembreteMinutosAntes());
 
         Instant agora = Instant.now();
         SerieRecorrente serie = new SerieRecorrente(
@@ -812,10 +971,10 @@ public class TarefaService {
                 null,
                 0,
                 true,
+                request.modoLembrete(),
                 request.lembreteMinutosAntes(),
-                Boolean.TRUE.equals(request.usaPadraoGlobalLembrete()),
                 request.fusoAgendamento(),
-                request.operationId(),
+                request.origemOperacaoId(),
                 null,
                 null,
                 null,
@@ -895,11 +1054,11 @@ public class TarefaService {
                 request.dataFim() != null ? BsonDates.toLocalDate(request.dataFim()) : existente.dataFim(),
                 request.maxOcorrencias() != null ? request.maxOcorrencias() : existente.maxOcorrencias(),
                 request.ativa() != null ? request.ativa() : existente.ativa(),
+                request.modoLembrete() != null ? request.modoLembrete() : existente.modoLembrete(),
                 request.lembreteMinutosAntes() != null ? request.lembreteMinutosAntes() : existente.lembreteMinutosAntes(),
-                request.usaPadraoGlobalLembrete() != null ? request.usaPadraoGlobalLembrete() : existente.usaPadraoGlobalLembrete(),
                 request.fusoAgendamento() != null ? request.fusoAgendamento() : existente.fusoAgendamento(),
                 request.subtarefasModelo() != null ? converterSubtarefas(request.subtarefasModelo()) : existente.subtarefasModelo(),
-                request.operationId() != null ? request.operationId() : existente.operationId());
+                request.origemOperacaoId() != null ? request.origemOperacaoId() : existente.origemOperacaoId());
     }
 
     private void validarDadosEdicaoSerie(DadosEdicaoSerie dados) {
@@ -918,8 +1077,8 @@ public class TarefaService {
                 dados.horario(), dados.modelo(), dados.frequencia(), dados.intervalo(), dados.dias(),
                 dados.modoMensal(), dados.diaDoMes(), dados.ordinalSemana(), dados.diaSemanaOrdinal(),
                 dados.tipoTermino(), dados.dataInicio(), dados.dataFim(), dados.maxOcorrencias(),
-                existente.geradoAte(), existente.totalGeradas(), dados.ativa(), dados.lembrete(),
-                dados.usaPadrao(), dados.fuso(), dados.operationId(), existente.deletedAt(),
+                existente.geradoAte(), existente.totalGeradas(), dados.ativa(), dados.modoLembrete(),
+                dados.lembrete(), dados.fuso(), dados.origemOperacaoId(), existente.deletedAt(),
                 existente.expiresAt(), existente.loteExclusaoId(), existente.criadoEm(), Instant.now());
     }
 
@@ -985,37 +1144,68 @@ public class TarefaService {
     // LIXEIRA (30 DIAS) E RESTAURAÇÃO
     // =========================================================================
 
-    public LixeiraTarefasResponse listarLixeira(String usuarioIdStr) {
+    public LixeiraTarefasResponse listarLixeira(String usuarioIdStr, Integer paginaParam, Integer tamanhoParam) {
         ObjectId usuarioId = validarObjectId(usuarioIdStr, CAMPO_USUARIO_ID);
         Instant agora = Instant.now();
 
-        List<Tarefa> tarefas = tarefaRepository.listarLixeira(usuarioId, agora);
+        PaginacaoValidada paginacao = validarPaginacao(paginaParam, tamanhoParam, TAMANHO_PADRAO_LISTAGEM);
+        var paginaTarefas = tarefaRepository.listarLixeiraPaginada(
+                usuarioId, agora, paginacao.pagina(), paginacao.tamanho());
+
         List<ListaTarefas> listas = listaRepository.listarLixeira(usuarioId, agora);
         List<SerieRecorrente> series = serieRepository.listarLixeira(usuarioId, agora);
 
         return new LixeiraTarefasResponse(
-                tarefas.stream().map(this::paraTarefaResponse).toList(),
+                paginaTarefas.itens().stream().map(this::paraTarefaResponse).toList(),
                 listas.stream().map(l -> paraListaResponse(l, 0)).toList(),
-                series.stream().map(this::paraSerieResponse).toList()
+                series.stream().map(this::paraSerieResponse).toList(),
+                paginaTarefas.pagina(),
+                paginaTarefas.tamanho(),
+                paginaTarefas.totalItens(),
+                paginaTarefas.totalPaginas()
         );
     }
 
-    public TarefaResponse restaurarTarefaDaLixeira(String tarefaIdStr, String usuarioIdStr) {
+    /**
+     * Restauração de tarefa (D-25).
+     *
+     * <p>Se a lista original está na lixeira, restaura <strong>apenas o container</strong>
+     * (sem as irmãs do lote). Se a lista já foi purgada, a tarefa volta para a Lista Geral
+     * ({@code listaId = null}) e a resposta sinaliza {@code realocadaParaListaGeral}.</p>
+     */
+    public RestauracaoTarefaResponse restaurarTarefaDaLixeira(String tarefaIdStr, String usuarioIdStr) {
         ObjectId usuarioId = validarObjectId(usuarioIdStr, CAMPO_USUARIO_ID);
         ObjectId tarefaId = validarObjectId(tarefaIdStr, CAMPO_TAREFA_ID);
+        Instant agora = Instant.now();
 
         Tarefa existente = tarefaRepository.buscar(usuarioId, tarefaId)
                 .orElseThrow(() -> new NotFoundException("Tarefa não encontrada na lixeira."));
 
+        if (existente.deletedAt() == null) {
+            // Já ativa: restauração é idempotente.
+            return new RestauracaoTarefaResponse(paraTarefaResponse(existente), false);
+        }
+        if (existente.expiresAt() != null && !existente.expiresAt().isAfter(agora)) {
+            throw new TrashItemExpiredException("O prazo de 30 dias para restaurar esta tarefa expirou.");
+        }
+
         ObjectId novaListaId = existente.listaId();
+        boolean realocadaParaListaGeral = false;
         if (existente.listaId() != null) {
             Optional<ListaTarefas> listaOpt = listaRepository.buscarQualquerStatus(existente.listaId());
             if (listaOpt.isEmpty()) {
                 novaListaId = null;
+                realocadaParaListaGeral = true;
             } else {
                 ListaTarefas lista = listaOpt.get();
                 if (lista.deletedAt() != null) {
-                    listaRepository.restaurar(usuarioId, lista.id());
+                    if (lista.expiresAt() != null && !lista.expiresAt().isAfter(agora)) {
+                        novaListaId = null;
+                        realocadaParaListaGeral = true;
+                    } else {
+                        // Apenas o container: não restaura as irmãs do lote.
+                        listaRepository.restaurar(usuarioId, lista.id());
+                    }
                 }
             }
         }
@@ -1024,11 +1214,11 @@ public class TarefaService {
         Tarefa restaurada = tarefaRepository.buscar(usuarioId, tarefaId).orElse(existente);
         lembretePushService.agendarOuAtualizarLembrete(
                 restaurada,
+                restaurada.modoLembrete(),
                 restaurada.lembreteMinutosAntes(),
-                restaurada.usaPadraoGlobalLembrete(),
                 restaurada.fusoAgendamento()
         );
-        return paraTarefaResponse(restaurada);
+        return new RestauracaoTarefaResponse(paraTarefaResponse(restaurada), realocadaParaListaGeral);
     }
 
     public void esvaziarLixeira(String usuarioIdStr) {
@@ -1036,25 +1226,12 @@ public class TarefaService {
 
         List<ListaTarefas> listasLixeira = listaRepository.listarLixeira(usuarioId, Instant.now());
         for (ListaTarefas l : listasLixeira) {
-            serieRepository.desvincularLista(l.id());
+            serieRepository.desvincularLista(usuarioId, l.id());
         }
 
         tarefaRepository.esvaziarLixeira(usuarioId);
         serieRepository.esvaziarLixeira(usuarioId);
         listaRepository.esvaziarLixeira(usuarioId);
-    }
-
-    public int purgarExpiradasGlobal(Instant agora) {
-        List<ObjectId> listasExpiradas = listaRepository.listarIdsExpiradas(agora);
-        for (ObjectId lId : listasExpiradas) {
-            serieRepository.desvincularLista(lId);
-        }
-
-        long tRemovidas = tarefaRepository.purgarExpiradas(agora);
-        long sRemovidas = serieRepository.purgarExpiradas(agora);
-        long lRemovidas = listaRepository.purgarExpiradas(agora);
-
-        return (int) (tRemovidas + sRemovidas + lRemovidas);
     }
 
     // =========================================================================
@@ -1106,6 +1283,70 @@ public class TarefaService {
         return BsonIds.parse(idStr, nomeCampo);
     }
 
+    /**
+     * Retry de {@code ESTA_E_FUTURAS} (D-24.4): a ocorrência-âncora é removida quando a série
+     * sucessora é criada, então a busca por ID falha no reenvio. Se a {@code Idempotency-Key}
+     * já produziu uma série, devolve a ocorrência inicial dela — o mesmo resultado, 200.
+     */
+    private Optional<TarefaResponse> resolverResultadoIdempotente(ObjectId usuarioId, String origemOperacaoId) {
+        if (origemOperacaoId == null || origemOperacaoId.isBlank()) {
+            return Optional.empty();
+        }
+        return serieRepository.buscarPorOrigemOperacaoId(usuarioId, origemOperacaoId.trim())
+                .flatMap(serie -> {
+                    recorrenciaEngine.expandirSerie(serie, timezoneContext.hojeLocal(), null);
+                    return tarefaRepository.buscarPorOcorrencia(usuarioId, serie.id(), serie.dataInicio());
+                })
+                .map(this::paraTarefaResponse);
+    }
+
+    /**
+     * Valida {@code pagina}/{@code tamanho} contra a norma do endpoint (D-28).
+     *
+     * <p>Fora do intervalo responde {@code 400 INVALID_PAGINATION} com RFC 9457, igual a
+     * {@code SessaoService} e {@code CronogramaService}.</p>
+     */
+    private PaginacaoValidada validarPaginacao(Integer paginaParam, Integer tamanhoParam, int tamanhoPadrao) {
+        int pagina = paginaParam != null ? paginaParam : 1;
+        int tamanho = tamanhoParam != null ? tamanhoParam : tamanhoPadrao;
+        if (pagina < 1 || tamanho < 1 || tamanho > TAMANHO_MAXIMO_LISTAGEM) {
+            var problem = ProblemDetailsFactory.criar(
+                    CodigoErro.INVALID_PAGINATION,
+                    "Parâmetros de paginação inválidos. 'pagina' deve ser >= 1 e 'tamanho' deve estar entre 1 e "
+                            + TAMANHO_MAXIMO_LISTAGEM + ".",
+                    null);
+            throw new WebApplicationException(
+                    Response.status(problem.status())
+                            .type(ProblemDetails.MEDIA_TYPE)
+                            .entity(problem)
+                            .build());
+        }
+        return new PaginacaoValidada(pagina, tamanho);
+    }
+
+    /**
+     * Valida a preferência de lembrete (D-26): {@code PERSONALIZADO} exige um dos valores
+     * canônicos; {@code HERDAR} e {@code SEM_ALERTA} nunca carregam minutos.
+     */
+    private void validarPreferenciaLembrete(ModoLembrete modo, Integer minutos) {
+        if (modo == null) {
+            return;
+        }
+        if (modo == ModoLembrete.PERSONALIZADO) {
+            if (minutos == null || !MINUTOS_LEMBRETE_PERMITIDOS.contains(minutos)) {
+                throw new ValidationException(
+                        "lembreteMinutosAntes",
+                        "Lembrete personalizado exige 0, 5, 15, 30 ou 60 minutos antes.");
+            }
+            return;
+        }
+        if (minutos != null) {
+            throw new ValidationException(
+                    "lembreteMinutosAntes",
+                    "Apenas o modo PERSONALIZADO aceita minutos de antecedência.");
+        }
+    }
+
     private ListaTarefasResponse paraListaResponse(ListaTarefas l, long totalTarefas) {
         return new ListaTarefasResponse(
                 l.id().toHexString(),
@@ -1141,8 +1382,8 @@ public class TarefaService {
                 t.concluidaEm(),
                 t.ordem(),
                 subs,
+                t.modoLembrete(),
                 t.lembreteMinutosAntes(),
-                t.usaPadraoGlobalLembrete(),
                 t.fusoAgendamento(),
                 t.deletedAt(),
                 t.expiresAt(),
@@ -1180,9 +1421,10 @@ public class TarefaService {
                 BsonDates.toIso(s.geradoAte()),
                 s.totalGeradas(),
                 s.ativa(),
+                s.modoLembrete(),
                 s.lembreteMinutosAntes(),
-                s.usaPadraoGlobalLembrete(),
                 s.fusoAgendamento(),
+                s.origemOperacaoId(),
                 s.deletedAt(),
                 s.expiresAt(),
                 s.loteExclusaoId(),

@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import br.com.trilhara.auth.Role;
 import br.com.trilhara.auth.UserRepository;
 import br.com.trilhara.auth.Usuario;
+import br.com.trilhara.tarefa.ModoLembrete;
 import br.com.trilhara.tarefa.Tarefa;
 import br.com.trilhara.tarefa.TarefaRepository;
 import br.com.trilhara.tarefa.TarefaService;
@@ -78,8 +79,8 @@ class LembretePushLifecycleTest {
                 "2026-06-15",
                 "14:00",
                 null,
+                ModoLembrete.PERSONALIZADO,
                 15,
-                false,
                 "America/Sao_Paulo",
                 1
         );
@@ -115,8 +116,8 @@ class LembretePushLifecycleTest {
                 "2026-06-15",
                 "16:00",
                 null,
-                15,
-                true,
+                ModoLembrete.HERDAR,
+                null,
                 "America/Sao_Paulo",
                 1
         );
@@ -127,7 +128,8 @@ class LembretePushLifecycleTest {
         assertTrue(lembretePushRepository.buscarPorTarefa(usuarioId, tarefaId).isPresent());
 
         // Mover para lixeira
-        tarefaService.excluirTarefa(criada.id(), "ESTA", usuarioIdStr);
+        // Tarefa avulsa: escopo é proibido (D-24), então a exclusão não informa escopo.
+        tarefaService.excluirTarefa(criada.id(), null, usuarioIdStr);
 
         var lembreteLixeira = lembretePushRepository.buscarPorTarefa(usuarioId, tarefaId);
         assertTrue(lembreteLixeira.isPresent());
@@ -145,8 +147,8 @@ class LembretePushLifecycleTest {
                 "2026-06-15",
                 "10:00",
                 null,
+                ModoLembrete.PERSONALIZADO,
                 30,
-                false,
                 "America/Sao_Paulo",
                 1
         );
@@ -174,8 +176,8 @@ class LembretePushLifecycleTest {
                 tarefaExistente.concluidaEm(),
                 tarefaExistente.ordem(),
                 tarefaExistente.subtarefas(),
+                tarefaExistente.modoLembrete(),
                 tarefaExistente.lembreteMinutosAntes(),
-                tarefaExistente.usaPadraoGlobalLembrete(),
                 tarefaExistente.fusoAgendamento(),
                 tarefaExistente.deletedAt(),
                 tarefaExistente.expiresAt(),
@@ -194,7 +196,7 @@ class LembretePushLifecycleTest {
         // Tarefa preserva a preferência
         Tarefa tRecuperada = tarefaRepository.buscar(usuarioId, tarefaId).get();
         assertEquals(30, tRecuperada.lembreteMinutosAntes());
-        assertFalse(tRecuperada.usaPadraoGlobalLembrete());
+        assertEquals(ModoLembrete.PERSONALIZADO, tRecuperada.modoLembrete());
 
         // Volta a definir horário
         Tarefa comHorario = new Tarefa(
@@ -214,8 +216,8 @@ class LembretePushLifecycleTest {
                 tRecuperada.concluidaEm(),
                 tRecuperada.ordem(),
                 tRecuperada.subtarefas(),
+                tRecuperada.modoLembrete(),
                 tRecuperada.lembreteMinutosAntes(),
-                tRecuperada.usaPadraoGlobalLembrete(),
                 tRecuperada.fusoAgendamento(),
                 tRecuperada.deletedAt(),
                 tRecuperada.expiresAt(),
@@ -244,8 +246,8 @@ class LembretePushLifecycleTest {
                 "2026-06-15",
                 "10:00",
                 null,
-                15,
-                true, // usaPadraoGlobalLembrete = true
+                ModoLembrete.HERDAR,
+                null,
                 "America/Sao_Paulo",
                 1
         );
@@ -261,8 +263,8 @@ class LembretePushLifecycleTest {
                 "2026-06-15",
                 "11:00",
                 null,
+                ModoLembrete.PERSONALIZADO,
                 5, // 5 min antes explicitamente
-                false, // usaPadraoGlobalLembrete = false
                 "America/Sao_Paulo",
                 2
         );

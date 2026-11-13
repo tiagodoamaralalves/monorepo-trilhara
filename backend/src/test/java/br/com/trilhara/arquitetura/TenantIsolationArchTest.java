@@ -66,6 +66,13 @@ class TenantIsolationArchTest {
             "listarPorEstadoPublicacao");
 
     /**
+     * Varreduras da purga da lixeira de tarefas ({@code TarefaPurgaService}, {@code @SystemScope},
+     * D-27): operam por {@code expiresAt} em todos os tenants, sem {@code usuarioId}.
+     */
+    private static final Set<String> EXCECOES_PURGA_TAREFA = Set.of(
+            "purgarExpiradas", "listarExpiradas");
+
+    /**
      * Ativa em R0: nenhum recurso HTTP acessa o MongoDB diretamente. Vale hoje
      * (todos os {@code *Resource} usam serviços/repositórios).
      */
@@ -204,6 +211,40 @@ class TenantIsolationArchTest {
                     })
                     .because("D-06(a): repositórios de cronograma e blocos só consultam por usuarioId, "
                             + "exceto as varreduras do reconciliador em @SystemScope.");
+
+    /**
+     * Ativa em R7 (D-06a): todo {@code *Repository} do pacote {@code tarefa} recebe
+     * {@code ObjectId usuarioId} como primeiro parâmetro. Exceções: conversões BSON
+     * ({@code paraDocumento}/{@code paraEntidade}), inserção/atualização da própria entidade
+     * (que já carrega {@code usuarioId}) e as varreduras de purga em {@code @SystemScope}
+     * ({@code purgarExpiradas}/{@code listarExpiradas}), que são multi-tenant por definição.
+     */
+    @ArchTest
+    static final ArchRule repositoriosDeTarefaExigemUsuarioId =
+            methods()
+                    .that().arePublic()
+                    .and().areDeclaredInClassesThat().resideInAPackage("..tarefa..")
+                    .and().areDeclaredInClassesThat().haveSimpleNameEndingWith("Repository")
+                    .should(new ArchCondition<JavaMethod>("ter ObjectId usuarioId como primeiro parâmetro") {
+                        @Override
+                        public void check(JavaMethod metodo, ConditionEvents eventos) {
+                            String nome = metodo.getName();
+                            if (EXCECOES_POR_ENTIDADE.contains(nome)
+                                    || EXCECOES_POR_FILTRO.contains(nome)
+                                    || EXCECOES_PURGA_TAREFA.contains(nome)) {
+                                return;
+                            }
+                            List<JavaParameter> parametros = metodo.getParameters();
+                            boolean valido = !parametros.isEmpty()
+                                    && parametros.get(0).getRawType().isAssignableTo(ObjectId.class);
+                            if (!valido) {
+                                eventos.add(SimpleConditionEvent.violated(metodo,
+                                        metodo.getFullName() + " não recebe ObjectId usuarioId como primeiro parâmetro"));
+                            }
+                        }
+                    })
+                    .because("D-06(a): as coleções de tarefa são privadas e sempre filtram por usuarioId; "
+                            + "só a purga em @SystemScope varre por expiresAt.");
 
     /**
      * Habilitada em R2: guarda anti-regressão dos pacotes legados (Anexo C / DC-01).

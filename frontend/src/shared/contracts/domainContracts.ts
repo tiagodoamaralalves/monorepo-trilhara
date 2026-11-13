@@ -432,8 +432,8 @@ export interface SerieRecorrenteDTO {
   geradoAte?: string;
   totalGeradas: number;
   ativa: boolean;
+  modoLembrete?: ModoLembrete;
   lembreteMinutosAntes?: number;
-  usaPadraoGlobalLembrete?: boolean;
   fusoAgendamento?: string;
   deletedAt?: string;
   expiresAt?: string;
@@ -441,6 +441,9 @@ export interface SerieRecorrenteDTO {
   criadoEm?: string;
   atualizadoEm?: string;
 }
+
+/** Modelo explícito de lembrete (D-26): ausência de minutos nunca significa "herdar". */
+export type ModoLembrete = 'HERDAR' | 'SEM_ALERTA' | 'PERSONALIZADO';
 
 export interface TarefaDTO {
   id: string;
@@ -459,8 +462,8 @@ export interface TarefaDTO {
   concluidaEm?: string | null;
   ordem?: number;
   subtarefas?: SubtarefaDTO[];
+  modoLembrete?: ModoLembrete;
   lembreteMinutosAntes?: number;
-  usaPadraoGlobalLembrete?: boolean;
   fusoAgendamento?: string;
   deletedAt?: string;
   expiresAt?: string;
@@ -469,6 +472,7 @@ export interface TarefaDTO {
   atualizadoEm?: string;
 }
 
+/** Resposta de GET /api/tarefas/hoje (D-23): apenas tarefas PENDENTES. */
 export interface TarefasHojeDTO {
   hojeLocal: string;
   atrasadas: TarefaDTO[];
@@ -476,12 +480,33 @@ export interface TarefasHojeDTO {
   semData: TarefaDTO[];
 }
 
+/** Resposta de GET /api/tarefas/lixeira (D-28): tarefas paginadas + metadados. */
 export interface LixeiraTarefasDTO {
   tarefas: TarefaDTO[];
   listas: ListaTarefasDTO[];
   series: SerieRecorrenteDTO[];
+  pagina: number;
+  tamanho: number;
+  totalItens: number;
+  totalPaginas: number;
 }
 
+/** Resposta de POST /api/tarefas/lixeira/{id}/restaurar (D-25). */
+export interface RestauracaoTarefaDTO {
+  tarefa: TarefaDTO;
+  realocadaParaListaGeral: boolean;
+}
+
+/** Resposta de GET /api/listas-tarefas/{id}/impacto-exclusao (D-33). */
+export interface ListaImpactoExclusaoDTO {
+  id: string;
+  nome: string;
+  tarefasAtivas: number;
+  tarefasConcluidas: number;
+  seriesVinculadas: number;
+}
+
+/** Resposta de DELETE /api/listas-tarefas/{id}. */
 export interface ExclusaoListaDTO {
   id: string;
   tarefasAfetadas: number;

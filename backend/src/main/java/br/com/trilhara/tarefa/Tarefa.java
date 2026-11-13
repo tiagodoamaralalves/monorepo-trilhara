@@ -29,8 +29,8 @@ public record Tarefa(
         Instant concluidaEm,
         int ordem,
         List<Subtarefa> subtarefas,
+        ModoLembrete modoLembrete,
         Integer lembreteMinutosAntes,
-        boolean usaPadraoGlobalLembrete,
         String fusoAgendamento,
         Instant deletedAt,
         Instant expiresAt,
@@ -42,5 +42,7 @@ public record Tarefa(
         subtarefas = subtarefas == null
                 ? List.of()
                 : Collections.unmodifiableList(new ArrayList<>(subtarefas));
+        // D-26: ausência nunca significa "herdar"; o default do modelo é HERDAR explícito.
+        modoLembrete = modoLembrete == null ? ModoLembrete.HERDAR : modoLembrete;
     }
 }

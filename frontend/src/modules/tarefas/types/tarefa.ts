@@ -5,11 +5,14 @@ import {
   FrequenciaRecorrencia,
   ModoMensal,
   TipoTermino,
+  ModoLembrete,
   ListaTarefasDTO,
   SerieRecorrenteDTO,
   TarefaDTO,
   TarefasHojeDTO,
   LixeiraTarefasDTO,
+  RestauracaoTarefaDTO,
+  ListaImpactoExclusaoDTO,
   ExclusaoListaDTO
 } from '@shared/contracts/domainContracts';
 
@@ -19,11 +22,14 @@ export type {
   FrequenciaRecorrencia,
   ModoMensal,
   TipoTermino,
+  ModoLembrete,
   ListaTarefasDTO,
   SerieRecorrenteDTO,
   TarefaDTO,
   TarefasHojeDTO,
   LixeiraTarefasDTO,
+  RestauracaoTarefaDTO,
+  ListaImpactoExclusaoDTO,
   ExclusaoListaDTO
 };
 
@@ -75,8 +81,8 @@ export interface Tarefa {
   prioridade: Prioridade;
   ordem?: number;
   subtarefas?: Subtarefa[];
+  modoLembrete?: ModoLembrete;
   lembreteMinutosAntes?: number;
-  usaPadraoGlobalLembrete?: boolean;
   fusoAgendamento?: string;
   deletedAt?: string;
   expiresAt?: string;

@@ -104,19 +104,21 @@ class Fase6TarefaResourceTest {
         // Consulta tarefas: deve conter pelo menos 91 ocorrências geradas na janela de 90 dias
         List<?> tarefas1 = given()
                 .header("Authorization", "Bearer " + tokenUsuario)
+                .queryParam("tamanho", 100)
                 .when().get(TAREFAS)
                 .then().statusCode(200)
-                .body("$", hasSize(greaterThanOrEqualTo(90)))
-                .extract().as(List.class);
+                .body("totalItens", greaterThanOrEqualTo(90))
+                .extract().path("itens");
 
         int totalInicial = tarefas1.size();
 
         // Segunda consulta / recálculo: 100% idempotente, sem duplicar registros
         List<?> tarefas2 = given()
                 .header("Authorization", "Bearer " + tokenUsuario)
+                .queryParam("tamanho", 100)
                 .when().get(TAREFAS)
                 .then().statusCode(200)
-                .extract().as(List.class);
+                .extract().path("itens");
 
         assertEquals(totalInicial, tarefas2.size(), "Consultas repetidas não devem recriar tarefas já existentes");
     }
@@ -150,8 +152,8 @@ class Fase6TarefaResourceTest {
                 .queryParam("data", hoje.toString())
                 .when().get(TAREFAS)
                 .then().statusCode(200)
-                .body("$", hasSize(1))
-                .extract().path("[0].id");
+                .body("itens", hasSize(1))
+                .extract().path("itens[0].id");
 
         // Reagenda o vencimento para amanhã com escopo ESTA
         LocalDate amanha = hoje.plusDays(1);
@@ -172,7 +174,7 @@ class Fase6TarefaResourceTest {
                 .queryParam("data", hoje.toString())
                 .when().get(TAREFAS)
                 .then().statusCode(200)
-                .body("$", hasSize(0));
+                .body("itens", hasSize(0));
     }
 
     @Test
@@ -204,7 +206,7 @@ class Fase6TarefaResourceTest {
                 .queryParam("data", hoje.toString())
                 .when().get(TAREFAS)
                 .then().statusCode(200)
-                .extract().path("[0].id");
+                .extract().path("itens[0].id");
 
         given()
                 .header("Authorization", "Bearer " + tokenUsuario)
@@ -222,20 +224,20 @@ class Fase6TarefaResourceTest {
                 .queryParam("data", alvo.toString())
                 .when().get(TAREFAS)
                 .then().statusCode(200)
-                .extract().path("[0].id");
+                .extract().path("itens[0].id");
 
         String operationId = UUID.randomUUID().toString();
         given()
                 .header("Authorization", "Bearer " + tokenUsuario)
                 .contentType(ContentType.JSON)
                 .queryParam("escopo", "ESTA_E_FUTURAS")
+                .header("Idempotency-Key", operationId)
                 .body("""
                         {
                           "titulo": "Estudo Noturno Atualizado",
-                          "prioridade": "MEDIA",
-                          "operationId": "%s"
+                          "prioridade": "MEDIA"
                         }
-                        """.formatted(operationId))
+                        """)
                 .when().put(TAREFAS + "/" + tarefaAlvoId)
                 .then().statusCode(200)
                 .body("titulo", equalTo("Estudo Noturno Atualizado"));
@@ -331,8 +333,9 @@ class Fase6TarefaResourceTest {
                 .header("Authorization", "Bearer " + tokenUsuario)
                 .when().post(TAREFAS + "/lixeira/" + tarefaId + "/restaurar")
                 .then().statusCode(200)
-                .body("id", equalTo(tarefaId))
-                .body("listaId", equalTo(listaId));
+                .body("tarefa.id", equalTo(tarefaId))
+                .body("tarefa.listaId", equalTo(listaId))
+                .body("realocadaParaListaGeral", equalTo(false));
 
         // A lista pai agora está ativa novamente
         given()
@@ -357,8 +360,9 @@ class Fase6TarefaResourceTest {
                 .header("Authorization", "Bearer " + tokenUsuario)
                 .when().post(TAREFAS + "/lixeira/" + tarefaId + "/restaurar")
                 .then().statusCode(200)
-                .body("id", equalTo(tarefaId))
-                .body("listaId", nullValue());
+                .body("tarefa.id", equalTo(tarefaId))
+                .body("tarefa.listaId", nullValue())
+                .body("realocadaParaListaGeral", equalTo(true));
 
         // 7. Esvaziar lixeira manual
         given()

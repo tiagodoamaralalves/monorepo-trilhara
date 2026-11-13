@@ -9,6 +9,8 @@ import br.com.trilhara.tarefa.dto.AtualizarSubtarefaRequest;
 import br.com.trilhara.tarefa.dto.AtualizarTarefaRequest;
 import br.com.trilhara.tarefa.dto.CriarTarefaRequest;
 import br.com.trilhara.tarefa.dto.LixeiraTarefasResponse;
+import br.com.trilhara.tarefa.dto.PaginaTarefasDTO;
+import br.com.trilhara.tarefa.dto.RestauracaoTarefaResponse;
 import br.com.trilhara.tarefa.dto.TarefaResponse;
 import br.com.trilhara.tarefa.dto.TarefasHojeResponse;
 import jakarta.validation.Valid;
@@ -16,6 +18,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.PATCH;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
@@ -40,15 +43,21 @@ public class TarefaResource {
         this.authContext = authContext;
     }
 
+    /**
+     * Listagem paginada de tarefas manuais (D-28). {@code filtro} aceita
+     * {@code TODAS|FUTURO|CONCLUIDAS}. Nunca retorna blocos de cronograma.
+     */
     @GET
-    public List<TarefaResponse> listar(
+    public PaginaTarefasDTO listar(
             @QueryParam("listaId") String listaId,
             @QueryParam("data") String data,
             @QueryParam("dataInicio") String dataInicio,
             @QueryParam("dataFim") String dataFim,
             @QueryParam("concluida") Boolean concluida,
             @QueryParam("estado") String estado,
-            @QueryParam("filtro") String filtro) {
+            @QueryParam("filtro") String filtro,
+            @QueryParam("pagina") Integer pagina,
+            @QueryParam("tamanho") Integer tamanho) {
         return service.listarTarefas(
                 authContext.usuarioId(),
                 new TarefaService.FiltroTarefas(
@@ -58,7 +67,9 @@ public class TarefaResource {
                         dataFim,
                         concluida,
                         estado,
-                        filtro));
+                        filtro),
+                pagina,
+                tamanho);
     }
 
     @POST
@@ -75,14 +86,16 @@ public class TarefaResource {
 
     @GET
     @Path("lixeira")
-    public LixeiraTarefasResponse listarLixeira() {
-        return service.listarLixeira(authContext.usuarioId());
+    public LixeiraTarefasResponse listarLixeira(
+            @QueryParam("pagina") Integer pagina,
+            @QueryParam("tamanho") Integer tamanho) {
+        return service.listarLixeira(authContext.usuarioId(), pagina, tamanho);
     }
 
     @POST
     @Path("lixeira/{tarefaId}/restaurar")
     @Consumes(MediaType.WILDCARD)
-    public TarefaResponse restaurarDaLixeira(@PathParam("tarefaId") String tarefaId) {
+    public RestauracaoTarefaResponse restaurarDaLixeira(@PathParam("tarefaId") String tarefaId) {
         return service.restaurarTarefaDaLixeira(tarefaId, authContext.usuarioId());
     }
 
@@ -104,8 +117,9 @@ public class TarefaResource {
     public TarefaResponse atualizar(
             @PathParam("tarefaId") String tarefaId,
             @QueryParam("escopo") String escopo,
+            @HeaderParam("Idempotency-Key") String idempotencyKey,
             @NotNull @Valid AtualizarTarefaRequest request) {
-        return service.atualizarTarefa(tarefaId, request, escopo, authContext.usuarioId());
+        return service.atualizarTarefa(tarefaId, request, escopo, authContext.usuarioId(), idempotencyKey);
     }
 
     @DELETE

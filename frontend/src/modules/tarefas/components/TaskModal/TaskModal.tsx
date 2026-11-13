@@ -18,7 +18,8 @@ import {
 import {
   getPushPermissionState,
   isIOSNonStandalone,
-  PushPermissionState
+  PushPermissionState,
+  pushService
 } from '@shared/services/pushService';
 import {
   Tarefa,
@@ -28,7 +29,8 @@ import {
   EscopoRecorrencia,
   FrequenciaRecorrencia,
   ModoMensal,
-  TipoTermino
+  TipoTermino,
+  ModoLembrete
 } from '../../types/tarefa';
 import { hojeISO } from '../../utils/date';
 import styles from './TaskModal.module.css';
@@ -78,8 +80,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [erroTitulo, setErroTitulo] = useState('');
   const [salvando, setSalvando] = useState(false);
 
-  // Lembrete Web Push (FASE 10)
-  const [lembreteOpcao, setLembreteOpcao] = useState<string>('PADRAO_GLOBAL');
+  // Lembrete Web Push (FASE 10 / D-26)
+  const [modoLembrete, setModoLembrete] = useState<ModoLembrete>('HERDAR');
+  const [lembreteMinutos, setLembreteMinutos] = useState<number>(15);
+  const [padraoGlobalMinutos, setPadraoGlobalMinutos] = useState<number>(15);
   const [pushStatus, setPushStatus] = useState<PushPermissionState>('default');
   const [isIOS, setIsIOS] = useState(false);
   const [dicaIOSAberta, setDicaIOSAberta] = useState(false);
@@ -104,6 +108,20 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     setIsIOS(isIOSNonStandalone());
     setDicaIOSAberta(false);
 
+    // D-26: o rótulo "Usar padrão (X min)" reflete a preferência global do usuário.
+    if (isOpen) {
+      pushService
+        .obterConfig()
+        .then((config) => {
+          if (typeof config.padraoMinutosAntes === 'number') {
+            setPadraoGlobalMinutos(config.padraoMinutosAntes);
+          }
+        })
+        .catch(() => {
+          /* preferência global é informativa; a ausência não bloqueia o modal */
+        });
+    }
+
     if (tarefaParaEditar) {
       setTitulo(tarefaParaEditar.titulo);
       setObservacoes(tarefaParaEditar.observacoes || tarefaParaEditar.descricao || '');
@@ -115,16 +133,14 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setEscopoEdicao('ESTA');
       setHabilitarRecorrencia(false);
 
-      if (tarefaParaEditar.usaPadraoGlobalLembrete !== false) {
-        setLembreteOpcao('PADRAO_GLOBAL');
-      } else if (
-        tarefaParaEditar.lembreteMinutosAntes === null ||
-        tarefaParaEditar.lembreteMinutosAntes === undefined ||
-        tarefaParaEditar.lembreteMinutosAntes < 0
-      ) {
-        setLembreteOpcao('SEM_ALERTA');
+      if (tarefaParaEditar.modoLembrete === 'SEM_ALERTA') {
+        setModoLembrete('SEM_ALERTA');
+      } else if (tarefaParaEditar.modoLembrete === 'PERSONALIZADO') {
+        setModoLembrete('PERSONALIZADO');
+        setLembreteMinutos(tarefaParaEditar.lembreteMinutosAntes ?? 15);
       } else {
-        setLembreteOpcao(String(tarefaParaEditar.lembreteMinutosAntes));
+        setModoLembrete('HERDAR');
+        setLembreteMinutos(tarefaParaEditar.lembreteMinutosAntes ?? 15);
       }
     } else {
       setTitulo('');
@@ -144,7 +160,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setOrdinalSemana(1);
       setDiaSemanaOrdinal(1);
       setTipoTermino('NUNCA');
-      setLembreteOpcao('PADRAO_GLOBAL');
+      setModoLembrete('HERDAR');
+      setLembreteMinutos(15);
     }
     setNovaSubtarefaTitulo('');
     setErroTitulo('');
@@ -191,17 +208,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
     setSalvando(true);
     try {
-      let lembreteMinutos: number | undefined = undefined;
-      let usaPadrao = false;
-      if (horario) {
-        if (lembreteOpcao === 'PADRAO_GLOBAL') {
-          usaPadrao = true;
-          lembreteMinutos = 15;
-        } else if (lembreteOpcao !== 'SEM_ALERTA') {
-          usaPadrao = false;
-          lembreteMinutos = Number(lembreteOpcao);
-        }
-      }
+      // D-26: o modo é explícito; SEM_ALERTA nunca envia minutos e HERDAR não os define.
+      const modoFinal: ModoLembrete = horario ? modoLembrete : 'SEM_ALERTA';
+      const minutosFinal = modoFinal === 'PERSONALIZADO' ? lembreteMinutos : undefined;
 
       const payload: SalvarTarefaPayload = {
         titulo: titulo.trim(),
@@ -213,8 +222,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
         horario: horario || undefined,
         prioridade,
         subtarefas,
-        lembreteMinutosAntes: lembreteMinutos,
-        usaPadraoGlobalLembrete: usaPadrao,
+        modoLembrete: modoFinal,
+        lembreteMinutosAntes: minutosFinal,
         fusoAgendamento: Intl.DateTimeFormat().resolvedOptions().timeZone
       };
 
@@ -335,31 +344,46 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           </div>
         </div>
 
-        {/* Seletor de Lembrete Web Push (FASE 10) */}
-        {horario && (
-          <div className={styles.row}>
-            <div className={styles.col}>
-              <Select
-                label="Lembrete (Web Push)"
-                value={lembreteOpcao}
-                onChange={(val) => setLembreteOpcao(String(val))}
-                options={[
-                  { value: 'PADRAO_GLOBAL', label: 'Usar padrão global (15 min antes)' },
-                  { value: '0', label: 'No horário da tarefa' },
-                  { value: '5', label: '5 minutos antes' },
-                  { value: '15', label: '15 minutos antes' },
-                  { value: '30', label: '30 minutos antes' },
-                  { value: '60', label: '60 minutos antes (1 hora)' },
-                  { value: 'SEM_ALERTA', label: 'Sem alerta' }
-                ]}
-                disabled={salvando}
-              />
-            </div>
+        {/* Seletor de Lembrete Web Push (D-26) */}
+        <div className={styles.row}>
+          <div className={styles.col}>
+            <Select
+              label="Lembrete"
+              value={horario ? (modoLembrete === 'PERSONALIZADO' ? String(lembreteMinutos) : modoLembrete) : 'SEM_HORARIO'}
+              onChange={(val) => {
+                const valor = String(val);
+                if (valor === 'HERDAR' || valor === 'SEM_ALERTA') {
+                  setModoLembrete(valor);
+                  return;
+                }
+                setModoLembrete('PERSONALIZADO');
+                setLembreteMinutos(Number(valor));
+              }}
+              options={
+                horario
+                  ? [
+                      { value: 'HERDAR', label: `Usar padrão (${padraoGlobalMinutos} min antes)` },
+                      { value: 'SEM_ALERTA', label: 'Sem alerta' },
+                      { value: '0', label: 'No horário' },
+                      { value: '5', label: '5 min antes' },
+                      { value: '15', label: '15 min antes' },
+                      { value: '30', label: '30 min antes' },
+                      { value: '60', label: '60 min antes' }
+                    ]
+                  : [{ value: 'SEM_HORARIO', label: 'Defina um horário para configurar o lembrete' }]
+              }
+              disabled={salvando || !horario}
+            />
+            {!horario && (
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted, #6b7280)', marginTop: '4px' }}>
+                Sem horário não há lembrete: a tarefa continua funcionando normalmente.
+              </p>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Badges informativos sem bloquear operações da tarefa */}
-        {horario && lembreteOpcao !== 'SEM_ALERTA' && pushStatus === 'unsupported' && (
+        {horario && modoLembrete !== 'SEM_ALERTA' && pushStatus === 'unsupported' && (
           <div
             role="status"
             aria-live="polite"
@@ -382,7 +406,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           </div>
         )}
 
-        {horario && lembreteOpcao !== 'SEM_ALERTA' && pushStatus === 'denied' && (
+        {horario && modoLembrete !== 'SEM_ALERTA' && pushStatus === 'denied' && (
           <div
             role="status"
             aria-live="polite"
@@ -405,7 +429,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           </div>
         )}
 
-        {horario && lembreteOpcao !== 'SEM_ALERTA' && isIOS && (
+        {horario && modoLembrete !== 'SEM_ALERTA' && isIOS && (
           <div
             style={{
               padding: '8px 10px',

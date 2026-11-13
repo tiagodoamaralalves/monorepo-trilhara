@@ -35,10 +35,10 @@ public record SerieRecorrente(
         LocalDate geradoAte,
         int totalGeradas,
         boolean ativa,
+        ModoLembrete modoLembrete,
         Integer lembreteMinutosAntes,
-        boolean usaPadraoGlobalLembrete,
         String fusoAgendamento,
-        String operationId,
+        String origemOperacaoId,
         Instant deletedAt,
         Instant expiresAt,
         String loteExclusaoId,
@@ -52,5 +52,7 @@ public record SerieRecorrente(
         diasDaSemana = diasDaSemana == null
                 ? List.of()
                 : Collections.unmodifiableList(new ArrayList<>(diasDaSemana));
+        // D-26: ausência nunca significa "herdar"; o default do modelo é HERDAR explícito.
+        modoLembrete = modoLembrete == null ? ModoLembrete.HERDAR : modoLembrete;
     }
 }

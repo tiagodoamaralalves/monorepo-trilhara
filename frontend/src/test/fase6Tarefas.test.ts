@@ -164,7 +164,11 @@ describe('FASE 6 - Tarefas Manuais, Recorrência e Lixeira (Frontend)', () => {
             expiresAt: '2026-12-09T10:00:00Z'
           }
         ],
-        series: []
+        series: [],
+        pagina: 1,
+        tamanho: 50,
+        totalItens: 1,
+        totalPaginas: 1
       };
 
       vi.mocked(request).mockResolvedValueOnce(mockLixeira);
@@ -185,7 +189,7 @@ describe('FASE 6 - Tarefas Manuais, Recorrência e Lixeira (Frontend)', () => {
         prioridade: 'BAIXA'
       };
 
-      vi.mocked(request).mockResolvedValueOnce(mockRestaurada);
+      vi.mocked(request).mockResolvedValueOnce({ tarefa: mockRestaurada, realocadaParaListaGeral: false });
 
       const res = await TarefaService.restaurarTarefa('t-del-1');
 
@@ -193,7 +197,8 @@ describe('FASE 6 - Tarefas Manuais, Recorrência e Lixeira (Frontend)', () => {
         '/tarefas/lixeira/t-del-1/restaurar',
         expect.objectContaining({ method: 'POST' })
       );
-      expect(res.id).toBe('t-del-1');
+      expect(res.tarefa.id).toBe('t-del-1');
+      expect(res.realocadaParaListaGeral).toBe(false);
     });
 
     it('esvaziarLixeira chama DELETE /api/tarefas/lixeira/esvaziar', async () => {

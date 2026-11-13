@@ -2,6 +2,8 @@ package br.com.trilhara.tarefa.dto;
 
 import java.util.List;
 
+import br.com.trilhara.tarefa.ModoLembrete;
+
 import jakarta.validation.constraints.Size;
 
 public record AtualizarSerieRecorrenteRequest(
@@ -23,8 +25,8 @@ public record AtualizarSerieRecorrenteRequest(
         String dataFim,
         Integer maxOcorrencias,
         Boolean ativa,
+        ModoLembrete modoLembrete,
         Integer lembreteMinutosAntes,
-        Boolean usaPadraoGlobalLembrete,
         String fusoAgendamento,
-        String operationId) {
+        String origemOperacaoId) {
 }

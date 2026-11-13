@@ -125,6 +125,9 @@ function TarefasApp() {
   const [blocosTrilha, setBlocosTrilha] = useState<BlocoCronogramaItemDTO[]>([]);
   const [paginaBlocos, setPaginaBlocos] = useState<number>(1);
   const [totalPaginasBlocos, setTotalPaginasBlocos] = useState<number>(1);
+  // D-28: paginação de tarefas (50/100) com "Carregar mais".
+  const [paginaTarefas, setPaginaTarefas] = useState<number>(1);
+  const [totalPaginasTarefas, setTotalPaginasTarefas] = useState<number>(1);
   const [carregandoBlocos, setCarregandoBlocos] = useState<boolean>(false);
   const [erroBlocos, setErroBlocos] = useState<Error | null>(null);
   const [concluindoAtrasados, setConcluindoAtrasados] = useState<boolean>(false);
@@ -158,7 +161,9 @@ function TarefasApp() {
       ]);
 
       setListas(listasApi);
-      setTarefasManuais(tarefasApi);
+      setTarefasManuais(tarefasApi.itens);
+      setPaginaTarefas(tarefasApi.pagina);
+      setTotalPaginasTarefas(tarefasApi.totalPaginas);
 
       // Carrega trilhas com cronograma ativo (FASE 7)
       try {
@@ -193,6 +198,22 @@ function TarefasApp() {
   useEffect(() => {
     carregarDados();
   }, [carregarDados]);
+
+  /** "Carregar mais" de tarefas (D-28): acrescenta a próxima página à lista atual. */
+  const carregarMaisTarefas = useCallback(async () => {
+    if (!isAuthenticated || paginaTarefas >= totalPaginasTarefas) return;
+    try {
+      const proxima = await TarefaService.listarTarefas({
+        pagina: paginaTarefas + 1,
+        tamanho: 50
+      });
+      setTarefasManuais((prev) => [...prev, ...proxima.itens]);
+      setPaginaTarefas(proxima.pagina);
+      setTotalPaginasTarefas(proxima.totalPaginas);
+    } catch (err) {
+      toast.error(err instanceof Error ? err : 'Não foi possível carregar mais tarefas.');
+    }
+  }, [isAuthenticated, paginaTarefas, totalPaginasTarefas, toast]);
 
   // Carregamento da Lista Virtual da Trilha (FASE 7)
   const carregarBlocosTrilha = useCallback(
@@ -561,14 +582,19 @@ function TarefasApp() {
 
   const handleRestaurarTarefa = async (id: string) => {
     try {
-      const restaurada = await TarefaService.restaurarTarefaLixeira(id);
+      const resultado = await TarefaService.restaurarTarefaLixeira(id);
       if (dadosLixeira) {
         setDadosLixeira((prev) =>
           prev ? { ...prev, tarefas: prev.tarefas.filter((t) => t.id !== id) } : null
         );
       }
       await carregarDados();
-      toast.success(`Tarefa "${restaurada.titulo}" restaurada com sucesso!`);
+      if (resultado.realocadaParaListaGeral) {
+        // D-25: a lista original foi purgada definitivamente.
+        toast.info('Tarefa restaurada na Lista Geral (a lista original foi excluída definitivamente).');
+      } else {
+        toast.success(`Tarefa "${resultado.tarefa.titulo}" restaurada com sucesso!`);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err : 'Não foi possível restaurar a tarefa.');
     }
@@ -585,7 +611,7 @@ function TarefasApp() {
 
     try {
       await TarefaService.esvaziarLixeira();
-      setDadosLixeira({ tarefas: [], listas: [], series: [] });
+      setDadosLixeira({ tarefas: [], listas: [], series: [], pagina: 1, tamanho: 50, totalItens: 0, totalPaginas: 1 });
       toast.success('Lixeira esvaziada com sucesso.');
     } catch (err) {
       toast.error(err instanceof Error ? err : 'Não foi possível esvaziar a lixeira.');
@@ -981,9 +1007,11 @@ function TarefasApp() {
                     ))}
                   </div>
                 ) : (
-                  <p style={{ color: 'var(--text-muted, #9ca3af)', fontSize: '0.9rem' }}>
-                    Nenhuma tarefa na lixeira.
-                  </p>
+                  <EmptyState
+                    icone={<Trash2 size={24} />}
+                    titulo="A lixeira está vazia"
+                    descricao="Itens excluídos ficam aqui por 30 dias."
+                  />
                 )}
               </div>
             </div>
@@ -1386,22 +1414,45 @@ function TarefasApp() {
               ) : tarefasFiltradas.length === 0 ? (
                 <EmptyState
                   icone={<Filter size={24} />}
-                  titulo="Nenhuma tarefa cadastrada"
-                  descricao="Adicione novas tarefas acima ou crie suas próprias listas personalizadas."
+                  titulo={
+                    filtro === 'concluidas'
+                      ? 'Nenhuma tarefa concluída ainda'
+                      : filtro === 'hoje'
+                        ? 'Tudo em dia por hoje'
+                        : 'Nenhuma tarefa cadastrada'
+                  }
+                  descricao={
+                    filtro === 'concluidas'
+                      ? 'Quando você concluir uma tarefa, ela aparece aqui.'
+                      : filtro === 'hoje'
+                        ? 'Nenhuma tarefa pendente para hoje.'
+                        : 'Adicione novas tarefas acima ou crie suas próprias listas personalizadas.'
+                  }
                   acaoPrimaria={
-                    <Button
-                      variant="primary"
-                      leftIcon={<Plus size={16} />}
-                      onClick={() => {
-                        setTarefaEditando(null);
-                        setModalAberto(true);
-                      }}
-                    >
-                      Criar Primeira Tarefa
-                    </Button>
+                    filtro === 'concluidas' ? undefined : (
+                      <Button
+                        variant="primary"
+                        leftIcon={<Plus size={16} />}
+                        onClick={() => {
+                          setTarefaEditando(null);
+                          setModalAberto(true);
+                        }}
+                      >
+                        {filtro === 'hoje' ? 'Nova tarefa' : 'Criar Primeira Tarefa'}
+                      </Button>
+                    )
                   }
                 />
               ) : null}
+
+              {/* "Carregar mais" (D-28): progressão explícita na listagem paginada. */}
+              {paginaTarefas < totalPaginasTarefas && (
+                <div className={styles.carregarMaisBtnWrapper}>
+                  <Button type="button" variant="secondary" size="md" onClick={carregarMaisTarefas}>
+                    Carregar mais tarefas
+                  </Button>
+                </div>
+              )}
 
               {/* Concluídas colapsáveis */}
               {tarefasConcluidas.length > 0 && filtro !== 'concluidas' && (

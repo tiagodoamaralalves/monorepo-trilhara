@@ -1,4 +1,5 @@
 import { request } from './api';
+import type { Pagina } from '@shared/contracts';
 import {
   Tarefa,
   ListaTarefas,
@@ -6,6 +7,8 @@ import {
   EscopoRecorrencia,
   TarefasHojeDTO,
   LixeiraTarefasDTO,
+  RestauracaoTarefaDTO,
+  ListaImpactoExclusaoDTO,
   ExclusaoListaDTO,
   ListaTarefasDTO,
   TarefaDTO,
@@ -106,7 +109,9 @@ export const TarefaService = {
     dataFim?: string;
     concluida?: boolean;
     estado?: string;
-  }): Promise<Tarefa[]> {
+    pagina?: number;
+    tamanho?: number;
+  }): Promise<Pagina<Tarefa>> {
     const query = new URLSearchParams();
     if (params?.listaId) query.set('listaId', params.listaId);
     if (params?.filtro) query.set('filtro', params.filtro);
@@ -115,10 +120,12 @@ export const TarefaService = {
     if (params?.dataFim) query.set('dataFim', params.dataFim);
     if (params?.concluida !== undefined) query.set('concluida', String(params.concluida));
     if (params?.estado) query.set('estado', params.estado);
+    if (params?.pagina !== undefined) query.set('pagina', String(params.pagina));
+    if (params?.tamanho !== undefined) query.set('tamanho', String(params.tamanho));
 
     const qs = query.toString() ? `?${query.toString()}` : '';
-    const tarefas = await request<TarefaDTO[]>(`/tarefas${qs}`);
-    return tarefas.map(normalizarTarefa);
+    const pagina = await request<Pagina<TarefaDTO>>(`/tarefas${qs}`);
+    return { ...pagina, itens: (pagina.itens || []).map(normalizarTarefa) };
   },
 
   async buscarTarefa(id: string): Promise<Tarefa> {
@@ -136,8 +143,8 @@ export const TarefaService = {
       horario: dados.horario || undefined,
       prioridade,
       subtarefas: dados.subtarefas || [],
+      modoLembrete: dados.modoLembrete,
       lembreteMinutosAntes: dados.lembreteMinutosAntes,
-      usaPadraoGlobalLembrete: dados.usaPadraoGlobalLembrete,
       fusoAgendamento: dados.fusoAgendamento,
       ordem: dados.ordem
     };
@@ -153,7 +160,7 @@ export const TarefaService = {
     id: string,
     dados: Partial<Tarefa>,
     escopo?: EscopoRecorrencia,
-    operationId?: string
+    idempotencyKey?: string
   ): Promise<Tarefa> {
     const prioridade = dados.prioridade ? String(dados.prioridade).toUpperCase() : undefined;
     const payload = {
@@ -164,17 +171,20 @@ export const TarefaService = {
       horario: dados.horario || undefined,
       prioridade,
       subtarefas: dados.subtarefas || [],
+      modoLembrete: dados.modoLembrete,
       lembreteMinutosAntes: dados.lembreteMinutosAntes,
-      usaPadraoGlobalLembrete: dados.usaPadraoGlobalLembrete,
       fusoAgendamento: dados.fusoAgendamento,
       ordem: dados.ordem,
-      escopo,
-      operationId
+      escopo
     };
 
     const qs = escopo ? `?escopo=${encodeURIComponent(escopo)}` : '';
+    const headers: Record<string, string> = {};
+    if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
+
     const atualizada = await request<TarefaDTO>(`/tarefas/${encodeURIComponent(id)}${qs}`, {
       method: 'PUT',
+      headers,
       body: JSON.stringify(payload)
     });
     return normalizarTarefa(atualizada);
@@ -257,28 +267,42 @@ export const TarefaService = {
 
   // ── LIXEIRA (30 DIAS) ──
 
-  async listarLixeira(): Promise<LixeiraTarefasDTO> {
-    const res = await request<LixeiraTarefasDTO>('/tarefas/lixeira');
+  async listarLixeira(params?: { pagina?: number; tamanho?: number }): Promise<LixeiraTarefasDTO> {
+    const query = new URLSearchParams();
+    if (params?.pagina !== undefined) query.set('pagina', String(params.pagina));
+    if (params?.tamanho !== undefined) query.set('tamanho', String(params.tamanho));
+    const qs = query.toString() ? `?${query.toString()}` : '';
+
+    const res = await request<LixeiraTarefasDTO>(`/tarefas/lixeira${qs}`);
     return {
       tarefas: (res.tarefas || []).map(normalizarTarefa),
       listas: (res.listas || []).map(normalizarLista),
-      series: res.series || []
+      series: res.series || [],
+      pagina: res.pagina ?? 1,
+      tamanho: res.tamanho ?? 50,
+      totalItens: res.totalItens ?? 0,
+      totalPaginas: res.totalPaginas ?? 1
     };
   },
 
-  async obterLixeira(): Promise<LixeiraTarefasDTO> {
-    return this.listarLixeira();
+  async obterLixeira(params?: { pagina?: number; tamanho?: number }): Promise<LixeiraTarefasDTO> {
+    return this.listarLixeira(params);
   },
 
-  async restaurarTarefaLixeira(id: string): Promise<Tarefa> {
-    const res = await request<TarefaDTO>(`/tarefas/lixeira/${encodeURIComponent(id)}/restaurar`, {
+  async restaurarTarefaLixeira(id: string): Promise<RestauracaoTarefaDTO> {
+    const res = await request<RestauracaoTarefaDTO>(`/tarefas/lixeira/${encodeURIComponent(id)}/restaurar`, {
       method: 'POST'
     });
-    return normalizarTarefa(res);
+    return { ...res, tarefa: normalizarTarefa(res.tarefa) };
   },
 
-  async restaurarTarefa(id: string): Promise<Tarefa> {
+  async restaurarTarefa(id: string): Promise<RestauracaoTarefaDTO> {
     return this.restaurarTarefaLixeira(id);
+  },
+
+  /** D-33: contagens exibidas no ConfirmDialog antes de excluir a lista. */
+  async obterImpactoExclusaoLista(id: string): Promise<ListaImpactoExclusaoDTO> {
+    return request<ListaImpactoExclusaoDTO>(`/listas-tarefas/${encodeURIComponent(id)}/impacto-exclusao`);
   },
 
   async esvaziarLixeira(): Promise<void> {

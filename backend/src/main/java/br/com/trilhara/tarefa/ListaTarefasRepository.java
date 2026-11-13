@@ -113,13 +113,13 @@ public class ListaTarefasRepository {
         )).getDeletedCount();
     }
 
-    public List<ObjectId> listarIdsExpiradas(Instant agora) {
-        List<ObjectId> ids = new ArrayList<>();
+    public List<ListaTarefas> listarExpiradas(Instant agora) {
+        List<ListaTarefas> resultado = new ArrayList<>();
         collection.find(and(
                 ne("deletedAt", null),
                 lte("expiresAt", BsonDates.toBsonDate(agora))
-        )).forEach(doc -> ids.add(doc.getObjectId("_id")));
-        return ids;
+        )).forEach(doc -> resultado.add(paraEntidade(doc)));
+        return resultado;
     }
 
     public long purgarExpiradas(Instant agora) {

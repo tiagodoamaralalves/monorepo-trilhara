@@ -19,14 +19,14 @@
 | A3 | Trilha grande não exige transferir disciplinas/tópicos ao listar Hub | `trilha/TrilhaNormalizadaIntegrationTest` (17, inclui `deveCriarTrilhaERetornarResumoSemArrayDeTopicosNoHub`) | Parcial — falta assert de payload/`explain` em trilha de 2.000 tópicos; `MongoExplainBenchmarkTest` é opt-in. **R3:** o resumo não tem mais `disciplinas`/`progresso` no contrato |
 | A4 | Marcar/desmarcar tópico afeta somente aquele progresso e agregados | `trilha/TrilhaNormalizadaIntegrationTest#deveRetornar404AoMarcarProgressoDeTopicoDeOutraTrilha`; `test/topicoOtimista.test.tsx` | **Coberto na R3** — inclui isolamento por trilha no path e rollback otimista |
 | A5 | Regenerar cronograma substitui blocos via `versaoGeracao`/`versaoAtiva`, mantém sessões/progresso; concorrência nunca deixa dois ativos | `cronograma/CronogramaNormalizadoIntegrationTest` (8, inclui `deveCoordenarConcorrenciaComLockAtomicoNaTrilha`) + índice parcial único `idx_cronogramas_usuario_trilha_ativo_unique` | **Coberto na R5** — contador atômico `trilha.proximaVersaoCronograma`, fencing no ponteiro e `duplicateModalityNaoAlteraBlocos` |
-| A6 | Tarefas/Pomodoro mostram as mesmas tarefas manuais Hoje + blocos do dia; nenhum bloco é gravado como tarefa | `test/fase7IntegracaoDiaria.test.tsx` (9); `tarefa/Fase6TarefaResourceTest` (4) | Coberto |
+| A6 | Tarefas/Pomodoro mostram as mesmas tarefas manuais Hoje + blocos do dia; nenhum bloco é gravado como tarefa | `test/fase7IntegracaoDiaria.test.tsx` (9); `tarefa/TarefaIntegrationTest` (16); `test/tarefasHoje.test.tsx` (5) | **Coberto na R7** — Hoje devolve só `PENDENTE`, sem blocos |
 | A7 | Concluir manual nunca cria sessão; concluir bloco abre o modal global; cancelar não conclui | `test/globalSessionModal.test.tsx` (10); `test/sessaoGlobalService.test.ts` (5); `fase7IntegracaoDiaria.test.tsx` (9) | **Coberto na R6** — cancelar mantém o timer pausado e não conclui o bloco |
 | A8 | Retry após timeout não duplica sessão nem conclusão | `sessao/SessaoNormalizadaIntegrationTest` (9) + índice único `idx_sessoes_usuario_chaveIdempotencia_unique` | Parcial — falta retry concorrente com `operationId` repetido em `concluir-atrasados` |
 | A9 | Sessão de 95s persiste `duracaoSegundos=95` e soma 95s; estatísticas conferem; editar/excluir recalcula | `sessao/SessaoNormalizadaIntegrationTest`; `test/sessaoNormalizada.test.ts` (6) | Coberto |
 | A10 | Remover disciplina preserva histórico por padrão e permite apagar sessões/métricas explicitamente | `trilha/TrilhaNormalizadaIntegrationTest#deveRetornar409SeLeaseOcupadoAoExcluirDisciplina`; `sessao/SessaoNormalizadaIntegrationTest` | Coberto (R3 adicionou a guarda de lease na exclusão) |
-| A11 | Alterar `dataVencimento` de ocorrência mantém `dataOriginalOcorrencia` e não recria na data original | `tarefa/Fase6RecorrenciaEngineTest` (5); índice `idx_tarefas_usuario_serie_dataOriginal_unique` | Coberto |
+| A11 | Alterar `dataVencimento` de ocorrência mantém `dataOriginalOcorrencia` e não recria na data original | `tarefa/Fase6RecorrenciaEngineTest` (5); `tarefa/RecorrenciaEngineTest` (8); `TarefaIntegrationTest#materializacaoConcorrenteNaoDuplicaNemRetorna500`; índice parcial `uk_tarefas_usuarioId_serieId_dataOriginalOcorrencia` | **Coberto na R7** — inclui `E11000` engolido na materialização concorrente |
 | A12 | Autosave/busca/lixeira de Notas não transferem Markdown completo; rascunho local preservado em falha de rede | `nota/NotaResourceTest` (11); `nota/NotaSnippetExtractorTest` (2); `test/fase8Notas.test.tsx` (13) | Coberto |
-| A13 | Tarefas/notas em lixeira restauradas no prazo/contexto originais; purgadas após o prazo | `tarefa/Fase6TarefaResourceTest`; `test/fase6Tarefas.test.ts` (8) | Parcial — falta teste de purga após prazo |
+| A13 | Tarefas/notas em lixeira restauradas no prazo/contexto originais; purgadas após o prazo | `TarefaIntegrationTest#restaurarTarefaComListaNaLixeiraRestauraSoContainer`; `#restaurarTarefaComListaPurgadaRetornaFlag`; `#purgaDeListaMoveSeriesParaListaGeral`; `test/lixeiraTarefas.test.tsx` (5) | **Coberto na R7** — restauração só do container, flag de realocação e purga de 30 dias |
 | A14 | Logout/troca de conta sincronizam via `storage`/`BroadcastChannel`; entre subdomínios validação server-side ao focar; timers só na mesma origem | `test/sso.test.ts` (6); `fase5GlobalSessionTimer.test.tsx`; `appSwitcher.test.tsx` (6) | Parcial — sem teste de `BroadcastChannel` entre subdomínios |
 | A15 | Falha de serviço aparece como erro recuperável (`SectionErrorCard`/`SyncStatusBadge`), nunca como "sem dados" | `test/fase7IntegracaoDiaria.test.tsx`; `fase8Notas.test.tsx` | Parcial — `SyncStatusBadge` sem teste dedicado |
 | A16 | WCAG 2.2 AA (focus trap, `aria-live`, alvos mínimos, `scroll-padding-bottom`) nos 4 módulos | `test/fase11Accessibility.test.tsx` (9) | Coberto |
@@ -79,7 +79,7 @@
 | ~~`scripts/mongo/reset-dev.sh` inexistente~~ → **criado na R2** | — | `scripts/mongo/reset-dev.sh` |
 | ~~Resíduo `Ciclo`/`planejamento_ciclo` em `trilha/` + refs `ciclo` no frontend~~ → **resolvido na R5**: `termo-ciclo-backend` 0 e frontend só mantém "ciclo Pomodoro" (preservado pelo guia) | — | `verificar-legado.sh --quiet` |
 | ~~`tarefaStorage.ts` referenciava campos inexistentes~~ → **resolvido na R1** (arquivo removido) | — | `knip` exit 0 |
-| Anexo C precisa de decisão sobre `usaPadraoGlobalLembrete` e `OperacaoConcluirAtrasados` | D-02/R8 | REVISAO §8 |
+| ~~Anexo C precisa de decisão sobre `usaPadraoGlobalLembrete`~~ → **resolvido na R7** (`ModoLembrete` explícito); `OperacaoConcluirAtrasados` segue em R8 | R8 | `verificar-legado.sh --quiet` → `nomes-nao-canonicos-d02` = 0 |
 | ~~163 problemas ESLint / 73 achados knip~~ → **zerados na R1** | — | `npm run lint -- --max-warnings 0` + `npx knip` |
 | `eslint-plugin-react` ausente nas dependências aprovadas (`react/no-danger` expressa via `no-restricted-syntax`) | R13 | REVISAO §9 |
 
@@ -218,3 +218,31 @@
 | Os 4 apps abrem o modal só via `useGlobalSessionModal()` | `rg "abrirModal\\(" frontend/src/modules` → apenas chamadas do hook | Coberto |
 | Grep de canais antigos zerado | `rg "trilhara_study_timer|trilhara_pomodoro_timer|trilhara_agenda_hoje|'trilhara:auth'|\|\| 'anon'" frontend/src` → 0 | Coberto |
 | Gate comum verde | `docs/REVISAO-IMPLEMENTADA-R6.md` §5 | Coberto |
+
+## I. Critérios específicos da R7 (F6: tarefas manuais, recorrência e lixeira)
+
+| Critério | Teste / comando | Status |
+|---|---|---|
+| `GET /api/tarefas/hoje` devolve apenas `PENDENTE` | `tarefa/TarefaIntegrationTest#hojeNaoContemConcluidas`; `test/tarefasHoje.test.tsx` (5) | Coberto |
+| `TODA_A_SERIE` preserva `serieId`/`dataOriginalOcorrencia` das concluídas | `#todaASeriePreservaSerieIdDasConcluidas` | Coberto |
+| `ESTA_E_FUTURAS` (edição) preserva as ocorrências desvinculadas | `#estaEFuturasEdicaoPreservaDesvinculadas` | Coberto |
+| Retry de `ESTA_E_FUTURAS` com a mesma `Idempotency-Key` não duplica a série sucessora (200) | `#estaEFuturasRetryComMesmaChaveNaoDuplicaSerie` | Coberto |
+| `ESTA_E_FUTURAS` sem `Idempotency-Key` → 400 `IDEMPOTENCY_KEY_REQUIRED` | `#estaEFuturasSemChaveRetorna400` | Coberto |
+| `escopo` ausente em ocorrência de série → 400 `VALIDATION_ERROR` | `#escopoAusenteEmTarefaRecorrenteRetorna400` | Coberto |
+| Materialização concorrente não duplica nem devolve 500 (10 GETs paralelos) | `#materializacaoConcorrenteNaoDuplicaNemRetorna500` | Coberto |
+| Série com lista na lixeira não materializa | `#serieDeListaNaLixeiraNaoMaterializa` | Coberto |
+| Purga da lista move séries sobreviventes para a Lista Geral | `#purgaDeListaMoveSeriesParaListaGeral` | Coberto |
+| Restaurar tarefa com lista na lixeira restaura **só o container** | `#restaurarTarefaComListaNaLixeiraRestauraSoContainer` | Coberto |
+| Restaurar tarefa com lista purgada devolve `realocadaParaListaGeral` | `#restaurarTarefaComListaPurgadaRetornaFlag`; `test/lixeiraTarefas.test.tsx` | Coberto |
+| `listaId` de outro usuário no body → 400 `VALIDATION_ERROR` | `#listaIdDeOutroUsuarioRetorna400` | Coberto |
+| `GET /api/tarefas` paginado 50/100 com ordenação estável e `INVALID_PAGINATION` | `#paginacaoTarefasOrdenacaoEstavel` | Coberto |
+| Lixeira paginada com filtro `expiresAt > agora` | `#lixeiraPaginadaApenasItensVigentes` | Coberto |
+| `impacto-exclusao` de listas (D-33) | `#impactoExclusaoListaContaTarefasESeries` | Coberto |
+| Isolamento A×B em todas as rotas de tarefas (404) e 401 sem autenticação | `#isolamentoEntreUsuariosEmTodasAsRotas` | Coberto |
+| Calendário: virada de ano, semana ISO 53, fev/2027 e fev/2028, ordinal 5 e `-1` | `tarefa/RecorrenciaEngineTest` (8, 2 parametrizados) | Coberto |
+| `APOS_OCORRENCIAS` conta canceladas/movidas/desvinculadas; `EM_DATA` inclusiva | `#terminoAposOcorrenciasConsideraPosicoesConsumidas`; `#terminoEmDataEhInclusivo` | Coberto |
+| `modoLembrete` explícito: **SEM_ALERTA ≠ HERDAR** no payload | `test/lembreteSeletor.test.tsx` (4) | Coberto |
+| Escopos de recorrência no cliente com `Idempotency-Key` | `test/escopoRecorrencia.test.tsx` (5) | Coberto |
+| Repositórios de `tarefa` exigem `usuarioId` (D-06a) | `arquitetura/TenantIsolationArchTest#repositoriosDeTarefaExigemUsuarioId` | Coberto |
+| Grep do critério R7 §4 zerado | `grep -rn "usaPadraoGlobalLembrete\|dataTermino\|lista padr" backend frontend` → 0 | Coberto |
+| Gate comum verde | `docs/REVISAO-IMPLEMENTADA-R7.md` §5 | Coberto |

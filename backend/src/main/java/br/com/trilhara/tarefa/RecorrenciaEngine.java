@@ -120,8 +120,8 @@ public class RecorrenciaEngine {
                 serie.intervalo(), serie.diasDaSemana(), serie.modoMensal(), serie.diaDoMes(),
                 serie.ordinalSemana(), serie.diaSemanaOrdinal(), serie.tipoTermino(), serie.dataInicio(),
                 serie.dataFim(), serie.maxOcorrencias(), serie.geradoAte(), serie.totalGeradas(),
-                false, serie.lembreteMinutosAntes(), serie.usaPadraoGlobalLembrete(), serie.fusoAgendamento(),
-                serie.operationId(), serie.deletedAt(), serie.expiresAt(), serie.loteExclusaoId(),
+                false, serie.modoLembrete(), serie.lembreteMinutosAntes(), serie.fusoAgendamento(),
+                serie.origemOperacaoId(), serie.deletedAt(), serie.expiresAt(), serie.loteExclusaoId(),
                 serie.criadoEm(), Instant.now()
         ));
     }
@@ -136,41 +136,29 @@ public class RecorrenciaEngine {
         boolean ativa = serie.ativa();
         Instant agora = Instant.now();
 
-        boolean continuarProcessamento = true;
-        for (int indice = 0; indice < candidatas.size() && continuarProcessamento; indice++) {
-            LocalDate dataOcorrencia = candidatas.get(indice);
-            if (atingiuLimiteTermino(serie, totalGeradas, dataOcorrencia)) {
-                ativa = false;
-                continuarProcessamento = false;
-            } else {
-                materializarOcorrenciaSeNecessario(serie, dataOcorrencia, agora);
+        List<LocalDate> permitidas = aplicarLimiteTermino(serie, candidatas);
+        boolean terminoAtingido = permitidas.size() < candidatas.size();
 
-                totalGeradas++;
-                if (dataOcorrencia.isAfter(ultimoGeradoAte)) {
-                    ultimoGeradoAte = dataOcorrencia;
-                }
+        for (LocalDate dataOcorrencia : permitidas) {
+            materializarOcorrenciaSeNecessario(serie, dataOcorrencia, agora);
 
-                if ("APOS_OCORRENCIAS".equalsIgnoreCase(serie.tipoTermino())
-                        && serie.maxOcorrencias() != null
-                        && totalGeradas >= serie.maxOcorrencias()) {
-                    ativa = false;
-                    continuarProcessamento = false;
-                }
+            totalGeradas++;
+            if (dataOcorrencia.isAfter(ultimoGeradoAte)) {
+                ultimoGeradoAte = dataOcorrencia;
             }
+            if ("APOS_OCORRENCIAS".equalsIgnoreCase(serie.tipoTermino())
+                    && serie.maxOcorrencias() != null
+                    && totalGeradas >= serie.maxOcorrencias()) {
+                ativa = false;
+            }
+        }
+        if (terminoAtingido) {
+            // O término foi alcançado nesta janela: a série não volta a materializar.
+            ativa = false;
         }
 
         LocalDate cursorFinal = ultimoGeradoAte.isAfter(alvo) ? ultimoGeradoAte : alvo;
         atualizarCursorSerie(serie, cursorFinal, totalGeradas, ativa);
-    }
-
-    private boolean atingiuLimiteTermino(SerieRecorrente serie, int totalGeradas, LocalDate dataOcorrencia) {
-        if ("APOS_OCORRENCIAS".equalsIgnoreCase(serie.tipoTermino()) && serie.maxOcorrencias() != null) {
-            return totalGeradas >= serie.maxOcorrencias();
-        }
-        if ("EM_DATA".equalsIgnoreCase(serie.tipoTermino()) && serie.dataFim() != null) {
-            return dataOcorrencia.isAfter(serie.dataFim());
-        }
-        return false;
     }
 
     private void materializarOcorrenciaSeNecessario(SerieRecorrente serie, LocalDate dataOcorrencia, Instant agora) {
@@ -207,8 +195,8 @@ public class RecorrenciaEngine {
                 null,
                 0,
                 subtarefasClonadas,
+                serie.modoLembrete(),
                 serie.lembreteMinutosAntes(),
-                serie.usaPadraoGlobalLembrete(),
                 serie.fusoAgendamento(),
                 null,
                 null,
@@ -224,6 +212,30 @@ public class RecorrenciaEngine {
                 throw e;
             }
         }
+    }
+
+    /**
+     * Trunca as candidatas pelas regras de término vigentes (D-24 / §7.2).
+     *
+     * <p>{@code APOS_OCORRENCIAS} conta as posições já consumidas em {@code totalGeradas} —
+     * inclusive as concluídas, canceladas, movidas para a lixeira ou editadas
+     * individualmente —, porque cada posição programada ocupa um lugar na contagem.</p>
+     */
+    public List<LocalDate> aplicarLimiteTermino(SerieRecorrente serie, List<LocalDate> candidatas) {
+        if (candidatas == null || candidatas.isEmpty()) {
+            return List.of();
+        }
+        if ("APOS_OCORRENCIAS".equalsIgnoreCase(serie.tipoTermino()) && serie.maxOcorrencias() != null) {
+            int restantes = serie.maxOcorrencias() - serie.totalGeradas();
+            if (restantes <= 0) {
+                return List.of();
+            }
+            return candidatas.size() <= restantes ? candidatas : candidatas.subList(0, restantes);
+        }
+        if ("EM_DATA".equalsIgnoreCase(serie.tipoTermino()) && serie.dataFim() != null) {
+            return candidatas.stream().filter(d -> !d.isAfter(serie.dataFim())).toList();
+        }
+        return candidatas;
     }
 
     private void atualizarCursorSerie(SerieRecorrente serie, LocalDate novoGeradoAte, int totalGeradas, boolean ativa) {
@@ -250,10 +262,10 @@ public class RecorrenciaEngine {
                 novoGeradoAte,
                 totalGeradas,
                 ativa,
+                serie.modoLembrete(),
                 serie.lembreteMinutosAntes(),
-                serie.usaPadraoGlobalLembrete(),
                 serie.fusoAgendamento(),
-                serie.operationId(),
+                serie.origemOperacaoId(),
                 serie.deletedAt(),
                 serie.expiresAt(),
                 serie.loteExclusaoId(),

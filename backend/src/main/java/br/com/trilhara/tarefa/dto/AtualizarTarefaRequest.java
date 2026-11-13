@@ -4,6 +4,8 @@ import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 
+import br.com.trilhara.tarefa.ModoLembrete;
+
 import jakarta.validation.constraints.Size;
 
 public record AtualizarTarefaRequest(
@@ -14,10 +16,10 @@ public record AtualizarTarefaRequest(
         @JsonAlias("data") String dataVencimento,
         String horario,
         List<SubtarefaDTO> subtarefas,
+        ModoLembrete modoLembrete,
         Integer lembreteMinutosAntes,
-        Boolean usaPadraoGlobalLembrete,
         String fusoAgendamento,
         Integer ordem,
         String escopo,
-        String operationId) {
+        String origemOperacaoId) {
 }

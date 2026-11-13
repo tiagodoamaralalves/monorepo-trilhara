@@ -3,6 +3,8 @@ package br.com.trilhara.tarefa.dto;
 import java.time.Instant;
 import java.util.List;
 
+import br.com.trilhara.tarefa.ModoLembrete;
+
 public record SerieRecorrenteResponse(
         String id,
         String usuarioId,
@@ -26,9 +28,10 @@ public record SerieRecorrenteResponse(
         String geradoAte,
         int totalGeradas,
         boolean ativa,
+        ModoLembrete modoLembrete,
         Integer lembreteMinutosAntes,
-        boolean usaPadraoGlobalLembrete,
         String fusoAgendamento,
+        String origemOperacaoId,
         Instant deletedAt,
         Instant expiresAt,
         String loteExclusaoId,

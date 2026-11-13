@@ -7,6 +7,7 @@ import br.com.trilhara.auth.Autenticado;
 import br.com.trilhara.tarefa.dto.AtualizarListaTarefasRequest;
 import br.com.trilhara.tarefa.dto.CriarListaTarefasRequest;
 import br.com.trilhara.tarefa.dto.ExclusaoListaResponse;
+import br.com.trilhara.tarefa.dto.ListaImpactoExclusaoResponse;
 import br.com.trilhara.tarefa.dto.ListaTarefasResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -64,6 +65,13 @@ public class ListaTarefasResource {
     @Path("{listaId}")
     public ExclusaoListaResponse excluir(@PathParam("listaId") String listaId) {
         return service.excluirLista(listaId, authContext.usuarioId());
+    }
+
+    /** D-33: contagens exibidas no {@code ConfirmDialog} antes de excluir a lista. */
+    @GET
+    @Path("{listaId}/impacto-exclusao")
+    public ListaImpactoExclusaoResponse impactoExclusao(@PathParam("listaId") String listaId) {
+        return service.obterImpactoExclusaoLista(listaId, authContext.usuarioId());
     }
 
     @POST
