@@ -35,7 +35,7 @@
 | A20 | Geração de cronograma com falha injetada em cada etapa; lease expirado não publica | `PublicacaoCronogramaFaultInjectionTest` (7: 6 etapas + `leaseExpiradoNaoPublica`) | **Coberto na R5** — `FaultInjector` só no classpath de teste |
 | A21 | Materialização recorrente idempotente sob concorrência; casos diário/semanal/mensal em virada de ano/ISO/meses curtos | `tarefa/Fase6RecorrenciaEngineTest` (5) | Parcial — falta caso virada de ano/semana ISO |
 | A22 | Exclusão/restauração de lista/caderno/seção respeitam lotes e descendentes já purgados | `tarefa/ListaTarefasResourceTest` (1) | **Sem teste** — R7 |
-| A23 | Scheduler push não processa o mesmo item em paralelo; expirados não enviados; backoff | `push/PushDeliverySchedulerTest` (3); `push/LembretePushLifecycleTest` (4); `push/LembretePushCalculatorTest` (3) | Coberto |
+| A23 | Scheduler push não processa o mesmo item em paralelo; expirados não enviados; backoff | `push/PushDeliverySchedulerTest` (6: `doisWorkersNaoProcessamOMesmoItem`, `atrasoMaiorQue15MinExpiraSemEnviar`, `falhaTransitoriaRespeitaJanela`, `falhaSemTempoNaJanelaTerminaEmFalhaFinal`, `gone410RemoveInscricao`, `ttl900NoEnvio`); `push/LembretePushFilaFiltroTest` (3); `push/LembretePushLifecycleTest` (9); `push/LembretePushCalculatorTest` (5); `push/WebPushCriptografiaTest` (4); `push/PushPayloadFactoryTest` (6); `push/PushResourceTest` (7) | **Coberto na R11** — modelo versionado por D-36a, claim atômico com `leaseToken`/`leaseAte`, backoff derivado de `atualizadoEm`, payload cifrado RFC 8291 e `url` absoluta com allowlist. Execução dos 3 arquivos `@QuarkusTest` pendente de ambiente com Mongo (ver §0 do relatório R11) |
 | A24 | Frontend com Vitest + RTL + jsdom; cada critério de UI tem teste executável por `npm test` + `npm run build` | 14 arquivos / 109 testes; `npm run build` verde | Coberto |
 | A25 | Conta excluída retorna 202 e worker conclui as 18 coleções sem órfãos, mesmo com falha injetada | `auth/AccountDeletionIntegrationTest` (29: `excluiTodasAsColecoesPrivadasEIsolaOutrosUsuariosEEdital`, `falhaInjetadaEmCadaColecaoRetomaSemOrfaos` parametrizado por **18** filhas, `apos5FalhasEntraEmRetentandoLentoENaoConclui`, `retomadaAposRetentandoLentoConcluiSemOrfaos`, `logsNaoContemUsuarioId`, `semIdempotencyKeyRetorna400`, `senhaInvalidaRetorna401ESemEfeito`, `respostaNaoEhProblemJson`); `test/contaModal.test.tsx`; `test/authExclusaoConta.test.ts` | **Coberto na R10** — fixtures dirigidas por `ColecaoTrilhara.filhasPrivadas()` (faltar fixture falha o teste), hook de produção removido em favor de `FaultInjectorExclusaoConta`, estado terminal `FALHA` substituído por `RETENTANDO_LENTO` com retentativa horária, logs pseudonimizados |
 | A26 | IDs HTTP: malformado → 400 `INVALID_IDENTIFIER`; inexistente/outro tenant → 404 | `shared/InvalidIdentifierTest` (3: 400 + `errors[trilhaId]`, 404, 401); `shared/ProblemDetailsCatalogoTest` (4); `shared/mongo/BsonRoundTripTest` (2, `BsonIds.parse`) | **Coberto (R1)** — `toObjectIdOrNotFound` removido; `BsonIds.parse` é a única conversão |
@@ -336,4 +336,35 @@
 | Entrada de Conta não é mais propagada por prop entre apps | `grep -rn "onAbrirConta\|onOpenAccount" frontend/src --include=*.tsx` → só `ContaMenuButton` | Coberto |
 | Mensagem normativa "Sua conta está sendo excluída…" na tela pública | `test/authExclusaoConta.test.ts` + `AvisoContaExcluida` nos 4 módulos | Coberto |
 | Gate comum | `docs/REVISAO-IMPLEMENTADA-R10.md` §5 e §6 | Coberto; ressalva em §7 (14 achados herdados de R12/R13) |
+
+## M. Criterios especificos da R11 (F10: Web Push de Tarefas)
+
+| Criterio | Teste / comando | Status |
+|---|---|---|
+| Modelo `lembretes_push` exatamente conforme D-36a (`long versaoAgendamento`, `leaseToken`/`leaseAte`, sem campos extras) | `push/LembretePush`; `rg "horarioDisparoUtc|usaPadraoGlobalLembrete"` -> 0 | Coberto |
+| Uma versao por `(tarefaId, versaoAgendamento)`; anteriores `PENDENTE` canceladas | `LembretePushRepository.inserirNovaVersao`/`cancelarPendentesAnteriores` | Coberto (codigo) |
+| `SEM_ALERTA` nunca agenda | `LembretePushLifecycleTest#semAlertaNaoAgenda` | Escrito (execucao pendente de Mongo) |
+| `HERDAR` acompanha o padrao; `PERSONALIZADO` nao | `#herdarAcompanhaPadrao`; `#personalizadoNaoAcompanhaPadrao`; `PushResourceTest#putPreferenciasRecalculaSoHerdar` | Escrito (execucao pendente de Mongo) |
+| Remover horario cancela e preserva modo; redefinir reagenda em nova versao | `#removerHorarioCancelaEPreservaModo`; `#redefinirHorarioReagendaNovaVersao` | Escrito (execucao pendente de Mongo) |
+| Concluir/lixeira cancelam; restaurar reagenda se futuro | `#concluirCancela`; `#lixeiraCancela`; `#restaurarReagendaSeFuturo` | Escrito (execucao pendente de Mongo) |
+| Ocorrencia recorrente herda o modo da serie e agenda | `#ocorrenciaRecorrenteHerdaModoDaSerie` | Escrito (execucao pendente de Mongo) |
+| Gap DST -> `400 INVALID_LOCAL_DATETIME`; overlap -> offset anterior; SP e Lisboa | `LembretePushCalculatorTest` (5) | **Executado e verde** |
+| Dois workers nao processam o mesmo item | `PushDeliverySchedulerTest#doisWorkersNaoProcessamOMesmoItem` | Escrito (execucao pendente de Mongo) |
+| Atraso > 15 min -> `EXPIRADO_FORA_DA_JANELA` sem envio | `#atrasoMaiorQue15MinExpiraSemEnviar` | Escrito (execucao pendente de Mongo) |
+| Backoff exponencial limitado a janela, sem deslocar `instanteEntregaUtc` | `#falhaTransitoriaRespeitaJanela`; `#falhaSemTempoNaJanelaTerminaEmFalhaFinal`; `LembretePushFilaFiltroTest` (3) | **Filtro executado e verde**; integracao pendente de Mongo |
+| `410`/`404` removem a inscricao | `#gone410RemoveInscricao` | Escrito (execucao pendente de Mongo) |
+| `TTL: 900` no envio | `#ttl900NoEnvio` | Escrito (execucao pendente de Mongo) |
+| Payload cifrado RFC 8291 (`aes128gcm`) com round-trip | `WebPushCriptografiaTest` (4) | **Executado e verde** |
+| Payload `{lembreteId, tarefaId, titulo<=80, url absoluta}` + allowlist | `PushPayloadFactoryTest` (6) | **Executado e verde** |
+| `PUT /preferencias` com conjunto `{0,5,15,30,60}` | `PushResourceTest#putPreferenciasComValorForaDoConjuntoRetorna400`; `#putPreferenciasRecalculaSoHerdar` | Escrito (execucao pendente de Mongo) |
+| `DELETE` so por body; endpoint alheio -> 404 | `#deleteSemEndpointRetorna400`; `#deleteEndpointAlheioRetorna404` | Escrito (execucao pendente de Mongo) |
+| `POST` reatribui `endpoint` e devolve o `_id` persistido; exige HTTPS | `#upsertReatribuiEndpoint`; `#endpointSemHttpsRetorna400` | Escrito (execucao pendente de Mongo) |
+| SW registrado so no app Tarefas, com `scope: '/'` | `pushService.registrarServiceWorker`; `TarefasApp` (unico call site); `pushService.test.ts` | **Executado e verde** |
+| Dedupe de 100 `lembreteId`; clique nao conclui a tarefa | `sw.test.ts` (4) | **Executado e verde** |
+| Logout chama `DELETE` best-effort com timeout de 2 s | `logoutPush.test.ts` (3) | **Executado e verde** |
+| Deep link `?tarefaId=` abre o modal; 404 -> toast + limpeza | `deepLinkTarefa.test.tsx` (3) | **Executado e verde** |
+| Estados `unsupported`/`denied`/`default`/`granted`/`ios-nao-instalado` com textos do Anexo B | `lembretesUi.test.tsx` (4); `pushService.test.ts` | **Executado e verde** |
+| Manifest PWA com `display: standalone` e vinculo no `index.html` | `manifestPwa.test.ts` (3) | **Executado e verde** |
+| ArchUnit: repositorios `..push..` exigem `usuarioId`; scheduler e `@SystemScope` | `TenantIsolationArchTest#repositoriosDePushExigemUsuarioId`; `#schedulerDePushExigeSystemScope` | Escrito (execucao pendente de Mongo) |
+| Gate comum | `docs/REVISAO-IMPLEMENTADA-R11.md` secao 0 | Frontend verde; backend bloqueado por Mongo |
 

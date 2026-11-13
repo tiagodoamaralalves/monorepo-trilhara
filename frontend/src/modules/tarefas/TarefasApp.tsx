@@ -35,7 +35,8 @@ import {
   AvisoContaExcluida
 } from '@shared/design-system';
 import { useAuth, AuthView, AuthMode } from '@shared/auth';
-import { request } from '@shared/auth/api';
+import { request, ApiError } from '@shared/auth/api';
+import { pushService, isPushSupported } from '@shared/services/pushService';
 import { AgendaHoje, TarefaAgendaItem, useAgendaHoje } from '@shared/agenda';
 import { hojeISO } from '@shared/format';
 import {
@@ -204,6 +205,57 @@ function TarefasApp() {
   useEffect(() => {
     carregarDados();
   }, [carregarDados]);
+
+  /**
+   * D-36d: o Service Worker pertence **somente** à origem do app Tarefas. O registro é
+   * guardado por suporte e nunca pede permissão — o prompt só existe no clique do usuário.
+   */
+  useEffect(() => {
+    if (!isPushSupported()) return;
+    pushService.registrarServiceWorker().catch(() => {
+      // Push é best-effort: falha de registro nunca afeta o módulo de Tarefas.
+    });
+  }, []);
+
+  /**
+   * D-36f: deep link `?tarefaId=`. Abre o `TaskModal`; com 404 (inexistente/excluída) exibe o
+   * toast normativo e limpa o parâmetro para não repetir o alerta ao recarregar.
+   */
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const params = new URLSearchParams(window.location.search);
+    const tarefaId = params.get('tarefaId');
+    if (!tarefaId) return;
+
+    const limparParametro = () => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('tarefaId');
+      window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    };
+
+    let cancelado = false;
+    TarefaService.buscarTarefa(tarefaId)
+      .then((tarefa) => {
+        if (cancelado) return;
+        setTarefaEditando(tarefa);
+        setModalAberto(true);
+        limparParametro();
+      })
+      .catch((err) => {
+        if (cancelado) return;
+        const inexistente = err instanceof ApiError && (err.status === 404 || err.status === 400);
+        if (inexistente) {
+          toast.error('Tarefa não encontrada ou excluída');
+        } else {
+          toast.error('Não foi possível abrir a tarefa do lembrete.');
+        }
+        limparParametro();
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [isAuthenticated, toast]);
 
   /** "Carregar mais" de tarefas (D-28): acrescenta a próxima página à lista atual. */
   const carregarMaisTarefas = useCallback(async () => {

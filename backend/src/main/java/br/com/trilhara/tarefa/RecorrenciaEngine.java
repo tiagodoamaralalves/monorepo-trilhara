@@ -16,6 +16,7 @@ import org.bson.types.ObjectId;
 
 import com.mongodb.MongoWriteException;
 
+import br.com.trilhara.push.LembretePushService;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -25,21 +26,24 @@ public class RecorrenciaEngine {
     private final TarefaRepository tarefaRepository;
     private final SerieRecorrenteRepository serieRepository;
     private final ListaTarefasRepository listaRepository;
+    private final LembretePushService lembretePushService;
 
     public RecorrenciaEngine(
             TarefaRepository tarefaRepository,
             SerieRecorrenteRepository serieRepository) {
-        this(tarefaRepository, serieRepository, null);
+        this(tarefaRepository, serieRepository, null, null);
     }
 
     @Inject
     public RecorrenciaEngine(
             TarefaRepository tarefaRepository,
             SerieRecorrenteRepository serieRepository,
-            ListaTarefasRepository listaRepository) {
+            ListaTarefasRepository listaRepository,
+            LembretePushService lembretePushService) {
         this.tarefaRepository = tarefaRepository;
         this.serieRepository = serieRepository;
         this.listaRepository = listaRepository;
+        this.lembretePushService = lembretePushService;
     }
 
     public void expandirSeriesDoUsuario(ObjectId usuarioId, LocalDate hojeLocal, LocalDate fimIntervaloConsultado) {
@@ -207,11 +211,27 @@ public class RecorrenciaEngine {
 
         try {
             tarefaRepository.inserir(ocorrencia);
+            agendarLembreteDaOcorrencia(ocorrencia);
         } catch (MongoWriteException e) {
             if (e.getError().getCode() != 11000) {
                 throw e;
             }
         }
+    }
+
+    /**
+     * Agenda o lembrete da ocorrência recém-materializada (§11: "ocorrências recorrentes herdam
+     * lembrete").
+     *
+     * <p>A inserção é idempotente ({@code (tarefaId, versaoAgendamento)}), então uma ocorrência
+     * já existente nunca duplica versão. {@code lembretePushService} é opcional no construtor
+     * para permitir o uso da engine em testes puros de cálculo de datas.</p>
+     */
+    private void agendarLembreteDaOcorrencia(Tarefa ocorrencia) {
+        if (lembretePushService == null) {
+            return;
+        }
+        lembretePushService.agendarOuAtualizarLembrete(ocorrencia, null, null, null);
     }
 
     /**

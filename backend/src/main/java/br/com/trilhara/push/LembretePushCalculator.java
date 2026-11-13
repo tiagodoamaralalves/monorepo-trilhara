@@ -11,6 +11,8 @@ import java.time.zone.ZoneOffsetTransition;
 import java.time.zone.ZoneRules;
 import java.util.List;
 
+import br.com.trilhara.shared.TimezoneContext;
+
 public final class LembretePushCalculator {
 
     private LembretePushCalculator() {
@@ -34,7 +36,7 @@ public final class LembretePushCalculator {
             return null;
         }
         if (zoneId == null) {
-            zoneId = ZoneId.of("America/Sao_Paulo");
+            zoneId = TimezoneContext.DEFAULT_ZONE;
         }
 
         LocalDateTime ldt = LocalDateTime.of(dataVencimento, horario);

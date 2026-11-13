@@ -301,6 +301,8 @@ public class TarefaService {
         LocalDate dataVencimento = BsonDates.toLocalDate(request.dataVencimento());
         validarGapDst(dataVencimento, request.horario(), request.fusoAgendamento());
         validarPreferenciaLembrete(request.modoLembrete(), request.lembreteMinutosAntes());
+        // D-26: o fuso IANA é capturado no momento em que o lembrete é configurado.
+        String fusoAgendamento = resolverFusoAgendamento(request.fusoAgendamento());
 
         PrioridadeTarefa prioridade = PrioridadeTarefa.fromString(request.prioridade());
         int ordem = request.ordem() != null ? request.ordem() : tarefaRepository.proximaOrdem(usuarioId, listaId);
@@ -326,7 +328,7 @@ public class TarefaService {
                 subtarefas,
                 request.modoLembrete(),
                 request.lembreteMinutosAntes(),
-                request.fusoAgendamento(),
+                fusoAgendamento,
                 null,
                 null,
                 null,
@@ -339,7 +341,7 @@ public class TarefaService {
                 tarefa,
                 request.modoLembrete(),
                 request.lembreteMinutosAntes(),
-                request.fusoAgendamento()
+                fusoAgendamento
         );
         return paraTarefaResponse(tarefa);
     }
@@ -491,7 +493,11 @@ public class TarefaService {
         int ordem = request.ordem() != null ? request.ordem() : existente.ordem();
         ModoLembrete modoLembrete = request.modoLembrete() != null ? request.modoLembrete() : existente.modoLembrete();
         Integer lembrete = request.lembreteMinutosAntes() != null ? request.lembreteMinutosAntes() : existente.lembreteMinutosAntes();
-        String fuso = request.fusoAgendamento() != null ? request.fusoAgendamento() : existente.fusoAgendamento();
+        String fuso = request.fusoAgendamento() != null
+                ? request.fusoAgendamento()
+                : (existente.fusoAgendamento() != null
+                        ? existente.fusoAgendamento()
+                        : resolverFusoAgendamento(null));
         List<Subtarefa> subtarefas = request.subtarefas() != null ? converterSubtarefas(request.subtarefas()) : existente.subtarefas();
 
         validarPreferenciaLembrete(modoLembrete, lembrete);
@@ -753,6 +759,8 @@ public class TarefaService {
 
                 tarefaRepository.moverPendentesAPartirParaLixeira(
                         usuarioId, serieOriginal.id(), alvo, loteExclusaoId, agora, expiresAt);
+                lembretePushService.cancelarLembretesDaSerie(
+                        usuarioId, tarefaRepository.listarIdsPorSerie(usuarioId, serieOriginal.id()));
                 return;
             }
 
@@ -760,6 +768,8 @@ public class TarefaService {
                 // D-24.1: concluídas preservadas intactas (serieId e dataOriginalOcorrencia).
                 serieRepository.moverParaLixeira(usuarioId, existente.serieId(), loteExclusaoId, agora, expiresAt);
                 tarefaRepository.moverPendentesSerieParaLixeira(usuarioId, existente.serieId(), loteExclusaoId, agora, expiresAt);
+                lembretePushService.cancelarLembretesDaSerie(
+                        usuarioId, tarefaRepository.listarIdsPorSerie(usuarioId, existente.serieId()));
                 return;
             }
 
@@ -1237,6 +1247,21 @@ public class TarefaService {
     // =========================================================================
     // AUXILIARES E VALIDAÇÕES
     // =========================================================================
+
+    /**
+     * Materializa o fuso IANA do agendamento (D-26): o valor explícito vence; na ausência, o
+     * {@code X-Timezone} da requisição é gravado — nunca o fuso implícito do servidor.
+     */
+    private String resolverFusoAgendamento(String fusoExplicito) {
+        if (fusoExplicito != null && !fusoExplicito.isBlank()) {
+            return TimezoneContext.resolverZoneId(fusoExplicito).getId();
+        }
+        try {
+            return timezoneContext.zoneId().getId();
+        } catch (Exception _) {
+            return TimezoneContext.DEFAULT_ZONE.getId();
+        }
+    }
 
     private void validarGapDst(LocalDate dataVencimento, String horario, String fusoAgendamento) {
         if (horario != null && !horario.isBlank() && dataVencimento != null) {

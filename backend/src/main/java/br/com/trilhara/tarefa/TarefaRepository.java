@@ -396,6 +396,18 @@ public class TarefaRepository {
         )).getDeletedCount();
     }
 
+    /**
+     * IDs das tarefas de uma série no tenant (inclusive na lixeira), usado para cancelar os
+     * lembretes push das ocorrências em lote (D-36a). Começa por {@code usuarioId} (D-06a).
+     */
+    public List<ObjectId> listarIdsPorSerie(ObjectId usuarioId, ObjectId serieId) {
+        List<ObjectId> ids = new ArrayList<>();
+        collection.find(and(eq("usuarioId", usuarioId), eq("serieId", serieId)))
+                .projection(new Document("_id", 1))
+                .forEach(doc -> ids.add(doc.getObjectId("_id")));
+        return ids;
+    }
+
     public long moverPendentesSerieParaLixeira(ObjectId usuarioId, ObjectId serieId, String loteExclusaoId, Instant agora, Instant expiresAt) {
         return collection.updateMany(
                 and(

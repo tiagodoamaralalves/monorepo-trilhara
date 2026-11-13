@@ -1,7 +1,10 @@
 package br.com.trilhara.push;
 
+import java.net.URI;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Map;
+import java.util.Set;
 
 import org.bson.types.ObjectId;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -14,6 +17,7 @@ import br.com.trilhara.push.dto.AtualizarPreferenciasPushResponse;
 import br.com.trilhara.push.dto.PushConfigResponse;
 import br.com.trilhara.push.dto.PushSubscriptionRequest;
 import br.com.trilhara.push.dto.PushSubscriptionResponse;
+import br.com.trilhara.push.dto.RemoverInscricaoPushRequest;
 import br.com.trilhara.shared.erro.ValidationException;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
@@ -24,17 +28,25 @@ import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.NotFoundException;
-import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
+/**
+ * Web Push do usuário autenticado (D-36).
+ *
+ * <p>Rotas: {@code GET /config}, {@code POST|DELETE /subscriptions} e
+ * {@code PUT /preferencias}. Todas exigem autenticação; a inscrição de outro usuário não existe
+ * (404), e o upsert de um {@code endpoint} já existente o reatribui ao usuário atual.</p>
+ */
 @Path("/api/push")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 @Autenticado
 public class PushResource {
+
+    /** Conjunto fechado de antecedências aceitas (D-26). */
+    static final Set<Integer> MINUTOS_ACEITOS = Set.of(0, 5, 15, 30, 60);
 
     private final AuthContext authContext;
     private final PushSubscriptionRepository pushSubscriptionRepository;
@@ -46,6 +58,9 @@ public class PushResource {
 
     @ConfigProperty(name = "trilhara.push.vapid.public-key")
     java.util.Optional<String> vapidPublicKey;
+
+    @ConfigProperty(name = "trilhara.push.vapid.private-key")
+    java.util.Optional<String> vapidPrivateKey;
 
     @Inject
     public PushResource(
@@ -66,57 +81,59 @@ public class PushResource {
         int padrao = userRepository.obterPadraoLembreteMinutos(usuarioId);
 
         String pubKey = vapidPublicKey.map(String::trim).filter(s -> !s.isBlank()).orElse(null);
-        boolean habilitado = pushHabilitado && pubKey != null;
+        // "habilitado" só é verdadeiro quando é possível assinar o envio (par de chaves completo).
+        boolean habilitado = pushHabilitado && pubKey != null && temChavePrivada();
 
         return new PushConfigResponse(habilitado, pubKey, padrao);
     }
 
+    /**
+     * Upsert por {@code endpoint} (D-36e). Se o {@code endpoint} já pertence a outro usuário,
+     * ele é <strong>reatribuído</strong> ao usuário autenticado — o dispositivo físico é o mesmo
+     * e a inscrição push não pode continuar entregando para a conta anterior.
+     */
     @POST
     @Path("/subscriptions")
     public Response registrarInscricao(PushSubscriptionRequest request) {
         if (request == null || request.endpoint() == null || request.endpoint().isBlank()) {
             throw new ValidationException("endpoint", "Endpoint é obrigatório.");
         }
+        String endpoint = request.endpoint().trim();
+        validarEndpoint(endpoint);
+        validarChaves(request.resolvedP256dh(), request.resolvedAuth());
 
         ObjectId usuarioId = extrairUsuarioId();
-        ObjectId id = new ObjectId();
         Instant agora = Instant.now();
 
         PushSubscription sub = new PushSubscription(
-                id,
+                new ObjectId(),
                 usuarioId,
-                request.endpoint().trim(),
+                endpoint,
                 request.resolvedP256dh(),
                 request.resolvedAuth(),
                 request.userAgent(),
                 agora,
-                agora
-        );
+                agora);
 
-        pushSubscriptionRepository.salvarOuAtualizar(sub);
+        String idPersistido = pushSubscriptionRepository.salvarOuAtualizar(sub);
 
         return Response.status(Response.Status.CREATED)
-                .entity(new PushSubscriptionResponse(id.toHexString(), sub.endpoint(), agora))
+                .entity(new PushSubscriptionResponse(idPersistido, endpoint, agora))
                 .build();
     }
 
+    /**
+     * Remove a inscrição deste dispositivo (logout, D-36e). Endpoint de outro usuário ou
+     * inexistente responde {@code 404} sem revelar existência.
+     */
     @DELETE
     @Path("/subscriptions")
-    public Response removerInscricao(
-            @QueryParam("endpoint") String endpointParam,
-            PushSubscriptionRequest requestBody) {
-
-        ObjectId usuarioId = extrairUsuarioId();
-        String endpoint = endpointParam;
-        if ((endpoint == null || endpoint.isBlank()) && requestBody != null) {
-            endpoint = requestBody.endpoint();
-        }
-
-        if (endpoint == null || endpoint.isBlank()) {
+    public Response removerInscricao(RemoverInscricaoPushRequest request) {
+        if (request == null || request.endpoint() == null || request.endpoint().isBlank()) {
             throw new ValidationException("endpoint", "Endpoint é obrigatório para remoção.");
         }
-
-        boolean removido = pushSubscriptionRepository.removerPorEndpoint(usuarioId, endpoint.trim());
+        ObjectId usuarioId = extrairUsuarioId();
+        boolean removido = pushSubscriptionRepository.removerPorEndpoint(usuarioId, request.endpoint().trim());
         if (!removido) {
             throw new NotFoundException("Inscrição push não encontrada.");
         }
@@ -126,10 +143,57 @@ public class PushResource {
     @PUT
     @Path("/preferencias")
     public AtualizarPreferenciasPushResponse atualizarPreferencias(@Valid AtualizarPreferenciasPushRequest request) {
-        ObjectId usuarioId = extrairUsuarioId();
         int novoPadrao = request.padraoMinutosAntes();
+        if (!MINUTOS_ACEITOS.contains(novoPadrao)) {
+            throw new ValidationException("padraoMinutosAntes",
+                    "Valor inválido. Use 0, 5, 15, 30 ou 60 minutos.");
+        }
+        ObjectId usuarioId = extrairUsuarioId();
         long recalculados = lembretePushService.atualizarPreferenciaGlobal(usuarioId, novoPadrao);
         return new AtualizarPreferenciasPushResponse(novoPadrao, recalculados);
+    }
+
+    /** Endpoint de Web Push é sempre HTTPS (RFC 8030 §3.2). */
+    private void validarEndpoint(String endpoint) {
+        URI uri;
+        try {
+            uri = URI.create(endpoint);
+        } catch (IllegalArgumentException e) {
+            throw new ValidationException("endpoint", "Endpoint malformado.");
+        }
+        if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null) {
+            throw new ValidationException("endpoint", "Endpoint deve ser uma URL HTTPS.");
+        }
+    }
+
+    /**
+     * {@code p256dh} é chave pública P-256 não comprimida (65 bytes) e {@code auth} tem 16 bytes,
+     * ambos em base64url sem padding (RFC 8291 §3.2).
+     */
+    private void validarChaves(String p256dh, String auth) {
+        byte[] chavePublica = decodificarBase64Url(p256dh);
+        if (chavePublica != null && (chavePublica.length != 65 || chavePublica[0] != 0x04)) {
+            throw new ValidationException("keys.p256dh", "Chave p256dh deve ter 65 bytes (ponto EC não comprimido).");
+        }
+        byte[] segredo = decodificarBase64Url(auth);
+        if (segredo != null && segredo.length != 16) {
+            throw new ValidationException("keys.auth", "Chave auth deve ter 16 bytes.");
+        }
+    }
+
+    private byte[] decodificarBase64Url(String valor) {
+        if (valor == null || valor.isBlank()) {
+            throw new ValidationException("keys", "As chaves p256dh e auth são obrigatórias.");
+        }
+        try {
+            return Base64.getUrlDecoder().decode(valor.trim());
+        } catch (IllegalArgumentException e) {
+            throw new ValidationException("keys", "Chaves devem estar em base64url.");
+        }
+    }
+
+    private boolean temChavePrivada() {
+        return vapidPrivateKey != null && vapidPrivateKey.isPresent() && !vapidPrivateKey.get().isBlank();
     }
 
     private ObjectId extrairUsuarioId() {

@@ -269,7 +269,9 @@ public final class IndicesCanonicos {
                 unico(ColecaoTrilhara.PUSH_SUBSCRIPTIONS,
                         "uk_push_subscriptions_endpoint", asc("endpoint")),
 
-                // 20. lembretes_push (D-36)
+                // 20. lembretes_push (D-36a): uma versão por (tarefa, versão); fila por estado e
+                // instante de entrega; consulta por tenant. `leaseToken`/`leaseAte` são os nomes
+                // canônicos do lease de processamento (D-36a).
                 unico(ColecaoTrilhara.LEMBRETES_PUSH,
                         "uk_lembretes_push_tarefaId_versaoAgendamento",
                         composto(asc("tarefaId"), asc("versaoAgendamento"))),

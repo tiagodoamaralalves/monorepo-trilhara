@@ -10,12 +10,20 @@
 # Variáveis:
 #   JAVA_HOME      JDK 25 (o backend exige release 25). O VS Code aponta
 #                  JAVA_HOME para um JRE sem javac, o que quebra o mvnw.
-#   MONGODB_URL    O perfil %test de application.properties fixa 172.22.0.2,
-#                  IP que não existe no host atual. O container trilhara_mongo
-#                  não publica porta; usamos o IP da rede do compose.
+#   MONGODB_URL    O container trilhara_mongo não publica porta, então
+#                  localhost:27017 só funciona se alguém a publicar. Caso
+#                  contrário usamos o IP da rede do compose — o primeiro que
+#                  responder, pois o container pode estar em mais de uma rede.
 #   RESEND_API_KEY trilhara.email.resend-api-key não possui default; sem valor
 #                  o Quarkus aborta no startup (ConfigRecorder) e a suíte
 #                  backend pulam 106 testes + 1 erro. Valor dummy só para teste.
+#
+# Descoberta do Docker:
+#   No WSL podem coexistir dois daemons: o snap `docker` (onde vivem os
+#   containers deste compose) e o Docker Desktop do Windows, cujo docker.exe
+#   entra no PATH pelo interop e responde "could not be found in this WSL 2
+#   distro". Por isso não basta `command -v docker`: validamos que o cliente
+#   alcança de fato um daemon. Use DOCKER_BIN para forçar um binário.
 #
 set -uo pipefail
 
@@ -40,24 +48,63 @@ if [ -z "$JAVA_HOME_EFETIVO" ] || [ ! -x "$JAVA_HOME_EFETIVO/bin/javac" ]; then
   exit 1
 fi
 
+# --- Docker utilizável ----------------------------------------------------
+# Um `docker` no PATH pode ser o docker.exe do interop do WSL (Docker Desktop),
+# que falha com "could not be found in this WSL 2 distro". Só aceitamos o
+# cliente que responde a um `docker info` de verdade.
+resolver_docker() {
+  local candidato
+  for candidato in "${DOCKER_BIN:-}" /snap/bin/docker /usr/bin/docker /usr/local/bin/docker; do
+    [ -n "$candidato" ] || continue
+    [ -x "$candidato" ] || continue
+    if "$candidato" info >/dev/null 2>&1; then
+      DOCKER_BIN="$candidato"
+      return 0
+    fi
+  done
+  candidato="$(command -v docker 2>/dev/null || true)"
+  if [ -n "$candidato" ] && "$candidato" info >/dev/null 2>&1; then
+    DOCKER_BIN="$candidato"
+    return 0
+  fi
+  DOCKER_BIN=""
+  return 1
+}
+
 # --- MONGODB_URL ----------------------------------------------------------
 MONGODB_URL_EFETIVO="${MONGODB_URL:-}"
 if [ -z "$MONGODB_URL_EFETIVO" ]; then
   # 1) porta publicada no host, se existir
   if (exec 3<>/dev/tcp/127.0.0.1/27017) 2>/dev/null; then
     MONGODB_URL_EFETIVO="mongodb://localhost:27017"
-  # 2) IP do container trilhara_mongo na rede do compose
-  elif command -v docker >/dev/null 2>&1; then
-    IP_MONGO="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' trilhara_mongo 2>/dev/null | awk '{print $1}')"
-    if [ -n "$IP_MONGO" ] && (exec 3<>"/dev/tcp/$IP_MONGO/27017") 2>/dev/null; then
-      MONGODB_URL_EFETIVO="mongodb://$IP_MONGO:27017"
+  # 2) IP do container trilhara_mongo na rede do compose. O container pode
+  #    estar em várias redes (inclusive de stacks antigas já derrubadas), então
+  #    testamos cada IP e usamos o primeiro que aceitar conexão na 27017.
+  elif resolver_docker; then
+    CONTAINER_MONGO="${MONGO_CONTAINER:-trilhara_mongo}"
+    IP_MONGO="$(
+      "$DOCKER_BIN" inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' \
+        "$CONTAINER_MONGO" 2>/dev/null | tr ' ' '\n' | sed '/^$/d' || true
+    )"
+    if [ -z "$IP_MONGO" ]; then
+      echo "env-gate: container '$CONTAINER_MONGO' não encontrado via '$DOCKER_BIN'." >&2
     fi
+    for ip in $IP_MONGO; do
+      if (exec 3<>"/dev/tcp/$ip/27017") 2>/dev/null; then
+        MONGODB_URL_EFETIVO="mongodb://$ip:27017"
+        break
+      fi
+    done
+  else
+    echo "env-gate: nenhum cliente docker funcional (tente DOCKER_BIN=/snap/bin/docker)." >&2
   fi
 fi
 if [ -z "$MONGODB_URL_EFETIVO" ]; then
-  echo "env-gate: MongoDB inalcançável. Suba 'docker compose up -d mongo' ou exporte MONGODB_URL." >&2
+  echo "env-gate: MongoDB inalcançável. Suba o container com" \
+       "'${DOCKER_BIN:-docker} compose up -d mongo' ou exporte MONGODB_URL." >&2
   exit 1
 fi
+
 
 # --- RESEND_API_KEY -------------------------------------------------------
 # Valor dummy: a suíte nunca deve fazer chamadas reais ao provedor de e-mail.

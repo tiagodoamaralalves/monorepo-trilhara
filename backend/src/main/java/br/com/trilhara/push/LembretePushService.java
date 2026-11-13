@@ -17,6 +17,25 @@ import br.com.trilhara.tarefa.TarefaRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+/**
+ * Regras de agendamento e reagendamento do lembrete push (D-26 / D-36a).
+ *
+ * <p>Regra de elegibilidade, avaliada sempre a partir do estado atual da tarefa:</p>
+ * <pre>
+ * elegível = estado == PENDENTE
+ *            ∧ deletedAt == null
+ *            ∧ dataVencimento != null
+ *            ∧ horario != null
+ *            ∧ modoLembrete != SEM_ALERTA
+ *            ∧ instanteEntregaUtc &gt; agora
+ * </pre>
+ *
+ * <p>Quando a tarefa é elegível e o instante calculado difere da versão vigente
+ * {@code PENDENTE}, cria-se {@code versaoAgendamento + 1} e cancelam-se as anteriores. Quando
+ * nada relevante mudou, nenhuma versão nova é criada (idempotência). Quando a tarefa deixa de
+ * ser elegível, as versões {@code PENDENTE} são canceladas — a suspensão preserva
+ * {@code modoLembrete}/{@code lembreteMinutosAntes} na tarefa.</p>
+ */
 @ApplicationScoped
 public class LembretePushService {
 
@@ -39,75 +58,109 @@ public class LembretePushService {
         this.timezoneContext = timezoneContext;
     }
 
+
     /**
-     * Agenda ou atualiza o lembrete de uma tarefa manual com horário.
+     * Recalcula o agendamento da tarefa aplicando a regra D-36a. Idempotente: chamadas repetidas
+     * com o mesmo estado material não criam versões novas.
+     *
+     * @param tarefa  estado material da tarefa (já persistido)
+     * @param modoOverride modo a considerar antes da persistência (criação/edição); {@code null}
+     *                     usa o da tarefa
+     * @param minutosOverride minutos a considerar antes da persistência; {@code null} usa o da
+     *                        tarefa
+     * @return a versão {@code PENDENTE} vigente, ou vazio quando a tarefa não é elegível
      */
     public Optional<LembretePush> agendarOuAtualizarLembrete(
             Tarefa tarefa,
-            ModoLembrete modoLembreteOverride,
-            Integer lembreteMinutosAntesOverride,
-            String fusoAgendamentoOverride) {
+            ModoLembrete modoOverride,
+            Integer minutosOverride,
+            String fusoOverride) {
 
-        if (tarefa == null || tarefa.id() == null) {
+        if (tarefa == null || tarefa.id() == null || tarefa.usuarioId() == null) {
             return Optional.empty();
         }
 
-        if (deveCancelarLembrete(tarefa)) {
-            lembretePushRepository.cancelarPorTarefa(tarefa.usuarioId(), tarefa.id());
+        Optional<Instant> instanteOpt = calcularInstanteElegivel(tarefa, modoOverride, minutosOverride, fusoOverride);
+        if (instanteOpt.isEmpty()) {
+            lembretePushRepository.cancelarPendentes(tarefa.usuarioId(), tarefa.id());
             return Optional.empty();
         }
 
-        Integer minutosAntes = resolverMinutosAntes(tarefa, modoLembreteOverride, lembreteMinutosAntesOverride);
+        Instant instanteEntregaUtc = instanteOpt.get();
+        Optional<LembretePush> vigente = lembretePushRepository.buscarVersaoVigente(tarefa.usuarioId(), tarefa.id());
+
+        // Idempotência: mesma tarefa, mesmo instante e versão ainda PENDENTE = nada a fazer.
+        if (vigente.isPresent()
+                && LembretePush.ESTADO_PENDENTE.equals(vigente.get().estado())
+                && instanteEntregaUtc.equals(vigente.get().instanteEntregaUtc())) {
+            return vigente;
+        }
+
+        long proximaVersao = vigente.map(v -> v.versaoAgendamento() + 1).orElse(LembretePush.VERSAO_INICIAL);
+        Instant agora = Instant.now();
+        LembretePush nova = new LembretePush(
+                new ObjectId(),
+                tarefa.usuarioId(),
+                tarefa.id(),
+                proximaVersao,
+                instanteEntregaUtc,
+                LembretePush.ESTADO_PENDENTE,
+                0,
+                null,
+                null,
+                agora,
+                agora);
+
+        if (!lembretePushRepository.inserirNovaVersao(nova)) {
+            // Corrida perdida para outra requisição da mesma tarefa: a versão vigente é a fonte.
+            return lembretePushRepository.buscarVersaoVigente(tarefa.usuarioId(), tarefa.id());
+        }
+        lembretePushRepository.cancelarPendentesAnteriores(tarefa.usuarioId(), tarefa.id(), proximaVersao);
+        return Optional.of(nova);
+    }
+
+    /**
+     * Calcula o instante de entrega quando a tarefa é elegível; vazio caso contrário.
+     *
+     * <p>O cálculo roda mesmo quando a tarefa não é elegível por tempo, para que a decisão fique
+     * centralizada: a rejeição de gap DST ({@code 400 INVALID_LOCAL_DATETIME}) precisa acontecer
+     * também em criação/edição.</p>
+     */
+    private Optional<Instant> calcularInstanteElegivel(
+            Tarefa tarefa, ModoLembrete modoOverride, Integer minutosOverride, String fusoOverride) {
+
+        if (tarefa.deletedAt() != null) {
+            return Optional.empty();
+        }
+        if (!"PENDENTE".equalsIgnoreCase(tarefa.estado())) {
+            return Optional.empty();
+        }
+        if (tarefa.dataVencimento() == null || tarefa.horario() == null || tarefa.horario().isBlank()) {
+            return Optional.empty();
+        }
+
+        ModoLembrete modo = modoOverride != null ? modoOverride : tarefa.modoLembrete();
+        if (modo == ModoLembrete.SEM_ALERTA) {
+            return Optional.empty();
+        }
+        Integer minutosAntes = resolverMinutosAntes(tarefa, modo, minutosOverride);
         if (minutosAntes == null || minutosAntes < 0) {
-            lembretePushRepository.cancelarPorTarefa(tarefa.usuarioId(), tarefa.id());
             return Optional.empty();
         }
 
-        ZoneId zoneId = resolverZoneId(tarefa, fusoAgendamentoOverride);
         Optional<LocalTime> horarioOpt = parseHorario(tarefa.horario(), tarefa.id());
         if (horarioOpt.isEmpty()) {
             return Optional.empty();
         }
 
-        LocalTime horario = horarioOpt.get();
-        Instant instanteEntregaUtc = LembretePushCalculator.calcularInstanteEntregaUtc(
-                tarefa.dataVencimento(),
-                horario,
-                zoneId,
-                minutosAntes
-        );
+        ZoneId zoneId = resolverZoneId(tarefa, fusoOverride);
+        Instant instante = LembretePushCalculator.calcularInstanteEntregaUtc(
+                tarefa.dataVencimento(), horarioOpt.get(), zoneId, minutosAntes);
 
-        Optional<LembretePush> existente = lembretePushRepository.buscarPorTarefa(tarefa.usuarioId(), tarefa.id());
-        int versao = existente.map(e -> e.versaoAgendamento() + 1).orElse(1);
-
-        LembretePush novoLembrete = new LembretePush(
-                existente.map(LembretePush::id).orElse(new ObjectId()),
-                tarefa.usuarioId(),
-                tarefa.id(),
-                versao,
-                instanteEntregaUtc,
-                minutosAntes,
-                zoneId.getId(),
-                LembretePush.ESTADO_PENDENTE,
-                tarefa.titulo(),
-                0,
-                null,
-                null,
-                null,
-                null,
-                existente.map(LembretePush::criadoEm).orElse(Instant.now()),
-                Instant.now()
-        );
-
-        lembretePushRepository.salvarOuAtualizar(novoLembrete);
-        return Optional.of(novoLembrete);
-    }
-
-    private boolean deveCancelarLembrete(Tarefa tarefa) {
-        if (tarefa.dataVencimento() == null || tarefa.horario() == null || tarefa.horario().isBlank()) {
-            return true;
+        if (instante == null || !instante.isAfter(Instant.now())) {
+            return Optional.empty();
         }
-        return tarefa.concluida() || "CONCLUIDA".equalsIgnoreCase(tarefa.estado()) || tarefa.deletedAt() != null;
+        return Optional.of(instante);
     }
 
     /**
@@ -117,24 +170,24 @@ public class LembretePushService {
      * {@code SEM_ALERTA} devolve {@code null} (nenhum push); {@code PERSONALIZADO} usa o
      * deslocamento gravado na tarefa.</p>
      */
-    private Integer resolverMinutosAntes(
-            Tarefa tarefa, ModoLembrete modoLembreteOverride, Integer lembreteMinutosAntesOverride) {
-        ModoLembrete modo = modoLembreteOverride != null ? modoLembreteOverride : tarefa.modoLembrete();
+    private Integer resolverMinutosAntes(Tarefa tarefa, ModoLembrete modo, Integer minutosOverride) {
         return switch (modo) {
             case SEM_ALERTA -> null;
-            case PERSONALIZADO -> lembreteMinutosAntesOverride != null
-                    ? lembreteMinutosAntesOverride
-                    : tarefa.lembreteMinutosAntes();
+            case PERSONALIZADO -> minutosOverride != null ? minutosOverride : tarefa.lembreteMinutosAntes();
             case HERDAR -> userRepository.obterPadraoLembreteMinutos(tarefa.usuarioId());
         };
     }
 
+    /**
+     * Fuso do agendamento: o persistido na tarefa prevalece; {@code X-Timezone} só entra quando a
+     * tarefa ainda não tem fuso (D-26) e é materializado pelo chamador ao salvar.
+     */
     private ZoneId resolverZoneId(Tarefa tarefa, String fusoAgendamentoOverride) {
-        if (fusoAgendamentoOverride != null && !fusoAgendamentoOverride.isBlank()) {
-            return TimezoneContext.resolverZoneId(fusoAgendamentoOverride);
-        }
         if (tarefa.fusoAgendamento() != null && !tarefa.fusoAgendamento().isBlank()) {
             return TimezoneContext.resolverZoneId(tarefa.fusoAgendamento());
+        }
+        if (fusoAgendamentoOverride != null && !fusoAgendamentoOverride.isBlank()) {
+            return TimezoneContext.resolverZoneId(fusoAgendamentoOverride);
         }
         try {
             return timezoneContext.zoneId();
@@ -151,21 +204,35 @@ public class LembretePushService {
             return Optional.empty();
         }
     }
+
+    /** Cancela as versões {@code PENDENTE} (conclusão, exclusão, pulo). */
     public void cancelarLembrete(ObjectId usuarioId, ObjectId tarefaId) {
         if (usuarioId != null && tarefaId != null) {
-            lembretePushRepository.cancelarPorTarefa(usuarioId, tarefaId);
+            lembretePushRepository.cancelarPendentes(usuarioId, tarefaId);
         }
     }
 
+    /** Alias semântico de {@link #cancelarLembrete}: remover o horário suspende, não descarta. */
     public void suspenderLembrete(ObjectId usuarioId, ObjectId tarefaId) {
-        if (usuarioId != null && tarefaId != null) {
-            lembretePushRepository.cancelarPorTarefa(usuarioId, tarefaId);
+        cancelarLembrete(usuarioId, tarefaId);
+    }
+
+    /** Cancela em lote todos os lembretes de tarefas de uma série (exclusão de escopo). */
+    public void cancelarLembretesDaSerie(ObjectId usuarioId, List<ObjectId> tarefasIds) {
+        if (usuarioId == null || tarefasIds == null) {
+            return;
+        }
+        for (ObjectId tarefaId : tarefasIds) {
+            cancelarLembrete(usuarioId, tarefaId);
         }
     }
 
     /**
-     * Atualiza a preferência global do usuário e recalcula lembretes PENDENTES
-     * exclusivamente das tarefas herdeiras ({@code modoLembrete == HERDAR}, D-26).
+     * Atualiza a preferência global do usuário e recalcula lembretes exclusivamente das tarefas
+     * herdeiras ({@code modoLembrete == HERDAR}, D-26.2). Overrides {@code PERSONALIZADO} e
+     * {@code SEM_ALERTA} nunca são tocados.
+     *
+     * @return quantidade de tarefas herdeiras efetivamente reagendadas
      */
     public long atualizarPreferenciaGlobal(ObjectId usuarioId, int novoPadraoMinutos) {
         userRepository.salvarPadraoLembreteMinutos(usuarioId, novoPadraoMinutos);
@@ -174,32 +241,15 @@ public class LembretePushService {
         long recalculados = 0;
 
         for (Tarefa t : tarefasHerdeiras) {
-            if (t.dataVencimento() == null || t.horario() == null || t.horario().isBlank()) {
-                continue;
-            }
-
-            ZoneId zoneId = t.fusoAgendamento() != null && !t.fusoAgendamento().isBlank()
-                    ? TimezoneContext.resolverZoneId(t.fusoAgendamento())
-                    : TimezoneContext.DEFAULT_ZONE;
-
             try {
-                LocalTime horario = LocalTime.parse(t.horario().trim());
-                Instant novoInstante = LembretePushCalculator.calcularInstanteEntregaUtc(
-                        t.dataVencimento(),
-                        horario,
-                        zoneId,
-                        novoPadraoMinutos
-                );
-
-                Optional<LembretePush> existente = lembretePushRepository.buscarPorTarefa(usuarioId, t.id());
-                if (existente.isPresent() && LembretePush.ESTADO_PENDENTE.equals(existente.get().estado())) {
-                    lembretePushRepository.atualizarPendente(existente.get().id(), novoInstante, novoPadraoMinutos);
-                    recalculados++;
-                } else if (existente.isEmpty()) {
-                    agendarOuAtualizarLembrete(t, ModoLembrete.PERSONALIZADO, novoPadraoMinutos, zoneId.getId());
+                // O modo da própria tarefa é HERDAR; o novo padrão entra pelo override de minutos.
+                Optional<LembretePush> agendado =
+                        agendarOuAtualizarLembrete(t, ModoLembrete.HERDAR, novoPadraoMinutos, null);
+                if (agendado.isPresent()) {
                     recalculados++;
                 }
             } catch (Exception e) {
+                // Uma tarefa com data inválida (ex.: gap DST) nunca impede o recálculo das demais.
                 LOG.warnf("Falha ao recalcular lembrete da tarefa %s: %s", t.id(), e.getMessage());
             }
         }

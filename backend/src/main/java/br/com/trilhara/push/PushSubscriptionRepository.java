@@ -15,7 +15,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
-import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -33,9 +34,19 @@ public class PushSubscriptionRepository {
         this.collection = mongoClient.getDatabase(databaseName).getCollection("push_subscriptions");
     }
 
-    public void salvarOuAtualizar(PushSubscription sub) {
+    /**
+     * Upsert por {@code endpoint} (chave única {@code uk_push_subscriptions_endpoint}).
+     *
+     * <p>Um {@code endpoint} já existente é <strong>reatribuído</strong> ao usuário informado
+     * (D-36e): o dispositivo físico mudou de conta e não pode continuar recebendo notificações
+     * da conta anterior.</p>
+     *
+     * @return o {@code _id} efetivamente persistido (o mesmo documento em reupsert)
+     */
+    public String salvarOuAtualizar(PushSubscription sub) {
         Date agora = Date.from(Instant.now());
-        collection.updateOne(
+
+        Document resultado = collection.findOneAndUpdate(
                 eq("endpoint", sub.endpoint()),
                 Updates.combine(
                         Updates.set("usuarioId", sub.usuarioId()),
@@ -43,10 +54,14 @@ public class PushSubscriptionRepository {
                         Updates.set("auth", sub.auth()),
                         Updates.set("userAgent", sub.userAgent()),
                         Updates.set("atualizadoEm", agora),
-                        Updates.setOnInsert("criadoEm", sub.criadoEm() != null ? Date.from(sub.criadoEm()) : agora)
-                ),
-                new UpdateOptions().upsert(true)
-        );
+                        Updates.setOnInsert("criadoEm", sub.criadoEm() != null ? Date.from(sub.criadoEm()) : agora)),
+                new FindOneAndUpdateOptions()
+                        .upsert(true)
+                        .returnDocument(ReturnDocument.AFTER));
+
+        return resultado != null && resultado.getObjectId("_id") != null
+                ? resultado.getObjectId("_id").toHexString()
+                : sub.id().toHexString();
     }
 
     public boolean removerPorEndpoint(ObjectId usuarioId, String endpoint) {
@@ -56,7 +71,12 @@ public class PushSubscriptionRepository {
         return collection.deleteOne(and(eq("usuarioId", usuarioId), eq("endpoint", endpoint.trim()))).getDeletedCount() > 0;
     }
 
-    public boolean removerPorEndpoint(String endpoint) {
+    /**
+     * Remove a inscrição <strong>morta</strong> informada pelo provedor ({@code 404}/{@code 410},
+     * §11). Operação de sistema: o {@code endpoint} é único globalmente e a inscrição não pode
+     * continuar na coleção, mesmo que já tenha sido reatribuída a outro usuário no intervalo.
+     */
+    public boolean removerEndpointInvalido(String endpoint) {
         if (endpoint == null || endpoint.isBlank()) {
             return false;
         }
@@ -69,8 +89,10 @@ public class PushSubscriptionRepository {
         return lista;
     }
 
-    public Optional<PushSubscription> buscarPorEndpoint(String endpoint) {
-        Document doc = collection.find(eq("endpoint", endpoint)).first();
+    public Optional<PushSubscription> buscarPorEndpoint(ObjectId usuarioId, String endpoint) {
+        Document doc = collection
+                .find(and(eq("usuarioId", usuarioId), eq("endpoint", endpoint)))
+                .first();
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
 

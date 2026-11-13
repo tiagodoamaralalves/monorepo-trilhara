@@ -2,13 +2,10 @@ package br.com.trilhara.push;
 
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
-import static com.mongodb.client.model.Filters.lte;
-import static com.mongodb.client.model.Filters.or;
+import static com.mongodb.client.model.Filters.ne;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 import java.util.Optional;
 
 import org.bson.Document;
@@ -17,15 +14,18 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
-import com.mongodb.client.model.FindOneAndUpdateOptions;
-import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+/**
+ * Acesso <strong>por tenant</strong> a {@code lembretes_push} (D-06a).
+ *
+ * <p>Toda leitura/escrita começa por {@code ObjectId usuarioId}. A varredura multi-tenant do
+ * scheduler vive em {@link LembretePushFilaRepository} ({@code @SystemScope}), nunca aqui.</p>
+ */
 @ApplicationScoped
 public class LembretePushRepository {
 
@@ -38,158 +38,103 @@ public class LembretePushRepository {
         this.collection = mongoClient.getDatabase(databaseName).getCollection("lembretes_push");
     }
 
-    public void salvarOuAtualizar(LembretePush lembrete) {
-        Date agora = Date.from(Instant.now());
-        collection.updateOne(
-                and(eq("usuarioId", lembrete.usuarioId()), eq("tarefaId", lembrete.tarefaId())),
-                Updates.combine(
-                        Updates.set("versaoAgendamento", lembrete.versaoAgendamento()),
-                        Updates.set("instanteEntregaUtc", Date.from(lembrete.instanteEntregaUtc())),
-                        Updates.set("minutosAntes", lembrete.minutosAntes()),
-                        Updates.set("fusoAgendamento", lembrete.fusoAgendamento()),
-                        Updates.set("estado", lembrete.estado()),
-                        Updates.set("tituloTarefa", lembrete.tituloTarefa()),
-                        Updates.set("tentativas", lembrete.tentativas()),
-                        Updates.set("proximaTentativaEm", lembrete.proximaTentativaEm() != null ? Date.from(lembrete.proximaTentativaEm()) : null),
-                        Updates.set("leaseOwner", lembrete.leaseOwner()),
-                        Updates.set("leaseExpiraEm", lembrete.leaseExpiraEm() != null ? Date.from(lembrete.leaseExpiraEm()) : null),
-                        Updates.set("ultimoErro", lembrete.ultimoErro()),
-                        Updates.set("atualizadoEm", agora),
-                        Updates.setOnInsert("criadoEm", lembrete.criadoEm() != null ? Date.from(lembrete.criadoEm()) : agora)
-                ),
-                new UpdateOptions().upsert(true)
-        );
+    /**
+     * Insere uma nova versão do agendamento. O índice único
+     * {@code {tarefaId, versaoAgendamento}} é a chave idempotente por
+     * {@code (tarefaId, versaoAgendamento)} (D-36a): reinserir a mesma versão por corrida entre
+     * duas requisições é no-op silencioso (nunca 500).
+     *
+     * @return {@code true} se a versão foi realmente inserida
+     */
+    public boolean inserirNovaVersao(LembretePush lembrete) {
+        Instant agora = Instant.now();
+        try {
+            collection.insertOne(paraDocumento(lembrete, Date.from(agora)));
+            return true;
+        } catch (com.mongodb.MongoWriteException e) {
+            if (e.getError().getCode() == 11000) {
+                return false;
+            }
+            throw e;
+        }
     }
 
-    public Optional<LembretePush> buscarPorTarefa(ObjectId usuarioId, ObjectId tarefaId) {
-        Document doc = collection.find(and(eq("usuarioId", usuarioId), eq("tarefaId", tarefaId))).first();
-        return Optional.ofNullable(doc).map(this::paraEntidade);
+    /** Versão vigente (maior {@code versaoAgendamento}) da tarefa no tenant. */
+    public Optional<LembretePush> buscarVersaoVigente(ObjectId usuarioId, ObjectId tarefaId) {
+        Document doc = collection
+                .find(and(eq("usuarioId", usuarioId), eq("tarefaId", tarefaId)))
+                .sort(Sorts.descending("versaoAgendamento"))
+                .first();
+        return Optional.ofNullable(doc).map(LembretePushRepository::paraEntidade);
     }
 
-    public Optional<LembretePush> buscarPorId(ObjectId id) {
-        Document doc = collection.find(eq("_id", id)).first();
-        return Optional.ofNullable(doc).map(this::paraEntidade);
+    /**
+     * Cancela as versões {@code PENDENTE} da tarefa que não sejam a versão informada.
+     *
+     * @return quantidade de documentos cancelados
+     */
+    public long cancelarPendentesAnteriores(ObjectId usuarioId, ObjectId tarefaId, long versaoMantida) {
+        return cancelar(and(
+                eq("usuarioId", usuarioId),
+                eq("tarefaId", tarefaId),
+                eq("estado", LembretePush.ESTADO_PENDENTE),
+                ne("versaoAgendamento", versaoMantida)));
     }
 
-    public void cancelarPorTarefa(ObjectId usuarioId, ObjectId tarefaId) {
-        collection.updateMany(
-                and(eq("usuarioId", usuarioId), eq("tarefaId", tarefaId)),
+    /** Cancela todas as versões {@code PENDENTE} da tarefa (suspensão, conclusão, lixeira). */
+    public long cancelarPendentes(ObjectId usuarioId, ObjectId tarefaId) {
+        return cancelar(and(
+                eq("usuarioId", usuarioId),
+                eq("tarefaId", tarefaId),
+                eq("estado", LembretePush.ESTADO_PENDENTE)));
+    }
+
+    private long cancelar(org.bson.conversions.Bson filtro) {
+        return collection.updateMany(
+                filtro,
                 Updates.combine(
                         Updates.set("estado", LembretePush.ESTADO_CANCELADO),
-                        Updates.set("atualizadoEm", Date.from(Instant.now()))
-                )
-        );
-    }
-
-    public void removerPorTarefa(ObjectId usuarioId, ObjectId tarefaId) {
-        collection.deleteMany(and(eq("usuarioId", usuarioId), eq("tarefaId", tarefaId)));
-    }
-
-    public List<LembretePush> listarCandidatosEnvio(Instant agora, int limite) {
-        List<LembretePush> lista = new ArrayList<>();
-        Date dateAgora = Date.from(agora);
-
-        var filtro = or(
-                and(eq("estado", LembretePush.ESTADO_PENDENTE), lte("instanteEntregaUtc", dateAgora)),
-                and(eq("estado", LembretePush.ESTADO_PROCESSANDO), lte("leaseExpiraEm", dateAgora))
-        );
-
-        collection.find(filtro)
-                .sort(Sorts.ascending("instanteEntregaUtc"))
-                .limit(limite)
-                .forEach(doc -> lista.add(paraEntidade(doc)));
-
-        return lista;
-    }
-
-    public Optional<LembretePush> claimLembrete(ObjectId id, String workerId, Instant agora, Instant leaseAte) {
-        Date dateAgora = Date.from(agora);
-        var filtro = and(
-                eq("_id", id),
-                or(
-                        eq("estado", LembretePush.ESTADO_PENDENTE),
-                        and(eq("estado", LembretePush.ESTADO_PROCESSANDO), lte("leaseExpiraEm", dateAgora))
-                )
-        );
-
-        var update = Updates.combine(
-                Updates.set("estado", LembretePush.ESTADO_PROCESSANDO),
-                Updates.set("leaseOwner", workerId),
-                Updates.set("leaseExpiraEm", Date.from(leaseAte)),
-                Updates.inc("tentativas", 1),
-                Updates.set("atualizadoEm", dateAgora)
-        );
-
-        Document doc = collection.findOneAndUpdate(
-                filtro,
-                update,
-                new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER)
-        );
-
-        return Optional.ofNullable(doc).map(this::paraEntidade);
-    }
-
-    public boolean concluirLembrete(ObjectId id, String workerId, String estado, String erro, Instant agora) {
-        var filtro = and(eq("_id", id), eq("leaseOwner", workerId));
-        var update = Updates.combine(
-                Updates.set("estado", estado),
-                Updates.set("ultimoErro", erro),
-                Updates.set("leaseOwner", null),
-                Updates.set("leaseExpiraEm", null),
-                Updates.set("atualizadoEm", Date.from(agora))
-        );
-        return collection.updateOne(filtro, update).getModifiedCount() > 0;
-    }
-
-    public boolean remarcarFalhaTemporaria(ObjectId id, String workerId, Instant proximaTentativaEm, String erro, Instant agora) {
-        var filtro = and(eq("_id", id), eq("leaseOwner", workerId));
-        var update = Updates.combine(
-                Updates.set("estado", LembretePush.ESTADO_PENDENTE),
-                Updates.set("instanteEntregaUtc", Date.from(proximaTentativaEm)),
-                Updates.set("proximaTentativaEm", Date.from(proximaTentativaEm)),
-                Updates.set("ultimoErro", erro),
-                Updates.set("leaseOwner", null),
-                Updates.set("leaseExpiraEm", null),
-                Updates.set("atualizadoEm", Date.from(agora))
-        );
-        return collection.updateOne(filtro, update).getModifiedCount() > 0;
-    }
-
-    public boolean atualizarPendente(ObjectId id, Instant novoInstanteEntregaUtc, int novoMinutosAntes) {
-        var update = Updates.combine(
-                Updates.set("instanteEntregaUtc", Date.from(novoInstanteEntregaUtc)),
-                Updates.set("minutosAntes", novoMinutosAntes),
-                Updates.set("atualizadoEm", Date.from(Instant.now()))
-        );
-        return collection.updateOne(and(eq("_id", id), eq("estado", LembretePush.ESTADO_PENDENTE)), update).getModifiedCount() > 0;
+                        Updates.set("leaseToken", null),
+                        Updates.set("leaseAte", null),
+                        Updates.set("atualizadoEm", Date.from(Instant.now()))))
+                .getModifiedCount();
     }
 
     public long excluirPorUsuario(ObjectId usuarioId) {
         return collection.deleteMany(eq("usuarioId", usuarioId)).getDeletedCount();
     }
 
-    private LembretePush paraEntidade(Document doc) {
+    static Document paraDocumento(LembretePush lembrete, Date agora) {
+        return new Document()
+                .append("_id", lembrete.id() != null ? lembrete.id() : new ObjectId())
+                .append("usuarioId", lembrete.usuarioId())
+                .append("tarefaId", lembrete.tarefaId())
+                .append("versaoAgendamento", lembrete.versaoAgendamento())
+                .append("instanteEntregaUtc", Date.from(lembrete.instanteEntregaUtc()))
+                .append("estado", lembrete.estado())
+                .append("tentativas", lembrete.tentativas())
+                .append("leaseToken", lembrete.leaseToken())
+                .append("leaseAte", lembrete.leaseAte() != null ? Date.from(lembrete.leaseAte()) : null)
+                .append("criadoEm", lembrete.criadoEm() != null ? Date.from(lembrete.criadoEm()) : agora)
+                .append("atualizadoEm", lembrete.atualizadoEm() != null ? Date.from(lembrete.atualizadoEm()) : agora);
+    }
+
+    static LembretePush paraEntidade(Document doc) {
         return new LembretePush(
                 doc.getObjectId("_id"),
                 doc.getObjectId("usuarioId"),
                 doc.getObjectId("tarefaId"),
-                doc.getInteger("versaoAgendamento", 1),
+                doc.get("versaoAgendamento") instanceof Number n ? n.longValue() : LembretePush.VERSAO_INICIAL,
                 paraInstant(doc.getDate("instanteEntregaUtc")),
-                doc.getInteger("minutosAntes"),
-                doc.getString("fusoAgendamento"),
                 doc.getString("estado"),
-                doc.getString("tituloTarefa"),
                 doc.getInteger("tentativas", 0),
-                paraInstant(doc.getDate("proximaTentativaEm")),
-                doc.getString("leaseOwner"),
-                paraInstant(doc.getDate("leaseExpiraEm")),
-                doc.getString("ultimoErro"),
+                doc.getString("leaseToken"),
+                paraInstant(doc.getDate("leaseAte")),
                 paraInstant(doc.getDate("criadoEm")),
-                paraInstant(doc.getDate("atualizadoEm"))
-        );
+                paraInstant(doc.getDate("atualizadoEm")));
     }
 
-    private static Instant paraInstant(Date date) {
+    static Instant paraInstant(Date date) {
         return date != null ? date.toInstant() : null;
     }
 }

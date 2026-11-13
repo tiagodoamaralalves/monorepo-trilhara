@@ -66,4 +66,34 @@ class LembretePushCalculatorTest {
         Instant instanteCalculado = LembretePushCalculator.calcularInstanteEntregaUtc(data, horario, zoneId, 15);
         assertEquals(Instant.parse("2026-11-01T05:15:00Z"), instanteCalculado);
     }
+
+    @Test
+    @DisplayName("Overlap DST em Europe/Lisbon: offset de verão (WEST) é escolhido deterministicamente")
+    void overlapDstEmLisboaEscolheOffsetDeVerao() {
+        // Em 25/10/2026 às 02:00 WEST os relógios voltam para 01:00 WET: 01:30 existe duas vezes.
+        LocalDate data = LocalDate.of(2026, 10, 25);
+        LocalTime horario = LocalTime.of(1, 30);
+        ZoneId lisboa = ZoneId.of("Europe/Lisbon");
+
+        // WEST (UTC+1): 01:30 local = 00:30 UTC. 10 min antes = 00:20 UTC.
+        // WET (UTC+0) seria 01:30 UTC, 01:20 UTC antes — a ocorrência anterior deve vencer.
+        Instant calculado = LembretePushCalculator.calcularInstanteEntregaUtc(data, horario, lisboa, 10);
+        assertEquals(Instant.parse("2026-10-25T00:20:00Z"), calculado);
+    }
+
+    @Test
+    @DisplayName("Cálculo com America/Sao_Paulo e Europe/Lisbon no mesmo instante local difere por fuso")
+    void fusosDiferentesProduzemInstantesDiferentes() {
+        LocalDate data = LocalDate.of(2026, 6, 15);
+        LocalTime horario = LocalTime.of(14, 0);
+
+        Instant saoPaulo = LembretePushCalculator.calcularInstanteEntregaUtc(
+                data, horario, ZoneId.of("America/Sao_Paulo"), 15);
+        Instant lisboa = LembretePushCalculator.calcularInstanteEntregaUtc(
+                data, horario, ZoneId.of("Europe/Lisbon"), 15);
+
+        // São Paulo UTC-3 → 13:45 local = 16:45 UTC. Lisboa (WEST) UTC+1 → 13:45 = 12:45 UTC.
+        assertEquals(Instant.parse("2026-06-15T16:45:00Z"), saoPaulo);
+        assertEquals(Instant.parse("2026-06-15T12:45:00Z"), lisboa);
+    }
 }

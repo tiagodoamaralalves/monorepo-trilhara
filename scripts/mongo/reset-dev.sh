@@ -49,12 +49,21 @@ executar_mongosh() {
       && mongosh "${MONGODB_URL:-mongodb://localhost:27017}" --quiet --eval "$script" >/dev/null 2>&1; then
     return 0
   fi
-  if command -v docker >/dev/null 2>&1; then
-    docker exec "$CONTAINER" mongosh "$BANCO" --quiet --eval "$script"
-    return 0
+  # No WSL o `docker` do PATH pode ser o docker.exe do Docker Desktop, que não
+  # enxerga os containers deste compose. Preferimos um daemon que responda de fato.
+  local candidato
+  for candidato in "${DOCKER_BIN:-}" /snap/bin/docker /usr/bin/docker /usr/local/bin/docker; do
+    [ -n "$candidato" ] || continue
+    [ -x "$candidato" ] || continue
+    "$candidato" info >/dev/null 2>&1 || continue
+    "$candidato" exec "$CONTAINER" mongosh "$BANCO" --quiet --eval "$script" && return 0
+  done
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    docker exec "$CONTAINER" mongosh "$BANCO" --quiet --eval "$script" && return 0
   fi
   return 1
 }
+
 
 echo "reset-dev: removendo o banco '$BANCO' (container '$CONTAINER')..."
 if ! executar_mongosh 'db.dropDatabase()'; then

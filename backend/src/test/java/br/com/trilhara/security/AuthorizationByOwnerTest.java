@@ -677,10 +677,13 @@ public class AuthorizationByOwnerTest {
     @Test
     @DisplayName("13. Auditoria de Web Push: Usuario B não consegue excluir inscrição push pertencente a Usuario A (404)")
     void auditarPush() {
-        // Usuario B tenta remover o endpoint de A
+        // Usuario B tenta remover o endpoint de A. O contrato de
+        // DELETE /api/push/subscriptions recebe o endpoint no CORPO
+        // (RemoverInscricaoPushRequest); não há grafia por query string.
         given()
                 .header("Authorization", "Bearer " + tokenB)
-                .queryParam("endpoint", pushEndpointA)
+                .contentType("application/json")
+                .body(Map.of("endpoint", pushEndpointA))
                 .when()
                 .delete("/api/push/subscriptions")
                 .then()

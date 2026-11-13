@@ -15,6 +15,32 @@ export interface ConfiguracaoLembreteModalProps {
   onSalvo?: (novoPadrao: number) => void;
 }
 
+/** Textos normativos do Anexo B por estado de permissão do dispositivo. */
+const TEXTO_ESTADO: Record<PushPermissionState, string> = {
+  unsupported: 'Este navegador não suporta notificações. Suas tarefas funcionam normalmente.',
+  denied: 'As notificações estão bloqueadas nas configurações do navegador.',
+  default: 'Pendente de permissão',
+  granted: 'Concedida (Ativo)',
+  'ios-nao-instalado':
+    'Para receber notificações no iPhone/iPad, toque em Compartilhar → Adicionar à Tela de Início e abra o Trilhara por lá.'
+};
+
+const ROTULO_ESTADO: Record<PushPermissionState, string> = {
+  unsupported: 'Não Suportado',
+  denied: 'Bloqueada pelo Usuário',
+  default: 'Pendente de Permissão',
+  granted: 'Concedida (Ativo)',
+  'ios-nao-instalado': 'Instalação Necessária'
+};
+
+const COR_ESTADO: Record<PushPermissionState, string> = {
+  unsupported: '#94a3b8',
+  denied: '#ef4444',
+  default: '#f59e0b',
+  granted: '#10b981',
+  'ios-nao-instalado': '#f59e0b'
+};
+
 export const ConfiguracaoLembreteModal: React.FC<ConfiguracaoLembreteModalProps> = ({
   isOpen,
   onClose,
@@ -131,25 +157,23 @@ export const ConfiguracaoLembreteModal: React.FC<ConfiguracaoLembreteModalProps>
               style={{
                 fontSize: '0.8125rem',
                 fontWeight: 600,
-                color:
-                  permissionState === 'granted'
-                    ? '#10b981'
-                    : permissionState === 'denied'
-                    ? '#ef4444'
-                    : '#f59e0b'
+                color: COR_ESTADO[permissionState]
               }}
             >
-              {permissionState === 'granted'
-                ? 'Concedida (Ativo)'
-                : permissionState === 'denied'
-                ? 'Bloqueada pelo Usuário'
-                : permissionState === 'unsupported'
-                ? 'Não Suportado'
-                : 'Pendente de Permissão'}
+              {ROTULO_ESTADO[permissionState]}
             </span>
           </div>
 
-          {permissionState !== 'granted' && permissionState !== 'unsupported' && (
+          {/* Texto normativo do estado (Anexo B) */}
+          <p
+            data-testid="texto-estado-push"
+            style={{ margin: '8px 0 0 0', fontSize: '0.8125rem', color: 'var(--text-secondary, #94a3b8)' }}
+          >
+            {TEXTO_ESTADO[permissionState]}
+          </p>
+
+          {/* O pedido de permissão só acontece no clique (D-36 / Anexo B). */}
+          {permissionState !== 'granted' && permissionState !== 'unsupported' && permissionState !== 'ios-nao-instalado' && (
             <div style={{ marginTop: '10px' }}>
               <Button
                 type="button"
@@ -164,8 +188,8 @@ export const ConfiguracaoLembreteModal: React.FC<ConfiguracaoLembreteModalProps>
           )}
         </div>
 
-        {/* Dica para iOS Safari */}
-        {isIOS && (
+        {/* Dica para iOS Safari fora do modo standalone */}
+        {permissionState === 'ios-nao-instalado' && isIOS && (
           <div
             data-testid="dica-ios-standalone"
             style={{
@@ -179,8 +203,9 @@ export const ConfiguracaoLembreteModal: React.FC<ConfiguracaoLembreteModalProps>
           >
             <Smartphone size={20} color="#3b82f6" style={{ flexShrink: 0 }} />
             <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary, #cbd5e1)' }}>
-              <strong>Atenção no iPhone/iPad:</strong> No iOS Safari (16.4+), o Web Push só pode ser ativado se o Trilhara for instalado.
-              Toque em <strong>Compartilhar</strong> e selecione <strong>"Adicionar à Tela de Início"</strong>.
+              <strong>Atenção no iPhone/iPad:</strong> no iOS Safari (16.4+), o Web Push exige o
+              Trilhara instalado. Toque em <strong>Compartilhar</strong> e selecione{' '}
+              <strong>&quot;Adicionar à Tela de Início&quot;</strong>.
             </div>
           </div>
         )}

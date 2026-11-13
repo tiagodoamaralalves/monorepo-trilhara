@@ -1,5 +1,6 @@
 import { ApiError, request, tentarRenovarToken } from './api';
 import { registrarFalha } from '../diagnostico';
+import { pushService } from '../services/pushService';
 import { AuthStorage } from './authStorage';
 import {
   AuthResponse,
@@ -70,6 +71,9 @@ export const AuthService = {
   },
   async logout(): Promise<void> {
     try {
+      // SEC-12 / D-36e: a inscrição push deste dispositivo pertence à sessão que está saindo.
+      // Best-effort com timeout interno: falha ou lentidão nunca bloqueiam o logout.
+      await pushService.removerInscricaoDoDispositivo();
       await request('/auth/logout', { method: 'POST', body: '{}' });
     } catch (err) {
       // Falha de rede/servidor: limpa localmente, mas registra para diagnóstico

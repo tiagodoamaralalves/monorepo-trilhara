@@ -2,6 +2,7 @@ package br.com.trilhara.arquitetura;
 
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.simpleNameEndingWith;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
@@ -41,7 +42,8 @@ class TenantIsolationArchTest {
      * helpers internos de conversão BSON — não se aplica a regra do primeiro parâmetro.
      */
     private static final Set<String> EXCECOES_POR_ENTIDADE = Set.of(
-            "inserir", "inserirEmLote", "inserirLote", "atualizar", "atualizarOrdem",
+            "inserir", "inserirEmLote", "inserirLote", "inserirNovaVersao", "atualizar",
+            "atualizarOrdem", "salvarOuAtualizar",
             "paraDocumento", "paraEntidade", "paraSessao");
 
     /**
@@ -80,6 +82,16 @@ class TenantIsolationArchTest {
      */
     private static final Set<String> EXCECOES_PURGA_NOTA = Set.of(
             "purgarExpirados", "listarLixeira", "contarLixeira");
+
+    /**
+     * Operação de sistema da entrega de Web Push (D-36e): {@code removerEndpointInvalido} só é
+     * chamada por {@code PushDeliveryScheduler}, que é {@code @SystemScope}. O {@code endpoint} é
+     * único globalmente, então remover uma inscrição morta ({@code 404}/{@code 410}) não pode
+     * ficar preso ao tenant que a registrou — o dispositivo pode ter sido reatribuído a outra
+     * conta no intervalo.
+     */
+    private static final Set<String> EXCECOES_SISTEMA_PUSH = Set.of(
+            "removerEndpointInvalido");
 
     /**
      * Ativa em R0: nenhum recurso HTTP acessa o MongoDB diretamente. Vale hoje
@@ -316,6 +328,55 @@ class TenantIsolationArchTest {
                     "br.com.trilhara.tarefas..",
                     "br.com.trilhara.notas..")
             .because("Anexo C: pacotes br.com.trilhara.{estudos,tarefas,notas} são legados.");
+
+    /**
+     * R11 (D-06a): todo {@code *Repository} do pacote {@code push} recebe {@code ObjectId
+     * usuarioId} como primeiro parâmetro. Exceções: conversão BSON ({@code paraDocumento}/
+     * {@code paraEntidade}) e a fila multi-tenant de {@code @SystemScope}
+     * ({@link br.com.trilhara.push.LembretePushFilaRepository}), que por definição varre todos os
+     * tenants e por isso não recebe {@code usuarioId}.
+     */
+    @ArchTest
+    static final ArchRule repositoriosDePushExigemUsuarioId =
+            methods()
+                    .that().arePublic()
+                    .and().areDeclaredInClassesThat().resideInAPackage("..push..")
+                    .and().areDeclaredInClassesThat().haveSimpleNameEndingWith("Repository")
+                    .and().areDeclaredInClassesThat().areNotAnnotatedWith(
+                            br.com.trilhara.shared.SystemScope.class)
+                    .should(new ArchCondition<JavaMethod>("ter ObjectId usuarioId como primeiro parâmetro") {
+                        @Override
+                        public void check(JavaMethod metodo, ConditionEvents eventos) {
+                            String nome = metodo.getName();
+                            if (EXCECOES_POR_ENTIDADE.contains(nome)
+                                    || EXCECOES_SISTEMA_PUSH.contains(nome)
+                                    || nome.startsWith("para")) {
+                                return;
+                            }
+                            List<JavaParameter> parametros = metodo.getParameters();
+                            boolean valido = !parametros.isEmpty()
+                                    && parametros.get(0).getRawType().isAssignableTo(ObjectId.class);
+                            if (!valido) {
+                                eventos.add(SimpleConditionEvent.violated(metodo,
+                                        metodo.getFullName()
+                                                + " não recebe ObjectId usuarioId como primeiro parâmetro"));
+                            }
+                        }
+                    })
+                    .because("D-06(a): push_subscriptions e lembretes_push são coleções privadas; "
+                            + "só a fila @SystemScope varre todos os tenants.");
+
+    /**
+     * R11 (D-06b): o scheduler de entrega é multi-tenant e não pode ser exposto por HTTP.
+     * A regra exige {@code @SystemScope} em qualquer {@code *Scheduler} do pacote {@code push}.
+     */
+    @ArchTest
+    static final ArchRule schedulerDePushExigeSystemScope =
+            classes()
+                    .that().resideInAPackage("..push..")
+                    .and().haveSimpleNameEndingWith("Scheduler")
+                    .should().beAnnotatedWith(br.com.trilhara.shared.SystemScope.class)
+                    .because("D-06(b): a varredura de lembretes_push atravessa todos os tenants.");
 
     /**
      * Guarda auxiliar: garante que o predicado de pacote continua compilando e

@@ -15,7 +15,7 @@
 |---|---|---|
 | `rg` (ripgrep) | **ausente** na máquina (sem `/usr/bin/rg`, `sudo` exige senha) | `verificar-legado.sh` usa `rg --pcre2` quando existe e cai para `grep -rInE` (GNU) quando não |
 | `JAVA_HOME` | apontava para JRE do VS Code (sem `javac`) → `mvnw` abortava com "JAVA_HOME is not defined correctly" | `scripts/env-gate.sh` resolve um JDK 25 com `javac` |
-| MongoDB | container `trilhara_mongo` **sem porta publicada**; `%test` de `application.properties` fixa `172.22.0.2` (IP inexistente) | `env-gate.sh` descobre IP do container (`172.25.0.2`) ou `localhost:27017` |
+| MongoDB | container `trilhara_mongo` **sem porta publicada**; `%test` de `application.properties` fixa `172.22.0.2` (IP inexistente) | `env-gate.sh` descobre IP do container (`172.25.0.3` em 2026-11-13) ou `localhost:27017`. **Correção de 2026-11-13:** a descoberta falhava porque o `docker` do `PATH` é o `docker.exe` do Desktop (interop WSL) e não o daemon do snap; o script agora valida o cliente com `docker info` e testa cada IP do container |
 | `RESEND_API_KEY` | config **sem default** (`trilhara.email.resend-api-key`). Sem valor, o Quarkus não sobe: `Tests run: 136, Errors: 1, Skipped: 106` + `BUILD FAILURE` | `env-gate.sh` fornece valor dummy; CI corrigido |
 | Node/npm | 20.20.2 / 10.8.2 (local) × 22 (CI) | divergência registrada para R13 |
 | Banco de dev | 19 coleções canônicas + **3 fora do inventário** (`handoff_tokens`, `operacoes_concluir_atrasados`, `planejamento_ciclo`) | registrado; correção é de R2/R5/R9 |

@@ -1,6 +1,6 @@
 import { request } from '../auth/api';
 
-export type PushPermissionState = 'granted' | 'denied' | 'default' | 'unsupported';
+export type PushPermissionState = 'granted' | 'denied' | 'default' | 'unsupported' | 'ios-nao-instalado';
 
 export interface PushConfig {
   habilitado: boolean;
@@ -12,6 +12,12 @@ export interface AtualizarPreferenciasPushResult {
   padraoMinutosAntes: number;
   lembretesRecalculados: number;
 }
+
+/** Escopo do Service Worker: a raiz da origem do app Tarefas (D-36d). */
+const SW_URL = '/sw.js';
+const SW_SCOPE = '/';
+/** Timeout do DELETE de inscrição no logout: o logout nunca espera mais que isso (D-36e). */
+const TIMEOUT_DESINSCRICAO_MS = 2000;
 
 export function isPushSupported(): boolean {
   return (
@@ -25,6 +31,9 @@ export function isPushSupported(): boolean {
 export function getPushPermissionState(): PushPermissionState {
   if (!isPushSupported()) {
     return 'unsupported';
+  }
+  if (isIOSNonStandalone()) {
+    return 'ios-nao-instalado';
   }
   return Notification.permission;
 }
@@ -53,6 +62,7 @@ function urlB64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
+
 export const pushService = {
   isPushSupported,
   getPushPermissionState,
@@ -69,6 +79,20 @@ export const pushService = {
     });
   },
 
+  /**
+   * Registra (ou reutiliza) o Service Worker **na raiz da origem** (D-36d).
+   *
+   * <p>Somente o app Tarefas chama este método — os demais módulos nunca registram SW, de modo
+   * que o escopo `/` pertence a uma única origem de aplicação.</p>
+   */
+  async registrarServiceWorker(): Promise<ServiceWorkerRegistration> {
+    const existente = await navigator.serviceWorker.getRegistration(SW_SCOPE);
+    if (existente) {
+      return existente;
+    }
+    return navigator.serviceWorker.register(SW_URL, { scope: SW_SCOPE });
+  },
+
   async registrarInscricao(subscription: PushSubscription): Promise<void> {
     const subJson = subscription.toJSON();
     await request('/push/subscriptions', {
@@ -81,31 +105,64 @@ export const pushService = {
     });
   },
 
+  /** Remove a inscrição do dispositivo no backend (body `{ endpoint }`, D-36e). */
   async removerInscricao(endpoint: string): Promise<void> {
-    await request(`/push/subscriptions?endpoint=${encodeURIComponent(endpoint)}`, {
-      method: 'DELETE'
+    await request('/push/subscriptions', {
+      method: 'DELETE',
+      body: JSON.stringify({ endpoint })
     });
   },
 
+  /**
+   * Remove a inscrição deste dispositivo, best-effort: qualquer falha ou demora acima de 2 s é
+   * ignorada, porque o logout nunca pode bloquear (D-36e / SEC-12).
+   */
+  async removerInscricaoDoDispositivo(): Promise<boolean> {
+    if (!isPushSupported()) {
+      return false;
+    }
+    try {
+      const reg = await navigator.serviceWorker.getRegistration(SW_SCOPE);
+      const sub = await reg?.pushManager.getSubscription();
+      if (!sub) {
+        return false;
+      }
+      await Promise.race([
+        this.removerInscricao(sub.endpoint),
+        new Promise((resolve) => setTimeout(resolve, TIMEOUT_DESINSCRICAO_MS))
+      ]);
+      await sub.unsubscribe().catch(() => undefined);
+      return true;
+    } catch {
+      // Best-effort: o logout segue independentemente do resultado.
+      return false;
+    }
+  },
+
+  /**
+   * Ativa as notificações neste dispositivo. O pedido de permissão acontece **apenas** aqui,
+   * sempre em reação a um clique explícito do usuário (D-36 / Anexo B).
+   */
   async ativarNotificacoes(publicKey?: string): Promise<{ sucesso: boolean; mensagem?: string }> {
     if (!isPushSupported()) {
-      return { sucesso: false, mensagem: 'Seu navegador não suporta notificações Web Push.' };
+      return { sucesso: false, mensagem: 'Este navegador não suporta notificações. Suas tarefas funcionam normalmente.' };
     }
 
     if (isIOSNonStandalone()) {
       return {
         sucesso: false,
-        mensagem: 'No iOS, para receber notificações push você precisa adicionar o Trilhara à Tela de Início primeiro.'
+        mensagem:
+          'Para receber notificações no iPhone/iPad, toque em Compartilhar → Adicionar à Tela de Início e abra o Trilhara por lá.'
       };
     }
 
     try {
       const permissao = await Notification.requestPermission();
       if (permissao !== 'granted') {
-        return { sucesso: false, mensagem: 'Permissão de notificação negada no navegador.' };
+        return { sucesso: false, mensagem: 'As notificações estão bloqueadas nas configurações do navegador.' };
       }
 
-      const reg = await navigator.serviceWorker.register('/sw.js');
+      const reg = await this.registrarServiceWorker();
       await navigator.serviceWorker.ready;
 
       let sub = await reg.pushManager.getSubscription();

@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.Signature;
+import java.security.GeneralSecurityException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Duration;
 import java.time.Instant;
@@ -22,6 +23,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 public class DefaultWebPushSender implements WebPushSender {
 
     private static final Logger LOG = Logger.getLogger(DefaultWebPushSender.class);
+
+    /** TTL padrão quando o chamador não informa: igual à janela útil de entrega. */
+    static final int TTL_PADRAO_SEGUNDOS = 900;
 
     @ConfigProperty(name = "trilhara.push.vapid.public-key")
     java.util.Optional<String> vapidPublicKey;
@@ -48,27 +52,32 @@ public class DefaultWebPushSender implements WebPushSender {
     }
 
     @Override
-    public PushSendResult send(PushSubscription subscription, String payloadJson, int ttlSeconds) {
+    public PushSendResult send(PushSubscription subscription, byte[] payload, int ttlSeconds) {
         if (subscription == null || subscription.endpoint() == null || subscription.endpoint().isBlank()) {
             return PushSendResult.endpointInvalido(400, "Endpoint vazio ou inexistente.");
         }
 
+        byte[] corpo;
+        try {
+            corpo = WebPushCriptografia.cifrar(subscription.p256dh(), subscription.auth(), payload);
+        } catch (GeneralSecurityException | IllegalArgumentException e) {
+            // Chave do dispositivo corrompida: a inscrição é inutilizável e deve sair da coleção.
+            LOG.warnf("Chaves inválidas na inscrição %s: %s", subscription.endpoint(), e.getMessage());
+            return PushSendResult.endpointInvalido(400, "Chaves da inscrição inválidas.");
+        }
+
         try {
             URI endpointUri = URI.create(subscription.endpoint().trim());
-            int ttl = ttlSeconds > 0 ? ttlSeconds : 900;
+            int ttl = ttlSeconds > 0 ? ttlSeconds : TTL_PADRAO_SEGUNDOS;
 
             HttpRequest.Builder builder = HttpRequest.newBuilder()
                     .uri(endpointUri)
                     .timeout(Duration.ofSeconds(10))
                     .header("TTL", String.valueOf(ttl))
-                    .header("Urgency", "normal");
-
-            if (payloadJson != null && !payloadJson.isBlank()) {
-                builder.header("Content-Type", "application/json");
-                builder.POST(HttpRequest.BodyPublishers.ofString(payloadJson, StandardCharsets.UTF_8));
-            } else {
-                builder.POST(HttpRequest.BodyPublishers.noBody());
-            }
+                    .header("Urgency", "normal")
+                    .header("Content-Encoding", "aes128gcm")
+                    .header("Content-Type", "application/octet-stream")
+                    .POST(HttpRequest.BodyPublishers.ofByteArray(corpo));
 
             // Injeta autenticação VAPID se chaves estiverem configuradas
             if (isVapidConfigured()) {

@@ -1,10 +1,13 @@
 package br.com.trilhara.push;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -20,13 +23,23 @@ import br.com.trilhara.tarefa.ModoLembrete;
 import br.com.trilhara.tarefa.Tarefa;
 import br.com.trilhara.tarefa.TarefaRepository;
 import br.com.trilhara.tarefa.TarefaService;
+import br.com.trilhara.tarefa.dto.CriarSerieRecorrenteRequest;
 import br.com.trilhara.tarefa.dto.CriarTarefaRequest;
+import br.com.trilhara.tarefa.dto.SerieRecorrenteResponse;
 import br.com.trilhara.tarefa.dto.TarefaResponse;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 
+/**
+ * R11 — ciclo de vida do agendamento (D-26 / D-36a).
+ *
+ * <p>Todas as datas são calculadas a partir de {@code Instant.now()} porque a elegibilidade
+ * exige {@code instanteEntregaUtc > agora}: data fixa no passado tornaria todo cenário inelegível.</p>
+ */
 @QuarkusTest
 class LembretePushLifecycleTest {
+
+    private static final ZoneId FUSO = ZoneId.of("America/Sao_Paulo");
 
     @Inject
     TarefaService tarefaService;
@@ -57,234 +70,190 @@ class LembretePushLifecycleTest {
                 "push-" + UUID.randomUUID() + "@teste.com",
                 "hash",
                 List.of(Role.USER),
-                true,
-                true,
-                0,
-                null,
-                null,
-                Instant.now(),
-                Instant.now()
-        );
+                true, true, 0, null, null, Instant.now(), Instant.now());
         userRepository.inserir(usuario);
     }
 
-    @Test
-    @DisplayName("Cancelamento ao concluir e reagendamento ao reabrir tarefa")
-    void deveCancelarAoConcluirEReagendarAoReabrir() {
-        CriarTarefaRequest request = new CriarTarefaRequest(
-                null,
-                "Estudar Direito Administrativo",
-                "Foco em atos administrativos",
-                "ALTA",
-                "2026-06-15",
-                "14:00",
-                null,
-                ModoLembrete.PERSONALIZADO,
-                15,
-                "America/Sao_Paulo",
-                1
-        );
+    /** Data local de amanhã no fuso do agendamento (sempre no futuro). */
+    private static LocalDate amanha() {
+        return ZonedDateTime.now(FUSO).toLocalDate().plusDays(1);
+    }
 
-        TarefaResponse criada = tarefaService.criarTarefa(request, usuarioIdStr);
-        ObjectId tarefaId = new ObjectId(criada.id());
+    private CriarTarefaRequest request(String titulo, String horario, ModoLembrete modo, Integer minutos) {
+        return new CriarTarefaRequest(
+                null, titulo, null, "MEDIA",
+                amanha().toString(), horario, null,
+                modo, minutos, FUSO.getId(), 1);
+    }
 
-        var lembreteOpt = lembretePushRepository.buscarPorTarefa(usuarioId, tarefaId);
-        assertTrue(lembreteOpt.isPresent());
-        assertEquals(LembretePush.ESTADO_PENDENTE, lembreteOpt.get().estado());
+    private TarefaResponse criar(String titulo, String horario, ModoLembrete modo, Integer minutos) {
+        return tarefaService.criarTarefa(request(titulo, horario, modo, minutos), usuarioIdStr);
+    }
 
-        // Concluir tarefa cancela o lembrete
-        tarefaService.atualizarConclusao(criada.id(), true, usuarioIdStr);
-        var lembreteConcluida = lembretePushRepository.buscarPorTarefa(usuarioId, tarefaId);
-        assertTrue(lembreteConcluida.isPresent());
-        assertEquals(LembretePush.ESTADO_CANCELADO, lembreteConcluida.get().estado());
-
-        // Reabrir tarefa reagenda o lembrete
-        tarefaService.atualizarConclusao(criada.id(), false, usuarioIdStr);
-        var lembreteReaberta = lembretePushRepository.buscarPorTarefa(usuarioId, tarefaId);
-        assertTrue(lembreteReaberta.isPresent());
-        assertEquals(LembretePush.ESTADO_PENDENTE, lembreteReaberta.get().estado());
+    private LembretePush versaoVigente(ObjectId tarefaId) {
+        return lembretePushRepository.buscarVersaoVigente(usuarioId, tarefaId).orElseThrow();
     }
 
     @Test
-    @DisplayName("Cancelamento ao mover tarefa para a lixeira")
-    void deveCancelarAoMoverParaLixeira() {
-        CriarTarefaRequest request = new CriarTarefaRequest(
-                null,
-                "Tarefa para exclusao",
-                null,
-                "MEDIA",
-                "2026-06-15",
-                "16:00",
-                null,
-                ModoLembrete.HERDAR,
-                null,
-                "America/Sao_Paulo",
-                1
-        );
+    @DisplayName("semAlertaNaoAgenda: SEM_ALERTA nunca cria versão de lembrete")
+    void semAlertaNaoAgenda() {
+        TarefaResponse tarefa = criar("Sem alerta", "10:00", ModoLembrete.SEM_ALERTA, null);
 
-        TarefaResponse criada = tarefaService.criarTarefa(request, usuarioIdStr);
-        ObjectId tarefaId = new ObjectId(criada.id());
-
-        assertTrue(lembretePushRepository.buscarPorTarefa(usuarioId, tarefaId).isPresent());
-
-        // Mover para lixeira
-        // Tarefa avulsa: escopo é proibido (D-24), então a exclusão não informa escopo.
-        tarefaService.excluirTarefa(criada.id(), null, usuarioIdStr);
-
-        var lembreteLixeira = lembretePushRepository.buscarPorTarefa(usuarioId, tarefaId);
-        assertTrue(lembreteLixeira.isPresent());
-        assertEquals(LembretePush.ESTADO_CANCELADO, lembreteLixeira.get().estado());
+        assertTrue(lembretePushRepository
+                .buscarVersaoVigente(usuarioId, new ObjectId(tarefa.id())).isEmpty());
     }
 
     @Test
-    @DisplayName("Suspensão ao remover horário preservando preferência, e reagendamento ao redefinir horário")
-    void deveSuspenderAoRemoverHorarioEReagendarAoRedefinir() {
-        CriarTarefaRequest request = new CriarTarefaRequest(
-                null,
-                "Tarefa com horario temporario",
-                null,
-                "BAIXA",
-                "2026-06-15",
-                "10:00",
-                null,
-                ModoLembrete.PERSONALIZADO,
-                30,
-                "America/Sao_Paulo",
-                1
-        );
+    @DisplayName("herdarAcompanhaPadrao: tarefa HERDAR segue o padrão global do usuário")
+    void herdarAcompanhaPadrao() {
+        TarefaResponse tarefa = criar("Herdeira", "10:00", ModoLembrete.HERDAR, null);
+        ObjectId tarefaId = new ObjectId(tarefa.id());
 
-        TarefaResponse criada = tarefaService.criarTarefa(request, usuarioIdStr);
+        // Padrão default é 15 min: 10:00 local (UTC-3) menos 15 min = 12:45 UTC.
+        assertEquals(Instant.parse(amanha() + "T12:45:00Z"), versaoVigente(tarefaId).instanteEntregaUtc());
+
+        lembretePushService.atualizarPreferenciaGlobal(usuarioId, 30);
+
+        // Após o novo padrão (30 min) a versão vigente é reagendada para 12:30 UTC.
+        assertEquals(Instant.parse(amanha() + "T12:30:00Z"), versaoVigente(tarefaId).instanteEntregaUtc());
+    }
+
+    @Test
+    @DisplayName("personalizadoNaoAcompanhaPadrao: override local sobrevive à mudança do padrão")
+    void personalizadoNaoAcompanhaPadrao() {
+        TarefaResponse tarefa = criar("Override", "10:00", ModoLembrete.PERSONALIZADO, 5);
+        ObjectId tarefaId = new ObjectId(tarefa.id());
+
+        assertEquals(Instant.parse(amanha() + "T12:55:00Z"), versaoVigente(tarefaId).instanteEntregaUtc());
+
+        lembretePushService.atualizarPreferenciaGlobal(usuarioId, 60);
+
+        // 5 minutos antes permanece: 13:00 UTC - 5 min = 12:55 UTC.
+        assertEquals(Instant.parse(amanha() + "T12:55:00Z"), versaoVigente(tarefaId).instanteEntregaUtc());
+    }
+
+    @Test
+    @DisplayName("removerHorarioCancelaEPreservaModo: suspender cancela o push e mantém a escolha")
+    void removerHorarioCancelaEPreservaModo() {
+        TarefaResponse criada = criar("Suspensa", "10:00", ModoLembrete.PERSONALIZADO, 30);
         ObjectId tarefaId = new ObjectId(criada.id());
+        assertEquals(LembretePush.ESTADO_PENDENTE, versaoVigente(tarefaId).estado());
 
-        // Remove o horário da tarefa
-        // Para atualizar explicitamente horario como null, chamamos atualizarTarefa passando horario = null
-        Tarefa tarefaExistente = tarefaRepository.buscar(usuarioId, tarefaId).get();
+        // Remove o horário persistindo a tarefa sem `horario`, mantendo modo/minutos (D-26).
+        Tarefa existente = tarefaRepository.buscar(usuarioId, tarefaId).orElseThrow();
         Tarefa semHorario = new Tarefa(
-                tarefaExistente.id(),
-                tarefaExistente.usuarioId(),
-                tarefaExistente.listaId(),
-                null,
-                null,
-                false,
-                tarefaExistente.titulo(),
-                tarefaExistente.descricao(),
-                tarefaExistente.prioridade(),
-                tarefaExistente.dataVencimento(),
-                null, // horário removido
-                tarefaExistente.estado(),
-                tarefaExistente.concluida(),
-                tarefaExistente.concluidaEm(),
-                tarefaExistente.ordem(),
-                tarefaExistente.subtarefas(),
-                tarefaExistente.modoLembrete(),
-                tarefaExistente.lembreteMinutosAntes(),
-                tarefaExistente.fusoAgendamento(),
-                tarefaExistente.deletedAt(),
-                tarefaExistente.expiresAt(),
-                tarefaExistente.loteExclusaoId(),
-                tarefaExistente.criadoEm(),
-                Instant.now()
-        );
+                existente.id(), existente.usuarioId(), existente.listaId(), existente.serieId(),
+                existente.dataOriginalOcorrencia(), existente.desvinculadaDaSerie(), existente.titulo(),
+                existente.descricao(), existente.prioridade(), existente.dataVencimento(), null,
+                existente.estado(), existente.concluida(), existente.concluidaEm(), existente.ordem(),
+                existente.subtarefas(), existente.modoLembrete(), existente.lembreteMinutosAntes(),
+                existente.fusoAgendamento(), existente.deletedAt(), existente.expiresAt(),
+                existente.loteExclusaoId(), existente.criadoEm(), Instant.now());
         tarefaRepository.atualizar(semHorario);
+
         lembretePushService.agendarOuAtualizarLembrete(semHorario, null, null, null);
 
-        // Lembrete suspenso (CANCELADO)
-        var lembreteSuspenso = lembretePushRepository.buscarPorTarefa(usuarioId, tarefaId);
-        assertTrue(lembreteSuspenso.isPresent());
-        assertEquals(LembretePush.ESTADO_CANCELADO, lembreteSuspenso.get().estado());
-
-        // Tarefa preserva a preferência
-        Tarefa tRecuperada = tarefaRepository.buscar(usuarioId, tarefaId).get();
-        assertEquals(30, tRecuperada.lembreteMinutosAntes());
-        assertEquals(ModoLembrete.PERSONALIZADO, tRecuperada.modoLembrete());
-
-        // Volta a definir horário
-        Tarefa comHorario = new Tarefa(
-                tRecuperada.id(),
-                tRecuperada.usuarioId(),
-                tRecuperada.listaId(),
-                null,
-                null,
-                false,
-                tRecuperada.titulo(),
-                tRecuperada.descricao(),
-                tRecuperada.prioridade(),
-                tRecuperada.dataVencimento(),
-                "15:00",
-                tRecuperada.estado(),
-                tRecuperada.concluida(),
-                tRecuperada.concluidaEm(),
-                tRecuperada.ordem(),
-                tRecuperada.subtarefas(),
-                tRecuperada.modoLembrete(),
-                tRecuperada.lembreteMinutosAntes(),
-                tRecuperada.fusoAgendamento(),
-                tRecuperada.deletedAt(),
-                tRecuperada.expiresAt(),
-                tRecuperada.loteExclusaoId(),
-                tRecuperada.criadoEm(),
-                Instant.now()
-        );
-        tarefaRepository.atualizar(comHorario);
-        lembretePushService.agendarOuAtualizarLembrete(comHorario, null, null, null);
-
-        var lembreteReagendado = lembretePushRepository.buscarPorTarefa(usuarioId, tarefaId);
-        assertTrue(lembreteReagendado.isPresent());
-        assertEquals(LembretePush.ESTADO_PENDENTE, lembreteReagendado.get().estado());
-        assertEquals(30, lembreteReagendado.get().minutosAntes());
+        assertEquals(LembretePush.ESTADO_CANCELADO, versaoVigente(tarefaId).estado(),
+                "Remover o horário suspende o lembrete pendente.");
+        Tarefa relida = tarefaRepository.buscar(usuarioId, tarefaId).orElseThrow();
+        assertEquals(ModoLembrete.PERSONALIZADO, relida.modoLembrete(),
+                "A escolha do usuário é preservada na suspensão.");
+        assertEquals(30, relida.lembreteMinutosAntes());
     }
 
     @Test
-    @DisplayName("Atualização de herdeiras: mudar padrão global atualiza apenas tarefas que usam o padrão, preservando overrides locais")
-    void deveAtualizarApenasTarefasHerdeirasAoMudarPadraoGlobal() {
-        // Tarefa 1: usa padrao global (herdeira)
-        CriarTarefaRequest reqHerdeira = new CriarTarefaRequest(
-                null,
-                "Tarefa Herdeira",
-                null,
-                "MEDIA",
-                "2026-06-15",
-                "10:00",
-                null,
-                ModoLembrete.HERDAR,
-                null,
-                "America/Sao_Paulo",
-                1
-        );
-        TarefaResponse herdeira = tarefaService.criarTarefa(reqHerdeira, usuarioIdStr);
-        ObjectId herdeiraId = new ObjectId(herdeira.id());
+    @DisplayName("redefinirHorarioReagendaNovaVersao: voltar a definir horário cria nova versão futuro")
+    void redefinirHorarioReagendaNovaVersao() {
+        TarefaResponse criada = criar("Reagendada", "10:00", ModoLembrete.PERSONALIZADO, 30);
+        ObjectId tarefaId = new ObjectId(criada.id());
+        long versaoInicial = versaoVigente(tarefaId).versaoAgendamento();
 
-        // Tarefa 2: override local explícito (não-herdeira)
-        CriarTarefaRequest reqOverride = new CriarTarefaRequest(
-                null,
-                "Tarefa Com Override Local",
-                null,
-                "ALTA",
-                "2026-06-15",
-                "11:00",
-                null,
-                ModoLembrete.PERSONALIZADO,
-                5, // 5 min antes explicitamente
-                "America/Sao_Paulo",
-                2
-        );
-        TarefaResponse override = tarefaService.criarTarefa(reqOverride, usuarioIdStr);
-        ObjectId overrideId = new ObjectId(override.id());
+        Tarefa existente = tarefaRepository.buscar(usuarioId, tarefaId).orElseThrow();
+        Tarefa comNovoHorario = new Tarefa(
+                existente.id(), existente.usuarioId(), existente.listaId(), existente.serieId(),
+                existente.dataOriginalOcorrencia(), existente.desvinculadaDaSerie(), existente.titulo(),
+                existente.descricao(), existente.prioridade(), existente.dataVencimento(), "11:00",
+                existente.estado(), existente.concluida(), existente.concluidaEm(), existente.ordem(),
+                existente.subtarefas(), existente.modoLembrete(), existente.lembreteMinutosAntes(),
+                existente.fusoAgendamento(), existente.deletedAt(), existente.expiresAt(),
+                existente.loteExclusaoId(), existente.criadoEm(), Instant.now());
+        tarefaRepository.atualizar(comNovoHorario);
 
-        // Altera preferência global do usuário para 30 minutos antes
-        long recalculados = lembretePushService.atualizarPreferenciaGlobal(usuarioId, 30);
-        assertTrue(recalculados >= 1);
+        lembretePushService.agendarOuAtualizarLembrete(comNovoHorario, null, null, null);
 
-        // Herdeira deve ter sido recalculada para 30 minutos antes
-        var lembreteHerdeira = lembretePushRepository.buscarPorTarefa(usuarioId, herdeiraId).get();
-        assertEquals(30, lembreteHerdeira.minutosAntes());
-        // 10:00 local (UTC-3) = 13:00 UTC. 30 min antes = 12:30 UTC = 2026-06-15T12:30:00Z
-        assertEquals(Instant.parse("2026-06-15T12:30:00Z"), lembreteHerdeira.instanteEntregaUtc());
+        LembretePush vigente = versaoVigente(tarefaId);
+        assertEquals(LembretePush.ESTADO_PENDENTE, vigente.estado());
+        assertEquals(versaoInicial + 1, vigente.versaoAgendamento(), "Cada mudança relevante cria versão nova.");
+        // 11:00 local (UTC-3) menos 30 min = 13:30 UTC.
+        assertEquals(Instant.parse(amanha() + "T13:30:00Z"), vigente.instanteEntregaUtc());
+    }
 
-        // Tarefa com override NÃO deve ter sido alterada
-        var lembreteOverride = lembretePushRepository.buscarPorTarefa(usuarioId, overrideId).get();
-        assertEquals(5, lembreteOverride.minutosAntes());
-        // 11:00 local (UTC-3) = 14:00 UTC. 5 min antes = 13:55 UTC = 2026-06-15T13:55:00Z
-        assertEquals(Instant.parse("2026-06-15T13:55:00Z"), lembreteOverride.instanteEntregaUtc());
+    @Test
+    @DisplayName("concluirCancela: concluir a tarefa cancela o lembrete pendente")
+    void concluirCancela() {
+        TarefaResponse criada = criar("Concluída", "10:00", ModoLembrete.HERDAR, null);
+        ObjectId tarefaId = new ObjectId(criada.id());
+        assertEquals(LembretePush.ESTADO_PENDENTE, versaoVigente(tarefaId).estado());
+
+        tarefaService.atualizarConclusao(criada.id(), true, usuarioIdStr);
+
+        assertEquals(LembretePush.ESTADO_CANCELADO, versaoVigente(tarefaId).estado());
+    }
+
+    @Test
+    @DisplayName("lixeiraCancela: mover para a lixeira cancela o lembrete pendente")
+    void lixeiraCancela() {
+        TarefaResponse criada = criar("Na lixeira", "10:00", ModoLembrete.HERDAR, null);
+        ObjectId tarefaId = new ObjectId(criada.id());
+        assertEquals(LembretePush.ESTADO_PENDENTE, versaoVigente(tarefaId).estado());
+
+        tarefaService.excluirTarefa(criada.id(), null, usuarioIdStr);
+
+        assertEquals(LembretePush.ESTADO_CANCELADO, versaoVigente(tarefaId).estado());
+    }
+
+    @Test
+    @DisplayName("restaurarReagendaSeFuturo: restaurar da lixeira reagenda quando a entrega é futura")
+    void restaurarReagendaSeFuturo() {
+        TarefaResponse criada = criar("Restaurável", "10:00", ModoLembrete.HERDAR, null);
+        ObjectId tarefaId = new ObjectId(criada.id());
+
+        tarefaService.excluirTarefa(criada.id(), null, usuarioIdStr);
+        assertEquals(LembretePush.ESTADO_CANCELADO, versaoVigente(tarefaId).estado());
+
+        tarefaService.restaurarTarefaDaLixeira(criada.id(), usuarioIdStr);
+
+        LembretePush vigente = versaoVigente(tarefaId);
+        assertEquals(LembretePush.ESTADO_PENDENTE, vigente.estado(),
+                "Restauração com entrega futura volta a agendar.");
+        assertTrue(vigente.instanteEntregaUtc().isAfter(Instant.now()));
+    }
+
+    @Test
+    @DisplayName("ocorrenciaRecorrenteHerdaModoDaSerie: ocorrência materializada herda o modo e agenda")
+    void ocorrenciaRecorrenteHerdaModoDaSerie() {
+        CriarSerieRecorrenteRequest serie = new CriarSerieRecorrenteRequest(
+                null, "Série com lembrete", null, "MEDIA", "10:00", List.of(), "DIARIO", 1,
+                List.of(), null, null, null, null, "EM_DATA",
+                amanha().toString(), amanha().plusDays(30).toString(), null,
+                ModoLembrete.PERSONALIZADO, 60, FUSO.getId(), null);
+
+
+        SerieRecorrenteResponse criada = tarefaService.criarSerie(serie, usuarioIdStr);
+
+        List<TarefaResponse> ocorrencias = tarefaService
+                .listarTarefas(usuarioIdStr, null, 1, 100)
+                .itens().stream()
+                .filter(t -> criada.id().equals(t.serieId()))
+                .toList();
+
+        assertTrue(!ocorrencias.isEmpty(), "A série deve materializar ao menos uma ocorrência futura.");
+        TarefaResponse primeira = ocorrencias.get(0);
+        assertEquals(ModoLembrete.PERSONALIZADO, primeira.modoLembrete(),
+                "A ocorrência herda o modo de lembrete da série.");
+        assertEquals(60, primeira.lembreteMinutosAntes());
+
+        assertEquals(LembretePush.ESTADO_PENDENTE, versaoVigente(new ObjectId(primeira.id())).estado(),
+                "Ocorrência materializada também gera lembrete.");
     }
 }
