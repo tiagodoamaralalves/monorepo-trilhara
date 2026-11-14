@@ -75,18 +75,11 @@
 }
 
 .btnEditar {
-  color: var(--text-mid);
   opacity: 0.8;
-  transition: all var(--transition-fast);
 }
 
 .card:hover .btnEditar {
   opacity: 1;
-}
-
-.btnEditar:hover {
-  color: var(--text);
-  background: var(--surface-3);
 }
 
 .trilhaNome {

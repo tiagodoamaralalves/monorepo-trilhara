@@ -81,27 +81,6 @@
   color: var(--text-soft);
 }
 
-.novaListaBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: var(--radius-xs);
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-mid);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.novaListaBtn:hover {
-  background: var(--surface-3);
-  border-color: var(--border);
-  color: var(--text);
-  transform: translateY(-1px);
-}
-
 .listasItems {
   display: flex;
   flex-direction: column;
@@ -210,29 +189,14 @@
 }
 
 .listaOpcoesBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
   margin-right: 4px;
-  border-radius: var(--radius-xs);
-  border: none;
-  background: transparent;
-  color: var(--text-soft);
-  cursor: pointer;
   opacity: 0;
-  transition: all var(--transition-fast);
 }
 
 .listaItemRow:hover .listaOpcoesBtn,
+.listaItemRow:focus-within .listaOpcoesBtn,
 .listaOpcoesBtn:focus-visible {
   opacity: 1;
-}
-
-.listaOpcoesBtn:hover {
-  background: var(--surface-3);
-  color: var(--text);
 }
 
 .listaCheck {

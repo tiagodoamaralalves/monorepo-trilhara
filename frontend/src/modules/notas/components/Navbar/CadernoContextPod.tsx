@@ -139,24 +139,28 @@ export const CadernoContextPod: React.FC<CadernoContextPodProps> = ({
 
         {cadernoAtivo && (
           <div className={styles.headerActions}>
-            <button
+            <Button
               type="button"
-              className={styles.iconBtn}
+              variant="ghost"
+              size="sm"
+              iconOnly
               onClick={onAbrirEditarCaderno}
               title="Editar título e cor do caderno"
               aria-label="Editar caderno"
             >
-              <Edit2 size={13} />
-            </button>
-            <button
+              <Edit2 size={15} />
+            </Button>
+            <Button
               type="button"
-              className={styles.iconBtn}
+              variant="danger"
+              size="sm"
+              iconOnly
               onClick={onExcluirCaderno}
               title="Excluir caderno e todas as suas notas"
               aria-label="Excluir caderno"
             >
-              <Trash2 size={13} />
-            </button>
+              <Trash2 size={15} />
+            </Button>
           </div>
         )}
       </div>

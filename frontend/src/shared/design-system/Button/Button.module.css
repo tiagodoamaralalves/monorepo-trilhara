@@ -51,6 +51,7 @@
 .iconOnly {
   width: var(--button-height);
   min-width: var(--button-height);
+  min-inline-size: var(--target-min);
   padding: 0;
   flex-shrink: 0;
 }
@@ -111,6 +112,7 @@
 
 .danger:hover:not(:disabled) {
   background: var(--red);
+  border-color: var(--red);
   color: var(--primary-contrast);
 }
 
@@ -159,15 +161,15 @@
 }
 
 .btn.danger.iconOnly:not(.selected) {
-  border-color: var(--red-border);
-  background: var(--red-bg);
-  color: var(--red-text);
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-mid);
 }
 
 .btn.danger.iconOnly:not(.selected):hover:not(:disabled) {
-  border-color: var(--red-hover);
-  background: var(--red-hover);
-  color: var(--primary-contrast);
+  border-color: var(--red-border);
+  background: var(--red-bg);
+  color: var(--red-text);
   box-shadow: none;
 }
 
@@ -193,7 +195,16 @@
   flex-shrink: 0;
 }
 
-.iconOnly .label svg {
+.sm.iconOnly .icon svg,
+.sm.iconOnly .label svg {
+  width: 16px;
+  height: 16px;
+}
+
+.md.iconOnly .icon svg,
+.md.iconOnly .label svg,
+.lg.iconOnly .icon svg,
+.lg.iconOnly .label svg {
   width: 20px;
   height: 20px;
 }

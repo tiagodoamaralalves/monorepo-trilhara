@@ -482,27 +482,47 @@ function TarefasApp() {
   };
 
   const handleAlternarTarefa = async (id: string, concluida: boolean) => {
-    // Atualização otimista
-    setTarefasManuais((prev) =>
-      prev.map((t) =>
+    const atualizarCampoConclusao = (lista: Tarefa[], estadoConcluido: boolean) =>
+      lista.map((t) =>
         t.id === id
           ? {
               ...t,
-              concluida,
-              estado: concluida ? 'CONCLUIDA' : 'PENDENTE',
-              concluidaEm: concluida ? new Date().toISOString() : null
+              concluida: estadoConcluido,
+              estado: (estadoConcluido ? 'CONCLUIDA' : 'PENDENTE') as Tarefa['estado'],
+              concluidaEm: estadoConcluido ? new Date().toISOString() : null
             }
           : t
-      )
+      );
+
+    // Atualização otimista
+    setTarefasManuais((prev) => atualizarCampoConclusao(prev, concluida));
+    setTarefaEditando((prev) =>
+      prev && prev.id === id
+        ? {
+            ...prev,
+            concluida,
+            estado: concluida ? 'CONCLUIDA' : 'PENDENTE',
+            concluidaEm: concluida ? new Date().toISOString() : null
+          }
+        : prev
     );
 
     try {
       const atualizada = await TarefaService.alternarConclusao(id, concluida);
       setTarefasManuais((prev) => prev.map((t) => (t.id === atualizada.id ? atualizada : t)));
+      setTarefaEditando((prev) => (prev && prev.id === id ? atualizada : prev));
       notificarMudanca();
     } catch (err) {
-      setTarefasManuais((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, concluida: !concluida } : t))
+      setTarefasManuais((prev) => atualizarCampoConclusao(prev, !concluida));
+      setTarefaEditando((prev) =>
+        prev && prev.id === id
+          ? {
+              ...prev,
+              concluida: !concluida,
+              estado: !concluida ? 'CONCLUIDA' : 'PENDENTE',
+              concluidaEm: !concluida ? new Date().toISOString() : null
+            }
+          : prev
       );
       toast.error(err instanceof Error ? err : 'Não foi possível atualizar o status da tarefa.');
     }
@@ -949,7 +969,7 @@ function TarefasApp() {
               <Button
                 variant="danger"
                 size="md"
-                leftIcon={<Trash2 size={16} />}
+                leftIcon={<Trash2 size={15} />}
                 onClick={handleEsvaziarLixeira}
                 disabled={!dadosLixeira?.tarefas.length && !dadosLixeira?.listas.length}
               >
@@ -1301,6 +1321,8 @@ function TarefasApp() {
         tarefaParaEditar={tarefaEditando}
         listas={listas}
         listaAtivaId={listaAtivaId}
+        onExcluir={(tarefa) => void handleExcluirTarefa(tarefa)}
+        onToggleConclusao={(id, concluida) => void handleAlternarTarefa(id, concluida)}
       />
 
       <ListaModal

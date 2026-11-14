@@ -1,140 +1,396 @@
-.formGrid {
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.headerCheck {
+  margin-left: -2px;
+}
+
+.headerCreateIcon {
+  color: var(--text-soft);
+}
+
+.titleHeroInput > div {
+  box-sizing: border-box;
+  min-height: 48px;
+  border-color: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.titleHeroInput input {
+  height: 46px;
+  padding: 0 12px;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.metaStrip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.completionPill {
+  min-height: var(--status-pill-height);
+  height: var(--status-pill-height);
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.completionPillDone {
+  background: var(--green-bg);
+  border-color: var(--green-border);
+  color: var(--green);
+}
+
+.completionPillDone:hover:not(:disabled) {
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--on-primary-solid);
+}
+
+.completionPillUndo {
+  background: var(--yellow-bg);
+  border-color: var(--yellow-border);
+  color: var(--yellow);
+}
+
+.completionPillUndo:hover:not(:disabled) {
+  background: var(--yellow);
+  border-color: var(--yellow);
+  color: var(--on-primary-solid);
+}
+
+.inlineListaSelect {
+  min-width: 170px;
+}
+
+.recurrenceBanner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.recurrenceBannerHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.recurrenceBannerHeader svg {
+  color: var(--primary-light);
+  flex-shrink: 0;
+}
+
+.scheduleGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.8fr) minmax(0, 1.3fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.mutedHint {
+  margin: 4px 0 0 0;
+  font-size: 12px;
+  color: var(--text-soft);
+  line-height: 1.4;
+}
+
+.statusNotice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  line-height: 1.4;
+  border: 1px solid var(--border);
+}
+
+.statusNoticeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.statusNoticeLead {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.statusNoticeWarning {
+  background: var(--yellow-bg);
+  border-color: var(--yellow-border);
+  color: var(--yellow);
+}
+
+.statusNoticeDanger {
+  background: var(--red-bg);
+  border-color: var(--red-border);
+  color: var(--red-text);
+}
+
+.statusNoticeInfo {
+  background: var(--primary-bg);
+  border-color: var(--primary-border-subtle);
+  color: var(--primary-light);
+}
+
+.iosHelpBtn {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  flex-shrink: 0;
+}
+
+.iosHelpBtn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+.iosHelpText {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-mid);
+  line-height: 1.45;
+}
+
+.recurrenceCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.recurrenceToggleLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.recurrenceBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.twoColGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.cicloAviso {
-  display: flex;
-  align-items: flex-start;
   gap: 10px;
-  padding: 10px 14px;
-  background: var(--purple-bg, rgba(139, 92, 246, 0.1));
-  border: 1px solid var(--purple, #8b5cf6);
-  border-radius: var(--radius-md);
-  color: var(--text);
-  font-size: 13px;
-  line-height: 1.45;
-  margin-bottom: 12px;
+  align-items: end;
 }
 
-.cicloAviso svg {
-  color: var(--purple, #8b5cf6);
-  flex-shrink: 0;
-  margin-top: 2px;
+.daysGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.daysLabel {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-mid);
+}
+
+.daysRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dayChip {
+  min-height: 32px;
+  padding: 0 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-1);
+  color: var(--text-mid);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+
+.dayChip:hover {
+  border-color: var(--primary);
+  color: var(--text);
+}
+
+.dayChipActive {
+  border-color: var(--primary);
+  background: var(--primary-bg);
+  color: var(--primary-light);
+}
+
+.dayChip:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.ordinalPair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .subtasksSection {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  margin-bottom: 12px;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
 }
 
 .subtasksHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
 }
 
 .subtasksTitle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text);
 }
 
-.subtasksCount {
-  font-size: 12px;
-  color: var(--text-mid);
+.quickAddSubtask {
+  padding: 8px 12px;
 }
 
-.subtasksList {
+.quickAddSubtask input {
+  font-size: 13px;
+}
+
+.subtaskList {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 180px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 220px;
   overflow-y: auto;
-  padding-right: 4px;
 }
 
-.subtaskItem {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  background: var(--surface-1);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  transition: all var(--transition-fast);
-}
-
-.subtaskItem:hover {
-  border-color: var(--border);
-}
-
-.subtaskText {
-  flex: 1;
-  font-size: 13px;
-  color: var(--text);
-  word-break: break-word;
-}
-
-.subtaskTextDone {
+.subtaskDoneRow :global(span) {
   color: var(--text-soft);
   text-decoration: line-through;
 }
 
-.subtaskDeleteBtn {
-  background: none;
-  border: none;
-  color: var(--text-soft);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--transition-fast);
-}
-
-.subtaskDeleteBtn:hover {
-  color: var(--red, #ef4444);
-  background: var(--red-bg, rgba(239, 68, 68, 0.1));
-}
-
-.addSubtaskRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.addSubtaskInput {
+.inlineEditInput {
   flex: 1;
-  padding: 7px 12px;
-  font-size: 13px;
-  background: var(--surface-1);
-  border: 1px solid var(--border);
+  min-width: 0;
+  width: 100%;
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 1.5px solid var(--border-strong);
   border-radius: var(--radius-sm);
+  background: var(--control-bg);
   color: var(--text);
-  font-family: inherit;
+  font-family: var(--font-sans);
+  font-size: 13px;
   outline: none;
-  transition: border-color var(--transition-fast);
 }
 
-.addSubtaskInput:focus {
+.inlineEditInput:focus {
   border-color: var(--primary);
+  background: var(--control-bg-focus);
+  box-shadow: 0 0 0 3px var(--primary-glow);
 }
 
-@media (max-width: 520px) {
-  .formGrid {
+.emptySubtasks {
+  margin: 0;
+  padding: 10px 0 4px;
+  font-size: 12.5px;
+  color: var(--text-soft);
+  text-align: center;
+}
+
+.modalFooter {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+}
+
+.modalFooterLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modalFooterRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  .scheduleGrid,
+  .twoColGrid {
     grid-template-columns: 1fr;
+  }
+
+  .inlineListaSelect {
+    width: 100%;
+  }
+
+  .modalFooter {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .modalFooterLeft {
+    width: 100%;
+  }
+
+  .modalFooterLeft > * {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .modalFooterRight {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .modalFooterRight > * {
+    flex: 1;
   }
 }

@@ -29,6 +29,8 @@ export const Checkbox: React.FC<CheckboxProps> = ({
     if (inputRef.current) inputRef.current.indeterminate = indeterminate;
   }, [indeterminate]);
 
+  const marcado = Boolean(checked || indeterminate);
+
   return (
     <label
       htmlFor={inputId}
@@ -45,9 +47,19 @@ export const Checkbox: React.FC<CheckboxProps> = ({
           className={styles.nativeInput}
           {...props}
         />
-        <div className={`${styles.box} ${checked || indeterminate ? styles.checked : ''}`}>
-          {checked && <Check size={14} className={styles.checkIcon} strokeWidth={3} />}
-          {!checked && indeterminate && <Minus size={14} className={styles.checkIcon} strokeWidth={3} />}
+        <div
+          className={`${styles.box} ${marcado ? styles.checked : ''} ${disabled ? styles.disabledBox : ''}`}
+          aria-hidden="true"
+        >
+          {!checked && indeterminate ? (
+            <Minus size={12} className={styles.checkIcon} strokeWidth={2.75} />
+          ) : (
+            <Check
+              size={12}
+              className={checked ? styles.checkIcon : styles.idleIcon}
+              strokeWidth={checked ? 2.75 : 2.2}
+            />
+          )}
         </div>
       </div>
       {(label || description) && (
@@ -61,5 +73,41 @@ export const Checkbox: React.FC<CheckboxProps> = ({
         </div>
       )}
     </label>
+  );
+};
+
+export interface CheckCircleButtonProps
+  extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'type'> {
+  checked?: boolean;
+  size?: 'sm' | 'md';
+}
+
+export const CheckCircleButton: React.FC<CheckCircleButtonProps> = ({
+  checked = false,
+  disabled = false,
+  size = 'md',
+  className = '',
+  ...props
+}) => {
+  const iconSize = size === 'md' ? 13 : 12;
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      className={`${styles.circleButton} ${className}`}
+      {...props}
+    >
+      <span
+        className={`${styles.box} ${size === 'md' ? styles.boxMd : ''} ${checked ? styles.checked : ''}`}
+        aria-hidden="true"
+      >
+        <Check
+          size={iconSize}
+          className={checked ? styles.checkIcon : styles.idleIcon}
+          strokeWidth={checked ? 2.75 : 2.2}
+        />
+      </span>
+    </button>
   );
 };

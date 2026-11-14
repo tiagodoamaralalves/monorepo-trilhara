@@ -135,7 +135,14 @@ export const LixeiraModal: React.FC<LixeiraModalProps> = ({
           }}
         >
           {totalItens > 0 ? (
-            <Button variant="danger" size="sm" onClick={handleEsvaziar} disabled={carregando}>
+            <Button
+              type="button"
+              variant="danger"
+              size="md"
+              leftIcon={<Trash2 size={15} />}
+              onClick={handleEsvaziar}
+              disabled={carregando}
+            >
               Esvaziar lixeira
             </Button>
           ) : (

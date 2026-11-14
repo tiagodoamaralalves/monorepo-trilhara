@@ -107,23 +107,5 @@
   display: flex;
   align-items: center;
   gap: 2px;
-}
-
-.miniBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--text-mid);
-  border-radius: var(--radius-xs);
-  cursor: pointer;
-}
-
-.miniBtn:hover {
-  color: var(--text-primary);
-  background: var(--bg-hover);
+  flex-shrink: 0;
 }

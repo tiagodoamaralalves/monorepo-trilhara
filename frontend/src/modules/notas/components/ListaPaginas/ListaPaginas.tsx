@@ -230,8 +230,11 @@ export const ListaPaginas: React.FC<ListaPaginasProps> = ({
                       <span className={styles.itemDate}>{dataFormatada}</span>
                     )}
                   </button>
-                  <button
+                  <Button
                     type="button"
+                    variant="danger"
+                    size="sm"
+                    iconOnly
                     className={styles.deleteBtn}
                     title="Excluir página"
                     aria-label={`Excluir página ${nota.titulo}`}
@@ -240,8 +243,8 @@ export const ListaPaginas: React.FC<ListaPaginasProps> = ({
                       onExcluirNota(nota);
                     }}
                   >
-                    <Trash2 size={13} />
-                  </button>
+                    <Trash2 size={15} />
+                  </Button>
                 </div>
               </article>
             );

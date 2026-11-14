@@ -702,23 +702,6 @@
   white-space: nowrap;
 }
 
-.removerFocoBtn {
-  background: transparent;
-  border: none;
-  color: var(--text-soft);
-  cursor: pointer;
-  padding: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: color var(--transition-fast, 150ms ease);
-}
-
-.removerFocoBtn:hover {
-  color: var(--text);
-}
-
 .clockEditButton {
   all: unset;
   cursor: pointer;

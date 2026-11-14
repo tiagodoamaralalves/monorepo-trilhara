@@ -1,5 +1,6 @@
 import React from 'react';
 import { Edit2, Plus, Trash2 } from 'lucide-react';
+import { Button } from '@shared/design-system';
 import { Secao } from '../../types/nota';
 import styles from './SecaoTabs.module.css';
 
@@ -63,9 +64,11 @@ export const SecaoTabs: React.FC<SecaoTabsProps> = ({
             {isAtiva && (
               <div className={styles.itemActions}>
                 {onAbrirEditarSecao && (
-                  <button
+                  <Button
                     type="button"
-                    className={styles.miniBtn}
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
                     onClick={(e) => {
                       e.stopPropagation();
                       onAbrirEditarSecao(secao);
@@ -73,13 +76,15 @@ export const SecaoTabs: React.FC<SecaoTabsProps> = ({
                     title="Renomear seção"
                     aria-label="Editar seção"
                   >
-                    <Edit2 size={11} />
-                  </button>
+                    <Edit2 size={15} />
+                  </Button>
                 )}
                 {onExcluirSecao && (
-                  <button
+                  <Button
                     type="button"
-                    className={styles.miniBtn}
+                    variant="danger"
+                    size="sm"
+                    iconOnly
                     onClick={(e) => {
                       e.stopPropagation();
                       onExcluirSecao(secao);
@@ -87,8 +92,8 @@ export const SecaoTabs: React.FC<SecaoTabsProps> = ({
                     title="Mover seção para a lixeira"
                     aria-label="Excluir seção"
                   >
-                    <Trash2 size={11} />
-                  </button>
+                    <Trash2 size={15} />
+                  </Button>
                 )}
               </div>
             )}

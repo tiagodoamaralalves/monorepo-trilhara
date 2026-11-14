@@ -684,11 +684,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           </span>
                           <Button
                             type="button"
-                            variant="secondary"
-                            size="sm"
+                            variant="danger"
+                            size="md"
+                            leftIcon={<Trash2 size={15} />}
                             onClick={() => handleExcluirHistoricoDisciplinaRemovida(item)}
                           >
-                            <Trash2 size={14} style={{ marginRight: 4, color: 'var(--red)' }} />
                             Apagar histórico desta disciplina
                           </Button>
                         </div>
@@ -838,13 +838,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                               <div className={styles.acoesCol}>
                                 <Button
                                   type="button"
-                                  variant="ghost"
-                                  size="sm"
+                                  variant="danger"
+                                  size="md"
+                                  leftIcon={<Trash2 size={15} />}
                                   onClick={() => handleExcluirSessao(sessao)}
                                   title="Excluir sessão do histórico"
-                                  style={{ color: 'var(--red)' }}
                                 >
-                                  <Trash2 size={14} style={{ marginRight: 4 }} />
                                   Excluir
                                 </Button>
                               </div>

@@ -59,26 +59,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-}
-
-.iconBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--text-mid);
-  border-radius: var(--radius-xs, 4px);
-  cursor: pointer;
-  transition: all 120ms ease;
-}
-
-.iconBtn:hover {
-  color: var(--text-primary);
-  background: var(--bg-hover);
+  flex-shrink: 0;
 }
 
 .selectWrapper {

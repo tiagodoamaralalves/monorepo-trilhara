@@ -214,7 +214,7 @@ export const TarefaAgendaItem: React.FC<TarefaAgendaItemProps> = ({
           {onExcluir && (
             <Button
               type="button"
-              variant="ghost"
+              variant="danger"
               size="sm"
               iconOnly
               className={styles.deleteBtn}
@@ -234,20 +234,17 @@ export const TarefaAgendaItem: React.FC<TarefaAgendaItemProps> = ({
       {expandirSubtarefas && totalSubtarefas > 0 && (
         <div className={styles.subtarefas}>
           {subtarefas.map((sub) => (
-            <label
+            <Checkbox
               key={sub.id}
-              className={`${styles.subtarefa} ${sub.concluida ? styles.subtarefaConcluida : ''}`}
-            >
-              <input
-                type="checkbox"
-                aria-label={`Marcar subtarefa ${sub.titulo} como ${
-                  sub.concluida ? 'pendente' : 'concluída'
-                }`}
-                checked={sub.concluida}
-                onChange={() => onAlternarSubtarefa?.(tarefa.id, sub.id, !sub.concluida)}
-              />
-              <span>{sub.titulo}</span>
-            </label>
+              className={styles.subtaskCheckbox}
+              label={sub.titulo}
+              strikeThroughOnChecked
+              checked={sub.concluida}
+              onChange={() => onAlternarSubtarefa?.(tarefa.id, sub.id, !sub.concluida)}
+              aria-label={`Marcar subtarefa ${sub.titulo} como ${
+                sub.concluida ? 'pendente' : 'concluída'
+              }`}
+            />
           ))}
         </div>
       )}

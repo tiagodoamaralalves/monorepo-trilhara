@@ -1437,15 +1437,17 @@ export default function PomodoroApp() {
                     <span className={styles.focoItemTag}>Foco Selecionado</span>
                     <span className={styles.focoItemTitulo}>{focoItem.titulo}</span>
                   </div>
-                  <button
+                  <Button
                     type="button"
-                    className={styles.removerFocoBtn}
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
                     onClick={limparFoco}
                     title="Desmarcar foco"
                     aria-label="Desmarcar foco"
                   >
-                    <X size={14} />
-                  </button>
+                    <X size={15} />
+                  </Button>
                 </div>
               )}
 

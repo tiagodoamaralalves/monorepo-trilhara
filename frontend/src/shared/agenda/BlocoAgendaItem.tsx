@@ -1,6 +1,6 @@
 import React from 'react';
-import { BookOpen, Check } from 'lucide-react';
-import { Badge, DisciplineLabel } from '../design-system';
+import { BookOpen } from 'lucide-react';
+import { Badge, CheckCircleButton, DisciplineLabel } from '../design-system';
 import styles from './AgendaCard.module.css';
 
 type StatusDataBloco = 'ATRASADO' | 'HOJE' | 'FUTURO';
@@ -43,18 +43,15 @@ export const BlocoAgendaItem: React.FC<BlocoAgendaItemProps> = ({
     <article className={`${styles.card} ${selecionado ? styles.cardSelected : ''}`}>
       <div className={styles.cardRow}>
         <div className={styles.cardLead}>
-          <button
-            type="button"
-            className={styles.blocoCheckBtn}
+          <CheckCircleButton
+            size="md"
             onClick={(e) => {
               e.stopPropagation();
               onConcluir();
             }}
             title="Concluir bloco e registrar sessão"
             aria-label={`Concluir bloco de ${disciplinaNome}`}
-          >
-            <Check size={13} />
-          </button>
+          />
 
           <div className={styles.cardTitleWrap}>
             {onDefinirFoco ? (

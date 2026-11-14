@@ -149,16 +149,14 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
   const [novosTopicosTexto, setNovosTopicosTexto] = useState('');
   const [novoTopicoRapido, setNovoTopicoRapido] = useState('');
   const [erroTopicos, setErroTopicos] = useState('');
-  const [editandoDisciplinaId, setEditandoDisciplinaId] = useState<string | null>(null);
   const [nomeDisciplinaEditado, setNomeDisciplinaEditado] = useState('');
   const [editandoTopicoId, setEditandoTopicoId] = useState<string | null>(null);
   const [nomeTopicoEditado, setNomeTopicoEditado] = useState('');
   const [mostrarCores, setMostrarCores] = useState(false);
   const colorPickerContainerRef = useRef<HTMLDivElement>(null);
-  const titleInputRef = useRef<HTMLInputElement>(null);
 
-  const prevIsOpenRef = useRef(isOpen);
-  const prevInitialIdRef = useRef(initialDisciplinaId);
+  const prevIsOpenRef = useRef(false);
+  const prevInitialIdRef = useRef<string | null>(null);
   const prevModeRef = useRef(mode);
 
   const isCreateMode = mode === 'create';
@@ -186,14 +184,12 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
         };
         setDisciplinasLocais([rascunhoNova]);
         setDisciplinaAbertaId(ID_NOVA_DISCIPLINA);
-        setEditandoDisciplinaId(ID_NOVA_DISCIPLINA);
         setNomeDisciplinaEditado('');
       } else {
         const targetId =
           initialDisciplinaId ?? (isEditable && disciplinas.length === 1 ? disciplinas[0].id : null);
         setDisciplinasLocais(disciplinas);
         setDisciplinaAbertaId(targetId);
-        setEditandoDisciplinaId(null);
         const disciplinaInicial = disciplinas.find((item) => item.id === targetId);
         setNomeDisciplinaEditado(disciplinaInicial?.nome ?? '');
       }
@@ -205,10 +201,10 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
       setMostrarCores(false);
     } else if (!isOpen && prevIsOpenRef.current) {
       setDisciplinaAbertaId(null);
+      setNomeDisciplinaEditado('');
       setNovosTopicosTexto('');
       setNovoTopicoRapido('');
       setErroTopicos('');
-      setEditandoDisciplinaId(null);
       setEditandoTopicoId(null);
       setNomeTopicoEditado('');
       setMostrarCores(false);
@@ -274,25 +270,6 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
   );
 
   const exibePeso = mostrarPeso ?? !isEditable;
-
-  const handleRenomearDisciplina = () => {
-    const valor = nomeDisciplinaEditado.trim();
-    if (!editandoDisciplinaId) return;
-    if (!valor) {
-      if (isCreateMode) {
-        setDisciplinasLocais((prev) =>
-          prev.map((item) => (item.id === editandoDisciplinaId ? { ...item, nome: '' } : item))
-        );
-        return;
-      }
-      setEditandoDisciplinaId(null);
-      return;
-    }
-    setDisciplinasLocais((prev) =>
-      prev.map((item) => (item.id === editandoDisciplinaId ? { ...item, nome: valor } : item))
-    );
-    setEditandoDisciplinaId(null);
-  };
 
   const handleAlterarDisciplina = (campo: 'cor' | 'peso', valor: string | number) => {
     if (disciplinaAbertaId === null) return;
@@ -414,25 +391,8 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
     );
   };
 
-  const isEditingSelectedTitle =
-    isEditable &&
-    Boolean(disciplinaSelecionada) &&
-    editandoDisciplinaId === disciplinaSelecionada?.id;
-
-  useEffect(() => {
-    if (isOpen && isEditingSelectedTitle) {
-      titleInputRef.current?.focus();
-    }
-  }, [isOpen, isEditingSelectedTitle]);
-
-  const startEditingDiscipline = (disciplina: Disciplina) => {
-    if (!isEditable) return;
-    setEditandoDisciplinaId(disciplina.id);
-    setNomeDisciplinaEditado(disciplina.nome);
-  };
-
   const nomeFinalAtual = (
-    isEditingSelectedTitle ? nomeDisciplinaEditado : disciplinaSelecionada?.nome || ''
+    isEditable ? nomeDisciplinaEditado : disciplinaSelecionada?.nome || ''
   ).trim();
   const nomeFinalValido = Boolean(nomeFinalAtual);
 
@@ -496,47 +456,14 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
     onSaveDiscipline?.(disciplinaFinal);
   };
 
-  const modalTitle = disciplinaSelecionada ? (
-    isEditingSelectedTitle ? (
-      <Input
-        ref={titleInputRef}
-        className={styles.titleEditInput}
-        value={nomeDisciplinaEditado}
-        maxLength={MAX_CARACTERES_DISCIPLINA}
-        placeholder={isCreateMode ? 'Nome da disciplina' : undefined}
-        aria-label="Nome da disciplina"
-        onChange={(event) => setNomeDisciplinaEditado(event.target.value)}
-        onBlur={handleRenomearDisciplina}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            handleRenomearDisciplina();
-          } else if (event.key === 'Escape') {
-            event.preventDefault();
-            if (isCreateMode && !disciplinaSelecionada.nome.trim()) {
-              return;
-            }
-            setNomeDisciplinaEditado(disciplinaSelecionada.nome);
-            setEditandoDisciplinaId(null);
-          }
-        }}
-      />
-    ) : isEditable ? (
-      <button
-        type="button"
-        className={styles.editableTitle}
-        onClick={() => startEditingDiscipline(disciplinaSelecionada)}
-        aria-label={`Editar ${disciplinaSelecionada.nome}`}
-      >
-        <Pencil size={15} aria-hidden="true" />
-        <span>{disciplinaSelecionada.nome}</span>
-      </button>
-    ) : (
-      disciplinaSelecionada.nome
-    )
-  ) : (
-    title
-  );
+  const modalTitle =
+    isEditable && disciplinaSelecionada
+      ? isCreateMode
+        ? 'Nova disciplina'
+        : 'Editar disciplina'
+      : disciplinaSelecionada
+        ? disciplinaSelecionada.nome
+        : title;
 
   const totalTopicosSelecionados = disciplinaSelecionada?.topicos.length ?? 0;
   const topicosPersistidos = disciplinaSelecionada
@@ -555,7 +482,6 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
 
   const voltarParaDisciplinas = () => {
     setDisciplinaAbertaId(null);
-    setEditandoDisciplinaId(null);
     setEditandoTopicoId(null);
     setMostrarCores(false);
   };
@@ -636,15 +562,15 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
     disciplinaSelecionada?.cor ||
     obterCorDisponivel(disciplinasLocais, disciplinaSelecionada?.id);
 
-  const disciplinaIcon = disciplinaSelecionada ? (
-    <div className={styles.headerColorWrapper} ref={colorPickerContainerRef}>
+  const seletorCorDisciplina = (
+    <div className={styles.heroColorWrapper} ref={colorPickerContainerRef}>
       <button
         type="button"
         className={`${styles.colorBadgeButton} ${mostrarCores ? styles.colorBadgeButtonActive : ''}`}
-        aria-label={isEditable ? 'Alterar cor da disciplina' : `Cor da disciplina: ${corDisciplinaSelecionada}`}
-        title={isEditable ? 'Clique para alterar a cor da disciplina' : undefined}
-        onClick={() => isEditable && setMostrarCores((prev) => !prev)}
-        disabled={!isEditable}
+        aria-label="Alterar cor da disciplina"
+        aria-expanded={mostrarCores}
+        title="Clique para alterar a cor da disciplina"
+        onClick={() => setMostrarCores((prev) => !prev)}
       >
         <span
           className={styles.colorBadge}
@@ -652,7 +578,7 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
         />
       </button>
 
-      {isEditable && mostrarCores && (
+      {mostrarCores && (
         <div
           className={styles.colorPopover}
           role="dialog"
@@ -702,20 +628,34 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
         </div>
       )}
     </div>
-  ) : (
-    icon
   );
 
-  const iconBadgeStyle: React.CSSProperties | undefined = disciplinaSelecionada
-    ? {
-        width: '30px',
-        height: '30px',
-        marginTop: '0',
-        borderRadius: '50%',
-        backgroundColor: 'transparent',
-        borderColor: 'transparent'
-      }
-    : undefined;
+  const disciplinaIcon =
+    !isEditable && disciplinaSelecionada ? (
+      <span
+        className={styles.headerReadOnlyColorWrapper}
+        aria-label={`Cor da disciplina: ${corDisciplinaSelecionada}`}
+      >
+        <span
+          className={styles.colorBadge}
+          style={{ '--discipline-color': corDisciplinaSelecionada } as React.CSSProperties}
+        />
+      </span>
+    ) : (
+      icon
+    );
+
+  const iconBadgeStyle: React.CSSProperties | undefined =
+    !isEditable && disciplinaSelecionada
+      ? {
+          width: '30px',
+          height: '30px',
+          marginTop: '0',
+          borderRadius: '50%',
+          backgroundColor: 'transparent',
+          borderColor: 'transparent'
+        }
+      : undefined;
 
   return (
     <Modal
@@ -725,6 +665,7 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
       icon={disciplinaIcon}
       iconBadgeStyle={iconBadgeStyle}
       maxWidth={maxWidth}
+      focoInicial={isEditable && isCreateMode ? '[data-discipline-name-input="true"]' : undefined}
       isSaving={isSaving || isDeleting}
       footer={
         isEditable && disciplinaSelecionada ? (
@@ -771,6 +712,20 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
         )
       }
     >
+      {isEditable && disciplinaSelecionada && (
+        <div className={styles.disciplineHeroRow}>
+          {seletorCorDisciplina}
+          <Input
+            data-discipline-name-input="true"
+            className={styles.titleEditInput}
+            value={nomeDisciplinaEditado}
+            maxLength={MAX_CARACTERES_DISCIPLINA}
+            placeholder="Nome da disciplina"
+            aria-label="Nome da disciplina"
+            onChange={(event) => setNomeDisciplinaEditado(event.target.value)}
+          />
+        </div>
+      )}
       <div className={styles.modalContentMeta}>
         {disciplinaSelecionada ? modalSubtitle : subtitle}
       </div>
@@ -873,37 +828,38 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
                     }
                     actions={
                       isEditable ? (
-                        isEditing ? (
+                        <>
+                          {!isEditing && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              iconOnly
+                              title="Editar assunto"
+                              aria-label={`Editar assunto ${topico.nome}`}
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => {
+                                if (editandoTopicoId) {
+                                  handleRenomearTopico();
+                                }
+                                setEditandoTopicoId(topico.id);
+                                setNomeTopicoEditado(topico.nome);
+                              }}
+                              leftIcon={<Pencil size={14} />}
+                            />
+                          )}
                           <Button
                             type="button"
                             variant="danger"
                             size="sm"
                             iconOnly
                             title="Excluir assunto"
-                            aria-label="Excluir assunto"
+                            aria-label={`Excluir assunto ${topico.nome}`}
                             onMouseDown={(event) => event.preventDefault()}
                             onClick={() => void handleExcluirTopico(topico)}
-                            leftIcon={<Trash2 size={15} />}
+                            leftIcon={<Trash2 size={14} />}
                           />
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            iconOnly
-                            title="Editar assunto"
-                            aria-label={`Editar assunto ${topico.nome}`}
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => {
-                              if (editandoTopicoId) {
-                                handleRenomearTopico();
-                              }
-                              setEditandoTopicoId(topico.id);
-                              setNomeTopicoEditado(topico.nome);
-                            }}
-                            leftIcon={<Pencil size={15} />}
-                          />
-                        )
+                        </>
                       ) : undefined
                     }
                   />
@@ -927,7 +883,6 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
                   topicButtonClassName={styles.modalTopicPill}
                   onClick={() => {
                     setDisciplinaAbertaId(disciplina.id);
-                    setEditandoDisciplinaId(null);
                     setEditandoTopicoId(null);
                     setMostrarCores(false);
                   }}

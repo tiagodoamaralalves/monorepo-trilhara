@@ -111,7 +111,6 @@ export const TrilhaPod: React.FC<TrilhaPodProps> = ({
                   variant="ghost"
                   size="sm"
                   iconOnly
-                  className={styles.editTrilhaButton}
                   onClick={onAbrirEditarTrilha}
                   title="Editar trilha ativa"
                   aria-label="Editar trilha ativa"

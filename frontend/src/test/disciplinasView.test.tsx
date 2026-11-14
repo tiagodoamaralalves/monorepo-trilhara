@@ -162,7 +162,7 @@ describe('DisciplinasView — modal unificado, edição inline, quick add e conc
     expect(within(dialog).queryByRole('button', { name: 'Excluir disciplina' })).not.toBeInTheDocument();
   });
 
-  it('alterna o botão da linha do assunto entre lápis e lixeira e só edita ao clicar no lápis', async () => {
+  it('exibe lápis e lixeira lado a lado na linha do assunto e só edita ao clicar no lápis', async () => {
     const trilha = montarTrilha();
     await renderDisciplinasView(trilha);
 
@@ -173,28 +173,29 @@ describe('DisciplinasView — modal unificado, edição inline, quick add e conc
     fireEvent.click(within(dialog).getByText('Princípios Fundamentais'));
     expect(within(dialog).queryByLabelText('Nome do assunto')).not.toBeInTheDocument();
 
-    // Botão inicial é o lápis (lixeira não aparece antes de editar)
-    expect(within(dialog).queryByRole('button', { name: 'Excluir assunto' })).not.toBeInTheDocument();
+    // Lápis e lixeira ficam visíveis lado a lado antes de editar
     const editBtn = within(dialog).getByRole('button', { name: 'Editar assunto Princípios Fundamentais' });
+    expect(editBtn).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Excluir assunto Princípios Fundamentais' })).toBeInTheDocument();
+
     fireEvent.click(editBtn);
 
-    // Ao clicar no lápis, abre o textarea de edição e o botão vira lixeira
+    // Ao clicar no lápis, abre o textarea de edição, oculta o lápis e mantém a lixeira visível
     const editTextarea = within(dialog).getByLabelText('Nome do assunto') as HTMLTextAreaElement;
     expect(editTextarea.tagName).toBe('TEXTAREA');
-    expect(within(dialog).getByRole('button', { name: 'Excluir assunto' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Excluir assunto Princípios Fundamentais' })).toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: 'Editar assunto Princípios Fundamentais' })).not.toBeInTheDocument();
 
     fireEvent.change(editTextarea, { target: { value: 'Princípios Constitucionais' } });
     fireEvent.keyDown(editTextarea, { key: 'Enter' });
 
-    // Ao concluir com Enter, salva e volta o botão de lápis
+    // Ao concluir com Enter, salva e volta o botão de lápis ao lado da lixeira
     expect(within(dialog).queryByLabelText('Nome do assunto')).not.toBeInTheDocument();
     expect(within(dialog).getByText('Princípios Constitucionais')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Editar assunto Princípios Constitucionais' })).toBeInTheDocument();
 
-    // Reabre edição e clica na lixeira que aparece durante a edição para excluir o assunto
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Editar assunto Princípios Constitucionais' }));
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Excluir assunto' }));
+    // Clica diretamente na lixeira da linha para excluir o assunto sem precisar abrir edição
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Excluir assunto Princípios Constitucionais' }));
 
     const confirmBtn = await screen.findByRole('button', { name: 'Excluir' });
     fireEvent.click(confirmBtn);
@@ -349,5 +350,51 @@ describe('DisciplinasView — modal unificado, edição inline, quick add e conc
 
     expect(within(dialog).getByText('Cada assunto deve ter no máximo 300 caracteres.')).toBeInTheDocument();
     expect(atualizarSpy).not.toHaveBeenCalled();
+  });
+
+  it('exibe cabeçalho fixo ao criar e editar disciplina com cor e nome editáveis no corpo do modal', async () => {
+    const trilha = montarTrilha();
+    const atualizarSpy = vi.spyOn(EstudosService, 'atualizarDisciplina').mockResolvedValue({
+      ...trilha.disciplinas[0],
+      nome: 'Direito Administrativo',
+      cor: '#16a34a'
+    });
+    vi.spyOn(EstudosService, 'buscarTrilha').mockResolvedValue(trilha);
+
+    await renderDisciplinasView(trilha);
+
+    // Modo criação: cabeçalho "Nova disciplina" + campo de nome e cor no corpo
+    fireEvent.click(screen.getByRole('button', { name: /Adicionar Disciplina/i }));
+    const createDialog = screen.getByRole('dialog');
+    expect(within(createDialog).getByRole('heading', { name: 'Nova disciplina' })).toBeInTheDocument();
+    expect(within(createDialog).getByLabelText('Nome da disciplina')).toHaveValue('');
+    expect(within(createDialog).getByRole('button', { name: 'Alterar cor da disciplina' })).toBeInTheDocument();
+    fireEvent.click(within(createDialog).getByRole('button', { name: 'Cancelar' }));
+
+    // Modo edição: cabeçalho "Editar disciplina" + input de nome já aberto e editável diretamente
+    fireEvent.click(screen.getByRole('button', { name: 'Editar disciplina Direito Constitucional' }));
+    const editDialog = screen.getByRole('dialog');
+
+    expect(within(editDialog).getByRole('heading', { name: 'Editar disciplina' })).toBeInTheDocument();
+    const nomeInput = within(editDialog).getByLabelText('Nome da disciplina');
+    expect(nomeInput).toHaveValue('Direito Constitucional');
+
+    fireEvent.change(nomeInput, { target: { value: 'Direito Administrativo' } });
+
+    const colorTrigger = within(editDialog).getByRole('button', { name: 'Alterar cor da disciplina' });
+    fireEvent.click(colorTrigger);
+    expect(within(editDialog).getByRole('dialog', { name: 'Cor da disciplina' })).toBeInTheDocument();
+
+    fireEvent.click(within(editDialog).getByRole('button', { name: 'Salvar' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Manter histórico' }));
+
+    await waitFor(() => {
+      expect(atualizarSpy).toHaveBeenCalledWith('trilha-1', 'disc-1', {
+        nome: 'Direito Administrativo',
+        cor: '#2563eb',
+        peso: 2,
+        topicos: [{ id: 'top-1', nome: 'Princípios Fundamentais', ordem: 1 }]
+      });
+    });
   });
 });

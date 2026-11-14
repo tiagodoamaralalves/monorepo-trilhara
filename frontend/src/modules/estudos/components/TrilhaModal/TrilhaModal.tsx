@@ -188,7 +188,7 @@ export const TrilhaModal: React.FC<TrilhaModalProps> = ({
             <Button
               type="button"
               variant="danger"
-              size="sm"
+              size="md"
               leftIcon={<Trash2 size={15} />}
               disabled={salvando || excluindo}
               onClick={() => setConfirmarExclusao(true)}
@@ -271,6 +271,8 @@ export const TrilhaModal: React.FC<TrilhaModalProps> = ({
               <Button
                 type="button"
                 variant="danger"
+                size="md"
+                leftIcon={<Trash2 size={15} />}
                 loading={excluindo}
                 disabled={!confirmacaoValida || excluindo}
                 onClick={() => void handleExcluir()}

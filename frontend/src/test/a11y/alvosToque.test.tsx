@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { Button } from '../../shared/design-system/Button/Button';
 import { IconButton } from '../../shared/design-system/IconButton/IconButton';
-import { Checkbox } from '../../shared/design-system/Checkbox/Checkbox';
+import { Checkbox, CheckCircleButton } from '../../shared/design-system/Checkbox/Checkbox';
 
 /**
  * Alvos mínimos de toque/clique (WCAG 2.2 SC 2.5.8).
@@ -64,6 +64,18 @@ describe('Design System — alvos mínimos de toque (SC 2.5.8)', () => {
   it('renderiza o Checkbox com label associado (nome acessível)', () => {
     render(<Checkbox label="Concluir tarefa" readOnly />);
     expect(screen.getByRole('checkbox', { name: 'Concluir tarefa' })).toBeInTheDocument();
+  });
+
+  it('CheckCircleButton expõe button com nome acessível e respeita o alvo mínimo no CSS', () => {
+    const checkboxCss = readFileSync(
+      resolve(__dirname, '../../shared/design-system/Checkbox/Checkbox.module.css'),
+      'utf-8'
+    );
+    expect(checkboxCss).toMatch(/\.circleButton \{[^}]*var\(--target-min\)/);
+
+    render(<CheckCircleButton aria-label="Concluir bloco de estudo" />);
+    const botao = screen.getByRole('button', { name: 'Concluir bloco de estudo' });
+    expect(botao).toHaveAttribute('type', 'button');
   });
 
   it('Button continua clicável e nomeado', () => {

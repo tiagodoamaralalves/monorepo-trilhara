@@ -20,7 +20,7 @@ import {
   Trash2,
   AlertTriangle
 } from 'lucide-react';
-import { SyncStatusBadge } from '@shared/design-system';
+import { Button, SyncStatusBadge } from '@shared/design-system';
 import { NotaService } from '../../services/notaService';
 import { RascunhoNotaLocal } from '../../types/nota';
 import { useAutosaveNota } from '../../hooks/useAutosaveNota';
@@ -325,15 +325,17 @@ export const TiptapEditor: React.FC<TiptapEditorProps> = ({
         <SyncStatusBadge status={autosave.status} onRetry={autosave.tentarNovamente} />
 
         {onExcluirNota && (
-          <button
+          <Button
             type="button"
-            className={styles.toolBtn}
+            variant="danger"
+            size="sm"
+            iconOnly
             onClick={onExcluirNota}
             title="Excluir esta nota"
             aria-label="Excluir nota"
           >
             <Trash2 size={15} />
-          </button>
+          </Button>
         )}
       </header>
 

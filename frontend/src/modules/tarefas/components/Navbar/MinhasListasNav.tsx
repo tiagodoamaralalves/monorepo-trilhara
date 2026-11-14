@@ -1,6 +1,6 @@
 import React from 'react';
 import { Plus, Folder, BookOpen, MoreVertical, Check } from 'lucide-react';
-import { useSidebar, DisciplineLabel } from '@shared/design-system';
+import { Button, useSidebar, DisciplineLabel } from '@shared/design-system';
 import { ListaTarefas } from '../../types/tarefa';
 import styles from './MinhasListasNav.module.css';
 
@@ -117,15 +117,17 @@ export const MinhasListasNav: React.FC<MinhasListasNavProps> = ({
           <Folder size={12} />
           <span>Minhas Listas</span>
         </span>
-        <button
+        <Button
           type="button"
-          className={styles.novaListaBtn}
+          variant="ghost"
+          size="sm"
+          iconOnly
           onClick={onAbrirNovaLista}
           title="Criar nova lista"
           aria-label="Criar nova lista"
         >
-          <Plus size={14} />
-        </button>
+          <Plus size={15} />
+        </Button>
       </div>
 
       <div className={styles.listasItems}>
@@ -177,8 +179,11 @@ export const MinhasListasNav: React.FC<MinhasListasNavProps> = ({
               </button>
 
               {onAbrirEditarLista && (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
                   className={styles.listaOpcoesBtn}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -187,8 +192,8 @@ export const MinhasListasNav: React.FC<MinhasListasNavProps> = ({
                   title="Opções da lista"
                   aria-label="Opções da lista"
                 >
-                  <MoreVertical size={13} />
-                </button>
+                  <MoreVertical size={15} />
+                </Button>
               )}
             </div>
           );

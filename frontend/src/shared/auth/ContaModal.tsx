@@ -172,8 +172,9 @@ export const ContaModal: React.FC<ContaModalProps> = ({
               <Button
                 type="button"
                 variant="danger"
+                size="md"
                 onClick={handleIniciarExclusao}
-                leftIcon={<Trash2 size={16} />}
+                leftIcon={<Trash2 size={15} />}
               >
                 Excluir minha conta
               </Button>
