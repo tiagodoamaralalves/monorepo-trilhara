@@ -33,7 +33,7 @@ function obterTelaAuthInicial(): AuthScreen {
   return 'none';
 }
 
-/** Parâmetro do link "Abrir no Notas" de Estudos (R3/R9). */
+/** Parâmetro do link "Abrir no Notas" de Estudos. */
 function obterOrigemTrilhaInicial(): string | null {
   if (typeof window === 'undefined') return null;
   return new URLSearchParams(window.location.search).get('origemTrilhaId');
@@ -193,7 +193,7 @@ function NotasApp() {
     [toast]
   );
 
-  // 1. Carga inicial: respeita o filtro `origemTrilhaId` do link "Abrir no Notas" (R3/R9).
+  // 1. Carga inicial: respeita o filtro `origemTrilhaId` do link "Abrir no Notas".
   useEffect(() => {
     if (!isAuthenticated) return;
     void carregarCadernos(origemTrilhaInicialRef.current ?? undefined);
@@ -220,8 +220,8 @@ function NotasApp() {
   }, [isAuthenticated, notaAtivaId, carregarNotaDetalhe]);
 
   // 2. Consulta em segundo plano de /api/trilhas: a sugestão automática é apenas um convite.
-  //    É avaliada UMA vez por sessão de tela (nunca reabre a cada recarga de cadernos) e a falha
-  //    da consulta não abre o modal nem exibe erro intrusivo.
+  // É avaliada UMA vez por sessão de tela (nunca reabre a cada recarga de cadernos) e a falha
+  // da consulta não abre o modal nem exibe erro intrusivo.
   useEffect(() => {
     if (!isAuthenticated || !usuario?.id) return;
     if (sugestaoImportacaoAvaliadaRef.current) return;
@@ -295,11 +295,11 @@ function NotasApp() {
   );
 
   /**
-   * Exclusão de caderno com contagem real de impacto (D-33).
-   *
-   * O número vem de `GET /api/cadernos/{id}/impacto-exclusao` e conta só itens ativos. Sem essa
-   * resposta não há confirmação destrutiva: o erro aparece no toast.
-   */
+ * Exclusão de caderno com contagem real de impacto.
+ *
+ * O número vem de `GET /api/cadernos/{id}/impacto-exclusao` e conta só itens ativos. Sem essa
+ * resposta não há confirmação destrutiva: o erro aparece no toast.
+ */
   const handleExcluirCaderno = async () => {
     if (!cadernoAtivo) return;
 
@@ -432,11 +432,11 @@ function NotasApp() {
   };
 
   /**
-   * Persistência chamada pelo autosave do editor.
-   *
-   * O `AbortSignal` do hook é repassado ao `PUT`; o retorno carrega o `atualizadoEm` novo, que
-   * vira a nova base do rascunho (D-31b).
-   */
+ * Persistência chamada pelo autosave do editor.
+ *
+ * O `AbortSignal` do hook é repassado ao `PUT`; o retorno carrega o `atualizadoEm` novo, que
+ * vira a nova base do rascunho.
+ */
   const handleSalvarConteudoNota = async (
     idNota: string,
     novoTitulo: string,
@@ -491,7 +491,7 @@ function NotasApp() {
     [cadernoAtivoId, carregarNotasMetadados, secaoAtivaId, toast]
   );
 
-  /** Exclusão de página com toast "Desfazer" (Anexo B). */
+  /** Exclusão de página com toast "Desfazer". */
   const handleExcluirNota = async (notaAlvo?: NotaMetadata) => {
     const alvo = notaAlvo ?? notaAtivaDetalhe;
     if (!alvo) return;
@@ -509,7 +509,7 @@ function NotasApp() {
     }
   };
 
-  // ── IMPORTAÇÃO E SINCRONIZAÇÃO DE TRILHA (D-29) ──
+  // ── IMPORTAÇÃO E SINCRONIZAÇÃO DE TRILHA ──
 
   const handleImportarTrilha = async (trilhaId: string, reimportar: boolean) => {
     try {

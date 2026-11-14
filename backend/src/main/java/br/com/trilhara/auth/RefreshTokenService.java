@@ -51,10 +51,10 @@ public class RefreshTokenService {
     }
 
     /**
-     * Realiza a rotação atômica do Refresh Token.
-     * Se detectar tentativa de reutilização de um token já rotacionado ou revogado,
-     * revoga imediatamente toda a família de tokens (proteção contra roubo de sessão / replay attack).
-     */
+ * Realiza a rotação atômica do Refresh Token.
+ * Se detectar tentativa de reutilização de um token já rotacionado ou revogado,
+ * revoga imediatamente toda a família de tokens (proteção contra roubo de sessão / replay attack).
+ */
     public ParRefreshToken rotacionar(String tokenPuro, String userAgent, String ip) {
         if (tokenPuro == null || tokenPuro.isBlank()) {
             throw new TokenInvalidoException("Refresh token é obrigatório.");

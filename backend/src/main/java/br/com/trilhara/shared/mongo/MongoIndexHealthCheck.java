@@ -15,7 +15,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 /**
- * Readiness de índices (D-07).
+ * Readiness de índices.
  *
  * <p>{@code DOWN} se faltar índice declarado ou houver conflito de chave/opções. Índices
  * {@code idx_}/{@code uk_} não declarados são reportados como dado de diagnóstico (drift),

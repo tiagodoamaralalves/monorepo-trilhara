@@ -12,7 +12,7 @@ export interface EmptyStateProps {
 }
 
 /**
- * Lista vazia com sucesso (D-37).
+ * Lista vazia com sucesso.
  *
  * Só pode ser renderizado após resposta `2xx` com zero itens — nunca como estado inicial
  * de uma lista que ainda não carregou (use `Skeleton` e `useRecurso`).

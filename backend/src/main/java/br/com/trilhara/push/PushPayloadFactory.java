@@ -12,7 +12,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 /**
- * Monta o payload de notificação (D-36d) e valida a URL de destino contra uma allowlist.
+ * Monta o payload de notificação e valida a URL de destino contra uma allowlist.
  *
  * <p>O payload é {@code {lembreteId, tarefaId, titulo, url}} — nada além disso. O {@code titulo}
  * é truncado em {@link #LIMITE_TITULO} caracteres (por <em>code point</em>, nunca cortando um
@@ -51,9 +51,9 @@ public class PushPayloadFactory {
     }
 
     /**
-     * URL absoluta e validada da tarefa. Falha de configuração é erro de boot, não de request:
-     * uma URL fora da allowlist permitiria sequestrar o clique da notificação.
-     */
+ * URL absoluta e validada da tarefa. Falha de configuração é erro de boot, não de request:
+ * uma URL fora da allowlist permitiria sequestrar o clique da notificação.
+ */
     private String validarUrlBase(String url) {
         String candidata = url == null || url.isBlank() ? "http://localhost/" : url.trim();
         URI uri;
@@ -77,15 +77,15 @@ public class PushPayloadFactory {
         return base.endsWith("/") ? base : base + "/";
     }
 
-    /** URL absoluta do deep link {@code ?tarefaId=} (D-36f). */
+    /** URL absoluta do deep link {@code ?tarefaId=}. */
     public String urlDaTarefa(String tarefaIdHex) {
         return tarefasUrl + "?tarefaId=" + tarefaIdHex;
     }
 
     /**
-     * JSON do payload. Os dois IDs vêm de {@code ObjectId.toHexString()} (hex apenas) e o título
-     * passa por {@link #escaparJson}; a URL já é validada no boot.
-     */
+ * JSON do payload. Os dois IDs vêm de {@code ObjectId.toHexString} (hex apenas) e o título
+ * passa por {@link #escaparJson}; a URL já é validada no boot.
+ */
     public String payloadJson(String lembreteIdHex, String tarefaIdHex, String titulo) {
         return "{\"lembreteId\":\"" + lembreteIdHex + "\""
                 + ",\"tarefaId\":\"" + tarefaIdHex + "\""

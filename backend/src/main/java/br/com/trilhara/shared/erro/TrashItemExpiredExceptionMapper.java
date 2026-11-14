@@ -7,7 +7,7 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
 /**
- * {@code TrashItemExpiredException} → {@code 404 TRASH_ITEM_EXPIRED} (D-04).
+ * {@code TrashItemExpiredException} → {@code 404 TRASH_ITEM_EXPIRED}.
  */
 @Provider
 public class TrashItemExpiredExceptionMapper implements ExceptionMapper<TrashItemExpiredException> {

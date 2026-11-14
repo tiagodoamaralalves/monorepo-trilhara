@@ -10,7 +10,7 @@ import jakarta.enterprise.inject.Alternative;
 
 /**
  * Implementação controlável de {@link FaultInjectorExclusaoConta} disponível <strong>apenas</strong>
- * no classpath de teste (D-18c/D-35e). Substitui {@link FaultInjectorExclusaoContaNoOp} via
+ * no classpath de teste. Substitui {@link FaultInjectorExclusaoContaNoOp} via
  * {@code @Alternative}.
  *
  * <p>Uso típico: {@code injector.falharNa(ColecaoTrilhara.NOTAS)} antes de disparar a limpeza; a

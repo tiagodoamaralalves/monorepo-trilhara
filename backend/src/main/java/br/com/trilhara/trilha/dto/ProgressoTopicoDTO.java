@@ -8,7 +8,7 @@ import java.time.Instant;
  *
  * <p>O progresso é persistido apenas quando o tópico está concluído (requisitos §4.2);
  * por isso a resposta é sempre {@code concluido = true}. O mapa legado
- * {@code progresso: { topicoId: { done, doneAt } }} foi removido (D-11): o cliente deriva
+ * {@code progresso: { topicoId: { done, doneAt } }} foi removido: o cliente deriva
  * o progresso do conjunto {@code topicosConcluidosIds} do detalhe da trilha.</p>
  */
 public record ProgressoTopicoDTO(

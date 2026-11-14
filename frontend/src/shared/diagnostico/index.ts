@@ -2,7 +2,7 @@
  * Diagnóstico de falhas não fatais do cliente.
  *
  * O produto proíbe `console.*` em código de aplicação: falhas de integração devem ser
- * visíveis na interface (D-37) e registradas de forma inspecionável. Este módulo mantém um
+ * visíveis na interface e registradas de forma inspecionável. Este módulo mantém um
  * anel limitado de eventos e notifica ouvintes interessados.
  */
 

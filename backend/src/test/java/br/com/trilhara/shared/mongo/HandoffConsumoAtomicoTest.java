@@ -29,11 +29,11 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 
 /**
- * R2 — handoff SSO na coleção privada {@code tokens_handoff_sso} (D-08) com consumo
+ * handoff SSO na coleção privada {@code tokens_handoff_sso} com consumo
  * atômico de uso único.
  */
 @QuarkusTest
-@DisplayName("R2 - Handoff SSO: tokens_handoff_sso e consumo atômico")
+@DisplayName("Handoff SSO: tokens_handoff_sso e consumo atômico")
 class HandoffConsumoAtomicoTest {
 
     private static final String BANCO_TESTE = "trilhara_r2_handoff_test";

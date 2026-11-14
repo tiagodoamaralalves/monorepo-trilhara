@@ -43,7 +43,7 @@ async function abrirFormulario(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByLabelText('Senha atual');
 }
 
-describe('R10 — ContaModal: confirmação dupla, erros inline e envio único', () => {
+describe('ContaModal: confirmação dupla, erros inline e envio único', () => {
   it('mostra os dados da conta e a Zona de Perigo', () => {
     montar();
     expect(screen.getByText('Carlos Drummond')).toBeInTheDocument();

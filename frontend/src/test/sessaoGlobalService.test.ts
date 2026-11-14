@@ -14,7 +14,7 @@ const payload: RegistrarSessaoPayload = {
 
 const chave = 'idemp-chave-r6';
 
-describe('sessaoGlobalService (R6/D-22) — canal único de registro de sessão', () => {
+describe('sessaoGlobalService — canal único de registro de sessão', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -90,7 +90,7 @@ describe('sessaoGlobalService (R6/D-22) — canal único de registro de sessão'
       blocoId: '6af2000000000000000000b1',
       payload,
       chave,
-      sessaoSalva: { id: primeira.sessaoId }
+      sessaoSalva: { id: primeira.sessaoId! }
     });
 
     expect(retry.blocoConcluido).toBe(true);

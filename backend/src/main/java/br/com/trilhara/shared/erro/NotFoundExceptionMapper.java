@@ -8,7 +8,7 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
 /**
- * Recurso inexistente ou de outro tenant → {@code 404 NOT_FOUND}, sem revelar existência (D-03).
+ * Recurso inexistente ou de outro tenant → {@code 404 NOT_FOUND}, sem revelar existência.
  */
 @Provider
 public class NotFoundExceptionMapper implements ExceptionMapper<NotFoundException> {

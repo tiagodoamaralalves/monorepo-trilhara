@@ -15,7 +15,7 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
 /**
- * Bean Validation → {@code 400 VALIDATION_ERROR} com {@code errors} por campo (D-04).
+ * Bean Validation → {@code 400 VALIDATION_ERROR} com {@code errors} por campo.
  */
 @Provider
 public class ConstraintViolationExceptionMapper implements ExceptionMapper<ConstraintViolationException> {

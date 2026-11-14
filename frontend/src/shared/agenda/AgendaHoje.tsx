@@ -16,7 +16,7 @@ interface FocoAgenda {
 export interface AgendaHojeProps {
   /** `tarefas` (densidade confortável, ações de edição) ou `pomodoro` (compacta, foco). */
   modo: ModoAgendaHoje;
-  /** Saída de `useAgendaHoje().dados`; `null` para visitante (nunca renderizado). */
+  /** Saída de `useAgendaHoje.dados`; `null` para visitante (nunca renderizado). */
   dados: AgendaHojeDerivado | null;
   onAlternarTarefa: (id: string, concluida: boolean) => void;
   onConcluirBloco: (bloco: BlocoHojeDTO) => void;
@@ -44,15 +44,15 @@ function mensagemErro(erro: Error | null): string {
 }
 
 /**
- * Visão Hoje compartilhada por Tarefas e Pomodoro (§9 / D-23 / D-37).
+ * Visão Hoje compartilhada por Tarefas e Pomodoro (§9 / / ).
  *
- * - Seções: Atrasadas (agrupadas por série), Hoje (subgrupos "Blocos de estudo" e
- *   "Tarefas") e Sem data, cada uma com contador;
- * - carregamento inicial: `Skeleton row` ×3 por seção;
- * - falha de uma fonte: `SectionErrorCard variant="inline"` apenas no subgrupo afetado,
- *   mantendo os dados da outra fonte;
- * - tudo vazio com as duas fontes OK: `EmptyState` "Tudo em dia por hoje";
- * - `modo` controla densidade e a ação "Definir como foco" (exclusiva do Pomodoro).
+ * Seções: Atrasadas (agrupadas por série), Hoje (subgrupos "Blocos de estudo" e
+ * "Tarefas") e Sem data, cada uma com contador;
+ * carregamento inicial: `Skeleton row` ×3 por seção;
+ * falha de uma fonte: `SectionErrorCard variant="inline"` apenas no subgrupo afetado,
+ * mantendo os dados da outra fonte;
+ * tudo vazio com as duas fontes OK: `EmptyState` "Tudo em dia por hoje";
+ * `modo` controla densidade e a ação "Definir como foco" (exclusiva do Pomodoro).
  */
 export const AgendaHoje: React.FC<AgendaHojeProps> = ({
   modo,
@@ -157,7 +157,7 @@ export const AgendaHoje: React.FC<AgendaHojeProps> = ({
     );
   };
 
-  /** Carregamento inicial da fonte: skeleton `row` ×3 (D-37, 200 ms). */
+  /** Carregamento inicial da fonte: skeleton `row` ×3. */
   const renderSkeleton = () => <Skeleton variant="row" linhas={3} className={styles.carregando} />;
 
   /** Erro recuperável da fonte, sempre dentro do subgrupo afetado. */

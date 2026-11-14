@@ -45,9 +45,9 @@ public class TarefaRepository {
     }
 
     /**
-     * Filtro da listagem paginada de tarefas (D-28). {@code hojeLocal} alimenta o filtro
-     * {@code FUTURO} e {@code filtro} aceita exclusivamente {@code TODAS|FUTURO|CONCLUIDAS}.
-     */
+ * Filtro da listagem paginada de tarefas. {@code hojeLocal} alimenta o filtro
+ * {@code FUTURO} e {@code filtro} aceita exclusivamente {@code TODAS|FUTURO|CONCLUIDAS}.
+ */
     public record FiltroPaginacaoTarefas(
             ObjectId usuarioId,
             ObjectId listaId,
@@ -211,14 +211,14 @@ public class TarefaRepository {
     }
 
     /**
-     * Consulta paginada de tarefas ativas (D-28).
-     *
-     * <p>Nunca inclui blocos de cronograma: blocos não são tarefas (§7.4). A ordenação é
-     * estável e inclui {@code _id} como desempate final. Como {@code prioridade} é persistida
-     * como texto e {@code dataVencimento} é opcional, o peso numérico e o desempate
-     * "nulos por último" são derivados no pipeline — a fonte de verdade continua sendo o
-     * documento, sem campo duplicado.</p>
-     */
+ * Consulta paginada de tarefas ativas.
+ *
+ * <p>Nunca inclui blocos de cronograma: blocos não são tarefas (§7.4). A ordenação é
+ * estável e inclui {@code _id} como desempate final. Como {@code prioridade} é persistida
+ * como texto e {@code dataVencimento} é opcional, o peso numérico e o desempate
+ * "nulos por último" são derivados no pipeline — a fonte de verdade continua sendo o
+ * documento, sem campo duplicado.</p>
+ */
     public PaginaTarefas listarPaginado(FiltroPaginacaoTarefas filtro) {
         List<Bson> filtros = new ArrayList<>();
         filtros.add(eq("usuarioId", filtro.usuarioId()));
@@ -292,7 +292,7 @@ public class TarefaRepository {
         return new PaginaTarefas(itens, filtro.pagina(), filtro.tamanho(), totalItens, totalPaginas);
     }
 
-    /** Lixeira paginada de tarefas (D-28), com filtro {@code expiresAt > agora}. */
+    /** Lixeira paginada de tarefas, com filtro {@code expiresAt > agora}. */
     public PaginaTarefas listarLixeiraPaginada(ObjectId usuarioId, Instant agora, int pagina, int tamanho) {
         Bson predicado = and(
                 eq("usuarioId", usuarioId),
@@ -397,9 +397,9 @@ public class TarefaRepository {
     }
 
     /**
-     * IDs das tarefas de uma série no tenant (inclusive na lixeira), usado para cancelar os
-     * lembretes push das ocorrências em lote (D-36a). Começa por {@code usuarioId} (D-06a).
-     */
+ * IDs das tarefas de uma série no tenant (inclusive na lixeira), usado para cancelar os
+ * lembretes push das ocorrências em lote. Começa por {@code usuarioId}.
+ */
     public List<ObjectId> listarIdsPorSerie(ObjectId usuarioId, ObjectId serieId) {
         List<ObjectId> ids = new ArrayList<>();
         collection.find(and(eq("usuarioId", usuarioId), eq("serieId", serieId)))
@@ -426,10 +426,10 @@ public class TarefaRepository {
     }
 
     /**
-     * {@code ESTA_E_FUTURAS} por exclusão (D-24.2): move à lixeira as ocorrências
-     * <strong>pendentes</strong> com {@code dataOriginalOcorrencia >= aPartirDe}, com o mesmo
-     * {@code loteExclusaoId} da série. Concluídas nunca são tocadas.
-     */
+ * {@code ESTA_E_FUTURAS} por exclusão: move à lixeira as ocorrências
+ * <strong>pendentes</strong> com {@code dataOriginalOcorrencia >= aPartirDe}, com o mesmo
+ * {@code loteExclusaoId} da série. Concluídas nunca são tocadas.
+ */
     public long moverPendentesAPartirParaLixeira(
             ObjectId usuarioId,
             ObjectId serieId,
@@ -498,7 +498,7 @@ public class TarefaRepository {
         ));
     }
 
-    /** Contagem por estado de conclusão para o impacto de exclusão da lista (D-33). */
+    /** Contagem por estado de conclusão para o impacto de exclusão da lista. */
     public long contarPorListaPorConclusao(ObjectId usuarioId, ObjectId listaId, boolean concluida) {
         return collection.countDocuments(and(
                 eq("usuarioId", usuarioId),

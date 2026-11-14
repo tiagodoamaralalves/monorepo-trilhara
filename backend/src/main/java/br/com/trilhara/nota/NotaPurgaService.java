@@ -8,7 +8,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 /**
- * Purga definitiva da lixeira de Notas (D-06b/D-34).
+ * Purga definitiva da lixeira de Notas.
  *
  * <p>É uma varredura multi-tenant por {@code expiresAt}: vive em uma classe {@link SystemScope},
  * sem exposição HTTP, e portanto não recebe {@code usuarioId}. O gatilho é o

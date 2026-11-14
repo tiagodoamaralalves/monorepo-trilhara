@@ -7,10 +7,10 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 /**
- * Disparo diário da purga da lixeira de Notas (D-34).
+ * Disparo diário da purga da lixeira de Notas.
  *
  * <p>O job não faz a operação: delega a {@link NotaPurgaService}, que é a classe
- * {@code @SystemScope} autorizada a varrer todos os tenants por {@code expiresAt} (D-06b).</p>
+ * {@code @SystemScope} autorizada a varrer todos os tenants por {@code expiresAt}.</p>
  */
 @ApplicationScoped
 public class PurgaLixeiraNotasJob {

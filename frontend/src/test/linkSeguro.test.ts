@@ -2,12 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { protocoloDeLinkPermitido, LinkSeguro } from '../modules/notas/components/Editor/linkSeguro';
 
 /**
- * Política de links do editor de Notas (D-30c).
+ * Política de links do editor de Notas.
  *
  * O mark existe porque `tiptap-markdown` só fornece o serializador de link; sem ele `[a](b)`
  * sairia do schema. Aqui verificamos a allowlist de protocolos e os atributos fixos.
  */
-describe('protocoloDeLinkPermitido — allowlist D-30c', () => {
+describe('protocoloDeLinkPermitido — allowlist', () => {
   it('aceita http, https, mailto e caminhos relativos', () => {
     expect(protocoloDeLinkPermitido('http://exemplo.com')).toBe(true);
     expect(protocoloDeLinkPermitido('https://exemplo.com/pagina')).toBe(true);

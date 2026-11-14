@@ -4,7 +4,7 @@ import { useUnsavedChanges } from '@shared/hooks';
 import { NotaService } from '../services/notaService';
 import { RascunhoNotaLocal } from '../types/nota';
 
-/** Debounce do autosave (D-31). */
+/** Debounce do autosave. */
 export const DEBOUNCE_AUTOSAVE_MS = 800;
 
 export interface UseAutosaveNotaParams {
@@ -37,20 +37,20 @@ export interface UseAutosaveNotaResultado {
 }
 
 /**
- * Autosave de página com rascunho de contingência (D-31).
+ * Autosave de página com rascunho de contingência.
  *
  * Regras implementadas:
- * - **debounce de 800 ms** entre a digitação e o `PUT`;
- * - cada `PUT` carrega um `seq` local por página; respostas com `seq` menor que o último
- *   enviado (ou de outra página) são descartadas, então uma resposta atrasada não sobrescreve
- *   uma edição mais nova;
- * - a troca de página **grava o rascunho antes** de abortar a requisição pendente
- *   (`AbortController`), então nada é perdido;
- * - o rascunho só é apagado depois de um `200` cujo conteúdo enviado seja **igual** ao
- *   rascunho atual — se o usuário digitou durante o voo, o rascunho permanece;
- * - `visibilitychange: hidden` dispara `flush()` imediato;
- * - o registro global `unsavedChangesRegistry` fica ativo enquanto o estado for
- *   `salvando`, `alteracoes-locais` ou `erro`.
+ * **debounce de 800 ms** entre a digitação e o `PUT`;
+ * cada `PUT` carrega um `seq` local por página; respostas com `seq` menor que o último
+ * enviado (ou de outra página) são descartadas, então uma resposta atrasada não sobrescreve
+ * uma edição mais nova;
+ * a troca de página **grava o rascunho antes** de abortar a requisição pendente
+ * (`AbortController`), então nada é perdido;
+ * o rascunho só é apagado depois de um `200` cujo conteúdo enviado seja **igual** ao
+ * rascunho atual — se o usuário digitou durante o voo, o rascunho permanece;
+ * `visibilitychange: hidden` dispara `flush` imediato;
+ * o registro global `unsavedChangesRegistry` fica ativo enquanto o estado for
+ * `salvando`, `alteracoes-locais` ou `erro`.
  */
 export function useAutosaveNota({
   usuarioId,
@@ -201,12 +201,12 @@ export function useAutosaveNota({
   }, [enviar, gravarRascunho, limparTimer]);
 
   /**
-   * Aplica título e conteúdo juntos e envia imediatamente.
-   *
-   * Existe porque duas chamadas seguidas de `alterarTitulo`/`alterarConteudo` leriam o estado
-   * defasado do render (o segundo `alterar*` regravaria o valor antigo do outro campo). Aqui os
-   * dois valores chegam prontos, então o pendente enviado é exatamente o rascunho restaurado.
-   */
+ * Aplica título e conteúdo juntos e envia imediatamente.
+ *
+ * Existe porque duas chamadas seguidas de `alterarTitulo`/`alterarConteudo` leriam o estado
+ * defasado do render (o segundo `alterar*` regravaria o valor antigo do outro campo). Aqui os
+ * dois valores chegam prontos, então o pendente enviado é exatamente o rascunho restaurado.
+ */
   const aplicarRascunho = useCallback(
     (novoTitulo: string, novoConteudo: string) => {
       setTitulo(novoTitulo);
@@ -228,7 +228,7 @@ export function useAutosaveNota({
     void enviar();
   }, [conteudoMarkdown, enviar, limparTimer, titulo]);
 
-  // Troca de página: grava o rascunho ANTES de abortar o PUT pendente (D-31c).
+  // Troca de página: grava o rascunho ANTES de abortar o PUT pendente.
   useEffect(() => {
     if (notaIdRef.current === notaId) return;
     if (pendenteRef.current) {
@@ -252,7 +252,7 @@ export function useAutosaveNota({
     tituloInicial
   ]);
 
-  // Flush imediato quando a aba fica oculta (D-31d).
+  // Flush imediato quando a aba fica oculta.
   useEffect(() => {
     const aoMudarVisibilidade = () => {
       if (document.visibilityState === 'hidden') {
@@ -263,7 +263,7 @@ export function useAutosaveNota({
     return () => document.removeEventListener('visibilitychange', aoMudarVisibilidade);
   }, [flush]);
 
-  // Registro global de alterações não salvas (D-41/D-31f).
+  // Registro global de alterações não salvas.
   useUnsavedChanges(
     `nota:${notaId}`,
     notaId.length > 0 &&

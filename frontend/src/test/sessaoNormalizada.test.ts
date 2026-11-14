@@ -100,7 +100,7 @@ describe('Sessões normalizadas e estatísticas', () => {
     expect(pag.itens[0].id).toBe('sessao-1');
     expect(pag.itens[0].duracaoSegundos).toBe(120);
     expect(pag.itens[0].editavel).toBe(true);
-    // R4: `minutos`, `inicio` e `tipo` não existem mais no contrato do cliente.
+    // `minutos`, `inicio` e `tipo` não existem mais no contrato do cliente.
     expect(pag.itens[0]).not.toHaveProperty('minutos');
     expect(pag.itens[0]).not.toHaveProperty('inicio');
     expect(pag.itens[0]).not.toHaveProperty('tipo');

@@ -23,7 +23,7 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 /**
- * Inicializador centralizado e idempotente dos índices canônicos (D-07).
+ * Inicializador centralizado e idempotente dos índices canônicos.
  *
  * <p>Única classe autorizada a criar índices. A tabela válida é a de
  * {@link IndicesCanonicos}; conflito de chave/opções ou índice ausente <strong>não</strong>
@@ -84,10 +84,10 @@ public class MongoIndexInitializer {
     }
 
     /**
-     * Cria os índices ausentes e valida os existentes contra a tabela canônica.
-     *
-     * @return diagnóstico com ausências, conflitos e drift (nunca {@code null})
-     */
+ * Cria os índices ausentes e valida os existentes contra a tabela canônica.
+ *
+ * @return diagnóstico com ausências, conflitos e drift (nunca {@code null})
+ */
     public DiagnosticoIndices inicializarIndices(MongoDatabase database) {
         List<ConflitoIndice> conflitos = new ArrayList<>();
         Map<String, Set<String>> declaradosPorColecao = new HashMap<>();
@@ -184,10 +184,10 @@ public class MongoIndexInitializer {
     }
 
     /**
-     * Compara o índice declarado com o documento existente.
-     *
-     * @return {@code null} quando compatível; descrição da divergência caso contrário
-     */
+ * Compara o índice declarado com o documento existente.
+ *
+ * @return {@code null} quando compatível; descrição da divergência caso contrário
+ */
     private String comparar(IndicesCanonicos.IndiceCanonico indice, Document existente) {
         if (!chavesEquivalentes(chavesDoDocumento(existente), chavesBson(indice))) {
             return "key=" + json(chavesDoDocumento(existente));
@@ -267,9 +267,9 @@ public class MongoIndexInitializer {
     }
 
     /**
-     * Índices de texto aparecem no MongoDB como {@code {_fts: "text", _ftsx: 1}} com os
-     * campos reais em {@code weights}; nesse caso só os campos não-texto são comparados.
-     */
+ * Índices de texto aparecem no MongoDB como {@code {_fts: "text", _ftsx: 1}} com os
+ * campos reais em {@code weights}; nesse caso só os campos não-texto são comparados.
+ */
     private static boolean chavesEquivalentes(BsonDocument existente, BsonDocument esperado) {
         if (existente == null || esperado == null) {
             return false;

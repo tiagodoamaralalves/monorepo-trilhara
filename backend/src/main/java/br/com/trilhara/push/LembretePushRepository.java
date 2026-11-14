@@ -21,7 +21,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 /**
- * Acesso <strong>por tenant</strong> a {@code lembretes_push} (D-06a).
+ * Acesso <strong>por tenant</strong> a {@code lembretes_push}.
  *
  * <p>Toda leitura/escrita começa por {@code ObjectId usuarioId}. A varredura multi-tenant do
  * scheduler vive em {@link LembretePushFilaRepository} ({@code @SystemScope}), nunca aqui.</p>
@@ -39,13 +39,13 @@ public class LembretePushRepository {
     }
 
     /**
-     * Insere uma nova versão do agendamento. O índice único
-     * {@code {tarefaId, versaoAgendamento}} é a chave idempotente por
-     * {@code (tarefaId, versaoAgendamento)} (D-36a): reinserir a mesma versão por corrida entre
-     * duas requisições é no-op silencioso (nunca 500).
-     *
-     * @return {@code true} se a versão foi realmente inserida
-     */
+ * Insere uma nova versão do agendamento. O índice único
+ * {@code {tarefaId, versaoAgendamento}} é a chave idempotente por
+ * {@code (tarefaId, versaoAgendamento)}: reinserir a mesma versão por corrida entre
+ * duas requisições é no-op silencioso (nunca 500).
+ *
+ * @return {@code true} se a versão foi realmente inserida
+ */
     public boolean inserirNovaVersao(LembretePush lembrete) {
         Instant agora = Instant.now();
         try {
@@ -69,10 +69,10 @@ public class LembretePushRepository {
     }
 
     /**
-     * Cancela as versões {@code PENDENTE} da tarefa que não sejam a versão informada.
-     *
-     * @return quantidade de documentos cancelados
-     */
+ * Cancela as versões {@code PENDENTE} da tarefa que não sejam a versão informada.
+ *
+ * @return quantidade de documentos cancelados
+ */
     public long cancelarPendentesAnteriores(ObjectId usuarioId, ObjectId tarefaId, long versaoMantida) {
         return cancelar(and(
                 eq("usuarioId", usuarioId),

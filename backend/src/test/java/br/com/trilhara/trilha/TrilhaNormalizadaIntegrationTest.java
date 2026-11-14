@@ -30,7 +30,7 @@ import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 
 @QuarkusTest
-@DisplayName("FASE 2 - Domínio Estudos (Parte 1): Trilhas, Disciplinas, Tópicos e Progresso Normalizados")
+@DisplayName("Domínio Estudos (Parte 1): Trilhas, Disciplinas, Tópicos e Progresso Normalizados")
 class TrilhaNormalizadaIntegrationTest {
 
     private static final String API_TRILHAS = "/api/trilhas";
@@ -631,11 +631,11 @@ class TrilhaNormalizadaIntegrationTest {
     }
 
     // =========================================================================
-    // R3 — ACHADOS DE REVISÃO
+    // ACHADOS DE REVISÃO
     // =========================================================================
 
     @Test
-    @DisplayName("R3.1 Não deve existir a rota legada PATCH /api/trilhas/{id}/progresso/{topicoId}")
+    @DisplayName("Não deve existir a rota legada PATCH /api/trilhas/{id}/progresso/{topicoId}")
     void naoDeveExistirRotaLegadaDeProgresso() {
         ObjectId usuarioId = new ObjectId();
         String token = gerarTokenParaUsuario(usuarioId);
@@ -647,11 +647,11 @@ class TrilhaNormalizadaIntegrationTest {
                 .when().patch(API_TRILHA + "/progresso/{topicoId}", new ObjectId().toHexString(), new ObjectId().toHexString());
 
         assertTrue(res.statusCode() == 404 || res.statusCode() == 405,
-                "Rota legada de progresso deveria estar removida (D-11); status obtido: " + res.statusCode());
+                "Rota legada de progresso deveria estar removida; status obtido: " + res.statusCode());
     }
 
     @Test
-    @DisplayName("R3.2 Deve rejeitar edital inexistente com 400 VALIDATION_ERROR no campo editalId (SEC-09)")
+    @DisplayName("Deve rejeitar edital inexistente com 400 VALIDATION_ERROR no campo editalId")
     void deveRejeitarEditalInexistenteCom400NoCampoEditalId() {
         ObjectId usuarioId = new ObjectId();
         String token = gerarTokenParaUsuario(usuarioId);
@@ -669,7 +669,7 @@ class TrilhaNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("R3.3 Deve responder 404 ao marcar progresso de tópico de outra trilha")
+    @DisplayName("Deve responder 404 ao marcar progresso de tópico de outra trilha")
     void deveRetornar404AoMarcarProgressoDeTopicoDeOutraTrilha() {
         ObjectId usuarioId = new ObjectId();
         String token = gerarTokenParaUsuario(usuarioId);
@@ -711,7 +711,7 @@ class TrilhaNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("R3.4 Deve responder 409 SCHEDULE_GENERATION_IN_PROGRESS ao excluir com lease ocupado")
+    @DisplayName("Deve responder 409 SCHEDULE_GENERATION_IN_PROGRESS ao excluir com lease ocupado")
     void deveRetornar409SeLeaseOcupadoAoExcluirDisciplina() {
         ObjectId usuarioId = new ObjectId();
         String token = gerarTokenParaUsuario(usuarioId);
@@ -749,7 +749,7 @@ class TrilhaNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("R3.5 Deve contar corretamente o impacto de exclusão da trilha")
+    @DisplayName("Deve contar corretamente o impacto de exclusão da trilha")
     void impactoExclusaoTrilhaContaCorretamente() {
         ObjectId usuarioId = new ObjectId();
         String token = gerarTokenParaUsuario(usuarioId);
@@ -803,7 +803,7 @@ class TrilhaNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("R3.6 Deve rejeitar ID malformado na reordenação com 400 INVALID_IDENTIFIER")
+    @DisplayName("Deve rejeitar ID malformado na reordenação com 400 INVALID_IDENTIFIER")
     void deveRejeitarIdMalformadoComInvalidIdentifierNaReordenacao() {
         ObjectId usuarioId = new ObjectId();
         String token = gerarTokenParaUsuario(usuarioId);
@@ -829,7 +829,7 @@ class TrilhaNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("R3.7 Deve isolar todas as rotas de trilha, disciplina, progresso e impacto entre usuários")
+    @DisplayName("Deve isolar todas as rotas de trilha, disciplina, progresso e impacto entre usuários")
     void deveIsolarTodasAsRotasEntreUsuarios() {
         ObjectId usuarioA = new ObjectId();
         ObjectId usuarioB = new ObjectId();

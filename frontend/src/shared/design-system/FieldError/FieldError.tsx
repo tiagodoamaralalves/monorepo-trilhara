@@ -10,7 +10,7 @@ export interface FieldErrorProps {
 }
 
 /**
- * Erro de campo ligado ao input por `aria-describedby` (D-37).
+ * Erro de campo ligado ao input por `aria-describedby`.
  *
  * @example
  * const idErro = `${idCampo}-erro`;

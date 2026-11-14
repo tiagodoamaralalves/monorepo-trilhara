@@ -4,7 +4,7 @@ import java.time.LocalDate;
 import java.util.Set;
 
 /**
- * Cálculo de sequência de dias consecutivos de estudo (D-14).
+ * Cálculo de sequência de dias consecutivos de estudo.
  *
  * <p>Norma: {@code streakDias} é o número de dias de calendário consecutivos com ao menos uma
  * sessão, terminando em {@code hojeLocal} quando há sessão hoje; caso contrário, terminando em
@@ -20,10 +20,10 @@ public final class StreakCalculator {
     }
 
     /**
-     * @param diasComEstudo dias de calendário que possuem ao menos uma sessão válida
-     * @param hojeLocal     data de calendário de "hoje" no fuso do usuário; {@code null} zera o cálculo
-     * @return dias consecutivos terminando em hoje ou ontem
-     */
+ * @param diasComEstudo dias de calendário que possuem ao menos uma sessão válida
+ * @param hojeLocal data de calendário de "hoje" no fuso do usuário; {@code null} zera o cálculo
+ * @return dias consecutivos terminando em hoje ou ontem
+ */
     public static int calcular(Set<LocalDate> diasComEstudo, LocalDate hojeLocal) {
         if (diasComEstudo == null || diasComEstudo.isEmpty() || hojeLocal == null) {
             return 0;

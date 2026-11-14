@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# verificar-legado.sh — Gate anti-legado da reestruturação Trilhara (R0, endurecido na R13).
+# verificar-legado.sh — Gate anti-legado da reestruturação Trilhara.
 #
 # Falha (exit 1) ao encontrar qualquer padrão proibido fora das ALLOWLISTS
 # declaradas abaixo. Interface:
@@ -8,8 +8,8 @@
 #   bash scripts/verificar-legado.sh            # exit 1 se houver achados (gate de CI)
 #   bash scripts/verificar-legado.sh --quiet    # só o resumo por padrão
 #
-# R13/D-44: o modo `--report` (que retornava 0 mesmo com achados) foi REMOVIDO.
-# Ele existia como baseline da R0 e permitia que o CI ficasse verde com legado
+# /o modo `--report` (que retornava 0 mesmo com achados) foi REMOVIDO.
+# Ele existia como baseline da e permitia que o CI ficasse verde com legado
 # presente.
 #
 # Motor: usa `rg --pcre2` quando disponível; caso contrário cai para
@@ -52,27 +52,27 @@ ALLOWLIST=(
   # Fonte única e normativa do fuso: único lugar com America/Sao_Paulo literal.
   "backend/src/main/java/br/com/trilhara/shared/TimezoneContext.java"
   # Diagnóstico de conflito de índice usa BsonDocument.toJson() para formatar
-  # chaves (esperado x encontrado); não serializa documento de domínio (D-07).
+  # chaves (esperado x encontrado); não serializa documento de domínio.
   "backend/src/main/java/br/com/trilhara/shared/mongo/MongoIndexInitializer.java"
   # Comentário de documentação citando a remoção do fallback "local".
   "backend/src/main/java/br/com/trilhara/shared/UsuarioAtual.java"
-  # R12: catálogo público de editais é persistido como BSON explícito
+  # catálogo público de editais é persistido como BSON explícito
   # (Document.parse/readValue sobre o JSON do próprio documento), não é
   # serialização de DTO de domínio por reflexão; o filtro usa o Clock local
   # injetado via TimezoneContext (ver EditalService).
   "backend/src/main/java/br/com/trilhara/edital/EditalRepository.java"
-  # R12: payload do provedor de e-mail (Resend) é JSON de transporte externo e
+  # payload do provedor de e-mail (Resend) é JSON de transporte externo e
   # não serializa entidade do domínio.
   "backend/src/main/java/br/com/trilhara/auth/EmailService.java"
-  # R12: "Ciclo 1 de 4" do Pomodoro é o termo do produto (D-21), não o conceito
+  # "Ciclo 1 de 4" do Pomodoro é o termo do produto, não o conceito
   # de "planejamento-ciclo" removido pela reestruturação.
   "frontend/src/modules/pomodoro/PomodoroApp.tsx"
 )
 
-# Código de teste: o Anexo C permite console.* em teste. A renomeação dos testes
-# por fase é dívida de R12/R13 e não pode mascarar código de aplicação.
+# Código de teste: o permite console.* em teste. A renomeação dos testes
+# por fase é dívida de /e não pode mascarar código de aplicação.
 #
-# R13: a allowlist NÃO se aplica aos padrões de nomenclatura por fase (E3/E3b) —
+# a allowlist NÃO se aplica aos padrões de nomenclatura por fase (E3/E3b) —
 # aplicá-la tornava o gate cego justamente para `backend/src/test/`, onde viviam
 # `class Fase6*Test`. O controle é feito pela variável `APLICAR_ALLOWLIST_TESTE`,
 # ligada por omissão e desligada antes dos padrões que valem em código de teste.
@@ -95,17 +95,17 @@ imprimir_cabecalho() {
 buscar() {
   local rotulo="$1"; shift
   local escopo=()
-  while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do
+  while [[ "$#" -gt 0 ]] && [[ "$1" != "--" ]]; do
     escopo+=("$1"); shift
   done
-  [ "${1:-}" = "--" ] && shift
+  [[ "${1:-}" = "--" ]] && shift
   local regex="$1"
 
   local existentes=() e
   for e in "${escopo[@]}"; do
-    [ -e "$e" ] && existentes+=("$e")
+    [[ -e "$e" ]] && existentes+=("$e")
   done
-  if [ "${#existentes[@]}" -eq 0 ]; then
+  if [[ "${#existentes[@]}" -eq 0 ]]; then
     RESUMO+=("$(printf '%-46s %6s  (escopo ausente)' "$rotulo" "0")")
     return 0
   fi
@@ -117,8 +117,8 @@ buscar() {
   case "$regex" in
     '(?i)'*) flag_i="i"; regex="${regex#'(?i)'}" ;;
   esac
-  if [ "$MOTOR" = "rg" ]; then
-    if [ -n "$flag_i" ]; then
+  if [[ "$MOTOR" = "rg" ]]; then
+    if [[ -n "$flag_i" ]]; then
       brutos="$(rg --pcre2 -i -n --no-heading --color never "$regex" "${existentes[@]}" 2>/dev/null || true)"
     else
       brutos="$(rg --pcre2 -n --no-heading --color never "$regex" "${existentes[@]}" 2>/dev/null || true)"
@@ -129,31 +129,31 @@ buscar() {
 
   local filtrados="" a caminho ignorar permitido
   while IFS= read -r a; do
-    [ -z "$a" ] && continue
+    [[ -z "$a" ]] && continue
     caminho="${a%%:*}"
     ignorar=0
     for permitido in "${ALLOWLIST[@]}"; do
       case "$caminho" in *"$permitido") ignorar=1; break ;; esac
     done
-    if [ "$ignorar" -eq 0 ] && [ "$APLICAR_ALLOWLIST_TESTE" -eq 1 ]; then
+    if [[ "$ignorar" -eq 0 ]] && [[ "$APLICAR_ALLOWLIST_TESTE" -eq 1 ]]; then
       for permitido in "${ALLOWLIST_TESTE[@]}"; do
         case "$caminho" in *"$permitido"*) ignorar=1; break ;; esac
       done
     fi
-    [ "$ignorar" -eq 1 ] && continue
+    [[ "$ignorar" -eq 1 ]] && continue
     filtrados+="$a"$'\n'
   done <<< "$brutos"
 
   local qtd=0
-  if [ -n "$filtrados" ]; then
+  if [[ -n "$filtrados" ]]; then
     qtd="$(printf '%s' "$filtrados" | grep -c . || true)"
   fi
 
   RESUMO+=("$(printf '%-46s %6s' "$rotulo" "$qtd")")
   TOTAL=$((TOTAL + qtd))
-  if [ "$qtd" -gt 0 ]; then
+  if [[ "$qtd" -gt 0 ]]; then
     FALHAS=$((FALHAS + 1))
-    if [ "$MODO" != "quiet" ]; then
+    if [[ "$MODO" != "quiet" ]]; then
       imprimir_cabecalho "$rotulo" "${existentes[*]}"
       printf '%s' "$filtrados"
       echo
@@ -163,7 +163,7 @@ buscar() {
 }
 
 # ---------------------------------------------------------------------------
-# Anexo C (padrões do guia R0)
+# (padrões do guia )
 # ---------------------------------------------------------------------------
 buscar "serializacao-json" backend/src/main -- \
   'writeValueAsString|Document\.parse|\.toJson\(\)'
@@ -177,7 +177,7 @@ buscar "fallback-usuario-local" backend/src/main -- \
   'USUARIO_LOCAL_PADRAO|"local"'
 buscar "simbolos-legado" "backend/src" "frontend/src" -- \
   'AjusteQuestoes|TipoSessao|TipoRegistroSessao|AJUSTE_MANUAL|NovaSessao|PlanejamentoCiclo|DisciplinaProgramada|CicloAtivoResponse|OrigemTarefa|OperacaoConcluirAtrasados|removerTarefasDeCicloLegadas'
-buscar "nomes-nao-canonicos-d02" "backend/src" "frontend/src" -- \
+buscar "nomes-nao-canonicos" "backend/src" "frontend/src" -- \
   'dataEstudo|ordemDia|duracaoRealSegundos|horarioDisparoUtc|dataTermino|usaPadraoGlobalLembrete'
 buscar "pacotes-legados" backend/src -- \
   'package br\.com\.trilhara\.(estudos|tarefas|notas)\b'
@@ -197,19 +197,19 @@ buscar "termo-ciclo-frontend" frontend/src/modules -- \
   '(?i)\bciclos?\b'
 
 # ---------------------------------------------------------------------------
-# EXTENSÕES (lacunas comprovadas do Anexo C — ver docs/REVISAO-IMPLEMENTADA.md)
+# EXTENSÕES (lacunas comprovadas do ver docs/REVISAO-IMPLEMENTADA.md)
 # ---------------------------------------------------------------------------
-# E1: a regex do Anexo C só casa deleteMany(new Document()) sem argumentos, mas
+# E1: a regex do só casa deleteMany(new Document()) sem argumentos, mas
 # o repositório chama deleteMany(new Document(campo, valor)...) — igualmente
 # destrutivo e fora do padrão normativo de exclusão explícita.
 buscar "E1-deleteMany-com-filtro" backend/src/main -- \
   'deleteMany\(new Document\('
-# E2: o Anexo C cita `trilhara_auth_token`, mas as chaves reais no código são
+# E2: o cita `trilhara_auth_token`, mas as chaves reais no código são
 # `trilhara_auth_access_token`, `trilhara_auth_refresh_token` e `trilhara_auth_user`.
 buscar "E2-storage-auth-chaves" frontend/src -- \
   'trilhara_auth_(token|access_token|refresh_token|user)'
-# E3: nomenclatura por fase (D-43) em blocos de teste.
-# R13: case-insensitive (`FASE 3`, `Fase6`) e sem a allowlist de teste — é
+# E3: nomenclatura por fase em blocos de teste.
+# case-insensitive (`FASE 3`, `Fase6`) e sem a allowlist de teste — é
 # exatamente em `src/test` que esse padrão precisa falhar.
 APLICAR_ALLOWLIST_TESTE=0
 buscar "E3-nomenclatura-fase" "backend/src/test" "frontend/src/test" -- \
@@ -221,14 +221,14 @@ ARQUIVOS_FASE="$(find backend/src/test frontend/src/test -type f 2>/dev/null \
   | grep -Ei '(^|/)[fF]ase[0-9].*(\.test\.(t|j)sx?$|Test\.java$)' || true)"
 APLICAR_ALLOWLIST_TESTE=1
 QTD_ARQUIVOS_FASE=0
-if [ -n "$ARQUIVOS_FASE" ]; then
+if [[ -n "$ARQUIVOS_FASE" ]]; then
   QTD_ARQUIVOS_FASE="$(printf '%s\n' "$ARQUIVOS_FASE" | grep -c . || true)"
 fi
 RESUMO+=("$(printf '%-46s %6s' "E3b-arquivos-por-fase" "$QTD_ARQUIVOS_FASE")")
 TOTAL=$((TOTAL + QTD_ARQUIVOS_FASE))
-if [ "$QTD_ARQUIVOS_FASE" -gt 0 ]; then
+if [[ "$QTD_ARQUIVOS_FASE" -gt 0 ]]; then
   FALHAS=$((FALHAS + 1))
-  if [ "$MODO" != "quiet" ]; then
+  if [[ "$MODO" != "quiet" ]]; then
     imprimir_cabecalho "E3b-arquivos-por-fase" "backend/src/test frontend/src/test"
     printf '%s\n\n' "$ARQUIVOS_FASE"
   fi
@@ -245,7 +245,7 @@ printf '%s\n' "${RESUMO[@]}"
 echo "-------------------------------------------------------------"
 echo "Total de achados: $TOTAL (padroes com ocorrencia: $FALHAS)"
 
-if [ "$TOTAL" -gt 0 ]; then
+if [[ "$TOTAL" -gt 0 ]]; then
   echo "FALHOU: padroes de legado encontrados." >&2
   exit 1
 fi

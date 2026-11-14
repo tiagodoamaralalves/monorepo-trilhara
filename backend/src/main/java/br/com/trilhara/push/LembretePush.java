@@ -4,7 +4,7 @@ import java.time.Instant;
 import org.bson.types.ObjectId;
 
 /**
- * Versão imutável de um agendamento de lembrete push (D-36a).
+ * Versão imutável de um agendamento de lembrete push.
  *
  * <p>Cada alteração relevante da tarefa ({@code dataVencimento}, {@code horario},
  * {@code modoLembrete}, {@code lembreteMinutosAntes}, {@code fusoAgendamento}, {@code estado},

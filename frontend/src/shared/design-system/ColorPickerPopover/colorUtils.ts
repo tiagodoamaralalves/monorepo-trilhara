@@ -27,6 +27,16 @@ export function obterCoresEmUso<T extends ItemComCor>(
  * Seleciona inteligentemente uma cor não utilizada dentre as 27 cores da paleta.
  * Caso todas já estejam em uso, faz fallback sorteando qualquer uma das 27 cores.
  */
+function sortearIndice(tamanho: number): number {
+  if (tamanho <= 1) return 0;
+  if (typeof globalThis.crypto?.getRandomValues === 'function') {
+    const buffer = new Uint32Array(1);
+    globalThis.crypto.getRandomValues(buffer);
+    return buffer[0] % tamanho;
+  }
+  return Date.now() % tamanho;
+}
+
 export function obterCorDisponivel<T extends ItemComCor>(
   itens: readonly T[],
   ignorarId?: string
@@ -37,11 +47,9 @@ export function obterCorDisponivel<T extends ItemComCor>(
   );
 
   if (coresDisponiveis.length > 0) {
-    const indiceAleatorio = Math.floor(Math.random() * coresDisponiveis.length);
-    return coresDisponiveis[indiceAleatorio];
+    return coresDisponiveis[sortearIndice(coresDisponiveis.length)];
   }
 
-  const indiceAleatorio = Math.floor(Math.random() * DISCIPLINE_COLORS.length);
-  return DISCIPLINE_COLORS[indiceAleatorio];
+  return DISCIPLINE_COLORS[sortearIndice(DISCIPLINE_COLORS.length)];
 }
 

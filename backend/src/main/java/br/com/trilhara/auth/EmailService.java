@@ -49,14 +49,14 @@ public class EmailService {
     }
 
     /**
-     * Envia e-mail de confirmação de cadastro de forma assíncrona/não-bloqueante.
-     */
+ * Envia e-mail de confirmação de cadastro de forma assíncrona/não-bloqueante.
+ */
     public CompletableFuture<Boolean> enviarEmailConfirmacao(String destinatario, String nome, String token, String baseUrl) {
         String base = normalizarBaseUrl(baseUrl);
         String link = base + "/?pagina=confirmar-email&token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
 
         if (resendApiKey.isBlank()) {
-            // D-04/R13: nunca logar destinatario nem o link (o link contém o token puro).
+            // nunca logar destinatario nem o link (o link contém o token puro).
             LOG.warnf("[DEV] Resend API Key não configurada. Confirmação de e-mail emitida conta=%s integracao=resend",
                     Pseudonimo.de(destinatario));
             return CompletableFuture.completedFuture(true);
@@ -103,14 +103,14 @@ public class EmailService {
     }
 
     /**
-     * Envia e-mail de recuperação de senha de forma assíncrona/não-bloqueante.
-     */
+ * Envia e-mail de recuperação de senha de forma assíncrona/não-bloqueante.
+ */
     public CompletableFuture<Boolean> enviarEmailRecuperacaoSenha(String destinatario, String token, String baseUrl) {
         String base = normalizarBaseUrl(baseUrl);
         String link = base + "/?pagina=resetar-senha&token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
 
         if (resendApiKey.isBlank()) {
-            // D-04/R13: o link de recuperação contém o token puro — não pode ir para o log.
+            // o link de recuperação contém o token puro — não pode ir para o log.
             LOG.warnf("[DEV] Resend API Key não configurada. Recuperação de senha emitida conta=%s integracao=resend",
                     Pseudonimo.de(destinatario));
             return CompletableFuture.completedFuture(true);
@@ -180,7 +180,7 @@ public class EmailService {
                                     Pseudonimo.de(destinatario));
                             return true;
                         } else {
-                            // D-04/R13: status sim, corpo do provedor não (pode ecoar o destinatário).
+                            // status sim, corpo do provedor não (pode ecoar o destinatário).
                             LOG.errorf("event=EMAIL_FALHA conta=%s integracao=resend status=%d",
                                     Pseudonimo.de(destinatario), response.statusCode());
                             return false;

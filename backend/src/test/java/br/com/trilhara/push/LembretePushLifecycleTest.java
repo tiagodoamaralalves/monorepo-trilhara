@@ -31,9 +31,9 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 
 /**
- * R11 — ciclo de vida do agendamento (D-26 / D-36a).
+ * ciclo de vida do agendamento.
  *
- * <p>Todas as datas são calculadas a partir de {@code Instant.now()} porque a elegibilidade
+ * <p>Todas as datas são calculadas a partir de {@code Instant.now} porque a elegibilidade
  * exige {@code instanteEntregaUtc > agora}: data fixa no passado tornaria todo cenário inelegível.</p>
  */
 @QuarkusTest
@@ -139,7 +139,7 @@ class LembretePushLifecycleTest {
         ObjectId tarefaId = new ObjectId(criada.id());
         assertEquals(LembretePush.ESTADO_PENDENTE, versaoVigente(tarefaId).estado());
 
-        // Remove o horário persistindo a tarefa sem `horario`, mantendo modo/minutos (D-26).
+        // Remove o horário persistindo a tarefa sem `horario`, mantendo modo/minutos.
         Tarefa existente = tarefaRepository.buscar(usuarioId, tarefaId).orElseThrow();
         Tarefa semHorario = new Tarefa(
                 existente.id(), existente.usuarioId(), existente.listaId(), existente.serieId(),

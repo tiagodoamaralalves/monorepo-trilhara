@@ -30,14 +30,14 @@ import javax.crypto.spec.SecretKeySpec;
  *
  * <p>Fluxo normativo:</p>
  * <ol>
- *   <li>par efêmero ECDH P-256 ({@code as_public}/{@code as_private});</li>
- *   <li>{@code ecdh_secret = ECDH(as_private, ua_public)};</li>
- *   <li>{@code ikm = HKDF(salt=auth_secret, info="WebPush: info\0" || ua_public || as_public,
- *       L=32, ecdh_secret)};</li>
- *   <li>{@code cek = HKDF(salt=salt, info="Content-Encoding: aes128gcm\0", L=16, ikm)} e
- *       {@code nonce = HKDF(salt=salt, info="Content-Encoding: nonce\0", L=12, ikm)};</li>
- *   <li>corpo = {@code salt(16) || rs=4096 (uint32 BE) || idlen=65 || as_public(65) ||
- *       AES-128-GCM(cek, nonce, payload || 0x02)}.</li>
+ * <li>par efêmero ECDH P-256 ({@code as_public}/{@code as_private});</li>
+ * <li>{@code ecdh_secret = ECDH(as_private, ua_public)};</li>
+ * <li>{@code ikm = HKDF(salt=auth_secret, info="WebPush: info\0" || ua_public || as_public,
+ * L=32, ecdh_secret)};</li>
+ * <li>{@code cek = HKDF(salt=salt, info="Content-Encoding: aes128gcm\0", L=16, ikm)} e
+ * {@code nonce = HKDF(salt=salt, info="Content-Encoding: nonce\0", L=12, ikm)};</li>
+ * <li>corpo = {@code salt(16) || rs=4096 (uint32 BE) || idlen=65 || as_public(65) ||
+ * AES-128-GCM(cek, nonce, payload || 0x02)}.</li>
  * </ol>
  *
  * <p>O byte {@code 0x02} ao final é o delimitador de registro único exigido pela RFC 8188.</p>
@@ -58,11 +58,11 @@ public final class WebPushCriptografia {
     }
 
     /**
-     * Cifra {@code payload} para o dispositivo descrito por {@code p256dh}/{@code auth}
-     * (base64url).
-     *
-     * @return corpo pronto para {@code POST}, com {@code Content-Encoding: aes128gcm}
-     */
+ * Cifra {@code payload} para o dispositivo descrito por {@code p256dh}/{@code auth}
+ * (base64url).
+ *
+ * @return corpo pronto para {@code POST}, com {@code Content-Encoding: aes128gcm}
+ */
     public static byte[] cifrar(String p256dhBase64Url, String authBase64Url, byte[] payload)
             throws GeneralSecurityException {
         return cifrar(decodificarBase64Url(p256dhBase64Url), decodificarBase64Url(authBase64Url), payload);

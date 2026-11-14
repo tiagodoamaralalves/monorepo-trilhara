@@ -18,16 +18,16 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 /**
- * Regras de agendamento e reagendamento do lembrete push (D-26 / D-36a).
+ * Regras de agendamento e reagendamento do lembrete push.
  *
  * <p>Regra de elegibilidade, avaliada sempre a partir do estado atual da tarefa:</p>
  * <pre>
  * elegível = estado == PENDENTE
- *            ∧ deletedAt == null
- *            ∧ dataVencimento != null
- *            ∧ horario != null
- *            ∧ modoLembrete != SEM_ALERTA
- *            ∧ instanteEntregaUtc &gt; agora
+ * ∧ deletedAt == null
+ * ∧ dataVencimento != null
+ * ∧ horario != null
+ * ∧ modoLembrete != SEM_ALERTA
+ * ∧ instanteEntregaUtc &gt; agora
  * </pre>
  *
  * <p>Quando a tarefa é elegível e o instante calculado difere da versão vigente
@@ -60,16 +60,16 @@ public class LembretePushService {
 
 
     /**
-     * Recalcula o agendamento da tarefa aplicando a regra D-36a. Idempotente: chamadas repetidas
-     * com o mesmo estado material não criam versões novas.
-     *
-     * @param tarefa  estado material da tarefa (já persistido)
-     * @param modoOverride modo a considerar antes da persistência (criação/edição); {@code null}
-     *                     usa o da tarefa
-     * @param minutosOverride minutos a considerar antes da persistência; {@code null} usa o da
-     *                        tarefa
-     * @return a versão {@code PENDENTE} vigente, ou vazio quando a tarefa não é elegível
-     */
+ * Recalcula o agendamento da tarefa aplicando a regra . Idempotente: chamadas repetidas
+ * com o mesmo estado material não criam versões novas.
+ *
+ * @param tarefa estado material da tarefa (já persistido)
+ * @param modoOverride modo a considerar antes da persistência (criação/edição); {@code null}
+ * usa o da tarefa
+ * @param minutosOverride minutos a considerar antes da persistência; {@code null} usa o da
+ * tarefa
+ * @return a versão {@code PENDENTE} vigente, ou vazio quando a tarefa não é elegível
+ */
     public Optional<LembretePush> agendarOuAtualizarLembrete(
             Tarefa tarefa,
             ModoLembrete modoOverride,
@@ -120,12 +120,12 @@ public class LembretePushService {
     }
 
     /**
-     * Calcula o instante de entrega quando a tarefa é elegível; vazio caso contrário.
-     *
-     * <p>O cálculo roda mesmo quando a tarefa não é elegível por tempo, para que a decisão fique
-     * centralizada: a rejeição de gap DST ({@code 400 INVALID_LOCAL_DATETIME}) precisa acontecer
-     * também em criação/edição.</p>
-     */
+ * Calcula o instante de entrega quando a tarefa é elegível; vazio caso contrário.
+ *
+ * <p>O cálculo roda mesmo quando a tarefa não é elegível por tempo, para que a decisão fique
+ * centralizada: a rejeição de gap DST ({@code 400 INVALID_LOCAL_DATETIME}) precisa acontecer
+ * também em criação/edição.</p>
+ */
     private Optional<Instant> calcularInstanteElegivel(
             Tarefa tarefa, ModoLembrete modoOverride, Integer minutosOverride, String fusoOverride) {
 
@@ -164,12 +164,12 @@ public class LembretePushService {
     }
 
     /**
-     * Resolve os minutos de antecedência (D-26).
-     *
-     * <p>{@code HERDAR} consulta a preferência global do usuário no momento do agendamento;
-     * {@code SEM_ALERTA} devolve {@code null} (nenhum push); {@code PERSONALIZADO} usa o
-     * deslocamento gravado na tarefa.</p>
-     */
+ * Resolve os minutos de antecedência.
+ *
+ * <p>{@code HERDAR} consulta a preferência global do usuário no momento do agendamento;
+ * {@code SEM_ALERTA} devolve {@code null} (nenhum push); {@code PERSONALIZADO} usa o
+ * deslocamento gravado na tarefa.</p>
+ */
     private Integer resolverMinutosAntes(Tarefa tarefa, ModoLembrete modo, Integer minutosOverride) {
         return switch (modo) {
             case SEM_ALERTA -> null;
@@ -179,9 +179,9 @@ public class LembretePushService {
     }
 
     /**
-     * Fuso do agendamento: o persistido na tarefa prevalece; {@code X-Timezone} só entra quando a
-     * tarefa ainda não tem fuso (D-26) e é materializado pelo chamador ao salvar.
-     */
+ * Fuso do agendamento: o persistido na tarefa prevalece; {@code X-Timezone} só entra quando a
+ * tarefa ainda não tem fuso e é materializado pelo chamador ao salvar.
+ */
     private ZoneId resolverZoneId(Tarefa tarefa, String fusoAgendamentoOverride) {
         if (tarefa.fusoAgendamento() != null && !tarefa.fusoAgendamento().isBlank()) {
             return TimezoneContext.resolverZoneId(tarefa.fusoAgendamento());
@@ -228,12 +228,12 @@ public class LembretePushService {
     }
 
     /**
-     * Atualiza a preferência global do usuário e recalcula lembretes exclusivamente das tarefas
-     * herdeiras ({@code modoLembrete == HERDAR}, D-26.2). Overrides {@code PERSONALIZADO} e
-     * {@code SEM_ALERTA} nunca são tocados.
-     *
-     * @return quantidade de tarefas herdeiras efetivamente reagendadas
-     */
+ * Atualiza a preferência global do usuário e recalcula lembretes exclusivamente das tarefas
+ * herdeiras ({@code modoLembrete == HERDAR}, ). Overrides {@code PERSONALIZADO} e
+ * {@code SEM_ALERTA} nunca são tocados.
+ *
+ * @return quantidade de tarefas herdeiras efetivamente reagendadas
+ */
     public long atualizarPreferenciaGlobal(ObjectId usuarioId, int novoPadraoMinutos) {
         userRepository.salvarPadraoLembreteMinutos(usuarioId, novoPadraoMinutos);
 

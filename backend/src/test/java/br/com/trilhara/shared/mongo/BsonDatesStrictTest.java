@@ -14,10 +14,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * R2 — {@link BsonDates} estrito (DC-17): tipos canônicos aceitos e tipo inesperado
+ * {@link BsonDates} estrito: tipos canônicos aceitos e tipo inesperado
  * rejeitado com {@link IllegalStateException} (dados legados não são convertidos).
  */
-@DisplayName("R2 - BsonDates estrito (DC-17)")
+@DisplayName("BsonDates estrito")
 class BsonDatesStrictTest {
 
     @Test

@@ -30,7 +30,7 @@ import styles from './EstudarView.module.css';
 
 const NOVA_DISCIPLINA = '__nova__';
 
-/** Pausas do cronômetro de Estudos: persistidas na chave escopada por usuário (D-21). */
+/** Pausas do cronômetro de Estudos: persistidas na chave escopada por usuário. */
 const PAUSAS_PADRAO = { short: 5, long: 15 };
 
 interface PauseConfig {
@@ -112,7 +112,7 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
     );
   }, [contextoBlocoPlanejamento, definirContextoBloco]);
 
-  // Pausas configuradas vivem no estado do timer (chave escopada por usuário, D-21).
+  // Pausas configuradas vivem no estado do timer (chave escopada por usuário, ).
   useEffect(() => {
     setPausas({ ...timer.pausas });
   }, [timer.pausas]);
@@ -131,7 +131,7 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
   const disciplinaAtual = trilha?.disciplinas.find((d) => d.id === disciplinaId);
 
   // Abertura do GlobalSessionModal ao encerrar o cronômetro.
-  // D-22.1: o timer é apenas **pausado** aqui; o reset só ocorre após 201/200 da sessão,
+  // o timer é apenas **pausado** aqui; o reset só ocorre após 201/200 da sessão,
   // informado pelo modal via `onSuccess`.
   const encerrarESalvar = async () => {
     if (timer.seconds < 60) {
@@ -153,6 +153,10 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
       disciplinaNome: disciplinaAtual?.nome,
       disciplinaCor: disciplinaAtual?.cor,
       trilhaNome: trilha?.nome,
+      onBlocoObsoleto: () => {
+        timer.reset();
+        onSessaoRegistrada();
+      },
       onSuccess: () => {
         timer.reset();
         onSessaoRegistrada();

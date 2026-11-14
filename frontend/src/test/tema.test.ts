@@ -9,7 +9,7 @@ import {
   temaInicial
 } from '../shared/design-system/Theme/useTheme';
 
-describe('Tema (R2/D-10) — cache por usuário, system e primeiro paint', () => {
+describe('Tema — cache por usuário, system e primeiro paint', () => {
   beforeEach(() => {
     localStorage.clear();
     document.documentElement.removeAttribute('data-theme');

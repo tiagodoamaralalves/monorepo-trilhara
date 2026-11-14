@@ -7,7 +7,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.params.provider.Arguments;
 
 /**
- * Allowlist executável das rotas privadas (R12, RI-39).
+ * Allowlist executável das rotas privadas.
  *
  * <p>Fonte única para {@link AuthorizationByOwnerTest}: cada rota privada declara
  * como deve ser exercitada com os IDs do usuário A autenticado como usuário B.
@@ -25,14 +25,14 @@ public final class RotasPrivadas {
     }
 
     /**
-     * Caso de auditoria anti-IDOR.
-     *
-     * @param metodo         verbo HTTP
-     * @param caminho        caminho com marcadores ({@code {trilhaA}}, ...)
-     * @param comCorpo       se envia corpo JSON
-     * @param statusEsperado 404 (ID no path) ou 400 (ID no body)
-     * @param descricao      rótulo para o relatório do teste
-     */
+ * Caso de auditoria anti-IDOR.
+ *
+ * @param metodo verbo HTTP
+ * @param caminho caminho com marcadores ({@code {trilhaA}}, ...)
+ * @param comCorpo se envia corpo JSON
+ * @param statusEsperado 404 (ID no path) ou 400 (ID no body)
+ * @param descricao rótulo para o relatório do teste
+ */
     public record Caso(String metodo, String caminho, boolean comCorpo,
                        int statusEsperado, String descricao) {
     }
@@ -109,12 +109,12 @@ public final class RotasPrivadas {
 
 
     /**
-     * Allowlist completa da superfície HTTP (Anexo A sincronizado com o código na R13).
-     *
-     * <p>Fonte única para {@code RotasPublicasContratoTest}. O conjunto é derivado de
-     * {@code RotasInventarioTest#inventariarRotas} e conferido nos dois sentidos: rota nova no
-     * código sem entrada aqui falha, e entrada aqui sem rota no código também falha.</p>
-     */
+ * Allowlist completa da superfície HTTP ( sincronizado com o código ).
+ *
+ * <p>Fonte única para {@code RotasPublicasContratoTest}. O conjunto é derivado de
+ * {@code RotasInventarioTest#inventariarRotas} e conferido nos dois sentidos: rota nova no
+ * código sem entrada aqui falha, e entrada aqui sem rota no código também falha.</p>
+ */
     public static final Set<String> TODAS_AS_ROTAS = Set.of(
             "DELETE /api/admin/editais/{id}",
             "DELETE /api/auth/conta",
@@ -228,8 +228,8 @@ public final class RotasPrivadas {
     );
 
     /**
-     * Rotas removidas pela reestruturação (D-11/D-23): não podem reaparecer.
-     */
+ * Rotas removidas pela reestruturação: não podem reaparecer.
+ */
     public static final Set<String> REMOVIDAS = Set.of(
             "PATCH /api/trilhas/{trilhaId}/progresso/{topicoId}",
             "GET /api/cadernos/{cadernoId}/secoes/{secaoId}/notas/{notaId}",

@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { SyncStatusBadge } from '../shared/design-system';
 
 /**
- * `SyncStatusBadge` (F8/D-31) — quatro estados, rótulos exatos do Anexo B e retry.
+ * `SyncStatusBadge` — quatro estados, rótulos exatos e retry.
  */
 describe('SyncStatusBadge — estados de sincronização', () => {
   beforeEach(() => {

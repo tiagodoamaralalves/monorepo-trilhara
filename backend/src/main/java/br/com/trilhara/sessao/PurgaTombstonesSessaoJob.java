@@ -7,7 +7,7 @@ import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 
 /**
- * Job horário de purga de tombstones de sessão (D-15).
+ * Job horário de purga de tombstones de sessão.
  *
  * <p>Remove os tombstones com {@code deletedAt < agora - 24h}. A execução agendada é apenas
  * um gatilho; a lógica vive em {@link SessaoPurgaService} ({@code @SystemScope}) e expõe

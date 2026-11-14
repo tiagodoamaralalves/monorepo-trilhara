@@ -1,14 +1,14 @@
 /**
- * Barramento único de eventos entre abas (D-21).
+ * Barramento único de eventos entre abas.
  *
  * Regras normativas:
- * - existe **um** `BroadcastChannel("trilhara")` para todas as mensagens internas;
- * - quando `BroadcastChannel` não existe (ex.: jsdom), o transporte cai para o evento
- *   `storage` na chave `trilhara:bus` — funcionalmente equivalente para abas da mesma origem;
- * - o envelope é versionado (`v: 1`) e sempre carrega `usuarioId` e `origemAbaId`;
- * - mensagens de outra aba **da própria origem** são ignoradas;
- * - mensagens cujo `usuarioId` difere do usuário em memória são **descartadas** (isolamento
- *   por conta, §8), inclusive quando a mensagem é anônima (`usuarioId: null`).
+ * existe **um** `BroadcastChannel("trilhara")` para todas as mensagens internas;
+ * quando `BroadcastChannel` não existe (ex.: jsdom), o transporte cai para o evento
+ * `storage` na chave `trilhara:bus` — funcionalmente equivalente para abas da mesma origem;
+ * o envelope é versionado (`v: 1`) e sempre carrega `usuarioId` e `origemAbaId`;
+ * mensagens de outra aba **da própria origem** são ignoradas;
+ * mensagens cujo `usuarioId` difere do usuário em memória são **descartadas** (isolamento
+ * por conta, §8), inclusive quando a mensagem é anônima (`usuarioId: null`).
  *
  * Nenhum módulo deve criar um canal próprio: timers, Agenda Hoje e autenticação publicam aqui.
  */
@@ -50,11 +50,19 @@ let usuarioCorrente: string | null = null;
 let canal: BroadcastChannel | null = null;
 let listenersGlobaisInstalados = false;
 
+let sequenciaFallbackAba = 0;
+
 function criarIdOrigem(): string {
   try {
     return globalThis.crypto.randomUUID();
   } catch {
-    return `aba-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    if (typeof globalThis.crypto?.getRandomValues === 'function') {
+      const buffer = new Uint32Array(2);
+      globalThis.crypto.getRandomValues(buffer);
+      return `aba-${Date.now()}-${buffer[0].toString(16)}${buffer[1].toString(16)}`;
+    }
+    sequenciaFallbackAba += 1;
+    return `aba-${Date.now()}-${sequenciaFallbackAba.toString(16)}`;
   }
 }
 
@@ -140,7 +148,7 @@ function entregar(mensagem: MensagemBarramento | null | undefined): void {
  * Publica uma mensagem tipada para as demais abas da mesma origem.
  *
  * @param usuarioId sobrescreve o usuário em memória (necessário em `CONTA_EXCLUIDA`, quando a
- *   sessão já foi limpa, mas as demais abas ainda precisam reconhecer a conta removida).
+ * sessão já foi limpa, mas as demais abas ainda precisam reconhecer a conta removida).
  */
 export function publicar<T>(
   tipo: TipoMensagemBarramento,

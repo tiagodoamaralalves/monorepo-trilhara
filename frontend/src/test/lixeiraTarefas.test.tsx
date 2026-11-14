@@ -7,7 +7,7 @@ vi.mock('../modules/tarefas/services/api', () => ({
 
 import { request } from '../modules/tarefas/services/api';
 
-describe('lixeiraTarefas (D-25 / D-28)', () => {
+describe('lixeiraTarefas', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -68,7 +68,7 @@ describe('lixeiraTarefas (D-25 / D-28)', () => {
     expect(res.tarefa.listaId).toBeUndefined();
   });
 
-  it('obterImpactoExclusaoLista consulta o endpoint de D-33', async () => {
+  it('obterImpactoExclusaoLista consulta o endpoint', async () => {
     vi.mocked(request).mockResolvedValueOnce({
       id: 'lista-1',
       nome: 'Faculdade',

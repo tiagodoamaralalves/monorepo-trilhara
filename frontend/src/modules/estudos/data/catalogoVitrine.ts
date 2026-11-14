@@ -164,8 +164,8 @@ const OBJECT_ID_REGEX = /^[a-f0-9]{24}$/i;
 
 /**
  * Importa um edital do catálogo para a conta do usuário.
- * - Editais da API (ObjectId): usa o endpoint de importação; erros são propagados.
- * - Itens da vitrine local (fallback offline): cria a trilha a partir do snapshot local.
+ * Editais da API (ObjectId): usa o endpoint de importação; erros são propagados.
+ * Itens da vitrine local (fallback offline): cria a trilha a partir do snapshot local.
  */
 export async function importarOuClonarEdital(edital: EditalResumo): Promise<TrilhaDetalheDTO> {
   if (OBJECT_ID_REGEX.test(edital.id)) {

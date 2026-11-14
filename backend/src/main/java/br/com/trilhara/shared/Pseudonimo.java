@@ -6,7 +6,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
 /**
- * Pseudonimização de identificadores em trilhas operacionais (D-04/RI-34).
+ * Pseudonimização de identificadores em trilhas operacionais.
  *
  * <p>Eventos operacionais precisam correlacionar ocorrências da mesma conta sem registrar
  * {@code usuarioId}, e-mail, nome ou qualquer outro identificador pessoal. Esta classe devolve

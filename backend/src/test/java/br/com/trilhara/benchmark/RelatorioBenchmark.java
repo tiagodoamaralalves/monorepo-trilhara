@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Coletor do relatório markdown do benchmark (R12, META-04).
+ * Coletor do relatório markdown do benchmark.
  *
  * <p>Archivado em `docs/benchmarks/explain-AAAA-MM-DD.md`. A raiz é resolvida como no
  * {@code RotasInventarioTest}: `user.dir` (backend/) com fallback para

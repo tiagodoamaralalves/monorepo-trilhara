@@ -37,7 +37,7 @@ export const MinhasListasNav: React.FC<MinhasListasNavProps> = ({
 }) => {
   const { collapsed } = useSidebar();
 
-  // R5: listas virtuais de cronograma não são listas persistidas de tarefas.
+  // listas virtuais de cronograma não são listas persistidas de tarefas.
   const listasManuais = listas.filter((l) => l.origem !== 'cronograma');
 
   if (collapsed) {
@@ -86,7 +86,7 @@ export const MinhasListasNav: React.FC<MinhasListasNavProps> = ({
           </button>
         ))}
 
-        {/* Trilhas de Estudo com Cronograma Ativo (FASE 7) */}
+        {/* Trilhas de Estudo com Cronograma Ativo */}
         {trilhasComCronograma.map((t) => (
           <button
             key={`trilha_${t.id}`}
@@ -167,7 +167,7 @@ export const MinhasListasNav: React.FC<MinhasListasNavProps> = ({
                 }}
               >
                 <DisciplineLabel
-                  name={lista.titulo}
+                  name={lista.titulo || lista.nome}
                   color={lista.cor}
                   className={styles.listaDisciplineLabel}
                 />
@@ -194,7 +194,7 @@ export const MinhasListasNav: React.FC<MinhasListasNavProps> = ({
           );
         })}
 
-        {/* ── SEÇÃO TRILHAS DE ESTUDO (FASE 7) ── */}
+        {/* ── SEÇÃO TRILHAS DE ESTUDO ── */}
         {trilhasComCronograma.length > 0 && (
           <div style={{ marginTop: '16px' }}>
             <div className={styles.listasHeader} style={{ padding: '4px 10px 4px' }}>

@@ -37,12 +37,12 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 /**
- * Cadernos, seções e páginas (D-29 a D-34).
+ * Cadernos, seções e páginas ( a ).
  *
  * <p>A criação de página existe <strong>apenas</strong> na rota aninhada
  * {@code POST /api/cadernos/{id}/secoes/{secaoId}/notas}: a rota duplicada {@code POST /api/notas}
- * foi removida (DC-12). A leitura completa continua exclusivamente em
- * {@code GET /api/notas/{notaId}} (D-32).</p>
+ * foi removida. A leitura completa continua exclusivamente em
+ * {@code GET /api/notas/{notaId}}.</p>
  */
 @Path("/api/cadernos")
 @Produces(MediaType.APPLICATION_JSON)
@@ -63,10 +63,10 @@ public class CadernoResource {
     // ── CADERNOS ──
 
     /**
-     * Lista os cadernos ativos, opcionalmente filtrados pela trilha de origem.
-     *
-     * <p>É o filtro usado pelo link "Abrir no Notas" de Estudos (R3/R9).</p>
-     */
+ * Lista os cadernos ativos, opcionalmente filtrados pela trilha de origem.
+ *
+ * <p>É o filtro usado pelo link "Abrir no Notas" de Estudos.</p>
+ */
     @GET
     public List<CadernoResponse> listar(@QueryParam("origemTrilhaId") String origemTrilhaId) {
         ObjectId origem = origemTrilhaId != null && !origemTrilhaId.isBlank()
@@ -110,15 +110,15 @@ public class CadernoResource {
         return notaService.deletarCaderno(usuarioId(), BsonIds.parse(id, "id"));
     }
 
-    // ── IMPORTAÇÃO E SINCRONIZAÇÃO DE TRILHA (D-29) ──
+    // ── IMPORTAÇÃO E SINCRONIZAÇÃO DE TRILHA ──
 
     /**
-     * Importa uma trilha como caderno novo.
-     *
-     * <p>Sem {@code reimportar=true}, uma trilha que já possui caderno ativo vinculado responde
-     * {@code 409 TRAIL_ALREADY_IMPORTED} com {@code errors.cadernoId}. Com a reimportação, o
-     * caderno antigo é mantido e desvinculado.</p>
-     */
+ * Importa uma trilha como caderno novo.
+ *
+ * <p>Sem {@code reimportar=true}, uma trilha que já possui caderno ativo vinculado responde
+ * {@code 409 TRAIL_ALREADY_IMPORTED} com {@code errors.cadernoId}. Com a reimportação, o
+ * caderno antigo é mantido e desvinculado.</p>
+ */
     @POST
     @Path("/importar-trilha/{trilhaId}")
     public Response importarTrilha(
@@ -131,11 +131,11 @@ public class CadernoResource {
     }
 
     /**
-     * Sincroniza o caderno com a trilha de origem.
-     *
-     * <p>Caderno sem {@code origemTrilhaId} responde {@code 400 VALIDATION_ERROR} com
-     * {@code errors.cadernoId}, não um 400 genérico.</p>
-     */
+ * Sincroniza o caderno com a trilha de origem.
+ *
+ * <p>Caderno sem {@code origemTrilhaId} responde {@code 400 VALIDATION_ERROR} com
+ * {@code errors.cadernoId}, não um 400 genérico.</p>
+ */
     @POST
     @Path("/{id}/sincronizar-trilha")
     public SincronizacaoTrilhaResponse sincronizarTrilha(@PathParam("id") String id) {

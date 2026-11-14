@@ -9,16 +9,16 @@ import org.bson.BsonValue;
 import org.bson.Document;
 
 /**
- * Utilitários BSON tipados e <strong>estritos</strong> (DC-17).
+ * Utilitários BSON tipados e <strong>estritos</strong>.
  *
  * <p>Regras normativas:</p>
  * <ol>
- *   <li>Instantes ({@code criadoEm}, {@code atualizadoEm}, {@code expiraEm}, …) são
- *       {@code BSON Date} no banco e {@link Instant} no Java;</li>
- *   <li>Datas de calendário ({@code dataVencimento}, {@code dataSessao}, …) são strings ISO
- *       estritas {@code yyyy-MM-dd}, sem conversão por fuso implícito;</li>
- *   <li>Leitura de tipo inesperado lança {@link IllegalStateException}: dados legados não são
- *       convertidos — devem ser recriados (o banco de desenvolvimento começa vazio).</li>
+ * <li>Instantes ({@code criadoEm}, {@code atualizadoEm}, {@code expiraEm}, …) são
+ * {@code BSON Date} no banco e {@link Instant} no Java;</li>
+ * <li>Datas de calendário ({@code dataVencimento}, {@code dataSessao}, …) são strings ISO
+ * estritas {@code yyyy-MM-dd}, sem conversão por fuso implícito;</li>
+ * <li>Leitura de tipo inesperado lança {@link IllegalStateException}: dados legados não são
+ * convertidos — devem ser recriados (o banco de desenvolvimento começa vazio).</li>
  * </ol>
  */
 public final class BsonDates {
@@ -42,10 +42,10 @@ public final class BsonDates {
     }
 
     /**
-     * Converte string ISO {@code yyyy-MM-dd} em {@link LocalDate}.
-     *
-     * @throws IllegalArgumentException formato inválido (o serviço de origem traduz em 400)
-     */
+ * Converte string ISO {@code yyyy-MM-dd} em {@link LocalDate}.
+ *
+ * @throws IllegalArgumentException formato inválido (o serviço de origem traduz em 400)
+ */
     public static LocalDate toLocalDate(String isoString) {
         if (isoString == null || isoString.isBlank()) {
             return null;
@@ -58,10 +58,10 @@ public final class BsonDates {
     }
 
     /**
-     * Lê um instante de um campo de documento, sem aceitar tipos legados.
-     *
-     * @throws IllegalStateException campo presente com tipo diferente de {@code BSON Date}
-     */
+ * Lê um instante de um campo de documento, sem aceitar tipos legados.
+ *
+ * @throws IllegalStateException campo presente com tipo diferente de {@code BSON Date}
+ */
     public static Instant lerInstant(Document doc, String campo) {
         if (doc == null || campo == null) {
             return null;
@@ -81,10 +81,10 @@ public final class BsonDates {
     }
 
     /**
-     * Lê uma data de calendário de um campo de documento, sem aceitar tipos legados.
-     *
-     * @throws IllegalStateException campo presente com tipo diferente de string
-     */
+ * Lê uma data de calendário de um campo de documento, sem aceitar tipos legados.
+ *
+ * @throws IllegalStateException campo presente com tipo diferente de string
+ */
     public static LocalDate lerLocalDate(Document doc, String campo) {
         if (doc == null || campo == null) {
             return null;
@@ -101,10 +101,10 @@ public final class BsonDates {
     }
 
     /**
-     * Lê um instante de um valor BSON bruto.
-     *
-     * @throws IllegalStateException valor presente com tipo inesperado (não é BSON Date)
-     */
+ * Lê um instante de um valor BSON bruto.
+ *
+ * @throws IllegalStateException valor presente com tipo inesperado (não é BSON Date)
+ */
     public static Instant lerInstant(BsonValue valor, String campo) {
         if (valor == null || valor.isNull()) {
             return null;
@@ -117,10 +117,10 @@ public final class BsonDates {
     }
 
     /**
-     * Lê uma data de calendário de um valor BSON bruto.
-     *
-     * @throws IllegalStateException valor presente com tipo inesperado (não é string)
-     */
+ * Lê uma data de calendário de um valor BSON bruto.
+ *
+ * @throws IllegalStateException valor presente com tipo inesperado (não é string)
+ */
     public static LocalDate lerLocalDate(BsonValue valor, String campo) {
         if (valor == null || valor.isNull()) {
             return null;

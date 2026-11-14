@@ -10,10 +10,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * R2 — readiness reflete o diagnóstico de índices (D-07): conflito ⇒ {@code DOWN},
+ * readiness reflete o diagnóstico de índices: conflito ⇒ {@code DOWN},
  * drift ⇒ dado informativo sem derrubar.
  */
-@DisplayName("R2 - MongoIndexHealthCheck: DOWN em conflito, drift informativo")
+@DisplayName("MongoIndexHealthCheck: DOWN em conflito, drift informativo")
 class MongoIndexHealthCheckTest {
 
     private static MongoIndexHealthCheck checkCom(DiagnosticoIndices diagnostico) {

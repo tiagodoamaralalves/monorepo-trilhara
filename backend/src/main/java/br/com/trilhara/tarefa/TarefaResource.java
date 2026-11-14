@@ -44,9 +44,9 @@ public class TarefaResource {
     }
 
     /**
-     * Listagem paginada de tarefas manuais (D-28). {@code filtro} aceita
-     * {@code TODAS|FUTURO|CONCLUIDAS}. Nunca retorna blocos de cronograma.
-     */
+ * Listagem paginada de tarefas manuais. {@code filtro} aceita
+ * {@code TODAS|FUTURO|CONCLUIDAS}. Nunca retorna blocos de cronograma.
+ */
     @GET
     public PaginaTarefasDTO listar(
             @QueryParam("listaId") String listaId,

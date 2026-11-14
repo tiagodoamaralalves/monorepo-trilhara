@@ -52,18 +52,18 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 
 /**
- * Serviço do domínio Notas (REQUISITOS §10, D-29 a D-34).
+ * Serviço do domínio Notas (REQUISITOS §10, a ).
  *
  * <p>Três coleções independentes ({@code cadernos}, {@code secoes}, {@code notas}) com
  * {@code usuarioId} em todas elas. Nenhum documento embute listas de seções ou páginas.</p>
  *
  * <p>Regras transversais aplicadas aqui:</p>
  * <ul>
- *   <li>toda leitura/escrita valida {@code usuarioId} e o vínculo pai-filho do path: recurso de
- *       outro usuário, ID inexistente ou seção de outro caderno respondem 404;</li>
- *   <li>paginação por offset com {@code 400 INVALID_PAGINATION} ao sair do intervalo;</li>
- *   <li>limites de acervo respondem {@code 409 RESOURCE_LIMIT_EXCEEDED};</li>
- *   <li>restauração fora do prazo responde {@code 404 TRASH_ITEM_EXPIRED} (D-34).</li>
+ * <li>toda leitura/escrita valida {@code usuarioId} e o vínculo pai-filho do path: recurso de
+ * outro usuário, ID inexistente ou seção de outro caderno respondem 404;</li>
+ * <li>paginação por offset com {@code 400 INVALID_PAGINATION} ao sair do intervalo;</li>
+ * <li>limites de acervo respondem {@code 409 RESOURCE_LIMIT_EXCEEDED};</li>
+ * <li>restauração fora do prazo responde {@code 404 TRASH_ITEM_EXPIRED}.</li>
  * </ul>
  */
 @ApplicationScoped
@@ -80,10 +80,10 @@ public class NotaService {
     private static final String TEXTO_SECAO_NAO_ENCONTRADA = "Seção não encontrada";
     private static final String TEXTO_PAGINA_NAO_ENCONTRADA = "Página não encontrada";
 
-    /** Limite validado de Markdown por página (D-30d). */
+    /** Limite validado de Markdown por página. */
     public static final int MAX_MARKDOWN_BYTES = 524288;
 
-    /** Retenção da lixeira em dias (D-34). */
+    /** Retenção da lixeira em dias. */
     public static final int DIAS_RETENCAO_LIXEIRA = 30;
 
     /** Tamanho padrão e máximo das listagens paginadas deste domínio. */
@@ -133,12 +133,12 @@ public class NotaService {
     // =========================================================================
 
     /**
-     * Cadernos ativos, opcionalmente filtrados pela trilha de origem (D-29).
-     *
-     * <p>A listagem é limitada a 500 itens e não pagina: é o teto de acervo do próprio usuário.
-     * As contagens de seções e páginas vêm de uma agregação por coleção, não de uma consulta por
-     * caderno.</p>
-     */
+ * Cadernos ativos, opcionalmente filtrados pela trilha de origem.
+ *
+ * <p>A listagem é limitada a 500 itens e não pagina: é o teto de acervo do próprio usuário.
+ * As contagens de seções e páginas vêm de uma agregação por coleção, não de uma consulta por
+ * caderno.</p>
+ */
     public List<CadernoResponse> listarCadernos(ObjectId usuarioId, ObjectId origemTrilhaId) {
         List<Caderno> cadernos = cadernoRepository.listarAtivos(
                 usuarioId, origemTrilhaId, CadernoRepository.LIMITE_LISTAGEM);
@@ -246,7 +246,7 @@ public class NotaService {
                 resolverNomeTrilha(usuarioId, atualizado.origemTrilhaId()));
     }
 
-    /** Impacto da exclusão do caderno (D-33): somente itens ativos entram na conta. */
+    /** Impacto da exclusão do caderno: somente itens ativos entram na conta. */
     public CadernoImpactoExclusaoResponse obterImpactoExclusaoCaderno(ObjectId usuarioId, ObjectId cadernoId) {
         Caderno caderno = cadernoRepository.buscarAtivo(usuarioId, cadernoId)
                 .orElseThrow(() -> new NotFoundException(TEXTO_CADERNO_NAO_ENCONTRADO));
@@ -357,7 +357,7 @@ public class NotaService {
         return paraSecaoResponse(atualizada, notaRepository.contarPorSecao(usuarioId, secaoId));
     }
 
-    /** Impacto da exclusão da seção (D-33): somente páginas ativas entram na conta. */
+    /** Impacto da exclusão da seção: somente páginas ativas entram na conta. */
     public SecaoImpactoExclusaoResponse obterImpactoExclusaoSecao(ObjectId usuarioId, ObjectId secaoId) {
         Secao secao = secaoRepository.buscarAtiva(usuarioId, secaoId)
                 .orElseThrow(() -> new NotFoundException(TEXTO_SECAO_NAO_ENCONTRADA));
@@ -384,11 +384,11 @@ public class NotaService {
     // =========================================================================
 
     /**
-     * Páginas de uma seção, paginadas e sem {@code conteudoMarkdown}.
-     *
-     * <p>A seção precisa pertencer ao caderno do path — um ID válido de seção de outro caderno
-     * responde 404, nunca expõe conteúdo alheio ao caminho informado.</p>
-     */
+ * Páginas de uma seção, paginadas e sem {@code conteudoMarkdown}.
+ *
+ * <p>A seção precisa pertencer ao caderno do path — um ID válido de seção de outro caderno
+ * responde 404, nunca expõe conteúdo alheio ao caminho informado.</p>
+ */
     public PaginaNotasResponse listarNotasMetadados(
             ObjectId usuarioId, ObjectId cadernoId, ObjectId secaoId, int pagina, int tamanho) {
         validarPaginacao(pagina, tamanho);
@@ -406,7 +406,7 @@ public class NotaService {
                 totalPaginas(total, tamanho));
     }
 
-    /** Endpoint canônico de leitura completa (D-32). */
+    /** Endpoint canônico de leitura completa. */
     public NotaDetalheResponse buscarNota(ObjectId usuarioId, ObjectId notaId) {
         Nota nota = notaRepository.buscarAtiva(usuarioId, notaId)
                 .orElseThrow(() -> new NotFoundException(TEXTO_PAGINA_NAO_ENCONTRADA));
@@ -503,16 +503,16 @@ public class NotaService {
     }
 
     // =========================================================================
-    // 4. BUSCA GLOBAL (D-30)
+    // 4. BUSCA GLOBAL
     // =========================================================================
 
     /**
-     * Busca textual global sobre as páginas ativas do usuário.
-     *
-     * <p>Responde snippet em texto puro com offsets de destaque; nunca devolve o Markdown
-     * completo nem gera HTML. A ordenação vem do repositório: relevância DESC,
-     * {@code atualizadoEm} DESC, {@code _id} DESC.</p>
-     */
+ * Busca textual global sobre as páginas ativas do usuário.
+ *
+ * <p>Responde snippet em texto puro com offsets de destaque; nunca devolve o Markdown
+ * completo nem gera HTML. A ordenação vem do repositório: relevância DESC,
+ * {@code atualizadoEm} DESC, {@code _id} DESC.</p>
+ */
     public BuscaNotasResponse buscarGlobal(ObjectId usuarioId, String termoBusca, int pagina, int tamanho) {
         snippetExtractor.validarQueryBusca(termoBusca);
         validarPaginacao(pagina, tamanho);
@@ -559,7 +559,7 @@ public class NotaService {
     }
 
     // =========================================================================
-    // 5. IMPORTAÇÃO E SINCRONIZAÇÃO (D-29)
+    // 5. IMPORTAÇÃO E SINCRONIZAÇÃO
     // =========================================================================
 
     public CadernoResponse importarTrilha(ObjectId usuarioId, ObjectId trilhaId, boolean reimportar) {
@@ -575,16 +575,16 @@ public class NotaService {
     }
 
     // =========================================================================
-    // 6. LIXEIRA HIERÁRQUICA (D-34)
+    // 6. LIXEIRA HIERÁRQUICA
     // =========================================================================
 
     /**
-     * Lixeira hierárquica paginada, ordenada por {@code deletedAt} DESC e {@code _id} DESC.
-     *
-     * <p>Os três tipos são lidos em páginas próprias e mesclados em memória apenas para a
-     * página pedida — nunca a coleção inteira. O {@code breadcrumb} é resolvido aqui porque o
-     * item isolado não carrega o contexto hierárquico que a UI precisa exibir.</p>
-     */
+ * Lixeira hierárquica paginada, ordenada por {@code deletedAt} DESC e {@code _id} DESC.
+ *
+ * <p>Os três tipos são lidos em páginas próprias e mesclados em memória apenas para a
+ * página pedida — nunca a coleção inteira. O {@code breadcrumb} é resolvido aqui porque o
+ * item isolado não carrega o contexto hierárquico que a UI precisa exibir.</p>
+ */
     public LixeiraNotasResponse listarLixeira(ObjectId usuarioId, int pagina, int tamanho) {
         validarPaginacao(pagina, tamanho);
         Instant agora = Instant.now();
@@ -635,13 +635,13 @@ public class NotaService {
     }
 
     /**
-     * Restaura um item da lixeira conforme D-34.
-     *
-     * <p>Regras: item inexistente ou que não está na lixeira responde {@code 404 NOT_FOUND};
-     * item além dos 30 dias responde {@code 404 TRASH_ITEM_EXPIRED}. A restauração levanta os
-     * ancestrais que estavam na lixeira e, quando algum ancestral já foi purgado, realoca o item
-     * para a seção/caderno "Restauradas" (com sufixo numérico quando o nome já existe).</p>
-     */
+ * Restaura um item da lixeira .
+ *
+ * <p>Regras: item inexistente ou que não está na lixeira responde {@code 404 NOT_FOUND};
+ * item além dos 30 dias responde {@code 404 TRASH_ITEM_EXPIRED}. A restauração levanta os
+ * ancestrais que estavam na lixeira e, quando algum ancestral já foi purgado, realoca o item
+ * para a seção/caderno "Restauradas" (com sufixo numérico quando o nome já existe).</p>
+ */
     public RestauracaoLixeiraResponse restaurarItem(ObjectId usuarioId, String tipo, ObjectId id) {
         String tipoNormalizado = tipo != null ? tipo.trim().toUpperCase(Locale.ROOT) : "";
         Instant agora = Instant.now();
@@ -867,9 +867,9 @@ public class NotaService {
     }
 
     /**
-     * Resolve um título livre na coleção: "Restauradas", "Restauradas (2)", "Restauradas (3)"…
-     * (D-34). O sufixo nunca é aplicado ao item original restaurado — só ao container novo.
-     */
+ * Resolve um título livre na coleção: "Restauradas", "Restauradas (2)", "Restauradas (3)"…
+ *. O sufixo nunca é aplicado ao item original restaurado — só ao container novo.
+ */
     static String tituloDisponivel(String desejado, java.util.Collection<String> ocupados) {
         if (!ocupados.contains(desejado)) {
             return desejado;
@@ -949,9 +949,9 @@ public class NotaService {
     }
 
     /**
-     * Valida o Markdown armazenado (D-30d): tamanho em bytes UTF-8 e ausência de caracteres de
-     * controle, exceto tabulação, quebra de linha e retorno de carro.
-     */
+ * Valida o Markdown armazenado: tamanho em bytes UTF-8 e ausência de caracteres de
+ * controle, exceto tabulação, quebra de linha e retorno de carro.
+ */
     void validarMarkdown(String markdown) {
         if (markdown == null) {
             return;
@@ -1002,9 +1002,9 @@ public class NotaService {
     }
 
     /**
-     * Nome da trilha vinculada, lido do documento de {@code trilhas}. Atrás do vínculo de
-     * origem o nome pode ter mudado em Estudos; a pílula do caderno mostra sempre o valor atual.
-     */
+ * Nome da trilha vinculada, lido do documento de {@code trilhas}. Atrás do vínculo de
+ * origem o nome pode ter mudado em Estudos; a pílula do caderno mostra sempre o valor atual.
+ */
     private String resolverNomeTrilha(ObjectId usuarioId, ObjectId trilhaId) {
         if (trilhaId == null) {
             return null;

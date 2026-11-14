@@ -15,18 +15,18 @@ export interface ContaMenuButtonProps {
   textoVisivel?: boolean;
   className?: string;
   /**
-   * Fallback opcional quando não há `AuthProvider` acima. Em produção o botão sempre lê o
-   * contexto; o fallback existe para telas públicas montadas isoladamente em teste.
-   */
+ * Fallback opcional quando não há `AuthProvider` acima. Em produção o botão sempre lê o
+ * contexto; o fallback existe para telas públicas montadas isoladamente em teste.
+ */
   onAbrirConta?: () => void;
 }
 
 /**
- * Entrada de conta única do produto (D-35f).
+ * Entrada de conta única do produto.
  *
  * <p>Centraliza o acesso ao gerenciamento de conta em <strong>um</strong> componente, consumido
  * pela `AppSidebar` (Estudos, Tarefas, Notas) e pelo header próprio do Pomodoro. Não recebe a
- * ação por prop de cada app: lê `AuthContext.abrirContaModal()` diretamente, evitando a
+ * ação por prop de cada app: lê `AuthContext.abrirContaModal` diretamente, evitando a
  * propagação manual que deixava o Pomodoro sem entrada.</p>
  */
 export const ContaMenuButton: React.FC<ContaMenuButtonProps> = ({

@@ -25,7 +25,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * R11 — cifra RFC 8291 / {@code aes128gcm} (RFC 8188).
+ * cifra RFC 8291 / {@code aes128gcm} (RFC 8188).
  *
  * <p>O teste é um <em>round-trip</em>: o corpo gerado é decifrado com as mesmas chaves do
  * "dispositivo" de teste, provando que cabeçalho, HKDF e delimitador de registro estão

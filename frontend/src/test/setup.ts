@@ -5,7 +5,7 @@ import { vi } from 'vitest';
  * Stub de `window.matchMedia` para o ambiente jsdom.
  *
  * jsdom não implementa `matchMedia`. Vários componentes de produção passaram a
- * consultá-lo na R12 (`useReducedMotion`, `AppSidebar`/`data-bottom-nav`) e, sem
+ * consultá-lo (`useReducedMotion`, `AppSidebar`/`data-bottom-nav`) e, sem
  * um stub global, cada teste precisaria registrar o seu — e qualquer teste que
  * montasse o shell quebraria com `window.matchMedia is not a function`.
  *

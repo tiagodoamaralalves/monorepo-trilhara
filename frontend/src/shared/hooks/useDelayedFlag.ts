@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 
 export interface UseDelayedFlagOptions {
-  /** Tempo em ms antes de a flag virar `true`. Padrão: 200 ms (D-37). */
+  /** Tempo em ms antes de a flag virar `true`. Padrão: 200 ms. */
   atrasoMs?: number;
   /** Tempo mínimo em ms que a flag permanece `true` depois de ativada. Padrão: 300 ms. */
   minimoVisivelMs?: number;
 }
 
 /**
- * Evita *flicker* de estados de carregamento (D-37).
+ * Evita *flicker* de estados de carregamento.
  *
- * - a flag só liga depois de `atrasoMs` (padrão 200 ms);
- * - depois de ligada, permanece no mínimo `minimoVisivelMs` (padrão 300 ms).
+ * a flag só liga depois de `atrasoMs` (padrão 200 ms);
+ * depois de ligada, permanece no mínimo `minimoVisivelMs` (padrão 300 ms).
  *
  * Use em `Skeleton`/`Spinner` para que carregamentos rápidos não pisquem na tela.
  */

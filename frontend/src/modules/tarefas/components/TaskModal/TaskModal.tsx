@@ -80,7 +80,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [erroTitulo, setErroTitulo] = useState('');
   const [salvando, setSalvando] = useState(false);
 
-  // Lembrete Web Push (FASE 10 / D-26)
+  // Lembrete Web Push
   const [modoLembrete, setModoLembrete] = useState<ModoLembrete>('HERDAR');
   const [lembreteMinutos, setLembreteMinutos] = useState<number>(15);
   const [padraoGlobalMinutos, setPadraoGlobalMinutos] = useState<number>(15);
@@ -108,7 +108,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     setIsIOS(isIOSNonStandalone());
     setDicaIOSAberta(false);
 
-    // D-26: o rótulo "Usar padrão (X min)" reflete a preferência global do usuário.
+    // o rótulo "Usar padrão (X min)" reflete a preferência global do usuário.
     if (isOpen) {
       pushService
         .obterConfig()
@@ -172,8 +172,12 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     const texto = novaSubtarefaTitulo.trim();
     if (!texto) return;
 
+    const sufixoUnico =
+      typeof globalThis.crypto?.randomUUID === 'function'
+        ? globalThis.crypto.randomUUID().slice(0, 8)
+        : String(subtarefas.length + 1);
     const nova: Subtarefa = {
-      id: 'sub_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      id: `sub_${Date.now().toString(36)}_${sufixoUnico}`,
       titulo: texto,
       concluida: false
     };
@@ -208,8 +212,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
     setSalvando(true);
     try {
-      // D-26: o modo é explícito; SEM_ALERTA nunca envia minutos e HERDAR não os define.
-      const modoFinal: ModoLembrete = horario ? modoLembrete : 'SEM_ALERTA';
+      const modoFinal: ModoLembrete = modoLembrete;
       const minutosFinal = modoFinal === 'PERSONALIZADO' ? lembreteMinutos : undefined;
 
       const payload: SalvarTarefaPayload = {
@@ -344,7 +347,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           </div>
         </div>
 
-        {/* Seletor de Lembrete Web Push (D-26) */}
+        {/* Seletor de Lembrete Web Push */}
         <div className={styles.row}>
           <div className={styles.col}>
             <Select

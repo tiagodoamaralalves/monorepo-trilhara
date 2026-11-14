@@ -14,11 +14,11 @@ export interface SkeletonProps {
 }
 
 /**
- * Placeholder de carregamento inicial com o formato do conteúdo (D-37).
+ * Placeholder de carregamento inicial com o formato do conteúdo.
  *
- * - aparece somente após 200 ms (`useDelayedFlag`) e fica no mínimo 300 ms visíveis;
- * - o container recebe `aria-busy="true"` e um texto oculto "Carregando…";
- * - nunca substitui conteúdo em refetch: use `Spinner` no cabeçalho da seção.
+ * aparece somente após 200 ms (`useDelayedFlag`) e fica no mínimo 300 ms visíveis;
+ * o container recebe `aria-busy="true"` e um texto oculto "Carregando…";
+ * nunca substitui conteúdo em refetch: use `Spinner` no cabeçalho da seção.
  */
 export const Skeleton: React.FC<SkeletonProps> = ({
   variant = 'line',

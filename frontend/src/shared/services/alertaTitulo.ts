@@ -1,15 +1,15 @@
 /**
  * Alerta de título da aba, compartilhado por Estudos e Pomodoro.
  *
- * Antes da R12 existiam **duas** cópias idênticas desta lógica (`alarmService.ts` e
+ * Antes existiam **duas** cópias idênticas desta lógica (`alarmService.ts` e
  * `PomodoroApp.tsx`), com `setInterval` de 900 ms alternando `document.title` por ~24
  * iterações — drift garantido e nenhuma delas respeitava `prefers-reduced-motion`.
  *
  * Requisitos atendidos:
- * - WCAG 2.2 §12.1.5: com movimento reduzido, o título recebe `⏰ {mensagem}` **estático**
- *   (informa sem piscar) e é restaurado no foco da janela ou ao fim do tempo máximo;
- * - restauração determinística: `restaurarTituloAba()` é idempotente e também chamada
- *   quando a aba recebe foco.
+ * WCAG 2.2 §12.1.5: com movimento reduzido, o título recebe `⏰ {mensagem}` **estático**
+ * (informa sem piscar) e é restaurado no foco da janela ou ao fim do tempo máximo;
+ * restauração determinística: `restaurarTituloAba` é idempotente e também chamada
+ * quando a aba recebe foco.
  */
 
 const INTERVALO_MS = 900;
@@ -47,7 +47,7 @@ export interface AlertaTituloOptions {
  * Versão não-hook da preferência de movimento reduzido.
  *
  * Para serviços fora do React (`AlarmService`) que não podem usar
- * `useReducedMotion()`. Degrada para `false` sem `matchMedia`.
+ * `useReducedMotion`. Degrada para `false` sem `matchMedia`.
  */
 export function preferenciaMovimentoReduzido(): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {

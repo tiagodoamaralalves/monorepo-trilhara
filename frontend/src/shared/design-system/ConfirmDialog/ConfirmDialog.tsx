@@ -9,12 +9,11 @@ interface ConfirmOptions {
   description: string;
   confirmText?: string;
   cancelText?: string;
-  /** `danger` é o padrão para destruição (D-37/D-38). */
+  /** `danger` é o padrão para destruição. */
   variant?: 'danger' | 'primary' | 'warning';
   /**
-   * Exige que o usuário digite o valor exato antes de habilitar a ação destrutiva (D-38:
-   * recursos grandes, como excluir trilha, usam o padrão GitHub de confirmação por nome).
-   */
+ * Exige que o usuário digite o valor exato antes de habilitar a ação destrutiva (* recursos grandes, como excluir trilha, usam o padrão GitHub de confirmação por nome).
+ */
   confirmacaoPorTexto?: {
     valor: string;
     rotulo: string;

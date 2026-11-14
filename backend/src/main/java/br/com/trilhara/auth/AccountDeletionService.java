@@ -37,15 +37,15 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.NotAuthorizedException;
 
 /**
- * Serviço da exclusão definitiva, idempotente e retry-safe da conta (D-35).
+ * Serviço da exclusão definitiva, idempotente e retry-safe da conta.
  *
- * <p>Percorre {@link ColecaoTrilhara#filhasPrivadas()} (18 coleções filhas, incluindo
+ * <p>Percorre {@link ColecaoTrilhara#filhasPrivadas} (18 coleções filhas, incluindo
  * {@code tokens_handoff_sso}) por {@code usuarioId} e só remove {@code usuarios} depois de
  * confirmar contagem zero em todas elas. O estado vive em {@code usuarios.exclusaoConta}:
  * {@code PENDENTE -> EM_ANDAMENTO -> (RETENTANDO_LENTO)*}. {@code CONCLUIDA} é registrada
  * apenas em log/métrica, porque o documento raiz já foi removido.</p>
  *
- * <p>Nenhum log desta classe contém {@code usuarioId}, e-mail ou nome (D-04/RI-34).</p>
+ * <p>Nenhum log desta classe contém {@code usuarioId}, e-mail ou nome.</p>
  */
 @ApplicationScoped
 public class AccountDeletionService {
@@ -54,10 +54,10 @@ public class AccountDeletionService {
     public static final String ESTADO_PENDENTE = "PENDENTE";
     /** Estado de uma tentativa em curso. */
     public static final String ESTADO_EM_ANDAMENTO = "EM_ANDAMENTO";
-    /** Estado após esgotar as tentativas rápidas: retentativa lenta e indefinida (D-35b). */
+    /** Estado após esgotar as tentativas rápidas: retentativa lenta e indefinida. */
     public static final String ESTADO_RETENTANDO_LENTO = "RETENTANDO_LENTO";
 
-    /** Métrica exigida por D-35b. */
+    /** Métrica exigida por . */
     public static final String METRICA_STUCK = "trilhara_account_deletion_stuck";
 
     private static final String CAMPO_EXCLUSAO_CONTA = "exclusaoConta";
@@ -77,10 +77,10 @@ public class AccountDeletionService {
     public static final String TEXTO_CONFIRMACAO_OBRIGATORIO = "EXCLUIR MINHA CONTA";
 
     /**
-     * Lista ordenada nominalmente das 18 coleções filhas privadas do sistema (D-08).
-     * A 19ª coleção privada ({@code usuarios}) é purgada por último após a limpeza das filhas.
-     * Fonte única: {@link ColecaoTrilhara#filhasPrivadas()}.
-     */
+ * Lista ordenada nominalmente das 18 coleções filhas privadas do sistema.
+ * A 19ª coleção privada ({@code usuarios}) é purgada por último após a limpeza das filhas.
+ * Fonte única: {@link ColecaoTrilhara#filhasPrivadas}.
+ */
     public static final List<String> COLECOES_FILHAS = ColecaoTrilhara.nomesFilhasPrivadas();
 
     public static final String COLECAO_USUARIOS = "usuarios";
@@ -134,12 +134,12 @@ public class AccountDeletionService {
 
 
     /**
-     * Valida credenciais e intenção, persiste {@code usuarios.exclusaoConta}, revoga credenciais
-     * e deixa a limpeza para o worker periódico.
-     *
-     * <p>A verificação de senha ocorre antes de qualquer escrita: senha inválida responde
-     * {@code 401 UNAUTHORIZED} <strong>sem efeito colateral</strong>.</p>
-     */
+ * Valida credenciais e intenção, persiste {@code usuarios.exclusaoConta}, revoga credenciais
+ * e deixa a limpeza para o worker periódico.
+ *
+ * <p>A verificação de senha ocorre antes de qualquer escrita: senha inválida responde
+ * {@code 401 UNAUTHORIZED} <strong>sem efeito colateral</strong>.</p>
+ */
     public AccountDeletionResponse solicitarExclusao(String usuarioIdStr, ExcluirContaRequest request, String idempotencyKey) {
         ObjectId usuarioId = validarSolicitacaoExclusao(usuarioIdStr, request);
 
@@ -190,7 +190,7 @@ public class AccountDeletionService {
         revogarCredenciaisParaExclusao(usuarioIdStr, agora);
 
         // Nenhum estado em memória: `AccountDeletionJob` retoma a partir do checkpoint em
-        // `usuarios.exclusaoConta` (D-35b), inclusive após reinício do servidor.
+        // `usuarios.exclusaoConta`, inclusive após reinício do servidor.
         return new AccountDeletionResponse(operationId, ESTADO_PENDENTE);
     }
 
@@ -211,16 +211,16 @@ public class AccountDeletionService {
 
 
     /**
-     * Idempotência de {@code DELETE /api/auth/conta} (D-35).
-     *
-     * <ul>
-     *   <li>mesma chave + mesmo payload funcional → {@code 202} com o mesmo {@code operationId}
-     *       e o estado atual;</li>
-     *   <li>mesma chave + payload funcional diferente → {@code 409 IDEMPOTENCY_KEY_CONFLICT};</li>
-     *   <li>conta já em exclusão com outra chave → {@code 409 IDEMPOTENCY_KEY_CONFLICT}; a chave
-     *       é escopada ao documento do usuário e nunca colide entre contas.</li>
-     * </ul>
-     */
+ * Idempotência de {@code DELETE /api/auth/conta}.
+ *
+ * <ul>
+ * <li>mesma chave + mesmo payload funcional → {@code 202} com o mesmo {@code operationId}
+ * e o estado atual;</li>
+ * <li>mesma chave + payload funcional diferente → {@code 409 IDEMPOTENCY_KEY_CONFLICT};</li>
+ * <li>conta já em exclusão com outra chave → {@code 409 IDEMPOTENCY_KEY_CONFLICT}; a chave
+ * é escopada ao documento do usuário e nunca colide entre contas.</li>
+ * </ul>
+ */
     private Optional<AccountDeletionResponse> verificarExclusaoEmAndamento(
             Document userDoc,
             String idempotencyKey,
@@ -276,11 +276,11 @@ public class AccountDeletionService {
     }
 
     /**
-     * Executa a limpeza das 18 coleções filhas privadas por {@code usuarioId: ObjectId} e, após
-     * confirmar contagem zero em todas, purga o documento raiz em {@code usuarios}.
-     *
-     * @return {@code true} quando a conta foi integralmente removida
-     */
+ * Executa a limpeza das 18 coleções filhas privadas por {@code usuarioId: ObjectId} e, após
+ * confirmar contagem zero em todas, purga o documento raiz em {@code usuarios}.
+ *
+ * @return {@code true} quando a conta foi integralmente removida
+ */
     public boolean executarLimpezaUsuario(ObjectId alvoObjectId, String operationId) {
         MongoCollection<Document> usuarios = getDatabase().getCollection(COLECAO_USUARIOS);
         Document userDoc = usuarios.find(eq("_id", alvoObjectId)).first();
@@ -338,15 +338,15 @@ public class AccountDeletionService {
 
 
     /**
-     * Persiste o checkpoint da falha e decide o próximo horário de tentativa (D-35b).
-     *
-     * <p>Backoff exponencial 1 s → 2 s → 4 s → 8 s → 16 s (teto 30 s) nas tentativas rápidas.
-     * Ao atingir {@code trilhara.account-deletion.max-tentativas}, o estado vira
-     * {@code RETENTANDO_LENTO}, com nova tentativa a cada
-     * {@code trilhara.account-deletion.retentativa-lenta-segundos} (default 1 h), indefinidamente,
-     * incrementando a métrica {@code trilhara_account_deletion_stuck}. Nenhum estado é terminal
-     * e silencioso (RI-35).</p>
-     */
+ * Persiste o checkpoint da falha e decide o próximo horário de tentativa.
+ *
+ * <p>Backoff exponencial 1 s → 2 s → 4 s → 8 s → 16 s (teto 30 s) nas tentativas rápidas.
+ * Ao atingir {@code trilhara.account-deletion.max-tentativas}, o estado vira
+ * {@code RETENTANDO_LENTO}, com nova tentativa a cada
+ * {@code trilhara.account-deletion.retentativa-lenta-segundos} (default 1 h), indefinidamente,
+ * incrementando a métrica {@code trilhara_account_deletion_stuck}. Nenhum estado é terminal
+ * e silencioso.</p>
+ */
     private void registrarFalha(ObjectId alvoObjectId, String operationId, String colecao, Exception erro) {
         LOG.errorf("event=ACCOUNT_DELETION_FAILED operationId=%s colecao=%s tipo=%s",
                 operationId,
@@ -399,9 +399,9 @@ public class AccountDeletionService {
     }
 
     /**
-     * Varre as contas com exclusão em aberto cujo {@code proximaTentativa} já venceu, retomando
-     * sem qualquer intervenção ou reautenticação do usuário.
-     */
+ * Varre as contas com exclusão em aberto cujo {@code proximaTentativa} já venceu, retomando
+ * sem qualquer intervenção ou reautenticação do usuário.
+ */
     public int processarExclusoesPendentes() {
         MongoCollection<Document> usuarios = getDatabase().getCollection(COLECAO_USUARIOS);
         Instant agora = Instant.now();

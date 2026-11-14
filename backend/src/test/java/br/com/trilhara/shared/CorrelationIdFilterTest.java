@@ -12,10 +12,10 @@ import br.com.trilhara.shared.erro.CorrelationIdFilter;
 import br.com.trilhara.shared.erro.ProblemDetailsFactory;
 
 /**
- * D-04: {@code X-Correlation-ID} presente em toda resposta, ecoando o valor recebido
+ * {@code X-Correlation-ID} presente em toda resposta, ecoando o valor recebido
  * ou gerando um novo.
  */
-@DisplayName("R1 - Cabeçalho X-Correlation-ID em toda resposta")
+@DisplayName("Cabeçalho X-Correlation-ID em toda resposta")
 class CorrelationIdFilterTest {
 
     @Test

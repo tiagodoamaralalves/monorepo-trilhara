@@ -90,7 +90,7 @@ function renderizar() {
   );
 }
 
-describe('R4 — Dashboard de Estudos: estados, grupo removido e D-38', () => {
+describe('Dashboard de Estudos: estados, grupo removido e', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -189,7 +189,7 @@ describe('R4 — Dashboard de Estudos: estados, grupo removido e D-38', () => {
     expect(excluirSpy).not.toHaveBeenCalled();
   });
 
-  it('confirma exclusão de sessão individual com o texto D-38', async () => {
+  it('confirma exclusão de sessão individual com o texto', async () => {
     vi.spyOn(EstudosService, 'obterEstatisticas').mockResolvedValue(estatisticas() as never);
     vi.spyOn(EstudosService, 'listarSessoesPaginado').mockResolvedValue(paginaSessoes() as never);
     const excluirSpy = vi.spyOn(EstudosService, 'excluirSessao').mockResolvedValue(undefined as never);

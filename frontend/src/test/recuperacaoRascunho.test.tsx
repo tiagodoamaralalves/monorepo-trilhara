@@ -31,8 +31,8 @@ function renderizarEditor(onSalvar = vi.fn().mockResolvedValue({ atualizadoEm: S
   );
 }
 
-/** A barra só aparece quando o rascunho difere do servidor (D-31b). */
-describe('Recuperação de rascunho — D-31b', () => {
+/** A barra só aparece quando o rascunho difere do servidor. */
+describe('Recuperação de rascunho', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();

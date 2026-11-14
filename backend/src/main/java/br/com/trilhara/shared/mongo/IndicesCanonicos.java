@@ -13,12 +13,12 @@ import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
 
 /**
- * Tabela canônica e única de índices do Trilhara (D-07).
+ * Tabela canônica e única de índices do Trilhara.
  *
  * <p>Fonte normativa de <em>todos</em> os índices do sistema. Qualquer índice criado fora
  * desta tabela é drift (reportado em {@code WARN} e no health, sem remoção automática).
- * A tabela cobre o plano F1 (itens 1–19) acrescido de D-08 ({@code tokens_handoff_sso}),
- * D-24 ({@code series_recorrentes.origemOperacaoId}) e D-36 ({@code lembretes_push}).</p>
+ * A tabela cobre o plano F1 (itens 1–19) acrescido ({@code tokens_handoff_sso}),
+ * ({@code series_recorrentes.origemOperacaoId}) e ({@code lembretes_push}).</p>
  *
  * <p>Convenção de nomes: {@code idx_{colecao}_{campos}} para índices comuns e
  * {@code uk_{colecao}_{campos}} para únicos (inclusive únicos parciais).</p>
@@ -32,17 +32,17 @@ public final class IndicesCanonicos {
     }
 
     /**
-     * Um índice declarado da tabela canônica.
-     *
-     * @param colecao       coleção do inventário (D-08)
-     * @param nome          nome canônico do índice
-     * @param chaves        especificação de chaves
-     * @param unico         {@code true} para índices únicos (inclusive parciais)
-     * @param ttlSegundos   {@code expireAfterSeconds}; {@code null} quando não é TTL
-     * @param filtroParcial {@code partialFilterExpression}; {@code null} quando integral
-     * @param idioma        {@code default_language} (apenas índices de texto)
-     * @param pesos         {@code weights} (apenas índices de texto)
-     */
+ * Um índice declarado da tabela canônica.
+ *
+ * @param colecao coleção do inventário
+ * @param nome nome canônico do índice
+ * @param chaves especificação de chaves
+ * @param unico {@code true} para índices únicos (inclusive parciais)
+ * @param ttlSegundos {@code expireAfterSeconds}; {@code null} quando não é TTL
+ * @param filtroParcial {@code partialFilterExpression}; {@code null} quando integral
+ * @param idioma {@code default_language} (apenas índices de texto)
+ * @param pesos {@code weights} (apenas índices de texto)
+ */
     public record IndiceCanonico(
             ColecaoTrilhara colecao,
             String nome,
@@ -91,12 +91,12 @@ public final class IndicesCanonicos {
     }
 
     /**
-     * Índice não-único com {@code partialFilterExpression}.
-     *
-     * <p>Usado quando só um subconjunto de documentos precisa ser indexado — por exemplo os
-     * tombstones de sessão ({@code deletedAt} presente), que são consultados apenas pela purga
-     * horária e não devem pesar na maioria dos documentos vivos.</p>
-     */
+ * Índice não-único com {@code partialFilterExpression}.
+ *
+ * <p>Usado quando só um subconjunto de documentos precisa ser indexado — por exemplo os
+ * tombstones de sessão ({@code deletedAt} presente), que são consultados apenas pela purga
+ * horária e não devem pesar na maioria dos documentos vivos.</p>
+ */
     private static IndiceCanonico parcial(ColecaoTrilhara colecao, String nome, Bson chaves, Bson filtro) {
         return new IndiceCanonico(colecao, nome, chaves, false, null, filtro, null, null);
     }
@@ -142,7 +142,7 @@ public final class IndicesCanonicos {
                 ttl(ColecaoTrilhara.TOKENS_CONFIRMACAO_EMAIL,
                         "idx_tokens_confirmacao_email_expiraEm", asc("expiraEm")),
 
-                // 5. tokens_handoff_sso (D-08)
+                // 5. tokens_handoff_sso
                 unico(ColecaoTrilhara.TOKENS_HANDOFF_SSO,
                         "uk_tokens_handoff_sso_codigoHash", asc("codigoHash")),
                 simples(ColecaoTrilhara.TOKENS_HANDOFF_SSO,
@@ -202,7 +202,7 @@ public final class IndicesCanonicos {
                 unicoParcial(ColecaoTrilhara.SESSOES, "uk_sessoes_usuarioId_chaveIdempotencia",
                         composto(asc("usuarioId"), asc("chaveIdempotencia")),
                         exists("chaveIdempotencia", true)),
-                // Consulta exclusiva da purga de tombstones (D-15): só documentos com deletedAt.
+                // Consulta exclusiva da purga de tombstones: só documentos com deletedAt.
                 parcial(ColecaoTrilhara.SESSOES, "idx_sessoes_deletedAt", asc("deletedAt"),
                         exists("deletedAt", true)),
 
@@ -269,9 +269,9 @@ public final class IndicesCanonicos {
                 unico(ColecaoTrilhara.PUSH_SUBSCRIPTIONS,
                         "uk_push_subscriptions_endpoint", asc("endpoint")),
 
-                // 20. lembretes_push (D-36a): uma versão por (tarefa, versão); fila por estado e
+                // 20. lembretes_push: uma versão por (tarefa, versão); fila por estado e
                 // instante de entrega; consulta por tenant. `leaseToken`/`leaseAte` são os nomes
-                // canônicos do lease de processamento (D-36a).
+                // canônicos do lease de processamento.
                 unico(ColecaoTrilhara.LEMBRETES_PUSH,
                         "uk_lembretes_push_tarefaId_versaoAgendamento",
                         composto(asc("tarefaId"), asc("versaoAgendamento"))),

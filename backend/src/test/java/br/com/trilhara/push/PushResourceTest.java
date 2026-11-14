@@ -37,7 +37,7 @@ import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 
 /**
- * R11 — contrato de `PushResource` (D-36c/d/e).
+ * contrato de `PushResource`.
  */
 @QuarkusTest
 class PushResourceTest {

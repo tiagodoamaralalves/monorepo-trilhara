@@ -14,7 +14,7 @@ import {
   ordenar
 } from './ordenarAgenda';
 
-/** Ciclo de vida de cada fonte da agenda (D-37). */
+/** Ciclo de vida de cada fonte da agenda. */
 type StatusFonte = 'carregando' | 'sucesso' | 'erro';
 
 interface FonteEstado<T> {
@@ -25,7 +25,7 @@ interface FonteEstado<T> {
 }
 
 /**
- * Estado da Visão Hoje de **um** usuário (D-46).
+ * Estado da Visão Hoje de **um** usuário.
  *
  * Nunca existe estado compartilhado entre contas: o manager guarda um mapa
  * `usuarioId -> EstadoAgendaUsuario` e apaga a fatia no logout, na exclusão da conta e quando
@@ -90,13 +90,13 @@ function statusAgregado(
  * em um único estado, sem mover lógica de domínio para uma coleção agregadora.
  *
  * Regras implementadas:
- * - estado indexado por `usuarioId`, zerado em `trilhara:logout`, `trilhara:conta-excluida`
- *   e na troca de conta (D-46);
- * - cada fonte tem estado próprio (`carregando`/`sucesso`/`erro`) para que a falha de uma
- *   não substitua a lista da outra por vazio;
- * - `focus`/`visibilitychange` recarregam com *throttle* de 5 s;
- * - `AGENDA_INVALIDADA` (barramento único, D-21) invalida as fontes em todas as abas;
- * - virada de `hojeLocal` descarta os itens do dia anterior e recarrega uma única vez.
+ * estado indexado por `usuarioId`, zerado em `trilhara:logout`, `trilhara:conta-excluida`
+ * e na troca de conta;
+ * cada fonte tem estado próprio (`carregando`/`sucesso`/`erro`) para que a falha de uma
+ * não substitua a lista da outra por vazio;
+ * `focus`/`visibilitychange` recarregam com *throttle* de 5 s;
+ * `AGENDA_INVALIDADA` (barramento único, ) invalida as fontes em todas as abas;
+ * virada de `hojeLocal` descarta os itens do dia anterior e recarrega uma única vez.
  */
 class AgendaHojeManager {
   private estados = new Map<string, EstadoAgendaUsuario>();
@@ -233,9 +233,9 @@ class AgendaHojeManager {
   }
 
   /**
-   * Carga das duas fontes em paralelo. `recargaPorVirada` evita laço infinito na virada de
-   * dia: a segunda passagem apenas consolida o estado novo.
-   */
+ * Carga das duas fontes em paralelo. `recargaPorVirada` evita laço infinito na virada de
+ * dia: a segunda passagem apenas consolida o estado novo.
+ */
   private async executarCarga(
     usuarioId: string,
     recargaPorVirada: boolean
@@ -329,7 +329,7 @@ class AgendaHojeManager {
     }
   }
 
-  /** Descarta o estado de uma conta; a próxima assinatura recarrega do zero (D-46). */
+  /** Descarta o estado de uma conta; a próxima assinatura recarrega do zero. */
   private zerar(usuarioId?: string | null): void {
     const alvos = usuarioId
       ? [usuarioId]
@@ -385,9 +385,9 @@ export const agendaHojeService = new AgendaHojeManager();
  * Deriva as três seções da Visão Hoje (§9) a partir do estado bruto por conta.
  *
  * Ordens normativas:
- * 1. Atrasadas — `dataVencimento < hojeLocal`, agrupadas por série (D-23);
+ * 1. Atrasadas — `dataVencimento < hojeLocal`, agrupadas por série;
  * 2. Hoje — blocos pendentes do dia (`trilhaNome ASC, ordem ASC`) e tarefas do dia
- *    (`horario ASC NULLS LAST, prioridade DESC, ordem ASC`), em grupos separados;
+ * (`horario ASC NULLS LAST, prioridade DESC, ordem ASC`), em grupos separados;
  * 3. Sem data — sem `dataVencimento`, `prioridade DESC, ordem ASC`.
  */
 export function derivarAgenda(estado: EstadoAgendaUsuario | null): AgendaHojeDerivado | null {
@@ -468,9 +468,9 @@ export interface UseAgendaHojeResultado {
 /**
  * Consumo reativo da Visão Hoje.
  *
- * - visitante (sem `usuarioId`) não dispara requisição e recebe `dados: null` (D-46);
- * - a troca de conta descarta o estado anterior antes de assinar o novo usuário, de modo
- *   que nenhuma renderização intermediária exibe dados da conta anterior.
+ * visitante (sem `usuarioId`) não dispara requisição e recebe `dados: null`;
+ * a troca de conta descarta o estado anterior antes de assinar o novo usuário, de modo
+ * que nenhuma renderização intermediária exibe dados da conta anterior.
  */
 export function useAgendaHoje(): UseAgendaHojeResultado {
   const { usuario } = useAuth();
@@ -481,15 +481,15 @@ export function useAgendaHoje(): UseAgendaHojeResultado {
   );
 
   const usuarioIdRef = useRef<string | null>(usuarioId);
-  usuarioIdRef.current = usuarioId;
 
   useEffect(() => {
+    usuarioIdRef.current = usuarioId;
     if (!usuarioId) {
       setEstado(null);
       return;
     }
 
-    // D-46: o estado em cache só é aceito se pertencer à conta corrente.
+    // o estado em cache só é aceito se pertencer à conta corrente.
     setEstado(agendaHojeService.obterEstado(usuarioId));
 
     let ativo = true;

@@ -19,10 +19,10 @@ import br.com.trilhara.shared.erro.ProblemDetails;
 import jakarta.ws.rs.core.Response;
 
 /**
- * D-04: {@code E11000} ({@link ErrorCategory#DUPLICATE_KEY}) vira
+ * {@code E11000} ({@link ErrorCategory#DUPLICATE_KEY}) vira
  * {@code 409 DUPLICATE_RESOURCE}; qualquer outra falha de escrita vira 503.
  */
-@DisplayName("R1 - Mapeamento seguro de MongoWriteException (E11000)")
+@DisplayName("Mapeamento seguro de MongoWriteException (E11000)")
 class DuplicateKeyMapperTest {
 
     private static MongoWriteException erroDuplicado() {

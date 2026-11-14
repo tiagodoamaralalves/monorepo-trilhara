@@ -7,10 +7,10 @@ import { AuthStorage } from '../shared/auth/authStorage';
 type WindowComPush = Window & { PushManager?: unknown; Notification?: unknown };
 
 /**
- * R11 / SEC-12 / D-36e — o logout remove a inscrição push deste dispositivo, best-effort:
+ * o logout remove a inscrição push deste dispositivo, best-effort:
  * qualquer falha ou lentidão nunca bloqueia a saída.
  */
-describe('logout — desinscrição push do dispositivo (R11)', () => {
+describe('logout — desinscrição push do dispositivo', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     AuthStorage.__resetarParaTeste();

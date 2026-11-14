@@ -37,8 +37,8 @@
   --border-subtle: rgba(255, 255, 255, 0.04);
   --border: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.15);
-  /* R12 — limites de controles de formulário (SC 1.4.11, 3:1 sobre --control-bg).
-   * Distinto de --border-strong, que é divisor decorativo e não exige 3:1. */
+  /* limites de controles de formulário (SC 1.4.11, 3:1 sobre --control-bg).
+ * Distinto de --border-strong, que é divisor decorativo e não exige 3:1. */
   --border-control: #64748b;
   --border-focus: #38bdf8;
   --swatch-border: rgba(255, 255, 255, 0.22);
@@ -46,8 +46,8 @@
   /* Tipografia */
   --text: #f8fafc;
   --text-mid: #94a3b8;
-  /* R12 — contraste WCAG AA: #64748b dava 3.21:1 sobre --surface-3 (falha 4.5:1).
-   * #8494ab mede 6.38 (–bg) / 5.91 (s1) / 5.51 (s2) / 4.96 (s3). */
+  /* contraste WCAG AA: #64748b dava 3.21:1 sobre --surface-3 (falha 4.5:1).
+ * #8494ab mede 6.38 (–bg) / 5.91 (s1) / 5.51 (s2) / 4.96 (s3). */
   --text-soft: #8494ab;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Nunito', var(--font-sans);
@@ -62,9 +62,9 @@
   --primary-bg: rgba(14, 165, 233, 0.12);
   --primary-border-subtle: rgba(56, 189, 248, 0.35);
   --primary-contrast: #07131d;
-  /* R12 — texto sobre preenchimento sólido da marca. Era #ffffff (2.77:1 sobre
-   * --primary, falha em AA). Alinhado a --primary-contrast: 6.77:1 sobre --primary,
-   * 7.10:1 sobre o topo do gradiente roxo e 4.74:1 sobre --purple. */
+  /* texto sobre preenchimento sólido da marca. Era #ffffff (2.77:1 sobre
+ * primary, falha em AA). Alinhado a --primary-contrast: 6.77:1 sobre --primary,
+ * 7.10:1 sobre o topo do gradiente roxo e 4.74:1 sobre --purple. */
   --on-primary-solid: #07131d;
 
   /* Estados Ativos de Navegação */
@@ -87,9 +87,9 @@
 
   --red: #f43f5e;
   --red-hover: #e11d48;
-  /* R12 — --red (#f43f5e) dava 4.17:1 sobre --surface-3 (falha 4.5:1 como texto).
-   * --red-text-banner já existia para esse papel; agora todo texto de perigo usa
-   * o tom claro abaixo (5.68:1 em --surface-3), mantendo --red para bordas/fundos. */
+  /* red (#f43f5e) dava 4.17:1 sobre --surface-3 (falha 4.5:1 como texto).
+ * red-text-banner já existia para esse papel; agora todo texto de perigo usa
+ * o tom claro abaixo (5.68:1 em --surface-3), mantendo --red para bordas/fundos. */
   --red-text: #fb7185;
   --red-text-banner: #fecdd3;
   --red-bg: rgba(244, 63, 94, 0.14);
@@ -188,9 +188,9 @@
   color-scheme: light;
 
   /* Camadas de Superfície (Arquitetura Daylight Slate)
-   * Evita branco estourado no canvas principal (#F8FAFC) e reserva #FFFFFF
-   * exclusivamente para superfícies elevadas (cards, sidebar, modais, popovers).
-   */
+ * Evita branco estourado no canvas principal (#F8FAFC) e reserva #FFFFFF
+ * exclusivamente para superfícies elevadas (cards, sidebar, modais, popovers).
+ */
   --bg: #f8fafc;
   --bg-elevated: #f1f5f9;
   --surface-1: #ffffff;
@@ -222,25 +222,25 @@
   --border-subtle: #f1f5f9;
   --border: #e2e8f0;
   --border-strong: #cbd5e1;
-  /* R12 — limites de controles (SC 1.4.11): 3.21:1 sobre --control-bg (#f1f5f9). */
+  /* limites de controles (SC 1.4.11): 3.21:1 sobre --control-bg (#f1f5f9). */
   --border-control: #7c8a9c;
   --border-focus: #0284c7;
   --swatch-border: rgba(15, 23, 42, 0.16);
 
   /* Tipografia (Grafite / Ardósia Escura — Zero Preto Puro #000000)
-   * --text (#0F172A sobre #FFFFFF): 17.4:1 (WCAG AAA)
-   * --text-mid (#475569 sobre #FFFFFF): 7.5:1 (WCAG AAA)
-   * R12: --text-soft precisava vencer --surface-3 (#E2E8F0): #64748b dava 3.86:1;
-   * #556277 mede 6.18 (–surface-1) / 5.64 (s2) / 5.01 (s3).
-   */
+ * text (#0F172A sobre #FFFFFF): 17.4:1 (WCAG AAA)
+ * text-mid (#475569 sobre #FFFFFF): 7.5:1 (WCAG AAA)
+ * text-soft precisava vencer --surface-3 (#E2E8F0): #64748b dava 3.86:1;
+ * #556277 mede 6.18 (–surface-1) / 5.64 (s2) / 5.01 (s3).
+ */
   --text: #0f172a;
   --text-mid: #475569;
   --text-soft: #556277;
 
   /* Marca & Acento Primário Calibrado para Luz do Dia
-   * R12: #0284C7 dava 4.10:1 sobre #FFFFFF e 3.74:1 sobre --surface-2 — abaixo do
-   * 4.5:1 exigido para texto. #0369A1 mede 5.93 / 5.42 / 4.81 (s3) e mantém o tom.
-   */
+ * #0284C7 dava 4.10:1 sobre #FFFFFF e 3.74:1 sobre --surface-2 — abaixo do
+ * 4.5:1 exigido para texto. #0369A1 mede 5.93 / 5.42 / 4.81 (s3) e mantém o tom.
+ */
   --primary: #0369a1;
   --primary-hover: #075985;
   --primary-light: #075985;
@@ -258,9 +258,9 @@
   --nav-badge-active-bg: rgba(2, 132, 199, 0.14);
 
   /* Status Semânticos Calibrados (Fundos Pastel + Textos Escuros da Mesma Matiz — WCAG AA)
-   * R12: --green-text e --yellow precisavam vencer --surface-3 (#E2E8F0):
-   * #047857 dava 4.45:1 e #b45309 dava 4.07:1. Valores abaixo: 5.30:1 e 5.64:1.
-   */
+ * green-text e --yellow precisavam vencer --surface-3 (#E2E8F0):
+ * #047857 dava 4.45:1 e #b45309 dava 4.07:1. Valores abaixo: 5.30:1 e 5.64:1.
+ */
   --green: #047857;
   --green-hover: #065f46;
   --green-text: #036b4c;
@@ -357,7 +357,7 @@ body {
   font-variant-numeric: tabular-nums lining-nums;
 }
 
-/* ── ACESSIBILIDADE WCAG 2.2 AA (R12) ── */
+/* ── ACESSIBILIDADE WCAG 2.2 AA ── */
 
 /* 1. Tokens de alvo mínimo de toque/clique (SC 2.5.8).
  *

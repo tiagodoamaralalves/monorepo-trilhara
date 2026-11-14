@@ -18,7 +18,7 @@ import jakarta.ws.rs.NotFoundException;
  * <p>Requisitos §5.4: token de fencing UUID, expiração em 2 minutos e operação
  * concorrente respondendo {@code 409 SCHEDULE_GENERATION_IN_PROGRESS}. O lease é o
  * mesmo para criação/regeneração/ativação/exclusão de cronograma, para a conclusão
- * de blocos atrasados (D-17c) e para as exclusões de disciplina e de trilha, de modo
+ * de blocos atrasados e para as exclusões de disciplina e de trilha, de modo
  * que essas operações nunca se sobreponham.</p>
  *
  * <p>A aquisição distingue trilha inexistente ({@code 404}, sem revelar se pertence a
@@ -30,7 +30,7 @@ public class LeaseTrilhaService {
     /** Requisitos §5.4: lease expira em 2 minutos. */
     public static final long TTL_SEGUNDOS = 120L;
 
-    /** D-18a: o heartbeat renova o lease a cada 30 s. */
+    /** o heartbeat renova o lease a cada 30 s. */
     public static final long INTERVALO_RENOVACAO_SEGUNDOS = 30L;
 
     static final String MSG_CONFLITO_LEASE =
@@ -46,17 +46,17 @@ public class LeaseTrilhaService {
     }
 
     /**
-     * Adquire o lease ou falha com {@code 409 SCHEDULE_GENERATION_IN_PROGRESS}
-     * (ou {@code 404} quando a trilha não existe para o usuário).
-     */
+ * Adquire o lease ou falha com {@code 409 SCHEDULE_GENERATION_IN_PROGRESS}
+ * (ou {@code 404} quando a trilha não existe para o usuário).
+ */
     public String adquirirOuFalhar(ObjectId usuarioId, ObjectId trilhaId) {
         return adquirirOuFalhar(usuarioId, trilhaId, UUID.randomUUID().toString());
     }
 
     /**
-     * Adquire o lease com um token de fencing já conhecido pelo chamador, que precisa reutilizá-lo
-     * nas liberações posteriores (operações compostas de cronograma).
-     */
+ * Adquire o lease com um token de fencing já conhecido pelo chamador, que precisa reutilizá-lo
+ * nas liberações posteriores (operações compostas de cronograma).
+ */
     public String adquirirOuFalhar(ObjectId usuarioId, ObjectId trilhaId, String leaseToken) {
         Instant expiraEm = Instant.now().plusSeconds(TTL_SEGUNDOS);
 
@@ -74,10 +74,10 @@ public class LeaseTrilhaService {
     }
 
     /**
-     * Renova o lease por mais {@link #TTL_SEGUNDOS} mantendo o mesmo token.
-     *
-     * @return {@code false} quando o token deixou de ser o dono do lease
-     */
+ * Renova o lease por mais {@link #TTL_SEGUNDOS} mantendo o mesmo token.
+ *
+ * @return {@code false} quando o token deixou de ser o dono do lease
+ */
     public boolean renovar(ObjectId usuarioId, ObjectId trilhaId, String leaseToken) {
         return trilhaRepository.renovarLease(
                 usuarioId, trilhaId, leaseToken, Instant.now().plusSeconds(TTL_SEGUNDOS));
@@ -96,20 +96,20 @@ public class LeaseTrilhaService {
     }
 
     /**
-     * Executa a operação sob lease, liberando em {@code finally} em qualquer desfecho.
-     *
-     * <p>Não há transação multi-documento: uma falha no meio deixa os efeitos parciais
-     * descritos no Javadoc de quem chama. A liberação do lease é a única garantia de
-     * que a próxima operação concorrente poderá tentar novamente.</p>
-     */
+ * Executa a operação sob lease, liberando em {@code finally} em qualquer desfecho.
+ *
+ * <p>Não há transação multi-documento: uma falha no meio deixa os efeitos parciais
+ * descritos no Javadoc de quem chama. A liberação do lease é a única garantia de
+ * que a próxima operação concorrente poderá tentar novamente.</p>
+ */
     public void executarComLease(ObjectId usuarioId, ObjectId trilhaId, Runnable operacao) {
         executarComLease(usuarioId, trilhaId, (String _token) -> operacao.run());
     }
 
     /**
-     * Variante que entrega o token de fencing ao bloco, necessária para as etapas da
-     * publicação que filtram por token (troca do ponteiro da trilha).
-     */
+ * Variante que entrega o token de fencing ao bloco, necessária para as etapas da
+ * publicação que filtram por token (troca do ponteiro da trilha).
+ */
     public void executarComLease(ObjectId usuarioId, ObjectId trilhaId, Consumer<String> operacao) {
         String leaseToken = adquirirOuFalhar(usuarioId, trilhaId);
         try {

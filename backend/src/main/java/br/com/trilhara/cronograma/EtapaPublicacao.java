@@ -1,7 +1,7 @@
 package br.com.trilhara.cronograma;
 
 /**
- * Etapas numeradas da publicação versionada de um cronograma (D-18).
+ * Etapas numeradas da publicação versionada de um cronograma.
  *
  * <p>Não existe transação distribuída: entre cada etapa o leitor vê a geração anterior ou a nova
  * completa. {@link FaultInjector} derruba a publicação em uma etapa específica para provar que

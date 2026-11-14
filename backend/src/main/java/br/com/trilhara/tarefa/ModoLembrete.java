@@ -1,7 +1,7 @@
 package br.com.trilhara.tarefa;
 
 /**
- * Modelo explícito de lembrete de tarefa (D-26).
+ * Modelo explícito de lembrete de tarefa.
  *
  * <p>O valor ausente de minutos nunca significa "herdar": "sem alerta" é uma escolha
  * própria do usuário. Por isso a decisão é materializada em um campo dedicado, e

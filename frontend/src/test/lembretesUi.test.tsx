@@ -9,8 +9,8 @@ import { TaskModal } from '../modules/tarefas/components/TaskModal/TaskModal';
 import { ConfiguracaoLembreteModal } from '../modules/tarefas/components/ConfiguracaoLembreteModal/ConfiguracaoLembreteModal';
 
 /**
- * R11 — UI de lembretes: badges informativos no `TaskModal` e estados do
- * `ConfiguracaoLembreteModal` (D-36 / Anexo B).
+ * UI de lembretes: badges informativos no `TaskModal` e estados do
+ * `ConfiguracaoLembreteModal`.
  *
  * <p>A detecção de suporte/permissão e o SW têm suítes próprias (`pushService.test.ts`,
  * `sw.test.ts`); aqui testamos apenas o comportamento da interface.</p>

@@ -7,7 +7,7 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
 /**
- * {@code ResourceLimitExceededException} → {@code 409 RESOURCE_LIMIT_EXCEEDED} (D-04).
+ * {@code ResourceLimitExceededException} → {@code 409 RESOURCE_LIMIT_EXCEEDED}.
  */
 @Provider
 public class ResourceLimitExceededExceptionMapper implements ExceptionMapper<ResourceLimitExceededException> {

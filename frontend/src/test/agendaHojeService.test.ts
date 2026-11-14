@@ -45,7 +45,7 @@ function bloco(id: string, extras: Partial<BlocoHojeDTO> = {}): BlocoHojeDTO {
 
 const TAREFA_BASE = { titulo: 'tarefa', concluida: false };
 
-describe('agendaHojeService (R8 / D-23 / D-46)', () => {
+describe('agendaHojeService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     agendaHojeService.resetarParaTestes();
@@ -117,7 +117,7 @@ describe('agendaHojeService (R8 / D-23 / D-46)', () => {
     });
   });
 
-  describe('agruparAtrasadasPorSerie (D-23)', () => {
+  describe('agruparAtrasadasPorSerie', () => {
     it('agrupaSerieSobOcorrenciaMaisRecenteComAnterioresAscendentes', () => {
       const atrasadas: TarefaDTO[] = [
         { ...TAREFA_BASE, id: 's-3', serieId: 'serie', prioridade: 'MEDIA', dataVencimento: '2026-11-05' },
@@ -318,7 +318,7 @@ describe('agendaHojeService (R8 / D-23 / D-46)', () => {
     });
   });
 
-  describe('isolamento por conta (D-46)', () => {
+  describe('isolamento por conta', () => {
     it('trocaDeContaZeraEstadoSemItensDaContaAnterior', async () => {
       vi.mocked(request).mockImplementation(async (caminho: string) => {
         if (caminho === '/tarefas/hoje') {

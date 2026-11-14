@@ -68,7 +68,7 @@ public class CronogramaRepository {
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
 
-    /** Lista cronogramas em um estado de publicação em qualquer tenant (reconciliador, D-18b). */
+    /** Lista cronogramas em um estado de publicação em qualquer tenant (reconciliador, ). */
     public List<Cronograma> listarPorEstadoPublicacao(String estadoPublicacao) {
         List<Cronograma> resultado = new ArrayList<>();
         for (Document doc : collection.find(eq("estadoPublicacao", estadoPublicacao))) {

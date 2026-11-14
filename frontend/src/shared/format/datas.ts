@@ -1,5 +1,5 @@
 /**
- * Formatação de datas de calendário (D-42).
+ * Formatação de datas de calendário.
  *
  * <p>Datas de calendário chegam como `yyyy-MM-dd` e <strong>não</strong> são instantes:
  * construir `new Date('2026-03-01')` interpreta o valor como UTC e desloca o dia em fusos
@@ -75,7 +75,7 @@ export function diasAte(dataISO?: string | null, hoje: string = hojeISO()): numb
  * Rótulo relativo de vencimento usado em listas de tarefas.
  *
  * `Hoje`, `Amanhã`, `Ontem`, `Atrasada (dd/mm/aaaa)` ou a data curta. Nunca constrói
- * `Date` a partir da string, evitando deslocamento de fuso (D-42).
+ * `Date` a partir da string, evitando deslocamento de fuso.
  */
 export function descreverDataRelativa(
   dataISO: string,

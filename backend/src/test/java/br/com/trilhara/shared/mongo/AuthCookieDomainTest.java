@@ -23,7 +23,7 @@ import io.restassured.response.Response;
 import jakarta.inject.Inject;
 
 @QuarkusTest
-@DisplayName("FASE 1 - Emissão de Cookies (Produção vs Localhost) e SSO Handoff")
+@DisplayName("Emissão de Cookies (Produção vs Localhost) e SSO Handoff")
 class AuthCookieDomainTest {
 
     @Inject

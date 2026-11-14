@@ -75,7 +75,7 @@ interface PomodoroConfig {
 const DEFAULT_POMODORO_MINUTES = 25;
 
 /**
- * Estado completo do Pomodoro persistido sob a chave escopada por conta (D-21/§8).
+ * Estado completo do Pomodoro persistido sob a chave escopada por conta.
  *
  * Visitante usa `trilhara:anon:pomodoro_timer`; ao autenticar o estado anônimo **não** é
  * migrado. Configuração (duração, pausas, som, notificação) vive aqui — nunca em chave global.
@@ -189,7 +189,7 @@ function alertarAbaNavegador(mensagem: string): void {
 }
 
 /**
- * Chave de persistência do Pomodoro (D-21).
+ * Chave de persistência do Pomodoro.
  *
  * Autenticado: `trilhara:u:{id}:pomodoro_timer`. Visitante: `trilhara:anon:pomodoro_timer`
  * (namespace separado; ao autenticar, o estado anônimo **não** é migrado).
@@ -204,7 +204,7 @@ export interface FocoPomodoroPersistido {
   id: string;
 }
 
-/** Chave do foco atual, escopada por conta (D-46). Visitante não persiste foco. */
+/** Chave do foco atual, escopada por conta. Visitante não persiste foco. */
 export function getPomodoroFocoStorageKey(usuarioId?: string | null): string | null {
   return usuarioId ? `trilhara:u:${usuarioId}:pomodoro_foco` : null;
 }
@@ -243,6 +243,9 @@ function salvarFocoPomodoro(
   }
 }
 
+function obterAgoraMs(): number {
+  return Date.now();
+}
 
 export default function PomodoroApp() {
   const toast = useToast();
@@ -261,10 +264,10 @@ export default function PomodoroApp() {
   const usuarioIdRef = useRef<string | null>(usuarioId);
 
   /**
-   * "Foco atual" é apenas contexto visual (§8): persistimos somente `{ tipo, id }` em
-   * `trilhara:u:{id}:pomodoro_foco` e derivamos o título da agenda. Se o item sumir, o foco
-   * é ignorado e a chave removida.
-   */
+ * "Foco atual" é apenas contexto visual (§8): persistimos somente `{ tipo, id }` em
+ * `trilhara:u:{id}:pomodoro_foco` e derivamos o título da agenda. Se o item sumir, o foco
+ * é ignorado e a chave removida.
+ */
   const [focoPersistido, setFocoPersistido] = useState<FocoPomodoroPersistido | null>(() =>
     lerFocoPomodoro(usuarioId)
   );
@@ -279,7 +282,7 @@ export default function PomodoroApp() {
     salvarFocoPomodoro(usuarioId, null);
   };
 
-  // Troca de conta/exclusão: nada do foco anterior é reaproveitado (D-46).
+  // Troca de conta/exclusão: nada do foco anterior é reaproveitado.
   const usuarioAnteriorRef = useRef<string | null>(usuarioId);
   useEffect(() => {
     if (usuarioAnteriorRef.current === usuarioId) return;
@@ -329,13 +332,15 @@ export default function PomodoroApp() {
     if (!focoPersistido) return;
     if (focoItem) return;
     if (!agendaHoje) return;
+    if (focoPersistido.tipo === 'TAREFA' && agendaHoje.statusTarefas !== 'sucesso') return;
+    if (focoPersistido.tipo === 'BLOCO' && agendaHoje.statusBlocos !== 'sucesso') return;
     setFocoPersistido(null);
     salvarFocoPomodoro(usuarioId, null);
   }, [agendaHoje, focoItem, focoPersistido, usuarioId]);
 
   /**
-   * Concluir tarefa manual **não** pausa o timer nem abre o modal de sessão (§8).
-   */
+ * Concluir tarefa manual **não** pausa o timer nem abre o modal de sessão (§8).
+ */
   const handleConcluirTarefa = async (tarefaId: string, concluida = true) => {
     try {
       await TarefaService.alternarConclusao(tarefaId, concluida);
@@ -382,11 +387,7 @@ export default function PomodoroApp() {
   };
 
 
-  const estadoInicialRef = useRef<EstadoPomodoroPersistido | null>(null);
-  if (estadoInicialRef.current === null) {
-    estadoInicialRef.current = lerEstadoPomodoro(usuarioId);
-  }
-  const estadoInicial = estadoInicialRef.current;
+  const [estadoInicial] = useState<EstadoPomodoroPersistido>(() => lerEstadoPomodoro(usuarioId));
 
   const [pomodoroMode, setPomodoroMode] = useState<boolean>(
     () => estadoInicial.pomodoroMode ?? true
@@ -407,8 +408,8 @@ export default function PomodoroApp() {
   const pomodoroMinutes = Math.max(1, Math.round(pomodoroDurationSeconds / 60));
 
   // Segundos do relógio:
-  // - Modo Pomodoro: regressivo (inicia no pomodoroDurationSeconds)
-  // - Timer Manual: progressivo (inicia em 0)
+  // Modo Pomodoro: regressivo (inicia no pomodoroDurationSeconds)
+  // Timer Manual: progressivo (inicia em 0)
   const [timerSeconds, setTimerSeconds] = useState<number>(() => {
     if (typeof estadoInicial.timerSeconds === 'number') return estadoInicial.timerSeconds;
     return (estadoInicial.pomodoroMode ?? true) ? (estadoInicial.pomodoroDurationSeconds ?? DEFAULT_POMODORO_MINUTES * 60) : 0;
@@ -438,10 +439,15 @@ export default function PomodoroApp() {
   );
 
   const timerSecondsRef = useRef(timerSeconds);
-  timerSecondsRef.current = timerSeconds;
-
   const breakSecondsRef = useRef(breakSeconds);
-  breakSecondsRef.current = breakSeconds;
+
+  useEffect(() => {
+    timerSecondsRef.current = timerSeconds;
+  }, [timerSeconds]);
+
+  useEffect(() => {
+    breakSecondsRef.current = breakSeconds;
+  }, [breakSeconds]);
 
   const alarmeFocoDisparadoRef = useRef(false);
   const targetEndTimeRef = useRef<number | null>(null);
@@ -449,7 +455,7 @@ export default function PomodoroApp() {
   const stopwatchBaseSecondsRef = useRef<number>(0);
   const breakEndTimeRef = useRef<number | null>(null);
 
-  // Escuta o barramento único (D-21) e também o evento `storage` da própria chave escopada.
+  // Escuta o barramento único e também o evento `storage` da própria chave escopada.
   useEffect(() => {
     const aplicarEstado = (s: EstadoPomodoroPersistido) => {
       if (typeof s.pomodoroMode === 'boolean') setPomodoroMode(s.pomodoroMode);
@@ -498,7 +504,7 @@ export default function PomodoroApp() {
     return cancelar;
   }, []);
 
-  // Logout (D-21.d): pausa o timer e persiste sob a chave escopada da conta que saiu.
+  // Logout: pausa o timer e persiste sob a chave escopada da conta que saiu.
   useEffect(() => {
     const handleLogout = (evento: Event) => {
       const detalhe = (evento as CustomEvent<{ usuarioId?: string }>).detail;
@@ -545,7 +551,7 @@ export default function PomodoroApp() {
   ]);
 
   // Ao alternar usuarioId (login/troca de usuário) lê a chave da nova conta.
-  // O estado anônimo **não** é migrado (D-21b).
+  // O estado anônimo **não** é migrado.
   useEffect(() => {
     if (usuarioIdRef.current === usuarioId) return;
     usuarioIdRef.current = usuarioId;
@@ -593,7 +599,7 @@ export default function PomodoroApp() {
       registrarFalha('estado-local.gravar', e);
     }
 
-    // Barramento único (D-21): a mensagem já carrega `usuarioId` e é filtrada no recebimento.
+    // Barramento único: a mensagem já carrega `usuarioId` e é filtrada no recebimento.
     publicar('TIMER_POMODORO_ATUALIZADO', estadoSalvar);
   }, [
     pomodoroMode,
@@ -840,8 +846,9 @@ export default function PomodoroApp() {
       tempoAtual = totalPomodoroSeconds;
       setTimerSeconds(totalPomodoroSeconds);
     }
-    const novoTarget = pomodoroMode ? Date.now() + tempoAtual * 1000 : null;
-    const novoStopwatchStart = !pomodoroMode ? Date.now() : null;
+    const agora = obterAgoraMs();
+    const novoTarget = pomodoroMode ? agora + tempoAtual * 1000 : null;
+    const novoStopwatchStart = !pomodoroMode ? agora : null;
 
     if (pomodoroMode) {
       targetEndTimeRef.current = novoTarget;
@@ -889,7 +896,7 @@ export default function PomodoroApp() {
     setBreakType(tipo);
     const duracaoSegundos = pausas[tipo] * 60;
     setBreakSeconds(duracaoSegundos);
-    const breakEnd = Date.now() + duracaoSegundos * 1000;
+    const breakEnd = obterAgoraMs() + duracaoSegundos * 1000;
     breakEndTimeRef.current = breakEnd;
 
     salvarETransmitir({
@@ -1328,7 +1335,7 @@ export default function PomodoroApp() {
           </div>
         </div>
 
-        {/* Coluna 2: Espelho da Visão Hoje (FASE 7) */}
+        {/* Coluna 2: Espelho da Visão Hoje */}
         <aside className={styles.agendaColumn} aria-label="Agenda do dia">
           {!isAuthenticated ? (
             <div className={styles.visitorCard}>

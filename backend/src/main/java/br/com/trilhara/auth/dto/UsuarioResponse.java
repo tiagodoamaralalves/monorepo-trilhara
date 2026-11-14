@@ -9,7 +9,7 @@ import br.com.trilhara.auth.Role;
 import br.com.trilhara.auth.Usuario;
 
 /**
- * Representação pública e segura de um usuário (D-09/D-10).
+ * Representação pública e segura de um usuário.
  *
  * <p>Contrato único para login, cadastro, refresh, handoff, {@code GET /auth/me} e admin:
  * {@code { id, nome, email, emailVerificado, papeis, preferencias }} acrescido de

@@ -17,21 +17,21 @@ import org.junit.jupiter.api.Test;
 import br.com.trilhara.shared.RotasInventarioTest;
 
 /**
- * R13 — contrato da superfície HTTP: as rotas registradas são exatamente as do Anexo A.
+ * contrato da superfície HTTP: as rotas registradas são exatamente as .
  *
- * <p>Até a R12 a allowlist de rotas vivia apenas em Markdown (Anexo A do guia) e não havia
+ * <p> a allowlist de rotas vivia apenas em Markdown ( do guia) e não havia
  * teste comparando-a com o código: uma rota nova entrava em produção sem revisão de contrato e
  * uma rota removida continuava documentada. Este teste lê os {@code *Resource} (mesmo
  * inventariador de {@code RotasInventarioTest}) e compara com {@link RotasPrivadas}.</p>
  *
  * <p>As três asserções cobrem os dois sentidos, sem falso verde:</p>
  * <ol>
- *   <li>toda rota do código está declarada na allowlist (rota nova sem documentação falha);</li>
- *   <li>toda rota da allowlist existe no código (rota removida e ainda documentada falha);</li>
- *   <li>as rotas explicitamente removidas por D-11/D-23 não voltam.</li>
+ * <li>toda rota do código está declarada na allowlist (rota nova sem documentação falha);</li>
+ * <li>toda rota da allowlist existe no código (rota removida e ainda documentada falha);</li>
+ * <li>as rotas legadas removidas não voltam.</li>
  * </ol>
  */
-@DisplayName("R13 - Contrato de rotas públicas × allowlist do Anexo A")
+@DisplayName("Contrato de rotas públicas × allowlist")
 class RotasPublicasContratoTest {
 
     private static List<String> rotasDoCodigo() throws IOException {
@@ -74,7 +74,7 @@ class RotasPublicasContratoTest {
     }
 
     @Test
-    @DisplayName("rotas removidas por D-11/D-23 não voltam")
+    @DisplayName("rotas legadas removidas não voltam")
     void rotasRemovidasNaoVoltam() throws IOException {
         Set<String> doCodigo = new TreeSet<>(rotasDoCodigo());
 

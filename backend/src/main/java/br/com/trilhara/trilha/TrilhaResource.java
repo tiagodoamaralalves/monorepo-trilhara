@@ -28,10 +28,10 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 /**
- * Rotas de trilhas, disciplinas e progresso de tópicos (Anexo A da R3).
+ * Rotas de trilhas, disciplinas e progresso de tópicos .
  *
  * <p>Somente as rotas da allowlist: qualquer variante mantida "por compatibilidade" (PATCH de
- * progresso, PATCH de metadados, importação por path) foi removida por D-11.</p>
+ * progresso, PATCH de metadados, importação por path) foi removida por .</p>
  */
 @Path("/api/trilhas")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -80,7 +80,7 @@ public class TrilhaResource {
         return Response.noContent().build();
     }
 
-    /** Contagens exibidas antes da exclusão irreversível da trilha (D-38). */
+    /** Contagens exibidas antes da exclusão irreversível da trilha. */
     @GET
     @Path("{trilhaId}/impacto-exclusao")
     public TrilhaImpactoExclusaoDTO impactoExclusao(@PathParam("trilhaId") String trilhaId) {

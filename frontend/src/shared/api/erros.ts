@@ -1,5 +1,5 @@
 /**
- * Catálogo fechado de códigos de erro do Trilhara no cliente (D-04).
+ * Catálogo fechado de códigos de erro do Trilhara no cliente.
  *
  * <p>União literal idêntica ao enum `CodigoErro` do backend. Novos códigos só entram
  * aqui quando entrarem lá — o cliente decide por `status` + `code`.</p>
@@ -42,7 +42,7 @@ export function ehCodigoErro(valor: unknown): valor is CodigoErro {
   return typeof valor === 'string' && CONJUNTO_CODIGOS.has(valor);
 }
 
-/** Categorias de estado de interface (D-37). */
+/** Categorias de estado de interface. */
 export type CategoriaErro =
   | 'rede'
   | 'autenticacao'
@@ -58,7 +58,7 @@ interface ErroClassificavel {
 }
 
 /**
- * Classifica qualquer erro em uma categoria de UI (D-37).
+ * Classifica qualquer erro em uma categoria de UI.
  *
  * <p>Nunca lança: entradas desconhecidas caem em `servidor`. É a única fonte de decisão
  * de estado de erro usada pelos componentes.</p>

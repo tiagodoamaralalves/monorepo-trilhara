@@ -85,7 +85,7 @@ function mockPadrao(overrides: { cronogramas?: unknown[]; blocos?: unknown; atra
   });
 }
 
-describe('R5 — Planejamento de cronogramas (D-19/D-20/D-17f)', () => {
+describe('Planejamento de cronogramas', () => {
   beforeEach(() => {
     requestMock.mockReset();
     mockPadrao();

@@ -16,7 +16,7 @@ async function carregarAgenda() {
   return derivarAgenda(estado)!;
 }
 
-describe('tarefasHoje (D-23)', () => {
+describe('tarefasHoje', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     agendaHojeService.resetarParaTestes();
@@ -98,7 +98,7 @@ describe('tarefasHoje (D-23)', () => {
     expect(dados.tarefasHoje).toHaveLength(0);
   });
 
-  it('empty state de Hoje usa o texto do Anexo B', () => {
+  it('empty state de Hoje usa o texto', () => {
     render(
       <div>
         <h2>Tudo em dia por hoje</h2>

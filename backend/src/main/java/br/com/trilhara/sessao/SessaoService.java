@@ -90,7 +90,7 @@ public class SessaoService {
                 .orElseThrow(() -> new NotFoundException("Trilha não encontrada"));
 
         ObjectId disciplinaId = BsonIds.parse(request.disciplinaId(), "disciplinaId");
-        // Referência de corpo (D-06d): disciplina de outra trilha ou de outro usuário é
+        // Referência de corpo: disciplina de outra trilha ou de outro usuário é
         // 400 VALIDATION_ERROR em errors.disciplinaId, nunca 404 — o 404 revelaria existência.
         Disciplina disciplina = disciplinaRepository.buscarPorId(usuarioId, trilhaId, disciplinaId)
                 .orElseThrow(() -> badRequestCampo(
@@ -464,14 +464,14 @@ public class SessaoService {
     }
 
     /**
-     * Hash funcional do payload de criação (SHA-256 sobre JSON canônico com chaves ordenadas).
-     *
-     * <p>O JSON canônico é montado em {@link java.util.LinkedHashMap} com a ordem fixa
-     * {@code trilhaId, disciplinaId, dataSessao, duracaoSegundos, questoes, acertos}. A ordem de
-     * inserção não depende de reflexão, {@code ObjectMapper} ou configuração de ambiente, então o
-     * mesmo payload funcional sempre produz o mesmo hash — condição para reconhecer replay
-     * idempotente e distinguir de conflito de chave.</p>
-     */
+ * Hash funcional do payload de criação (SHA-256 sobre JSON canônico com chaves ordenadas).
+ *
+ * <p>O JSON canônico é montado em {@link java.util.LinkedHashMap} com a ordem fixa
+ * {@code trilhaId, disciplinaId, dataSessao, duracaoSegundos, questoes, acertos}. A ordem de
+ * inserção não depende de reflexão, {@code ObjectMapper} ou configuração de ambiente, então o
+ * mesmo payload funcional sempre produz o mesmo hash — condição para reconhecer replay
+ * idempotente e distinguir de conflito de chave.</p>
+ */
     public static String calcularRequestHash(
             ObjectId trilhaId,
             ObjectId disciplinaId,
@@ -505,10 +505,10 @@ public class SessaoService {
     }
 
     /**
-     * Serializa o payload em JSON canônico: chaves na ordem de inserção do
-     * {@link LinkedHashMap} e valores escalares sem espaço. {@code null} vira {@code null} JSON
-     * (não string vazia), para que payloads distintos nunca colidam.
-     */
+ * Serializa o payload em JSON canônico: chaves na ordem de inserção do
+ * {@link LinkedHashMap} e valores escalares sem espaço. {@code null} vira {@code null} JSON
+ * (não string vazia), para que payloads distintos nunca colidam.
+ */
     private static String jsonCanonico(Map<String, Object> payload) {
         StringBuilder sb = new StringBuilder(128).append('{');
         boolean primeiro = true;
@@ -589,13 +589,13 @@ public class SessaoService {
     }
 
     /**
-     * Erro de payload com extensão {@code errors} preenchida (D-04).
-     *
-     * <p>Toda referência inválida vinda no corpo ou todo campo funcional fora de faixa responde
-     * {@code 400 VALIDATION_ERROR} com a chave do campo, para que o cliente destaque o input. A
-     * referência cruzada ({@code disciplinaId} de outra trilha ou de outro usuário) segue a mesma
-     * regra: não é recurso do path, então não vira {@code 404}.</p>
-     */
+ * Erro de payload com extensão {@code errors} preenchida.
+ *
+ * <p>Toda referência inválida vinda no corpo ou todo campo funcional fora de faixa responde
+ * {@code 400 VALIDATION_ERROR} com a chave do campo, para que o cliente destaque o input. A
+ * referência cruzada ({@code disciplinaId} de outra trilha ou de outro usuário) segue a mesma
+ * regra: não é recurso do path, então não vira {@code 404}.</p>
+ */
     private WebApplicationException badRequestCampo(String campo, String mensagem, String detail, String instance) {
         ProblemDetails problem = ProblemDetailsFactory.criarCampo(
                 CodigoErro.VALIDATION_ERROR, detail, instance, campo, mensagem);
@@ -608,10 +608,10 @@ public class SessaoService {
     }
 
     /**
-     * Mapeia os códigos de validação de sessão para o catálogo fechado (D-04).
-     * Todo erro de payload é {@code VALIDATION_ERROR}; apenas a paginação e o
-     * descasamento de idempotência têm código próprio.
-     */
+ * Mapeia os códigos de validação de sessão para o catálogo fechado.
+ * Todo erro de payload é {@code VALIDATION_ERROR}; apenas a paginação e o
+ * descasamento de idempotência têm código próprio.
+ */
     private static CodigoErro codigoDoErro(String code) {
         if (code == null) {
             return CodigoErro.VALIDATION_ERROR;

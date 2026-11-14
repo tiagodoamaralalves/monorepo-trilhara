@@ -13,9 +13,9 @@ import java.util.Locale;
 import org.bson.Document;
 
 /**
- * Plano vencedor de uma consulta extraído de `explain("executionStats")` (R12, META-04).
+ * Plano vencedor de uma consulta extraído de `explain("executionStats")`.
  *
- * <p>Antes da R12 as assertivas procuravam `IXSCAN` e o nome do índice por
+ * <p>Antes as assertivas procuravam `IXSCAN` e o nome do índice por
  * <em>substring</em> no JSON inteiro do `explain` — o que passa mesmo quando o estágio
  * vencedor é `COLLSCAN` e o índice aparece apenas num plano rejeitado. Aqui o
  * `queryPlanner.winningPlan` é percorrido recursivamente para obter o estágio e o
@@ -62,9 +62,9 @@ final class PlanoVencedor {
     }
 
     /**
-     * Desce pelo plano. `IXSCAN` é o estágio que interessa; estágios de junção
-     * (`SORT`, `FETCH`, `LIMIT`, `PROJECTION_*`) são atravessados.
-     */
+ * Desce pelo plano. `IXSCAN` é o estágio que interessa; estágios de junção
+ * (`SORT`, `FETCH`, `LIMIT`, `PROJECTION_*`) são atravessados.
+ */
     private static void percorrer(Document plano, Estagio alvo) {
         if (plano == null) {
             return;

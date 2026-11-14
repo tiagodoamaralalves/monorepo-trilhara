@@ -1,9 +1,9 @@
 /**
- * Registro global de alterações não salvas (D-41).
+ * Registro global de alterações não salvas.
  *
  * Qualquer formulário com edição pendente registra-se aqui. Com ao menos um item sujo:
- * - `beforeunload` nativo é ativado (uma única vez);
- * - `AppSwitcher`, logout voluntário e troca de trilha pedem confirmação antes de navegar.
+ * `beforeunload` nativo é ativado (uma única vez);
+ * `AppSwitcher`, logout voluntário e troca de trilha pedem confirmação antes de navegar.
  *
  * O registro guarda também um `flush` opcional, executado **antes** de qualquer navegação
  * para gravar rascunhos (Notas) em `localStorage`.
@@ -78,9 +78,9 @@ export const unsavedChangesRegistry = {
   },
 
   /**
-   * Executa os `flush` registrados (rascunhos em `localStorage`) antes de navegar.
-   * Não altera o estado sujo: quem decide sair chama `limpar()` depois de confirmar.
-   */
+ * Executa os `flush` registrados (rascunhos em `localStorage`) antes de navegar.
+ * Não altera o estado sujo: quem decide sair chama `limpar` depois de confirmar.
+ */
   flushTodos(): void {
     itens.forEach((item) => {
       try {

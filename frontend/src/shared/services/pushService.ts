@@ -13,10 +13,10 @@ export interface AtualizarPreferenciasPushResult {
   lembretesRecalculados: number;
 }
 
-/** Escopo do Service Worker: a raiz da origem do app Tarefas (D-36d). */
+/** Escopo do Service Worker: a raiz da origem do app Tarefas. */
 const SW_URL = '/sw.js';
 const SW_SCOPE = '/';
-/** Timeout do DELETE de inscrição no logout: o logout nunca espera mais que isso (D-36e). */
+/** Timeout do DELETE de inscrição no logout: o logout nunca espera mais que isso. */
 const TIMEOUT_DESINSCRICAO_MS = 2000;
 
 export function isPushSupported(): boolean {
@@ -80,11 +80,11 @@ export const pushService = {
   },
 
   /**
-   * Registra (ou reutiliza) o Service Worker **na raiz da origem** (D-36d).
-   *
-   * <p>Somente o app Tarefas chama este método — os demais módulos nunca registram SW, de modo
-   * que o escopo `/` pertence a uma única origem de aplicação.</p>
-   */
+ * Registra (ou reutiliza) o Service Worker **na raiz da origem**.
+ *
+ * <p>Somente o app Tarefas chama este método — os demais módulos nunca registram SW, de modo
+ * que o escopo `/` pertence a uma única origem de aplicação.</p>
+ */
   async registrarServiceWorker(): Promise<ServiceWorkerRegistration> {
     const existente = await navigator.serviceWorker.getRegistration(SW_SCOPE);
     if (existente) {
@@ -105,7 +105,7 @@ export const pushService = {
     });
   },
 
-  /** Remove a inscrição do dispositivo no backend (body `{ endpoint }`, D-36e). */
+  /** Remove a inscrição do dispositivo no backend (body `{ endpoint }`, ). */
   async removerInscricao(endpoint: string): Promise<void> {
     await request('/push/subscriptions', {
       method: 'DELETE',
@@ -114,9 +114,9 @@ export const pushService = {
   },
 
   /**
-   * Remove a inscrição deste dispositivo, best-effort: qualquer falha ou demora acima de 2 s é
-   * ignorada, porque o logout nunca pode bloquear (D-36e / SEC-12).
-   */
+ * Remove a inscrição deste dispositivo, best-effort: qualquer falha ou demora acima de 2 s é
+ * ignorada, porque o logout nunca pode bloquear.
+ */
   async removerInscricaoDoDispositivo(): Promise<boolean> {
     if (!isPushSupported()) {
       return false;
@@ -140,9 +140,9 @@ export const pushService = {
   },
 
   /**
-   * Ativa as notificações neste dispositivo. O pedido de permissão acontece **apenas** aqui,
-   * sempre em reação a um clique explícito do usuário (D-36 / Anexo B).
-   */
+ * Ativa as notificações neste dispositivo. O pedido de permissão acontece **apenas** aqui,
+ * sempre em reação a um clique explícito do usuário.
+ */
   async ativarNotificacoes(publicKey?: string): Promise<{ sucesso: boolean; mensagem?: string }> {
     if (!isPushSupported()) {
       return { sucesso: false, mensagem: 'Este navegador não suporta notificações. Suas tarefas funcionam normalmente.' };

@@ -75,7 +75,7 @@ export const TrilhaModal: React.FC<TrilhaModalProps> = ({
     setImpacto(null);
   }, [trilha, isOpen]);
 
-  // D-38: exclusão de trilha exige o impacto em números e o nome exato.
+  // exclusão de trilha exige o impacto em números e o nome exato.
   useEffect(() => {
     if (!confirmarExclusao || !trilha) return;
     let ativo = true;
@@ -143,7 +143,7 @@ export const TrilhaModal: React.FC<TrilhaModalProps> = ({
     }
   };
 
-  // D-38: recurso grande confirma digitando o nome exato da trilha (padrão GitHub).
+  // recurso grande confirma digitando o nome exato da trilha (padrão GitHub).
   const confirmacaoValida = Boolean(trilha)
     && textoConfirmacao.trim() === (trilha?.nome ?? '').trim();
 

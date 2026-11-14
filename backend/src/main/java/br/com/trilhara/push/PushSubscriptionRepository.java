@@ -35,14 +35,14 @@ public class PushSubscriptionRepository {
     }
 
     /**
-     * Upsert por {@code endpoint} (chave única {@code uk_push_subscriptions_endpoint}).
-     *
-     * <p>Um {@code endpoint} já existente é <strong>reatribuído</strong> ao usuário informado
-     * (D-36e): o dispositivo físico mudou de conta e não pode continuar recebendo notificações
-     * da conta anterior.</p>
-     *
-     * @return o {@code _id} efetivamente persistido (o mesmo documento em reupsert)
-     */
+ * Upsert por {@code endpoint} (chave única {@code uk_push_subscriptions_endpoint}).
+ *
+ * <p>Um {@code endpoint} já existente é <strong>reatribuído</strong> ao usuário informado
+ *: o dispositivo físico mudou de conta e não pode continuar recebendo notificações
+ * da conta anterior.</p>
+ *
+ * @return o {@code _id} efetivamente persistido (o mesmo documento em reupsert)
+ */
     public String salvarOuAtualizar(PushSubscription sub) {
         Date agora = Date.from(Instant.now());
 
@@ -72,10 +72,10 @@ public class PushSubscriptionRepository {
     }
 
     /**
-     * Remove a inscrição <strong>morta</strong> informada pelo provedor ({@code 404}/{@code 410},
-     * §11). Operação de sistema: o {@code endpoint} é único globalmente e a inscrição não pode
-     * continuar na coleção, mesmo que já tenha sido reatribuída a outro usuário no intervalo.
-     */
+ * Remove a inscrição <strong>morta</strong> informada pelo provedor ({@code 404}/{@code 410},
+ * §11). Operação de sistema: o {@code endpoint} é único globalmente e a inscrição não pode
+ * continuar na coleção, mesmo que já tenha sido reatribuída a outro usuário no intervalo.
+ */
     public boolean removerEndpointInvalido(String endpoint) {
         if (endpoint == null || endpoint.isBlank()) {
             return false;

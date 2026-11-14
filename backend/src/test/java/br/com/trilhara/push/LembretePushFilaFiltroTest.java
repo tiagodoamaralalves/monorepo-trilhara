@@ -11,7 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * R11 — semântica do filtro de fila (D-36b).
+ * semântica do filtro de fila.
  *
  * <p>O filtro é a única peça que garante "primeira tentativa imediata" e "backoff limitado à
  * janela". Estes testes verificam o BSON gerado (sem MongoDB), provando a aritmética que não

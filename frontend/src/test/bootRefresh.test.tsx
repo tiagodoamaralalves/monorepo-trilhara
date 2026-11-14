@@ -27,7 +27,7 @@ const SondaSessao: React.FC = () => {
   );
 };
 
-describe('boot da sessão (R2/D-09) — refresh single-flight e /auth/me', () => {
+describe('boot da sessão — refresh single-flight e /auth/me', () => {
   const fetchOriginal = globalThis.fetch;
 
   beforeEach(() => {

@@ -34,7 +34,7 @@ import jakarta.inject.Inject;
 @ApplicationScoped
 public class SecaoRepository {
 
-    /** Teto normativo de seções por caderno (D-29: 500 seções/caderno). */
+    /** Teto normativo de seções por caderno (500 seções/caderno). */
     public static final int LIMITE_LISTAGEM = 500;
 
     private final MongoCollection<Document> collection;
@@ -81,11 +81,11 @@ public class SecaoRepository {
     }
 
     /**
-     * Seções ativas do caderno, com teto normativo de 500 (D-29).
-     *
-     * <p>A ordenação usa {@code ordem} e {@code _id} como desempate estável, para que duas
-     * leituras concorrentes não troquem a posição de seções com a mesma ordem.</p>
-     */
+ * Seções ativas do caderno, com teto normativo de 500.
+ *
+ * <p>A ordenação usa {@code ordem} e {@code _id} como desempate estável, para que duas
+ * leituras concorrentes não troquem a posição de seções com a mesma ordem.</p>
+ */
     public List<Secao> listarPorCaderno(ObjectId usuarioId, ObjectId cadernoId, int limite) {
         List<Secao> lista = new ArrayList<>();
         collection.find(and(
@@ -224,7 +224,7 @@ public class SecaoRepository {
         return lista;
     }
 
-    /** Seções ativas do caderno — usado no teto de 500 seções (D-29). */
+    /** Seções ativas do caderno — usado no teto de 500 seções. */
     public long contarAtivas(ObjectId usuarioId, ObjectId cadernoId) {
         return collection.countDocuments(and(
                 eq("usuarioId", usuarioId),
@@ -233,7 +233,7 @@ public class SecaoRepository {
         ));
     }
 
-    /** Contagem de seções ativas por caderno em uma agregação — evita N+1 (D-29). */
+    /** Contagem de seções ativas por caderno em uma agregação — evita N+1. */
     public Map<ObjectId, Long> contarPorCadernos(ObjectId usuarioId, List<ObjectId> cadernoIds) {
         Map<ObjectId, Long> contagens = new HashMap<>();
         if (cadernoIds == null || cadernoIds.isEmpty()) {
@@ -249,7 +249,7 @@ public class SecaoRepository {
         return contagens;
     }
 
-    /** Títulos de seções ativas do caderno — desempate de "Restauradas (2)", "(3)"… (D-34). */
+    /** Títulos de seções ativas do caderno — desempate de "Restauradas (2)", "(3)"…. */
     public List<String> titulosAtivosPorCaderno(ObjectId usuarioId, ObjectId cadernoId) {
         List<String> titulos = new ArrayList<>();
         collection.find(and(

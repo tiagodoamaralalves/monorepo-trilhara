@@ -7,7 +7,7 @@ import { NotaService } from '../../services/notaService';
 import { SnippetDestacado } from './SnippetDestacado';
 import styles from './BuscaModal.module.css';
 
-/** Debounce da busca (D-30). */
+/** Debounce da busca. */
 export const DEBOUNCE_BUSCA_MS = 300;
 
 /** Mínimo de caracteres alfanuméricos para disparar a busca, validado no cliente. */
@@ -27,7 +27,7 @@ function contarAlfanumericos(texto: string): number {
 }
 
 /**
- * Busca global de páginas (D-30).
+ * Busca global de páginas.
  *
  * O backend devolve snippet em texto puro + offsets; a renderização é sempre por nós de texto
  * React com `<mark>`. O mínimo de caracteres é validado **no cliente** (mensagem inline, sem

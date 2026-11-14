@@ -3,7 +3,7 @@ import { formatarDuracao, formatarMinutos, formatarRelogio } from '../shared/for
 import { formatarDataCurta, formatarDataLonga, formatarDataCompacta, hojeISO, diasAte } from '../shared/format/datas';
 import { formatarPercentual } from '../shared/format/numeros';
 
-describe('R1 — formatarDuracao (D-42)', () => {
+describe('formatarDuracao', () => {
   it('45 segundos vira "45 s"', () => {
     expect(formatarDuracao(45)).toBe('45 s');
   });
@@ -34,7 +34,7 @@ describe('R1 — formatarDuracao (D-42)', () => {
   });
 });
 
-describe('R1 — datas de calendário sem deslocamento de fuso (D-42)', () => {
+describe('datas de calendário sem deslocamento de fuso', () => {
   it('2026-03-01 continua 01/03/2026 (não vira 28/02)', () => {
     expect(formatarDataCurta('2026-03-01')).toBe('01/03/2026');
     expect(formatarDataLonga('2026-03-01')).toBe('1 de março de 2026');
@@ -56,7 +56,7 @@ describe('R1 — datas de calendário sem deslocamento de fuso (D-42)', () => {
   });
 });
 
-describe('R1 — percentuais', () => {
+describe('percentuais', () => {
   it('usa 0 casas decimais', () => {
     expect(formatarPercentual(72.5)).toBe('73%');
     expect(formatarPercentual(0)).toBe('0%');

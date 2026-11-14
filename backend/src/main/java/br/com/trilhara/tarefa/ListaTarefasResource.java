@@ -67,7 +67,7 @@ public class ListaTarefasResource {
         return service.excluirLista(listaId, authContext.usuarioId());
     }
 
-    /** D-33: contagens exibidas no {@code ConfirmDialog} antes de excluir a lista. */
+    /** contagens exibidas no {@code ConfirmDialog} antes de excluir a lista. */
     @GET
     @Path("{listaId}/impacto-exclusao")
     public ListaImpactoExclusaoResponse impactoExclusao(@PathParam("listaId") String listaId) {

@@ -17,7 +17,7 @@ function GatilhoToast() {
 
 const acoes = { desfazer: vi.fn() };
 
-describe('R1 — Toast (D-37)', () => {
+describe('Toast', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     acoes.desfazer.mockReset();
@@ -111,7 +111,7 @@ function HarnessConfirm() {
   );
 }
 
-describe('R1 — ConfirmDialog (D-37/D-38)', () => {
+describe('ConfirmDialog', () => {
   it('foca o botão seguro (Cancelar) ao abrir', async () => {
     render(
       <ConfirmProvider>

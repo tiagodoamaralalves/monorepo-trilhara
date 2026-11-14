@@ -45,7 +45,7 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
- * Integração do domínio Notas (R9: D-29 a D-34).
+ * Integração do domínio Notas ( a ).
  *
  * <p>Cobre os contratos congelados na revisão: guarda de reimportação, sincronização sem tocar
  * páginas existentes, busca com snippet texto puro + destaques, endpoint canônico de página,
@@ -188,7 +188,7 @@ class NotaResourceTest {
     // ── 1. autenticação e ciclo de vida ─────────────────────────────────────
 
     @Test
-    @DisplayName("R9.1 Todas as rotas privadas exigem autenticação (401)")
+    @DisplayName("Todas as rotas privadas exigem autenticação (401)")
     void deveExigirAutenticacaoEmTodasAsRotas() {
         given().when().get(CADERNOS).then().statusCode(401);
         given()
@@ -204,7 +204,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R9.2 Ciclo de vida: caderno, seções, página e caderno com zero seções ativas")
+    @DisplayName("Ciclo de vida: caderno, seções, página e caderno com zero seções ativas")
     void deveGerenciarCicloCompletoEPermitirCadernoComZeroSecoes() {
         String cadernoId = criarCaderno(tokenUsuarioA, "Caderno de Constitucional");
 
@@ -257,7 +257,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R9.3 Listagem de páginas é paginada e nunca projeta conteudoMarkdown")
+    @DisplayName("Listagem de páginas é paginada e nunca projeta conteudoMarkdown")
     void listagemNaoContemConteudoMarkdown() {
         String cadernoId = criarCaderno(tokenUsuarioA, "Caderno Metadados");
         String secaoId = primeiraSecao(tokenUsuarioA, cadernoId);
@@ -281,7 +281,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R9.4 Paginação fora do intervalo responde 400 INVALID_PAGINATION")
+    @DisplayName("Paginação fora do intervalo responde 400 INVALID_PAGINATION")
     void paginacaoInvalidaRetorna400() {
         String cadernoId = criarCaderno(tokenUsuarioA, "Caderno Paginação");
         String secaoId = primeiraSecao(tokenUsuarioA, cadernoId);
@@ -304,7 +304,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R9.5 Endpoint canônico de página existe e o aninhado foi removido (D-32)")
+    @DisplayName("Endpoint canônico de página existe e o aninhado foi removido")
     void endpointAninhadoDeNotaNaoExiste() {
         String cadernoId = criarCaderno(tokenUsuarioA, "Caderno Canônico");
         String secaoId = primeiraSecao(tokenUsuarioA, cadernoId);
@@ -326,7 +326,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R9.6 POST /api/notas não existe: criação é apenas pela rota aninhada (DC-12)")
+    @DisplayName("POST /api/notas não existe: criação é apenas pela rota aninhada")
     void rotaDuplicadaDeCriacaoNaoExiste() {
         String cadernoId = criarCaderno(tokenUsuarioA, "Caderno Sem Duplicata");
         String secaoId = primeiraSecao(tokenUsuarioA, cadernoId);
@@ -341,7 +341,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R9.7 Página em seção de outro caderno responde 404 (hierarquia do path)")
+    @DisplayName("Página em seção de outro caderno responde 404 (hierarquia do path)")
     void notaComSecaoDeOutroCadernoRetorna404() {
         String cadernoA = criarCaderno(tokenUsuarioA, "Caderno A");
         String cadernoB = criarCaderno(tokenUsuarioA, "Caderno B");
@@ -363,7 +363,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R9.8 Markdown acima de 512 KB responde 400 VALIDATION_ERROR em conteudoMarkdown")
+    @DisplayName("Markdown acima de 512 KB responde 400 VALIDATION_ERROR em conteudoMarkdown")
     void markdownAcimaDe512KBRetorna400ValidationError() {
         String cadernoId = criarCaderno(tokenUsuarioA, "Caderno Limite");
         String secaoId = primeiraSecao(tokenUsuarioA, cadernoId);
@@ -381,7 +381,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R9.9 Markdown com caractere de controle responde 400 VALIDATION_ERROR (D-30d)")
+    @DisplayName("Markdown com caractere de controle responde 400 VALIDATION_ERROR")
     void markdownComCaractereDeControleRetorna400() {
         String cadernoId = criarCaderno(tokenUsuarioA, "Caderno Controle");
         String secaoId = primeiraSecao(tokenUsuarioA, cadernoId);
@@ -401,7 +401,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R9.10 Busca devolve snippet texto puro com destaques, acento-insensível, sem lixeira nem outro usuário")
+    @DisplayName("Busca devolve snippet texto puro com destaques, acento-insensível, sem lixeira nem outro usuário")
     void buscaRetornaSnippetTextoPuroComDestaques() {
         String cadernoA = criarCaderno(tokenUsuarioA, "Caderno de Constitucional A");
         String secaoA = primeiraSecao(tokenUsuarioA, cadernoA);
@@ -432,7 +432,7 @@ class NotaResourceTest {
                 .body("itens[0].snippet", not(containsString("<mark>")))
                 .body("itens[0].snippet.length()", lessThanOrEqualTo(180));
 
-        // Busca com acento encontra o mesmo documento (D-30).
+        // Busca com acento encontra o mesmo documento.
         given()
                 .header("Authorization", "Bearer " + tokenUsuarioA)
                 .queryParam("q", "Constituição")
@@ -443,7 +443,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R9.11 Busca ignora itens na lixeira e consulta curta responde 400")
+    @DisplayName("Busca ignora itens na lixeira e consulta curta responde 400")
     void buscaNaoRetornaLixeiraNemOutroUsuario() {
         String cadernoId = criarCaderno(tokenUsuarioA, "Caderno Busca Lixeira");
         String secaoId = primeiraSecao(tokenUsuarioA, cadernoId);
@@ -479,10 +479,10 @@ class NotaResourceTest {
                 .body("code", equalTo("INVALID_SEARCH_QUERY"));
     }
 
-    // ── 2. importação, reimportação e sincronização (D-29) ───────────────────
+    // ── 2. importação, reimportação e sincronização ───────────────────
 
     @Test
-    @DisplayName("R9.12 Reimportar sem reimportar=true com vínculo ativo responde 409 TRAIL_ALREADY_IMPORTED")
+    @DisplayName("Reimportar sem reimportar=true com vínculo ativo responde 409 TRAIL_ALREADY_IMPORTED")
     void importarSemReimportarComVinculoExistenteRetorna409() {
         ObjectId trilhaId = new ObjectId();
         semearTrilha(trilhaId, usuarioAId, "Trilha Auditor",
@@ -505,7 +505,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R9.13 Reimportar desvincula o antigo e cria novo com o nome da trilha (sem sufixo)")
+    @DisplayName("Reimportar desvincula o antigo e cria novo com o nome da trilha (sem sufixo)")
     void reimportarDesvinculaAntigoECriaNovoComNomeDaTrilha() {
         ObjectId trilhaId = new ObjectId();
         semearTrilha(trilhaId, usuarioAId, "Trilha Auditor Fiscal",
@@ -557,7 +557,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R9.15 Importar trilha de outro usuário responde 404")
+    @DisplayName("Importar trilha de outro usuário responde 404")
     void importarTrilhaDeOutroUsuarioRetorna404() {
         ObjectId trilhaDoB = new ObjectId();
         semearTrilha(trilhaDoB, usuarioBId, "Trilha Privada do B",
@@ -571,7 +571,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R9.16 Sincronizar caderno sem origem responde 400 VALIDATION_ERROR em errors.cadernoId")
+    @DisplayName("Sincronizar caderno sem origem responde 400 VALIDATION_ERROR em errors.cadernoId")
     void sincronizarCadernoSemOrigemRetorna400ComCampo() {
         String cadernoId = criarCaderno(tokenUsuarioA, "Caderno sem trilha");
 
@@ -586,7 +586,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R9.14 Sincronizar não cria nem altera páginas de seções existentes")
+    @DisplayName("Sincronizar não cria nem altera páginas de seções existentes")
     void sincronizarNaoCriaNotasEmSecoesExistentes() {
         ObjectId trilhaId = new ObjectId();
         Disciplina portugues = disciplina(trilhaId, usuarioAId, "Português", 0, List.of(topico("Crase", 0)));
@@ -647,7 +647,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R9.17 Sincronizar cria seção com páginas apenas para disciplina nova")
+    @DisplayName("Sincronizar cria seção com páginas apenas para disciplina nova")
     void sincronizarCriaSecaoParaDisciplinaNovaComPaginas() {
         ObjectId trilhaId = new ObjectId();
         Disciplina portugues = disciplina(trilhaId, usuarioAId, "Português", 0, List.of(topico("Crase", 0)));
@@ -681,10 +681,10 @@ class NotaResourceTest {
                 .body("titulo", hasItem("Direito Tributário"));
     }
 
-    // ── 3. impacto de exclusão, lixeira e Restauradas (D-33/D-34) ────────────
+    // ── 3. impacto de exclusão, lixeira e Restauradas ────────────
 
     @Test
-    @DisplayName("R9.18 impacto-exclusao conta somente itens ativos")
+    @DisplayName("impacto-exclusao conta somente itens ativos")
     void impactoExclusaoContaSoAtivos() {
         String cadernoId = criarCaderno(tokenUsuarioA, "Caderno Impacto");
         String secaoGeral = primeiraSecao(tokenUsuarioA, cadernoId);
@@ -737,7 +737,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R9.19 Lixeira é paginada com breadcrumb e restaura ancestrais do mesmo lote")
+    @DisplayName("Lixeira é paginada com breadcrumb e restaura ancestrais do mesmo lote")
     void lixeiraPaginadaRestauraAncestraisDoMesmoLote() {
         String cadernoId = criarCaderno(tokenUsuarioA, "Caderno Lixeira");
         String secaoId = primeiraSecao(tokenUsuarioA, cadernoId);
@@ -796,7 +796,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R9.20 Restaurar fora do prazo responde 404 TRASH_ITEM_EXPIRED")
+    @DisplayName("Restaurar fora do prazo responde 404 TRASH_ITEM_EXPIRED")
     void restaurarForaDoPrazoRetorna404TrashItemExpired() {
         String cadernoId = criarCaderno(tokenUsuarioA, "Caderno Expirado");
         String secaoId = primeiraSecao(tokenUsuarioA, cadernoId);
@@ -836,7 +836,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R9.21 Caderno purgado: página vai para a seção Restauradas do caderno Restauradas")
+    @DisplayName("Caderno purgado: página vai para a seção Restauradas do caderno Restauradas")
     void restaurarComCadernoPurgadoCriaCadernoESecaoRestauradas() {
         String cadernoId = criarCaderno(tokenUsuarioA, "Caderno que será purgado");
         String secaoId = primeiraSecao(tokenUsuarioA, cadernoId);
@@ -884,7 +884,7 @@ class NotaResourceTest {
     // ── 4. limites, filtro e lixeira administrativa ──────────────────────────
 
     @Test
-    @DisplayName("R9.22 Limite de 500 cadernos por usuário responde 409 RESOURCE_LIMIT_EXCEEDED")
+    @DisplayName("Limite de 500 cadernos por usuário responde 409 RESOURCE_LIMIT_EXCEEDED")
     void limiteDe500CadernosRetorna409() {
         int maximo = NotaServiceLimiteCadernos();
         for (int i = 0; i < maximo; i++) {
@@ -911,7 +911,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R9.23 Filtro origemTrilhaId devolve apenas o caderno vinculado da trilha")
+    @DisplayName("Filtro origemTrilhaId devolve apenas o caderno vinculado da trilha")
     void filtroOrigemTrilhaId() {
         ObjectId trilhaId = new ObjectId();
         semearTrilha(trilhaId, usuarioAId, "Trilha Filtro",
@@ -944,7 +944,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R9.24 Esvaziar lixeira remove tudo e a purga agendada roda sem erro")
+    @DisplayName("Esvaziar lixeira remove tudo e a purga agendada roda sem erro")
     void esvaziarLixeiraEPurgar() {
         String cadernoId = criarCaderno(tokenUsuarioA, "Caderno Esvaziar");
         String secaoId = primeiraSecao(tokenUsuarioA, cadernoId);
@@ -972,7 +972,7 @@ class NotaResourceTest {
     }
 
     @Test
-    @DisplayName("R12.1 Lote de exclusão respeita itens já excluídos isoladamente e descendentes já purgados")
+    @DisplayName("Lote de exclusão respeita itens já excluídos isoladamente e descendentes já purgados")
     void loteRespeitaItensJaExcluidosEDescendentesPurgados() {
         String cadernoId = criarCaderno(tokenUsuarioA, "Caderno Lote Misto");
         String secaoId = primeiraSecao(tokenUsuarioA, cadernoId);

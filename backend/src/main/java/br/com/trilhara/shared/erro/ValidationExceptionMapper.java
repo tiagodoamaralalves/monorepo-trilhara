@@ -7,7 +7,7 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
 /**
- * {@code ValidationException} → {@code 400 VALIDATION_ERROR} com {@code errors[campo]} (D-04).
+ * {@code ValidationException} → {@code 400 VALIDATION_ERROR} com {@code errors[campo]}.
  */
 @Provider
 public class ValidationExceptionMapper implements ExceptionMapper<ValidationException> {

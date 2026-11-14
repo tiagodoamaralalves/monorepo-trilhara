@@ -79,11 +79,11 @@ public class UserRepository {
     }
 
     /**
-     * {@code true} quando a conta possui o checkpoint {@code exclusaoConta} (D-35).
-     *
-     * <p>Leitura pontual e projetada: o record {@link Usuario} não carrega o subdocumento para
-     * não alterar o contrato de domínio nem os ~20 call sites de {@code new Usuario(...)}.</p>
-     */
+ * {@code true} quando a conta possui o checkpoint {@code exclusaoConta}.
+ *
+ * <p>Leitura pontual e projetada: o record {@link Usuario} não carrega o subdocumento para
+ * não alterar o contrato de domínio nem os ~20 call sites de {@code new Usuario(...)}.</p>
+ */
     public boolean estaEmExclusao(String id) {
         if (id == null || !ObjectId.isValid(id)) {
             return false;
@@ -179,7 +179,7 @@ public class UserRepository {
         );
     }
 
-    /** Tema persistido em {@code usuarios.preferencias.tema} (D-10). */
+    /** Tema persistido em {@code usuarios.preferencias.tema}. */
     public java.util.Optional<String> obterTema(ObjectId usuarioId) {
         Document doc = usuarios.find(eq("_id", usuarioId)).first();
         if (doc == null) {

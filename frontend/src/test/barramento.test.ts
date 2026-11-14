@@ -11,7 +11,7 @@ import {
   __resetarParaTeste
 } from '../shared/sync/barramento';
 
-describe('barramento (R6/D-21) — canal único e isolamento por conta', () => {
+describe('barramento — canal único e isolamento por conta', () => {
   beforeEach(() => {
     localStorage.clear();
     __resetarParaTeste();

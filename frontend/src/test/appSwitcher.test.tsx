@@ -7,7 +7,7 @@ import { unsavedChangesRegistry } from '../shared/state/unsavedChangesRegistry';
 import { useUnsavedChanges } from '../shared/hooks/useUnsavedChanges';
 import { ConfirmProvider } from '../shared/design-system/ConfirmDialog/ConfirmDialog';
 
-describe('AppSwitcher (R2/D-12) — APG Menu Button', () => {
+describe('AppSwitcher — APG Menu Button', () => {
   it('deve listar os 4 módulos do ecossistema Trilhara', () => {
     expect(APPS_TRILHARA).toHaveLength(4);
     expect(APPS_TRILHARA.map((a) => a.id)).toEqual(
@@ -103,7 +103,7 @@ const FormularioComFlush: React.FC<{ flush: () => void }> = ({ flush }) => {
   return <div>formulário com flush</div>;
 };
 
-describe('AppSwitcher (R2/D-41) — guarda de alterações não salvas', () => {
+describe('AppSwitcher — guarda de alterações não salvas', () => {
   beforeEach(() => {
     unsavedChangesRegistry.__resetarParaTeste();
   });

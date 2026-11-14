@@ -9,7 +9,7 @@ export interface SpinnerProps {
 }
 
 /**
- * Indicador de atividade para refetch e ações pontuais (D-37).
+ * Indicador de atividade para refetch e ações pontuais.
  *
  * Para carregamento inicial de seção use `Skeleton`; para ação de botão use `Button loading`.
  */

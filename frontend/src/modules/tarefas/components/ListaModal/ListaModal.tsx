@@ -43,7 +43,7 @@ export const ListaModal: React.FC<ListaModalProps> = ({
       return;
     }
     if (listaParaEditar) {
-      setTitulo(listaParaEditar.titulo);
+      setTitulo(listaParaEditar.titulo || listaParaEditar.nome || '');
       setCor(listaParaEditar.cor || obterCorDisponivel(listasExistentes, listaParaEditar.id));
     } else {
       setTitulo('');

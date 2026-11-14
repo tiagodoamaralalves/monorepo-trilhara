@@ -4,7 +4,7 @@ import { DestaqueBusca } from '../../types/nota';
 export interface SnippetDestacadoProps {
   /** Texto puro devolvido pelo backend — nunca HTML. */
   snippet: string;
-  /** Offsets UTF-16 em `snippet` (D-30a). */
+  /** Offsets UTF-16 em `snippet`. */
   destaques: DestaqueBusca[];
 }
 
@@ -58,7 +58,7 @@ export function calcularTrechos(snippet: string, destaques: DestaqueBusca[]): Tr
 }
 
 /**
- * Renderiza o snippet de busca como **nós de texto React** com `<mark>` (D-30b).
+ * Renderiza o snippet de busca como **nós de texto React** com `<mark>`.
  *
  * A injeção de HTML bruto é proibida no repositório (regra ESLint + gate anti-legado). Um
  * snippet contendo `<img src=x onerror=alert(1)>` aparece literalmente como texto.

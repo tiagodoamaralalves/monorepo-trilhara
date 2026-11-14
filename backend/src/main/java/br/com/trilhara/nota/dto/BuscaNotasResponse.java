@@ -3,7 +3,7 @@ package br.com.trilhara.nota.dto;
 import java.util.List;
 
 /**
- * Página de resultados da busca global de notas (D-30).
+ * Página de resultados da busca global de notas.
  *
  * <p>Segue o envelope normativo de paginação por offset:
  * {@code { itens, pagina, tamanho, totalItens, totalPaginas }}. A ordenação é relevância

@@ -12,7 +12,7 @@ export interface SyncStatusBadgeProps {
 
 /**
  * Indicador visual compacto com role="status" e aria-live="polite"
- * Atende aos requisitos da FASE 8 do Design System Trilhara.
+ * Atende aos requisitos do Design System Trilhara.
  */
 export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({
   status,

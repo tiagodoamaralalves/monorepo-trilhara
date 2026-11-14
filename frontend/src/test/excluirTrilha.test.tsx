@@ -33,10 +33,10 @@ function renderModal(onExcluirTrilha = vi.fn().mockResolvedValue(true)) {
 }
 
 /**
- * D-38: excluir trilha é irreversível e exige o nome exato (padrão GitHub), com o impacto
+ * excluir trilha é irreversível e exige o nome exato (padrão GitHub), com o impacto
  * descrito em números. O botão destrutivo só habilita com o texto correto.
  */
-describe('Excluir trilha — confirmação por nome exato (D-38)', () => {
+describe('Excluir trilha — confirmação por nome exato', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.spyOn(EstudosService, 'obterImpactoExclusaoTrilha').mockResolvedValue({

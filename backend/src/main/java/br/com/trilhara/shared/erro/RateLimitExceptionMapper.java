@@ -9,7 +9,7 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
 /**
- * Limite de requisições excedido → {@code 429 RATE_LIMITED} com {@code Retry-After} (D-04).
+ * Limite de requisições excedido → {@code 429 RATE_LIMITED} com {@code Retry-After}.
  */
 @Provider
 public class RateLimitExceptionMapper implements ExceptionMapper<RateLimitExceededException> {

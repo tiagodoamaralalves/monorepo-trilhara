@@ -31,6 +31,7 @@ import {
   useToast,
   Badge,
   SectionErrorCard,
+  Skeleton,
   useGlobalSessionModal,
   AvisoContaExcluida
 } from '@shared/design-system';
@@ -124,15 +125,15 @@ function TarefasApp() {
   // Visão Hoje
   const [, setDadosHoje] = useState<TarefasHojeDTO | null>(null);
 
-  // FASE 7: Trilhas de Estudo com cronograma ativo e Listas Virtuais
+  // Trilhas de Estudo com cronograma ativo e Listas Virtuais
   const [trilhasComCronograma, setTrilhasComCronograma] = useState<TrilhaComCronogramaInfo[]>([]);
   const [trilhaAtivaId, setTrilhaAtivaId] = useState<string | undefined>(undefined);
   const [blocosTrilha, setBlocosTrilha] = useState<BlocoCronogramaItemDTO[]>([]);
   const [paginaBlocos, setPaginaBlocos] = useState<number>(1);
   const [totalPaginasBlocos, setTotalPaginasBlocos] = useState<number>(1);
-  /** RI-27: contagem exata de blocos atrasados, vinda de `totalItens` (não da página). */
+  /** contagem exata de blocos atrasados, vinda de `totalItens` (não da página). */
   const [totalAtrasados, setTotalAtrasados] = useState<number>(0);
-  // D-28: paginação de tarefas (50/100) com "Carregar mais".
+  // paginação de tarefas (50/100) com "Carregar mais".
   const [paginaTarefas, setPaginaTarefas] = useState<number>(1);
   const [totalPaginasTarefas, setTotalPaginasTarefas] = useState<number>(1);
   const [carregandoBlocos, setCarregandoBlocos] = useState<boolean>(false);
@@ -153,7 +154,9 @@ function TarefasApp() {
   const [tarefaParaExcluirRecorrente, setTarefaParaExcluirRecorrente] = useState<Tarefa | null>(null);
   const [escopoExclusao, setEscopoExclusao] = useState<EscopoRecorrencia>('ESTA');
 
-  const [, setCarregandoDados] = useState(false);
+  const [carregandoDados, setCarregandoDados] = useState(false);
+  const [erroCarregamento, setErroCarregamento] = useState<string | null>(null);
+  const [carregandoMaisLixeira, setCarregandoMaisLixeira] = useState(false);
   const hoje = hojeISO();
 
   // ── CARREGAMENTO DE DADOS ──
@@ -161,6 +164,7 @@ function TarefasApp() {
   const carregarDados = useCallback(async () => {
     if (!isAuthenticated) return;
     setCarregandoDados(true);
+    setErroCarregamento(null);
     try {
       const [listasApi, tarefasApi] = await Promise.all([
         TarefaService.listarListas(),
@@ -172,16 +176,18 @@ function TarefasApp() {
       setPaginaTarefas(tarefasApi.pagina);
       setTotalPaginasTarefas(tarefasApi.totalPaginas);
 
-      // Carrega trilhas com cronograma ativo (FASE 7)
+      // Carrega trilhas com cronograma ativo
       try {
         const trilhasApi = await request<TrilhaResumoDTO[]>('/trilhas');
         const comCronograma: TrilhaComCronogramaInfo[] = (trilhasApi || [])
-          .filter((t) => Boolean(t.cronogramaAtivoResumo?.cronogramaAtivoId))
+          .filter((t): t is TrilhaResumoDTO & { cronogramaAtivoResumo: { cronogramaAtivoId: string } } =>
+            Boolean(t.cronogramaAtivoResumo?.cronogramaAtivoId)
+          )
           .map((t) => ({
             id: t.id,
             nome: t.nome,
             cor: t.cor,
-            cronogramaAtivoId: t.cronogramaAtivoResumo?.cronogramaAtivoId
+            cronogramaAtivoId: t.cronogramaAtivoResumo.cronogramaAtivoId
           }));
         setTrilhasComCronograma(comCronograma);
       } catch {
@@ -196,7 +202,9 @@ function TarefasApp() {
         setDadosLixeira(lixeiraRes);
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err : 'Não foi possível carregar as tarefas.');
+      const mensagemErro = err instanceof Error ? err.message : 'Não foi possível carregar as tarefas.';
+      setErroCarregamento(mensagemErro);
+      toast.error(err instanceof Error ? err : mensagemErro);
     } finally {
       setCarregandoDados(false);
     }
@@ -207,9 +215,9 @@ function TarefasApp() {
   }, [carregarDados]);
 
   /**
-   * D-36d: o Service Worker pertence **somente** à origem do app Tarefas. O registro é
-   * guardado por suporte e nunca pede permissão — o prompt só existe no clique do usuário.
-   */
+ * o Service Worker pertence **somente** à origem do app Tarefas. O registro é
+ * guardado por suporte e nunca pede permissão — o prompt só existe no clique do usuário.
+ */
   useEffect(() => {
     if (!isPushSupported()) return;
     pushService.registrarServiceWorker().catch(() => {
@@ -218,9 +226,9 @@ function TarefasApp() {
   }, []);
 
   /**
-   * D-36f: deep link `?tarefaId=`. Abre o `TaskModal`; com 404 (inexistente/excluída) exibe o
-   * toast normativo e limpa o parâmetro para não repetir o alerta ao recarregar.
-   */
+ * deep link `?tarefaId=`. Abre o `TaskModal`; com 404 (inexistente/excluída) exibe o
+ * toast normativo e limpa o parâmetro para não repetir o alerta ao recarregar.
+ */
   useEffect(() => {
     if (!isAuthenticated) return;
     const params = new URLSearchParams(window.location.search);
@@ -257,7 +265,7 @@ function TarefasApp() {
     };
   }, [isAuthenticated, toast]);
 
-  /** "Carregar mais" de tarefas (D-28): acrescenta a próxima página à lista atual. */
+  /** "Carregar mais" de tarefas: acrescenta a próxima página à lista atual. */
   const carregarMaisTarefas = useCallback(async () => {
     if (!isAuthenticated || paginaTarefas >= totalPaginasTarefas) return;
     try {
@@ -273,7 +281,7 @@ function TarefasApp() {
     }
   }, [isAuthenticated, paginaTarefas, totalPaginasTarefas, toast]);
 
-  // Carregamento da Lista Virtual da Trilha (FASE 7)
+  // Carregamento da Lista Virtual da Trilha
   const carregarBlocosTrilha = useCallback(
     async (pagina = 1) => {
       if (!trilhaAtivaId) return;
@@ -287,7 +295,7 @@ function TarefasApp() {
           trilha.cronogramaAtivoId
         )}/blocos`;
 
-        // RI-27: a contagem N vem de `totalItens` com `tamanho=1`, nunca da página carregada.
+        // a contagem N vem de `totalItens` com `tamanho=1`, nunca da página carregada.
         const [res, contagem] = await Promise.all([
           request<Pagina<BlocoCronogramaItemDTO>>(
             `${base}?concluido=false&pagina=${pagina}&tamanho=50`
@@ -381,16 +389,16 @@ function TarefasApp() {
   };
 
   /**
-   * D-48: o bloco pertence a uma versão substituída do cronograma. A lista e a agenda são
-   * recarregadas com toast normativo; nenhuma sessão é reenviada.
-   */
+ * o bloco pertence a uma versão substituída do cronograma. A lista e a agenda são
+ * recarregadas com toast normativo; nenhuma sessão é reenviada.
+ */
   const tratarBlocoObsoleto = useCallback(() => {
     toast.info('O cronograma foi atualizado. A lista foi recarregada.');
     void carregarBlocosTrilha(1);
     notificarMudanca();
   }, [carregarBlocosTrilha, notificarMudanca, toast]);
 
-  // Concluir bloco abrindo GlobalSessionModal (FASE 7)
+  // Concluir bloco abrindo GlobalSessionModal
   const handleConcluirBloco = (bloco: BlocoCronogramaItemDTO | BlocoHojeDTO) => {
     const blocoId = 'blocoId' in bloco ? bloco.blocoId : bloco.id;
     const trilhaNome = 'trilhaNome' in bloco ? bloco.trilhaNome : undefined;
@@ -671,7 +679,7 @@ function TarefasApp() {
       }
       await carregarDados();
       if (resultado.realocadaParaListaGeral) {
-        // D-25: a lista original foi purgada definitivamente.
+        // a lista original foi purgada definitivamente.
         toast.info('Tarefa restaurada na Lista Geral (a lista original foi excluída definitivamente).');
       } else {
         toast.success(`Tarefa "${resultado.tarefa.titulo}" restaurada com sucesso!`);
@@ -696,6 +704,31 @@ function TarefasApp() {
       toast.success('Lixeira esvaziada com sucesso.');
     } catch (err) {
       toast.error(err instanceof Error ? err : 'Não foi possível esvaziar a lixeira.');
+    }
+  };
+
+  const carregarMaisLixeira = async () => {
+    if (!dadosLixeira || dadosLixeira.pagina >= dadosLixeira.totalPaginas || carregandoMaisLixeira) return;
+    setCarregandoMaisLixeira(true);
+    try {
+      const prox = await TarefaService.listarLixeira({
+        pagina: dadosLixeira.pagina + 1,
+        tamanho: dadosLixeira.tamanho
+      });
+      setDadosLixeira((prev) =>
+        prev
+          ? {
+              ...prox,
+              listas: [...prev.listas, ...prox.listas],
+              tarefas: [...prev.tarefas, ...prox.tarefas],
+              series: [...prev.series, ...prox.series]
+            }
+          : prox
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err : 'Não foi possível carregar mais itens da lixeira.');
+    } finally {
+      setCarregandoMaisLixeira(false);
     }
   };
 
@@ -750,6 +783,7 @@ function TarefasApp() {
     () => tarefasFiltradas.filter((t) => t.concluida),
     [tarefasFiltradas]
   );
+  const tarefasPrincipais = filtro === 'concluidas' ? tarefasConcluidas : tarefasPendentes;
 
   // Contadores para as abas
   const countHoje = useMemo(
@@ -1022,9 +1056,9 @@ function TarefasApp() {
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           padding: '12px 16px',
-                          background: 'var(--bg-card, #fff)',
+                          background: 'var(--surface-1)',
                           borderRadius: '8px',
-                          border: '1px solid var(--border-subtle, #e5e7eb)'
+                          border: '1px solid var(--border-subtle)'
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1044,7 +1078,7 @@ function TarefasApp() {
                     ))}
                   </div>
                 ) : (
-                  <p style={{ color: 'var(--text-muted, #9ca3af)', fontSize: '0.9rem' }}>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
                     Nenhuma lista na lixeira.
                   </p>
                 )}
@@ -1064,15 +1098,15 @@ function TarefasApp() {
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           padding: '12px 16px',
-                          background: 'var(--bg-card, #fff)',
+                          background: 'var(--surface-1)',
                           borderRadius: '8px',
-                          border: '1px solid var(--border-subtle, #e5e7eb)'
+                          border: '1px solid var(--border-subtle)'
                         }}
                       >
                         <div>
                           <div style={{ fontWeight: 600 }}>{t.titulo}</div>
                           {t.descricao && (
-                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted, #6b7280)' }}>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                               {t.descricao}
                             </div>
                           )}
@@ -1095,6 +1129,19 @@ function TarefasApp() {
                     titulo="A lixeira está vazia"
                     descricao="Itens excluídos ficam aqui por 30 dias."
                   />
+                )}
+                {dadosLixeira && dadosLixeira.pagina < dadosLixeira.totalPaginas && (
+                  <div className={styles.carregarMaisBtnWrapper}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="md"
+                      onClick={carregarMaisLixeira}
+                      loading={carregandoMaisLixeira}
+                    >
+                      Carregar mais itens da lixeira
+                    </Button>
+                  </div>
                 )}
               </div>
             </div>
@@ -1120,7 +1167,7 @@ function TarefasApp() {
               }}
             />
           ) : trilhaAtiva ? (
-            /* ── LISTA VIRTUAL POR TRILHA (FASE 7) ── */
+            /* ── LISTA VIRTUAL POR TRILHA ── */
             <div>
               <div className={styles.virtualListTopBar}>
                 <div className={styles.virtualListTitleGroup}>
@@ -1248,77 +1295,93 @@ function TarefasApp() {
             <div>
               <QuickAddTask onAdicionar={handleCriarTarefaRapida} />
 
-              {tarefasFiltradas.length > 0 && (
-                <div className={styles.listHeader}>
-                  <div className={styles.listHeaderTitle}>
-                    <span>Tarefas ({tarefasPendentes.length} pendentes)</span>
-                  </div>
-                  <div className={styles.listHeaderActions}>
-                    <ArrowUpDown size={14} style={{ color: 'var(--text-soft)' }} />
-                    <div className={styles.sortSelectWrapper}>
-                      <Select
-                        value={ordenacao}
-                        onChange={(val) => setOrdenacao(val as Ordenacao)}
-                        options={OPCOES_ORDENACAO}
-                        aria-label="Ordenar tarefas"
-                      />
+              {erroCarregamento && tarefasManuais.length === 0 ? (
+                <SectionErrorCard
+                  titulo="Não foi possível carregar as tarefas"
+                  descricao={erroCarregamento}
+                  onRetry={() => void carregarDados()}
+                />
+              ) : carregandoDados && tarefasManuais.length === 0 ? (
+                <Skeleton variant="row" linhas={4} />
+              ) : (
+                <>
+                  {tarefasFiltradas.length > 0 && (
+                    <div className={styles.listHeader}>
+                      <div className={styles.listHeaderTitle}>
+                        <span>
+                          {filtro === 'concluidas'
+                            ? `Tarefas concluídas (${tarefasConcluidas.length})`
+                            : `Tarefas (${tarefasPendentes.length} pendentes)`}
+                        </span>
+                      </div>
+                      <div className={styles.listHeaderActions}>
+                        <ArrowUpDown size={14} style={{ color: 'var(--text-soft)' }} />
+                        <div className={styles.sortSelectWrapper}>
+                          <Select
+                            value={ordenacao}
+                            onChange={(val) => setOrdenacao(val as Ordenacao)}
+                            options={OPCOES_ORDENACAO}
+                            aria-label="Ordenar tarefas"
+                          />
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  )}
+
+                  {tarefasPrincipais.length > 0 ? (
+                    <div className={styles.taskList}>
+                      {tarefasPrincipais.map((tarefa) => (
+                        <TarefaAgendaItem
+                          key={tarefa.id}
+                          tarefa={tarefa}
+                          onAlternar={handleAlternarTarefa}
+                          onEditar={(t) => {
+                            setTarefaEditando(t as Tarefa);
+                            setModalAberto(true);
+                          }}
+                          onExcluir={(t) => handleExcluirTarefa(t as Tarefa)}
+                          onPular={handlePularTarefa}
+                          onAlternarSubtarefa={handleAlternarSubtarefa}
+                        />
+                      ))}
+                    </div>
+                  ) : tarefasFiltradas.length === 0 ? (
+                    <EmptyState
+                      icone={<Filter size={24} />}
+                      titulo={
+                        filtro === 'concluidas'
+                          ? 'Nenhuma tarefa concluída ainda'
+                          : filtro === 'hoje'
+                            ? 'Tudo em dia por hoje'
+                            : 'Nenhuma tarefa cadastrada'
+                      }
+                      descricao={
+                        filtro === 'concluidas'
+                          ? 'Quando você concluir uma tarefa, ela aparece aqui.'
+                          : filtro === 'hoje'
+                            ? 'Nenhuma tarefa pendente para hoje.'
+                            : 'Adicione novas tarefas acima ou crie suas próprias listas personalizadas.'
+                      }
+                      acaoPrimaria={
+                        filtro === 'concluidas' ? undefined : (
+                          <Button
+                            variant="primary"
+                            leftIcon={<Plus size={16} />}
+                            onClick={() => {
+                              setTarefaEditando(null);
+                              setModalAberto(true);
+                            }}
+                          >
+                            {filtro === 'hoje' ? 'Nova tarefa' : 'Criar Primeira Tarefa'}
+                          </Button>
+                        )
+                      }
+                    />
+                  ) : null}
+                </>
               )}
 
-              {tarefasPendentes.length > 0 ? (
-                <div className={styles.taskList}>
-                  {tarefasPendentes.map((tarefa) => (
-                    <TarefaAgendaItem
-                      key={tarefa.id}
-                      tarefa={tarefa}
-                      onAlternar={handleAlternarTarefa}
-                      onEditar={(t) => {
-                        setTarefaEditando(t as Tarefa);
-                        setModalAberto(true);
-                      }}
-                      onExcluir={(t) => handleExcluirTarefa(t as Tarefa)}
-                      onPular={handlePularTarefa}
-                      onAlternarSubtarefa={handleAlternarSubtarefa}
-                    />
-                  ))}
-                </div>
-              ) : tarefasFiltradas.length === 0 ? (
-                <EmptyState
-                  icone={<Filter size={24} />}
-                  titulo={
-                    filtro === 'concluidas'
-                      ? 'Nenhuma tarefa concluída ainda'
-                      : filtro === 'hoje'
-                        ? 'Tudo em dia por hoje'
-                        : 'Nenhuma tarefa cadastrada'
-                  }
-                  descricao={
-                    filtro === 'concluidas'
-                      ? 'Quando você concluir uma tarefa, ela aparece aqui.'
-                      : filtro === 'hoje'
-                        ? 'Nenhuma tarefa pendente para hoje.'
-                        : 'Adicione novas tarefas acima ou crie suas próprias listas personalizadas.'
-                  }
-                  acaoPrimaria={
-                    filtro === 'concluidas' ? undefined : (
-                      <Button
-                        variant="primary"
-                        leftIcon={<Plus size={16} />}
-                        onClick={() => {
-                          setTarefaEditando(null);
-                          setModalAberto(true);
-                        }}
-                      >
-                        {filtro === 'hoje' ? 'Nova tarefa' : 'Criar Primeira Tarefa'}
-                      </Button>
-                    )
-                  }
-                />
-              ) : null}
-
-              {/* "Carregar mais" (D-28): progressão explícita na listagem paginada. */}
+              {/* "Carregar mais": progressão explícita na listagem paginada. */}
               {paginaTarefas < totalPaginasTarefas && (
                 <div className={styles.carregarMaisBtnWrapper}>
                   <Button type="button" variant="secondary" size="md" onClick={carregarMaisTarefas}>

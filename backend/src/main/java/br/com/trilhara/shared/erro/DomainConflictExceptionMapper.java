@@ -7,7 +7,7 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
 /**
- * Conflito de estado de negócio → {@code 409} com o {@code code} do catálogo (D-04).
+ * Conflito de estado de negócio → {@code 409} com o {@code code} do catálogo.
  */
 @Provider
 public class DomainConflictExceptionMapper implements ExceptionMapper<DomainConflictException> {

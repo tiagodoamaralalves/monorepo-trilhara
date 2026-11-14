@@ -9,7 +9,7 @@ import jakarta.enterprise.inject.Alternative;
 
 /**
  * Implementação controlável de {@link FaultInjector} disponível <strong>apenas</strong> no
- * classpath de teste (D-18c). Substitui {@link FaultInjectorNoOp} via {@code @Alternative}.
+ * classpath de teste. Substitui {@link FaultInjectorNoOp} via {@code @Alternative}.
  *
  * <p>Uso típico: {@code injector.falharNa(EtapaPublicacao.TROCA_PONTEIRO)} antes de disparar a
  * requisição; a próxima publicação lança {@link FalhaInjetada} exatamente nessa etapa.</p>

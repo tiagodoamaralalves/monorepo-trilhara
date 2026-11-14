@@ -46,7 +46,7 @@ function comLocation(fake: Record<string, unknown>, acao: () => void): void {
   }
 }
 
-describe('R10 — exclusão de conta: contrato do cliente, limpeza local e redirecionamento', () => {
+describe('exclusão de conta: contrato do cliente, limpeza local e redirecionamento', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();

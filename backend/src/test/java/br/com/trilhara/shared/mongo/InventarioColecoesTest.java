@@ -17,21 +17,21 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 
 /**
- * R2 — teste-guarda do inventário de coleções (D-08).
+ * teste-guarda do inventário de coleções.
  *
  * <p>Falha se existir coleção no banco sem declaração no enum {@link ColecaoTrilhara},
  * exceto a allowlist temporária de resíduos cujo dono é outra revisão. Também garante que
  * toda coleção declarada tenha índices canônicos.</p>
  */
 @QuarkusTest
-@DisplayName("R2 - Inventário de coleções (D-08)")
+@DisplayName("Inventário de coleções")
 class InventarioColecoesTest {
 
     /**
-     * Nenhuma coleção fora do inventário é tolerada. A allowlist temporária de resíduos de
-     * R5 foi removida junto com `operacoes_concluir_atrasados` (D-17) e `planejamento_ciclo`
-     * (D-16/DC-15); `handoff_tokens` deixou de ser criada na R2.
-     */
+ * Nenhuma coleção fora do inventário é tolerada. A allowlist temporária de resíduos de
+ * foi removida junto com `operacoes_concluir_atrasados` e `planejamento_ciclo`
+ *; `handoff_tokens` deixou de ser criada .
+ */
     private static final Set<String> ALLOWLIST_LEGADO = Set.of();
 
     @Inject
@@ -50,7 +50,7 @@ class InventarioColecoesTest {
             }
         }
         assertTrue(naoDeclaradas.isEmpty(),
-                "Coleções fora do inventário (D-08): " + naoDeclaradas
+                "Coleções fora do inventário: " + naoDeclaradas
                         + " — declare no enum ColecaoTrilhara ou remova a criação");
     }
 

@@ -206,7 +206,7 @@ public class AuthResource {
     @APIResponse(responseCode = "401", description = "Não autenticado")
     public HandoffResponse emitirHandoff(@Valid HandoffRequest request,
             @Context RoutingContext routingContext) {
-        // D-45: 10/min por IP — cada emissão persiste um código em tokens_handoff_sso.
+        // 10/min por IP — cada emissão persiste um código em tokens_handoff_sso.
         rateLimitService.verificarLimiteHandoffEmissao(extrairIpCliente(routingContext));
         return handoffService.emitirHandoff(authContext.usuarioId(), request.destino());
     }
@@ -221,7 +221,7 @@ public class AuthResource {
             @Valid ConsumeHandoffRequest request,
             @Context HttpHeaders headers,
             @Context RoutingContext routingContext) {
-        // D-45: 20/min por IP — contenção de carga (o código é opaco e de uso único).
+        // 20/min por IP — contenção de carga (o código é opaco e de uso único).
         rateLimitService.verificarLimiteHandoffConsumo(extrairIpCliente(routingContext));
 
         String host = extrairHost(headers);

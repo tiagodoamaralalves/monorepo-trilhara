@@ -11,7 +11,7 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
 /**
- * Falha genérica do MongoDB → {@code 503 SERVICE_UNAVAILABLE}, sem expor detalhe interno (D-04).
+ * Falha genérica do MongoDB → {@code 503 SERVICE_UNAVAILABLE}, sem expor detalhe interno.
  *
  * <p>Chave duplicada é tratada antes por {@link MongoWriteExceptionMapper}.</p>
  */

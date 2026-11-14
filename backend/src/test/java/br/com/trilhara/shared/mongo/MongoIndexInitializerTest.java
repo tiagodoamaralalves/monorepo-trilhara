@@ -24,14 +24,14 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 
 /**
- * R2 — tabela canônica de índices (D-07).
+ * tabela canônica de índices.
  *
  * <p>Valida nome, chaves e <strong>todas</strong> as opções (unique, TTL, filtro parcial,
  * idioma/pesos de texto), a idempotência, o reporte de drift e a detecção de conflito de
  * opções (que deve deixar o readiness {@code DOWN}).</p>
  */
 @QuarkusTest
-@DisplayName("R2 - Índices canônicos das 20 coleções (D-07) e readiness")
+@DisplayName("Índices canônicos das 20 coleções e readiness")
 class MongoIndexInitializerTest {
 
     private static final String BANCO_TESTE = "trilhara_r2_indexes_test";

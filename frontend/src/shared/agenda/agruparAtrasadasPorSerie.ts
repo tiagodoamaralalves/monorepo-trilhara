@@ -1,7 +1,7 @@
 import { TarefaDTO } from '../contracts/domainContracts';
 import { compararAtrasadas } from './ordenarAgenda';
 
-/** Grupo de ocorrências atrasadas de uma mesma série recorrente (D-23). */
+/** Grupo de ocorrências atrasadas de uma mesma série recorrente. */
 export interface GrupoAtrasadas {
   /** Ocorrência mais recente: é ela quem representa o grupo na lista. */
   principal: TarefaDTO;
@@ -10,12 +10,12 @@ export interface GrupoAtrasadas {
 }
 
 /**
- * Agrupa ocorrências atrasadas da mesma série recorrente (D-23).
+ * Agrupa ocorrências atrasadas da mesma série recorrente.
  *
- * - a ocorrência **mais recente** é a principal (o expansor mostra as anteriores);
- * - tarefas sem série ou desvinculadas aparecem como grupos de um único item;
- * - os grupos seguem `dataVencimento ASC, prioridade DESC, ordem ASC, id ASC`,
- *   comparados pelo item principal.
+ * a ocorrência **mais recente** é a principal (o expansor mostra as anteriores);
+ * tarefas sem série ou desvinculadas aparecem como grupos de um único item;
+ * os grupos seguem `dataVencimento ASC, prioridade DESC, ordem ASC, id ASC`,
+ * comparados pelo item principal.
  *
  * Implementação única no produto: Tarefas e Pomodoro consomem este módulo.
  */

@@ -14,7 +14,7 @@ import jakarta.ws.rs.ext.Provider;
 
 /**
  * Propriedade desconhecida no corpo da requisição → {@code 400 VALIDATION_ERROR} com
- * {@code errors[propriedade]} (D-05, SEC-07).
+ * {@code errors[propriedade]}.
  *
  * <p>Com {@code quarkus.jackson.fail-on-unknown-properties=true}, enviar {@code usuarioId},
  * {@code criadoEm} ou qualquer campo de sistema no body falha explicitamente em vez de ser

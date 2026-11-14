@@ -166,9 +166,9 @@ public class TrilhaService {
     }
 
     /**
-     * Monta o detalhe a partir do documento da trilha já carregado para o usuário.
-     * Não há mapa de progresso no contrato (D-11): o cliente usa {@code topicosConcluidosIds}.
-     */
+ * Monta o detalhe a partir do documento da trilha já carregado para o usuário.
+ * Não há mapa de progresso no contrato: o cliente usa {@code topicosConcluidosIds}.
+ */
     private TrilhaDetalheDTO montarDetalhe(Document doc, ObjectId usuarioId, ObjectId trilhaId) {
         List<Disciplina> disciplinas = disciplinaRepository.listarPorTrilha(usuarioId, trilhaId);
         Set<String> concluidosTrilha = progressoRepository.listarTopicosConcluidosIds(usuarioId, trilhaId);
@@ -242,7 +242,7 @@ public class TrilhaService {
     public TrilhaDetalheDTO criarTrilha(CriarTrilhaRequest request) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
 
-        // D-45: criação de trilha limitada a 30/min por usuário (contenção de escrita em massa).
+        // criação de trilha limitada a 30/min por usuário (contenção de escrita em massa).
         rateLimitService.verificarLimiteCriacaoTrilha(usuarioId.toHexString());
 
         if (repository.contar(usuarioId) >= maxTrilhasPorUsuario) {
@@ -271,11 +271,11 @@ public class TrilhaService {
     }
 
     /**
-     * Importa o edital como snapshot da trilha (requisito §4.1: nova versão do edital não altera
-     * a trilha do usuário). Referência inválida, inexistente ou não publicada é falha do campo
-     * {@code editalId} no corpo ({@code 400 VALIDATION_ERROR}), não {@code 404}: o recurso do path
-     * é a trilha que está sendo criada.
-     */
+ * Importa o edital como snapshot da trilha (requisito §4.1: nova versão do edital não altera
+ * a trilha do usuário). Referência inválida, inexistente ou não publicada é falha do campo
+ * {@code editalId} no corpo ({@code 400 VALIDATION_ERROR}), não {@code 404}: o recurso do path
+ * é a trilha que está sendo criada.
+ */
     private void criarTrilhaPorEdital(ObjectId usuarioId, ObjectId trilhaId, CriarTrilhaRequest request, Instant agora) {
         Edital edital = editalRepository.buscar(request.editalId())
                 .filter(item -> item.status() == StatusEdital.PUBLICADA)
@@ -419,9 +419,9 @@ public class TrilhaService {
     }
 
     /**
-     * Contagens exibidas na confirmação de exclusão (D-38). Cadernos vinculados não são excluídos
-     * pela trilha, são apenas desvinculados.
-     */
+ * Contagens exibidas na confirmação de exclusão. Cadernos vinculados não são excluídos
+ * pela trilha, são apenas desvinculados.
+ */
     public TrilhaImpactoExclusaoDTO obterImpactoExclusao(String trilhaIdStr) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
         ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
@@ -437,24 +437,24 @@ public class TrilhaService {
     }
 
     /**
-     * Exclui a trilha e tudo que depende dela, sob o lease da trilha.
-     *
-     * <p><b>Não há transação multi-documento</b> — a sequência é:</p>
-     * <ol>
-     *   <li>remove {@code progresso_topicos} da trilha;</li>
-     *   <li>fotografa IDs de disciplinas e tópicos e remove {@code disciplinas} da trilha;</li>
-     *   <li>remove {@code sessoes} da trilha (histórico apagado com a trilha, ação irreversível
-     *       de D-38);</li>
-     *   <li>remove {@code cronogramas}, {@code blocos_cronograma} e planejamento herdado,
-     *       desvinculando cadernos, seções e notas;</li>
-     *   <li>remove a trilha por último.</li>
-     * </ol>
-     *
-     * <p>Se um passo falhar, o lease é liberado e os passos já concluídos permanecem aplicados
-     * (efeito parcial). Repetir a operação com o mesmo ID responde {@code 404} porque a trilha já
-     * não existe; não há estado intermediário que impeça a limpeza posterior das coleções filhas,
-     * que deixam de ser alcançáveis sem a trilha.</p>
-     */
+ * Exclui a trilha e tudo que depende dela, sob o lease da trilha.
+ *
+ * <p><b>Não há transação multi-documento</b> — a sequência é:</p>
+ * <ol>
+ * <li>remove {@code progresso_topicos} da trilha;</li>
+ * <li>fotografa IDs de disciplinas e tópicos e remove {@code disciplinas} da trilha;</li>
+ * <li>remove {@code sessoes} da trilha (histórico apagado com a trilha, ação irreversível
+ * );</li>
+ * <li>remove {@code cronogramas}, {@code blocos_cronograma} e planejamento herdado,
+ * desvinculando cadernos, seções e notas;</li>
+ * <li>remove a trilha por último.</li>
+ * </ol>
+ *
+ * <p>Se um passo falhar, o lease é liberado e os passos já concluídos permanecem aplicados
+ * (efeito parcial). Repetir a operação com o mesmo ID responde {@code 404} porque a trilha já
+ * não existe; não há estado intermediário que impeça a limpeza posterior das coleções filhas,
+ * que deixam de ser alcançáveis sem a trilha.</p>
+ */
     public void excluirTrilha(String trilhaIdStr) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
         ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
@@ -594,10 +594,10 @@ public class TrilhaService {
     }
 
     /**
-     * Reconcilia a lista de tópicos enviada com a persistida. IDs desconhecidos são referência
-     * inválida no corpo ({@code 400 VALIDATION_ERROR} em {@code topicos}), nunca {@code 404};
-     * tópicos removidos têm o progresso apagado (requisito §4.2).
-     */
+ * Reconcilia a lista de tópicos enviada com a persistida. IDs desconhecidos são referência
+ * inválida no corpo ({@code 400 VALIDATION_ERROR} em {@code topicos}), nunca {@code 404};
+ * tópicos removidos têm o progresso apagado (requisito §4.2).
+ */
     private List<TopicoEmbutido> processarNovosTopicos(
             ObjectId usuarioId, ObjectId trilhaId, Disciplina existente, List<CriarTopicoRequest> topicosReq) {
         if (topicosReq == null) {
@@ -664,17 +664,17 @@ public class TrilhaService {
     }
 
     /**
-     * Exclui uma disciplina sob o lease da trilha.
-     *
-     * <p><b>Efeitos parciais</b> (sem transação multi-documento), nesta ordem:</p>
-     * <ol>
-     *   <li>remove a disciplina;</li>
-     *   <li>remove o progresso dos tópicos dessa disciplina;</li>
-     *   <li>remove os blocos futuros pendentes da disciplina nos cronogramas.</li>
-     * </ol>
-     * <p>Sessões de estudo são preservadas por padrão (requisitos §6.2) e só são apagadas por ação
-     * explícita do usuário.</p>
-     */
+ * Exclui uma disciplina sob o lease da trilha.
+ *
+ * <p><b>Efeitos parciais</b> (sem transação multi-documento), nesta ordem:</p>
+ * <ol>
+ * <li>remove a disciplina;</li>
+ * <li>remove o progresso dos tópicos dessa disciplina;</li>
+ * <li>remove os blocos futuros pendentes da disciplina nos cronogramas.</li>
+ * </ol>
+ * <p>Sessões de estudo são preservadas por padrão (requisitos §6.2) e só são apagadas por ação
+ * explícita do usuário.</p>
+ */
     public void excluirDisciplina(String trilhaIdStr, String disciplinaIdStr) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
         ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
@@ -696,10 +696,10 @@ public class TrilhaService {
     // =========================================================================
 
     /**
-     * Marca o tópico como concluído de forma idempotente. A disciplina dona do tópico é resolvida
-     * dentro da trilha do path <b>e</b> do usuário autenticado: tópico de outra trilha ou de outro
-     * usuário responde {@code 404}, sem revelar existência.
-     */
+ * Marca o tópico como concluído de forma idempotente. A disciplina dona do tópico é resolvida
+ * dentro da trilha do path <b>e</b> do usuário autenticado: tópico de outra trilha ou de outro
+ * usuário responde {@code 404}, sem revelar existência.
+ */
     public ProgressoTopicoDTO marcarTopicoConcluido(String trilhaIdStr, String topicoId) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
         ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
@@ -716,13 +716,13 @@ public class TrilhaService {
     }
 
     /**
-     * Desmarca o tópico de forma idempotente ({@code 204} mesmo se já não havia progresso).
-     *
-     * <p>A trilha precisa existir para o usuário ({@code 404} caso contrário). O tópico não é
-     * revalidado porque a remoção é segura por construção: o filtro inclui {@code usuarioId},
-     * {@code trilhaId} e {@code topicoId}, então nenhum registro de outro usuário ou de outra
-     * trilha pode ser afetado.</p>
-     */
+ * Desmarca o tópico de forma idempotente ({@code 204} mesmo se já não havia progresso).
+ *
+ * <p>A trilha precisa existir para o usuário ({@code 404} caso contrário). O tópico não é
+ * revalidado porque a remoção é segura por construção: o filtro inclui {@code usuarioId},
+ * {@code trilhaId} e {@code topicoId}, então nenhum registro de outro usuário ou de outra
+ * trilha pode ser afetado.</p>
+ */
     public void desmarcarTopicoConcluido(String trilhaIdStr, String topicoId) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
         ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");

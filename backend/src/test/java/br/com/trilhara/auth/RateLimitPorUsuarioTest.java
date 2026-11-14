@@ -20,10 +20,9 @@ import io.restassured.response.ValidatableResponse;
 import jakarta.inject.Inject;
 
 /**
- * R13/D-45 — rate limiting transversal por usuário e por IP.
+ * rate limiting transversal por usuário e por IP.
  *
- * <p>Cobre os limitadores que existiam apenas na decisão e não no código até a R13:
- * {@code refresh} (10/min/IP), {@code handoff} (10/min/IP), {@code handoff/consume}
+ * <p>Cobre os limitadores que existiam apenas na decisão e não no código até a * {@code refresh} (10/min/IP), {@code handoff} (10/min/IP), {@code handoff/consume}
  * (20/min/IP), {@code notas/busca} (60/min/usuário) e {@code POST /api/trilhas}
  * (30/min/usuário).</p>
  *
@@ -31,7 +30,7 @@ import jakarta.inject.Inject;
  * {@code application/problem+json} e header {@code Retry-After} — não na implementação.</p>
  */
 @QuarkusTest
-@DisplayName("R13 - Rate limiting por usuário e por IP (D-45)")
+@DisplayName("Rate limiting por usuário e por IP")
 class RateLimitPorUsuarioTest {
 
     private static final String API_TRILHAS = "/api/trilhas";

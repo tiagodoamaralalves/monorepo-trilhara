@@ -17,14 +17,14 @@
         <quarkus.platform.version>3.40.1</quarkus.platform.version>
         <compiler-plugin.version>3.14.1</compiler-plugin.version>
         <surefire-plugin.version>3.5.4</surefire-plugin.version>
-        <!-- R0/D-44: versões usadas pelo gate (archunit 1.5.1 suporta class
-             files até Java 27; jacoco 0.8.16 tem suporte oficial a Java 27 e
-             cobre Java 25 desde 0.8.14). -->
+        <!-- versões usadas pelo gate (archunit 1.5.1 suporta class
+ files até Java 27; jacoco 0.8.16 tem suporte oficial a Java 27 e
+ cobre Java 25 desde 0.8.14). -->
         <archunit.version>1.5.1</archunit.version>
         <jacoco-plugin.version>0.8.16</jacoco-plugin.version>
-        <!-- R13/D-44: dependency-plugin 3.10.0 usa ASM que entende bytecode Java 25
-             (major 69). As versões 3.7/3.8.1 falham com "Unsupported class file major
-             version 69" e tornariam o gate `dependency:analyze` inexecutável. -->
+        <!-- dependency-plugin 3.10.0 usa ASM que entende bytecode Java 25
+ (major 69). As versões 3.7/3.8.1 falham com "Unsupported class file major
+ version 69" e tornariam o gate `dependency:analyze` inexecutável. -->
         <dependency-plugin.version>3.10.0</dependency-plugin.version>
     </properties>
 
@@ -65,15 +65,15 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-scheduler</artifactId>
         </dependency>
-        <!-- R10/D-35b: métrica trilhara_account_deletion_stuck (exclusão de conta travada). -->
+        <!-- métrica trilhara_account_deletion_stuck (exclusão de conta travada). -->
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-micrometer</artifactId>
         </dependency>
-        <!-- R13/D-43: `quarkus-jacoco` instrumenta os testes `@QuarkusTest`. Sem ele o
-             agente do JaCoCo não segue a classe carregada pelo QuarkusClassLoader e o
-             relatório mede 0% em todos os serviços exercitados por integração
-             (TrilhaService 0/1885, TarefaService 0/3710), tornando D-43 inaplicável. -->
+        <!-- `quarkus-jacoco` instrumenta os testes `@QuarkusTest`. Sem ele o
+ agente do JaCoCo não segue a classe carregada pelo QuarkusClassLoader e o
+ relatório mede 0% em todos os serviços exercitados por integração
+ (TrilhaService 0/1885, TarefaService 0/3710), tornando inaplicável. -->
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-jacoco</artifactId>
@@ -89,7 +89,7 @@
             <artifactId>rest-assured</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- R0/D-44: ArchUnit para as regras arquiteturais (TenantIsolationArchTest). -->
+        <!-- ArchUnit para as regras arquiteturais (TenantIsolationArchTest). -->
         <dependency>
             <groupId>com.tngtech.archunit</groupId>
             <artifactId>archunit-junit5</artifactId>
@@ -126,9 +126,9 @@
                 <version>${compiler-plugin.version}</version>
                 <configuration>
                     <parameters>true</parameters>
-                    <!-- R12: o padrão do Maven só compila **/*Test.java em src/test/java,
-                         o que deixaria de fora fixtures compartilhadas como RotasPrivadas
-                         (allowlist do teste anti-IDOR). Inclui todo o diretório de teste. -->
+                    <!-- o padrão do Maven só compila **/*Test.java em src/test/java,
+ o que deixaria de fora fixtures compartilhadas como RotasPrivadas
+ (allowlist do teste anti-IDOR). Inclui todo o diretório de teste. -->
                     <testIncludes>
                         <testInclude>**/*.java</testInclude>
                     </testIncludes>
@@ -144,20 +144,20 @@
                     </systemPropertyVariables>
                 </configuration>
             </plugin>
-            <!-- R13/D-44: gate `dependency:analyze` — falha o build com dependência
-                 declarada e não usada ou usada e não declarada. Fixado em 3.10.0 porque
-                 versões anteriores não leem bytecode Java 25 (major 69).
+            <!-- gate `dependency:analyze` — falha o build com dependência
+ declarada e não usada ou usada e não declarada. Fixado em 3.10.0 porque
+ versões anteriores não leem bytecode Java 25 (major 69).
 
-                 Exceções abaixo são estruturais do Quarkus, não dívida:
-                 (a) extensões `io.quarkus:*` são agregadores de build-time: o bytecode da
-                     extensão não é referenciado pela aplicação, mas sem a declaração o
-                     Quarkus não registra o módulo (Mongo, REST/Jackson, scheduler, etc.);
-                 (b) os transitivos que o Quarkus expõe como API pública (Jackson, JAX-RS,
-                     MicroProfile Health, Micrometer, Vert.x, JBoss Logging, quarkus-core)
-                     são usados diretamente no código e chegam via BOM — declará-los
-                     individualmente duplicaria a gestão de versão do BOM;
-                 (c) `archunit-junit5` é o agregador que traz `-api`/`-engine` usados nos
-                     testes. -->
+ Exceções abaixo são estruturais do Quarkus, não dívida:
+ (a) extensões `io.quarkus:*` são agregadores de build-time: o bytecode da
+ extensão não é referenciado pela aplicação, mas sem a declaração o
+ Quarkus não registra o módulo (Mongo, REST/Jackson, scheduler, etc.);
+ (b) os transitivos que o Quarkus expõe como API pública (Jackson, JAX-RS,
+ MicroProfile Health, Micrometer, Vert.x, JBoss Logging, quarkus-core)
+ são usados diretamente no código e chegam via BOM — declará-los
+ individualmente duplicaria a gestão de versão do BOM;
+ (c) `archunit-junit5` é o agregador que traz `-api`/`-engine` usados nos
+ testes. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
@@ -171,9 +171,9 @@
                     </ignoredUnusedDeclaredDependencies>
                     <ignoredUsedUndeclaredDependencies>
                         <!-- Transitivos gerenciados pelo quarkus-bom e usados diretamente no
-                             código (APIs públicas do Quarkus/Jakarta/Jackson/Mongo/Vert.x/
-                             MicroProfile) ou por fixtures de teste. Declará-los
-                             individualmente duplicaria a gestão de versão do BOM. -->
+ código (APIs públicas do Quarkus/Jakarta/Jackson/Mongo/Vert.x/
+ MicroProfile) ou por fixtures de teste. Declará-los
+ individualmente duplicaria a gestão de versão do BOM. -->
                         <ignoredUsedUndeclaredDependency>io.quarkus:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>jakarta.*:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.eclipse.microprofile.*:*</ignoredUsedUndeclaredDependency>
@@ -198,14 +198,14 @@
                     </execution>
                 </executions>
             </plugin>
-            <!-- R13/D-43: JaCoCo em modo ENFORCE.
+            <!-- JaCoCo em modo ENFORCE.
 
-                 A fonte de dados é `target/jacoco-quarkus.exec`, produzida pela extensão
-                 `io.quarkus:quarkus-jacoco` (test scope). Sem essa extensão o agente do
-                 prepare-agent não alcança as classes carregadas pelo QuarkusClassLoader e o
-                 relatório mede 0% em todo serviço exercitado por `@QuarkusTest`
-                 (TrilhaService 0/1885, TarefaService 0/3710). O `.exec` do Quarkus já agrega
-                 unitários + integração; medido nesta revisão: 40551/50676 = 80,0% global. -->
+ A fonte de dados é `target/jacoco-quarkus.exec`, produzida pela extensão
+ `io.quarkus:quarkus-jacoco` (test scope). Sem essa extensão o agente do
+ prepare-agent não alcança as classes carregadas pelo QuarkusClassLoader e o
+ relatório mede 0% em todo serviço exercitado por `@QuarkusTest`
+ (TrilhaService 0/1885, TarefaService 0/3710). O `.exec` do Quarkus já agrega
+ unitários + integração; medido nesta revisão: 40551/50676 = 80,0% global. -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
@@ -237,9 +237,9 @@
                         <configuration>
                             <dataFile>${project.build.directory}/jacoco-quarkus.exec</dataFile>
                             <haltOnFailure>true</haltOnFailure>
-                            <!-- D-43: domínio backend ≥ 75%. Os dois pacotes abaixo ficam
-                                 um pouco abaixo por serem infraestrutura de erro/fachada
-                                 fina; cada exceção está justificada no relatório da R13. -->
+                            <!-- domínio backend ≥ 75%. Os dois pacotes abaixo ficam
+ um pouco abaixo por serem infraestrutura de erro/fachada
+ fina; cada exceção está justificada no relatório . -->
                             <rules>
                                 <rule>
                                     <element>BUNDLE</element>
@@ -255,10 +255,10 @@
                                     <element>PACKAGE</element>
                                     <excludes>
                                         <!-- DTOs: records sem lógica; cobertos por construção
-                                             no round-trip BSON, não por unidade. -->
+ no round-trip BSON, não por unidade. -->
                                         <exclude>*.dto</exclude>
                                         <!-- Fachada fina de fuso/usuário, usada por todos os
-                                             testes indiretamente (54,1% de instrução). -->
+ testes indiretamente (54,1% de instrução). -->
                                         <exclude>br.com.trilhara.shared</exclude>
                                     </excludes>
                                     <limits>

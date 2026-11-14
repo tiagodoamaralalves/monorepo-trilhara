@@ -16,6 +16,7 @@ import { TrilhaDetalheDTO, TrilhaResumoDTO, RegistroBlocoPendente } from '../typ
 import { ModalidadeCronograma, CriarCronogramaPayload } from '@shared/contracts';
 import type { CronogramaDTO, BlocoCronogramaItemDTO, DisponibilidadeSemanalDTO } from '@shared/contracts';
 import type { Pagina } from '@shared/contracts';
+import { hojeISO } from '@shared/format';
 import styles from './PlanejamentoView.module.css';
 
 const DIAS_SEMANA = [
@@ -66,11 +67,6 @@ function diasEntre(inicioISO: string, fimISO: string): number {
   const fim = new Date(`${fimISO}T00:00:00`);
   if (Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime())) return 0;
   return Math.round((fim.getTime() - inicio.getTime()) / 86_400_000) + 1;
-}
-
-function hojeISO(): string {
-  const hoje = new Date();
-  return hoje.toISOString().split('T')[0];
 }
 
 export interface PlanejamentoProps {
@@ -124,7 +120,7 @@ export function PlanejamentoView({
 
   const [disponibilidade, setDisponibilidade] = useState<DisponibilidadeSemanalDTO | null>(null);
 
-  // ── D-20: "Até a data da prova" só é oferecido com dataProva > dataInicio ──
+  // ── "Até a data da prova" só é oferecido com dataProva > dataInicio ──
   const dataProvaFutura = useMemo(() => {
     const dataProva = selectedTrilhaDetalhe?.dataProva;
     if (!dataProva || !dataInicio) return false;
@@ -219,7 +215,7 @@ export function PlanejamentoView({
     void carregarDisponibilidade();
   }, []);
 
-  // ── D-20: período padrão depende da data da prova ──
+  // ── período padrão depende da data da prova ──
   useEffect(() => {
     setTipoPeriodo((atual) => {
       if (atual === 'ATE_PROVA' && !dataProvaFutura) return 'UM_MES';
@@ -289,7 +285,7 @@ export function PlanejamentoView({
     }
   }, [selectedTrilhaId, selectedCronogramaId, page, filtroBlocos, carregarBlocos]);
 
-  // ── D-17f: contagem exata de atrasados via totalItens (statusData=ATRASADO&tamanho=1) ──
+  // ── contagem exata de atrasados via totalItens (statusData=ATRASADO&tamanho=1) ──
   const carregarTotalAtrasados = useCallback(async () => {
     if (!selectedTrilhaId || !selectedCronogramaId) {
       setTotalAtrasados(0);
@@ -459,7 +455,7 @@ export function PlanejamentoView({
     }
   };
 
-  /** D-19: concluir SEMPRE abre o modal global; reabrir é direto, sem modal e sem apagar sessões. */
+  /** concluir SEMPRE abre o modal global; reabrir é direto, sem modal e sem apagar sessões. */
   const handleConcluirBloco = (bloco: BlocoCronogramaItemDTO) => {
     abrirModal({
       modo: 'BLOCO_DIRETO',
@@ -588,7 +584,7 @@ export function PlanejamentoView({
       </section>
 
 
-      {/* Formulário de criação/edição — D-20 */}
+      {/* Formulário de criação/edição — */}
       {showForm && (
         <section className={styles.formCard}>
           <h2 className={styles.formTitle}>
@@ -786,6 +782,13 @@ export function PlanejamentoView({
                     Excluir
                   </Button>
                 </div>
+                {cronogramaSelecionado.estadoPublicacao === 'RECUPERACAO_NECESSARIA' && (
+                  <SectionErrorCard
+                    titulo="Recuperação necessária na publicação do cronograma"
+                    descricao="Ocorreu uma interrupção ao publicar este cronograma. Regenere ou ative novamente para restaurar a consistência."
+                    onRetry={() => void handleAtivarCronograma(cronogramaSelecionado.id)}
+                  />
+                )}
               </div>
             )}
           </>

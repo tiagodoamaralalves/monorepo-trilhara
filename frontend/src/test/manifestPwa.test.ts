@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 /**
- * R11 / §11 — requisito técnico de PWA para Web Push no iOS 16.4+.
+ * / §11 — requisito técnico de PWA para Web Push no iOS 16.4+.
  *
  * <p>O manifest precisa existir na raiz, ser servido como `/manifest.webmanifest` e ter
  * `display: standalone`, senão o Safari não oferece a instalação que habilita o push.</p>

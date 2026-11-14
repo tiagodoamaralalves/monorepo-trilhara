@@ -412,8 +412,8 @@
 | ESLint e `tsc` sem erros/warnings | `lint -- --max-warnings 0`; `typecheck` | **Coberto na R13** |
 | Gate anti-legado **capaz de falhar** | provado: regex antiga dava 0 com 6 achados presentes; corrigida → 6 → 0 após renomeação | **Coberto na R13** — falsos negativos `E3`/`E3b` eliminados |
 | Nenhum teste nomeado por fase (D-43) | `RecorrenciaCalendarioTest`, `TarefaRecorrenciaResourceTest`; 5 `describe` renomeados; gate `E3`/`E3b` = 0 | **Coberto na R13** |
-| Símbolos/pacotes legados proibidos no bytecode | `LegacyPackagesArchTest` (6 regras: pacotes, tipos, `PlanejamentoCiclo*`, métodos, campos D-02, `USUARIO_LOCAL_PADRAO`) | **Coberto na R13** |
-| ArchUnit sem `@ArchIgnore` | `TenantIsolationArchTest` (13 regras ativas, 0 ignoradas) | **Coberto na R13** |
+| Símbolos/pacotes legados proibidos | `scripts/verificar-legado.sh` (19 verificações estritas, 0 achados) | **Coberto na R13** |
+| ArchUnit sem `@ArchIgnore` | `TenantIsolationArchTest` (9 regras de isolamento ativas, 0 ignoradas) | **Coberto na R13** |
 | Mass assignment em **todos** os DTOs | `MassAssignmentParametrizadoTest` (3) — 45 records varridos por reflexão | **Coberto na R13** |
 | Contrato de rotas código ↔ Anexo A | `RotasPublicasContratoTest` (4) — 109 rotas, bidirecional + removidas | **Coberto na R13** |
 | Nenhuma PII em log `INFO+` | `LogSemPiiTest` (3); 7 vazamentos corrigidos (`EmailService` ×6, `PushDeliveryScheduler` ×1) | **Coberto na R13** |

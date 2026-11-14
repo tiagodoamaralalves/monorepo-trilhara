@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Table from '@tiptap/extension-table';
+import { Table } from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
@@ -33,7 +33,7 @@ export interface TiptapEditorProps {
   titulo: string;
   conteudoMarkdown: string;
   atualizadoEmServidor?: string;
-  /** Deve devolver o `atualizadoEm` novo para virar a base do rascunho (D-31b). */
+  /** Deve devolver o `atualizadoEm` novo para virar a base do rascunho. */
   onSalvar: (
     notaId: string,
     novoTitulo: string,
@@ -50,14 +50,14 @@ function lerMarkdown(editor: { storage: unknown } | null): string {
 }
 
 /**
- * Editor de página com autosave e recuperação de rascunho (D-30/D-31).
+ * Editor de página com autosave e recuperação de rascunho.
  *
- * - Markdown com `html: false` (HTML bruto desabilitado) e colagem pelo schema do ProseMirror;
- * - links passam pelo mark `LinkSeguro` (allowlist `http:`/`https:`/`mailto:`, `rel` e `target`);
- * - autosave com debounce de 800 ms, `seq` por página e `AbortController` no hook
- *   `useAutosaveNota`;
- * - barra de recuperação aparece quando existe rascunho local com **conteúdo diferente** do
- *   servidor (nunca por comparação de relógios), avisando quando a versão do servidor mudou.
+ * Markdown com `html: false` (HTML bruto desabilitado) e colagem pelo schema do ProseMirror;
+ * links passam pelo mark `LinkSeguro` (allowlist `http:`/`https:`/`mailto:`, `rel` e `target`);
+ * autosave com debounce de 800 ms, `seq` por página e `AbortController` no hook
+ * `useAutosaveNota`;
+ * barra de recuperação aparece quando existe rascunho local com **conteúdo diferente** do
+ * servidor (nunca por comparação de relógios), avisando quando a versão do servidor mudou.
  */
 export const TiptapEditor: React.FC<TiptapEditorProps> = ({
   usuarioId,
@@ -71,7 +71,7 @@ export const TiptapEditor: React.FC<TiptapEditorProps> = ({
 }) => {
   const [rascunhoPendente, setRascunhoPendente] = useState<RascunhoNotaLocal | null>(null);
   const [servidorMudouDesdeRascunho, setServidorMudouDesdeRascunho] = useState(false);
-  const editorRef = useRef<ReturnType<typeof useEditor>>(null);
+  const editorRef = useRef<ReturnType<typeof useEditor> | null>(null);
 
   const salvarNoServidor = useCallback(
     async (
@@ -131,7 +131,7 @@ export const TiptapEditor: React.FC<TiptapEditorProps> = ({
     }
   }, [conteudoMarkdown, editor, notaId]);
 
-  // Recuperação de rascunho: compara CONTEÚDO, não relógios (D-31b).
+  // Recuperação de rascunho: compara CONTEÚDO, não relógios.
   useEffect(() => {
     if (!usuarioId || !notaId) {
       setRascunhoPendente(null);
@@ -176,7 +176,7 @@ export const TiptapEditor: React.FC<TiptapEditorProps> = ({
       editor.commands.setContent(rascunhoPendente.conteudoMarkdown);
     }
     // `aplicarRascunho` recebe título e conteúdo prontos e envia sem debounce: evita o estado
-    // defasado entre duas chamadas de `alterar*` (D-31e).
+    // defasado entre duas chamadas de `alterar*`.
     autosave.aplicarRascunho(rascunhoPendente.titulo, rascunhoPendente.conteudoMarkdown);
     onUpdateTitulo?.(rascunhoPendente.titulo);
     setRascunhoPendente(null);

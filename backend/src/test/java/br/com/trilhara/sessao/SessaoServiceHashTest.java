@@ -12,7 +12,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Hash funcional canônico da criação de sessão (R4).
+ * Hash funcional canônico da criação de sessão.
  *
  * <p>O {@code requestHash} é SHA-256 de JSON canônico com chaves ordenadas. Sem essa garantia o
  * retry de um salvamento legítimo seria tratado como conflito de chave.</p>

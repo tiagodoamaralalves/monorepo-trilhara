@@ -91,7 +91,7 @@ function corNivelAcerto(percentual: number): string {
 
 /**
  * Blocos planejados para a meta do período vêm do cronograma ATIVO publicado no ponteiro da
- * trilha (R5/D-18d). Sem cronograma ativo, não há meta.
+ * trilha. Sem cronograma ativo, não há meta.
  */
 function cronogramaAtivoId(trilha: TrilhaDetalheDTO): string | undefined {
   return trilha.cronogramaAtivoResumo?.cronogramaAtivoId;
@@ -137,9 +137,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
 
   /**
-   * Guarda de alterações do formulário de edição (D-38/D-41): o botão de salvar só habilita
-   * quando algum campo muda em relação ao valor carregado da sessão.
-   */
+ * Guarda de alterações do formulário de edição: o botão de salvar só habilita
+ * quando algum campo muda em relação ao valor carregado da sessão.
+ */
   const edicaoSuja = useMemo(() => {
     if (!sessaoEditando) return false;
     const segundosOriginal = sessaoEditando.duracaoSegundos ?? 60;
@@ -435,7 +435,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     setMostrarCustomPopover(false);
   }
 
-  // Ações de FASE 3
+  // Ações 
   function abrirEdicao(sessao: Sessao) {
     setSessaoEditando(sessao);
     const segundos = sessao.duracaoSegundos ?? 60;
@@ -964,7 +964,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </>
       )}
 
-      {/* Modal de edição da sessão mais recente (D-38: FormModal com guarda de alterações) */}
+      {/* Modal de edição da sessão mais recente (FormModal com guarda de alterações) */}
       {sessaoEditando && (
         <FormModal
           isOpen={true}

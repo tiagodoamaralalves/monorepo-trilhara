@@ -24,8 +24,17 @@ const COR_TIPO: Record<ItemLixeira['tipo'], string> = {
   NOTA: '#059669'
 };
 
+function calcularDiasRestantes(expiresAt: string): string {
+  if (!expiresAt) return '30 dias restantes';
+  const dias = Math.max(
+    0,
+    Math.ceil((new Date(expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  );
+  return `${dias} ${dias === 1 ? 'dia restante' : 'dias restantes'}`;
+}
+
 /**
- * Lixeira hierárquica de Notas (D-34).
+ * Lixeira hierárquica de Notas.
  *
  * Lista paginada com `breadcrumb` por item, restauração com feedback do destino real
  * (`realocadaPara`) e esvaziamento antecipado com confirmação `danger`.
@@ -106,15 +115,6 @@ export const LixeiraModal: React.FC<LixeiraModalProps> = ({
     } finally {
       setCarregando(false);
     }
-  };
-
-  const calcularDiasRestantes = (expiresAt: string) => {
-    if (!expiresAt) return '30 dias restantes';
-    const dias = Math.max(
-      0,
-      Math.ceil((new Date(expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-    );
-    return `${dias} ${dias === 1 ? 'dia restante' : 'dias restantes'}`;
   };
 
   return (

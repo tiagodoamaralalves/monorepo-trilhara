@@ -6,7 +6,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   size?: 'sm' | 'md' | 'lg';
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
-  /** Ação em andamento: spinner interno, largura preservada, `aria-busy` e desabilitado (D-37). */
+  /** Ação em andamento: spinner interno, largura preservada, `aria-busy` e desabilitado. */
   loading?: boolean;
   fullWidth?: boolean;
   iconOnly?: boolean;

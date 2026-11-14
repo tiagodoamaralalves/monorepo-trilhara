@@ -16,7 +16,7 @@ const tarefa = (over: Partial<Tarefa>): Tarefa => ({
   ...over
 });
 
-describe('lembreteSeletor (D-26)', () => {
+describe('lembreteSeletor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

@@ -27,7 +27,7 @@ import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 
 @QuarkusTest
-@DisplayName("FASE 3 - Domínio Estudos (Parte 2): Sessões em Segundos, Edição/Exclusão e Estatísticas Agregadas")
+@DisplayName("Domínio Estudos (Parte 2): Sessões em Segundos, Edição/Exclusão e Estatísticas Agregadas")
 class SessaoNormalizadaIntegrationTest {
 
     private static final String API_TRILHAS = "/api/trilhas";
@@ -691,16 +691,16 @@ class SessaoNormalizadaIntegrationTest {
     }
 
     // =========================================================================
-    // R4 — Cobertura obrigatória da revisão de sessões (nomes normativos)
+    // Cobertura obrigatória da revisão de sessões (nomes normativos)
     // =========================================================================
 
-    /** Setup padrão da R4: trilha com 2 disciplinas para um usuário novo. */
-    private record SetupR4(String token, TrilhaEDisciplinas trilhas) {}
+    /** Setup padrão da trilha com 2 disciplinas para um usuário novo. */
+    private record Setup(String token, TrilhaEDisciplinas trilhas) {}
 
-    private SetupR4 setupR4() {
+    private Setup setup() {
         ObjectId usuarioId = new ObjectId();
         String token = gerarTokenParaUsuario(usuarioId);
-        return new SetupR4(token, criarTrilhaComDisciplinas(token));
+        return new Setup(token, criarTrilhaComDisciplinas(token));
     }
 
     private String postarSessao(
@@ -721,9 +721,9 @@ class SessaoNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("R4-1: Idempotency-Key ausente retorna 400 IDEMPOTENCY_KEY_REQUIRED sem criar sessão")
+    @DisplayName("1: Idempotency-Key ausente retorna 400 IDEMPOTENCY_KEY_REQUIRED sem criar sessão")
     void deveExigirIdempotencyKey() {
-        SetupR4 ctx = setupR4();
+        Setup ctx = setup();
         String hoje = LocalDate.now(FUSO_TESTES).toString();
 
         given()
@@ -748,9 +748,9 @@ class SessaoNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("R4-2: concorrência da mesma chave produz 1 documento e respostas 201 + 200")
+    @DisplayName("2: concorrência da mesma chave produz 1 documento e respostas 201 + 200")
     void deveTratarConcorrenciaDaMesmaChave() throws Exception {
-        SetupR4 ctx = setupR4();
+        Setup ctx = setup();
         String hoje = LocalDate.now(FUSO_TESTES).toString();
         String chave = UUID.randomUUID().toString();
         String payload = """
@@ -793,9 +793,9 @@ class SessaoNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("R4-3: retry após editar retorna a sessão já atualizada (mesma chave, mesmo hash)")
+    @DisplayName("3: retry após editar retorna a sessão já atualizada (mesma chave, mesmo hash)")
     void retryAposEditarRetornaSessaoAtual() {
-        SetupR4 ctx = setupR4();
+        Setup ctx = setup();
         String hoje = LocalDate.now(FUSO_TESTES).toString();
         String chave = UUID.randomUUID().toString();
         String payload = """
@@ -832,9 +832,9 @@ class SessaoNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("R4-4: retry após excluir retorna 409 IDEMPOTENCY_RESULT_REMOVED")
+    @DisplayName("4: retry após excluir retorna 409 IDEMPOTENCY_RESULT_REMOVED")
     void retryAposExcluirRetorna409ResultRemoved() {
-        SetupR4 ctx = setupR4();
+        Setup ctx = setup();
         String hoje = LocalDate.now(FUSO_TESTES).toString();
         String chave = UUID.randomUUID().toString();
         String payload = """
@@ -864,9 +864,9 @@ class SessaoNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("R4-5: editavel é global mesmo com filtro de disciplina que exclui a sessão nº 1")
+    @DisplayName("5: editavel é global mesmo com filtro de disciplina que exclui a sessão nº 1")
     void editavelEhGlobalMesmoComFiltroDeDisciplina() {
-        SetupR4 ctx = setupR4();
+        Setup ctx = setup();
         LocalDate hoje = LocalDate.now(FUSO_TESTES);
 
         postarSessao(ctx.token(), ctx.trilhas().trilhaId(), ctx.trilhas().disciplina1Id(),
@@ -899,9 +899,9 @@ class SessaoNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("R4-6: editavel é falso em todas as sessões da página 2")
+    @DisplayName("6: editavel é falso em todas as sessões da página 2")
     void editavelFalsoNaPagina2() {
-        SetupR4 ctx = setupR4();
+        Setup ctx = setup();
         LocalDate hoje = LocalDate.now(FUSO_TESTES);
 
         for (int i = 0; i < 3; i++) {
@@ -920,9 +920,9 @@ class SessaoNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("R4-7: tombstone não aparece na listagem nem nas estatísticas")
+    @DisplayName("7: tombstone não aparece na listagem nem nas estatísticas")
     void tombstoneNaoApareceEmListagemNemEstatistica() {
-        SetupR4 ctx = setupR4();
+        Setup ctx = setup();
         LocalDate hoje = LocalDate.now(FUSO_TESTES);
 
         postarSessao(ctx.token(), ctx.trilhas().trilhaId(), ctx.trilhas().disciplina1Id(),
@@ -958,9 +958,9 @@ class SessaoNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("R4-8: período invertido no histórico e nas estatísticas retorna 400")
+    @DisplayName("8: período invertido no histórico e nas estatísticas retorna 400")
     void periodoInvertidoRetorna400() {
-        SetupR4 ctx = setupR4();
+        Setup ctx = setup();
         String filtro = "?dataInicio=2026-11-10&dataFim=2026-11-01";
 
         given()
@@ -981,9 +981,9 @@ class SessaoNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("R4-9: estatística vazia retorna zeros, percentual 0 e streak 0")
+    @DisplayName("9: estatística vazia retorna zeros, percentual 0 e streak 0")
     void estatisticaVaziaRetornaZerosEPercentual0() {
-        SetupR4 ctx = setupR4();
+        Setup ctx = setup();
 
         given()
                 .header("Authorization", "Bearer " + ctx.token())
@@ -1001,9 +1001,9 @@ class SessaoNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("R4-11: disciplina de outra trilha do mesmo usuário retorna 400 em errors.disciplinaId")
+    @DisplayName("11: disciplina de outra trilha do mesmo usuário retorna 400 em errors.disciplinaId")
     void disciplinaDeOutraTrilhaRetorna400() {
-        SetupR4 ctx = setupR4();
+        Setup ctx = setup();
         TrilhaEDisciplinas outra = criarTrilhaComDisciplinas(ctx.token());
         String hoje = LocalDate.now(FUSO_TESTES).toString();
 
@@ -1023,9 +1023,9 @@ class SessaoNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("R4-12: dataSessao futura retorna 400 em errors.dataSessao")
+    @DisplayName("12: dataSessao futura retorna 400 em errors.dataSessao")
     void dataSessaoFuturaRetorna400NoCampoDataSessao() {
-        SetupR4 ctx = setupR4();
+        Setup ctx = setup();
         String amanha = LocalDate.now(FUSO_TESTES).plusDays(1).toString();
 
         given()
@@ -1044,9 +1044,9 @@ class SessaoNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("R4-10: granularidade semanal/mensal preserva os totais das estatísticas")
+    @DisplayName("10: granularidade semanal/mensal preserva os totais das estatísticas")
     void granularidadeSemanalPreservaTotais() {
-        SetupR4 ctx = setupR4();
+        Setup ctx = setup();
         LocalDate hoje = LocalDate.now(FUSO_TESTES);
 
         postarSessao(ctx.token(), ctx.trilhas().trilhaId(), ctx.trilhas().disciplina1Id(),
@@ -1093,9 +1093,9 @@ class SessaoNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("R4-13: streak considera ontem quando não há sessão hoje")
+    @DisplayName("13: streak considera ontem quando não há sessão hoje")
     void streakConsideraOntemQuandoSemSessaoHoje() {
-        SetupR4 ctx = setupR4();
+        Setup ctx = setup();
         LocalDate hoje = LocalDate.now(FUSO_TESTES);
 
         postarSessao(ctx.token(), ctx.trilhas().trilhaId(), ctx.trilhas().disciplina1Id(),
@@ -1113,9 +1113,9 @@ class SessaoNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("R4-14: streak independe do filtro de período (calculado sobre a trilha inteira)")
+    @DisplayName("14: streak independe do filtro de período (calculado sobre a trilha inteira)")
     void streakIndependeDoFiltroDePeriodo() {
-        SetupR4 ctx = setupR4();
+        Setup ctx = setup();
         LocalDate hoje = LocalDate.now(FUSO_TESTES);
 
         postarSessao(ctx.token(), ctx.trilhas().trilhaId(), ctx.trilhas().disciplina1Id(),

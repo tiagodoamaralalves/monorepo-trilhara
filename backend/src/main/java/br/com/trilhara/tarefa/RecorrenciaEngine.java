@@ -220,13 +220,13 @@ public class RecorrenciaEngine {
     }
 
     /**
-     * Agenda o lembrete da ocorrência recém-materializada (§11: "ocorrências recorrentes herdam
-     * lembrete").
-     *
-     * <p>A inserção é idempotente ({@code (tarefaId, versaoAgendamento)}), então uma ocorrência
-     * já existente nunca duplica versão. {@code lembretePushService} é opcional no construtor
-     * para permitir o uso da engine em testes puros de cálculo de datas.</p>
-     */
+ * Agenda o lembrete da ocorrência recém-materializada (§11: "ocorrências recorrentes herdam
+ * lembrete").
+ *
+ * <p>A inserção é idempotente ({@code (tarefaId, versaoAgendamento)}), então uma ocorrência
+ * já existente nunca duplica versão. {@code lembretePushService} é opcional no construtor
+ * para permitir o uso da engine em testes puros de cálculo de datas.</p>
+ */
     private void agendarLembreteDaOcorrencia(Tarefa ocorrencia) {
         if (lembretePushService == null) {
             return;
@@ -235,12 +235,12 @@ public class RecorrenciaEngine {
     }
 
     /**
-     * Trunca as candidatas pelas regras de término vigentes (D-24 / §7.2).
-     *
-     * <p>{@code APOS_OCORRENCIAS} conta as posições já consumidas em {@code totalGeradas} —
-     * inclusive as concluídas, canceladas, movidas para a lixeira ou editadas
-     * individualmente —, porque cada posição programada ocupa um lugar na contagem.</p>
-     */
+ * Trunca as candidatas pelas regras de término vigentes.
+ *
+ * <p>{@code APOS_OCORRENCIAS} conta as posições já consumidas em {@code totalGeradas} —
+ * inclusive as concluídas, canceladas, movidas para a lixeira ou editadas
+ * individualmente —, porque cada posição programada ocupa um lugar na contagem.</p>
+ */
     public List<LocalDate> aplicarLimiteTermino(SerieRecorrente serie, List<LocalDate> candidatas) {
         if (candidatas == null || candidatas.isEmpty()) {
             return List.of();

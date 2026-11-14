@@ -6,11 +6,11 @@ import java.util.Map;
 
 /**
  * Exceção de negócio para conflito de estado → HTTP 409, carregando um
- * {@link CodigoErro} do catálogo fechado (D-04) e uma mensagem legível em pt-BR.
+ * {@link CodigoErro} do catálogo fechado e uma mensagem legível em pt-BR.
  *
  * <p>Conflitos que identificam o recurso causador expõem a extensão {@code errors}
  * (campo → mensagens). Exemplo: {@code 409 TRAIL_ALREADY_IMPORTED} aponta
- * {@code errors.cadernoId} para o caderno já vinculado (D-29).</p>
+ * {@code errors.cadernoId} para o caderno já vinculado.</p>
  */
 public class DomainConflictException extends RuntimeException {
 

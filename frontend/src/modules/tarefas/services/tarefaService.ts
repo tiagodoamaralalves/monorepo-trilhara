@@ -300,7 +300,7 @@ export const TarefaService = {
     return this.restaurarTarefaLixeira(id);
   },
 
-  /** D-33: contagens exibidas no ConfirmDialog antes de excluir a lista. */
+  /** contagens exibidas no ConfirmDialog antes de excluir a lista. */
   async obterImpactoExclusaoLista(id: string): Promise<ListaImpactoExclusaoDTO> {
     return request<ListaImpactoExclusaoDTO>(`/listas-tarefas/${encodeURIComponent(id)}/impacto-exclusao`);
   },

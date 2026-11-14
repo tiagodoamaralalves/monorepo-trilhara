@@ -11,17 +11,17 @@ import br.com.trilhara.trilha.TrilhaRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 
 /**
- * Reconciliação idempotente de cronogramas interrompidos (D-18b).
+ * Reconciliação idempotente de cronogramas interrompidos.
  *
  * <p>Executa fora do escopo de um tenant ({@link SystemScope}) e trata os dois estados
  * intermediários da publicação versionada:</p>
  * <ul>
- *   <li>{@code PREPARANDO} com lease expirado → o worker morreu antes de publicar; o staging é
- *       órfão e é removido, e o cronograma volta ao último estado publicado (ou é desativado, se
- *       nunca chegou a publicar);</li>
- *   <li>{@code RECUPERACAO_NECESSARIA} → o ponteiro da trilha já aponta para a versão nova, mas
- *       flags/staging podem estar inconsistentes; a reconciliação reaplica ponteiro e flags e
- *       limpa as versões antigas.</li>
+ * <li>{@code PREPARANDO} com lease expirado → o worker morreu antes de publicar; o staging é
+ * órfão e é removido, e o cronograma volta ao último estado publicado (ou é desativado, se
+ * nunca chegou a publicar);</li>
+ * <li>{@code RECUPERACAO_NECESSARIA} → o ponteiro da trilha já aponta para a versão nova, mas
+ * flags/staging podem estar inconsistentes; a reconciliação reaplica ponteiro e flags e
+ * limpa as versões antigas.</li>
  * </ul>
  *
  * <p>Todas as operações são idempotentes: rodar o reconciliador N vezes produz o mesmo resultado
@@ -59,9 +59,9 @@ public class CronogramaReconciliacaoService {
     }
 
     /**
-     * {@code PREPARANDO} cujo lease da trilha expirou: nenhum worker vai publicar essa versão.
-     * Remove os blocos do staging e devolve o cronograma ao estado publicado anterior.
-     */
+ * {@code PREPARANDO} cujo lease da trilha expirou: nenhum worker vai publicar essa versão.
+ * Remove os blocos do staging e devolve o cronograma ao estado publicado anterior.
+ */
     int reconciliarPreparandoOrfaos() {
         int tratados = 0;
         for (Cronograma cronograma : cronogramaRepository.listarPorEstadoPublicacao(ESTADO_PREPARANDO)) {
@@ -88,9 +88,9 @@ public class CronogramaReconciliacaoService {
     }
 
     /**
-     * {@code RECUPERACAO_NECESSARIA}: reaplica a publicação da {@code versaoAtiva} de forma
-     * idempotente — ponteiro da trilha, flags {@code ativo} e limpeza das versões antigas.
-     */
+ * {@code RECUPERACAO_NECESSARIA}: reaplica a publicação da {@code versaoAtiva} de forma
+ * idempotente — ponteiro da trilha, flags {@code ativo} e limpeza das versões antigas.
+ */
     int reconciliarRecuperacaoNecessaria() {
         int tratados = 0;
         for (Cronograma cronograma : cronogramaRepository.listarPorEstadoPublicacao(ESTADO_RECUPERACAO)) {

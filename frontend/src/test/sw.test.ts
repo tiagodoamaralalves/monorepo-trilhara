@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 /**
- * R11 — teste do próprio `public/sw.js` em ambiente simulado (D-36d).
+ * teste do próprio `public/sw.js` em ambiente simulado.
  *
  * O arquivo é lido do disco e avaliado em um contexto com `self` mockado, exatamente como o
  * navegador faria: assim testamos dedupe e o clique sem depender de um SW real.
@@ -42,7 +42,7 @@ function eventoPush(payload: unknown) {
   return { event, concluido: () => aguardado };
 }
 
-describe('sw.js — dedupe e clique (R11)', () => {
+describe('sw.js — dedupe e clique', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

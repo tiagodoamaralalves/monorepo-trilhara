@@ -11,7 +11,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 
 /**
- * Preferências do usuário autenticado (D-10).
+ * Preferências do usuário autenticado.
  *
  * <p>{@code PUT /api/usuarios/me/preferencias/tema} recebe {@code { "tema": "dark" }} e
  * devolve {@code 200} com as preferências completas. Tema nunca é transportado por query

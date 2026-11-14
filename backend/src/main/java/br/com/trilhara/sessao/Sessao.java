@@ -9,7 +9,7 @@ import org.bson.types.ObjectId;
  * Entidade normalizada de Sessão de Estudo.
  * 
  * Fonte de verdade única para tempo de estudo (duracaoSegundos) e questões/acertos.
- * Conforme REQUISITOS-REESTRUTURACAO-DADOS.md e PLANO-IMPLEMENTACAO-REESTRUTURACAO.md (FASE 3).
+ * Conforme REQUISITOS-REESTRUTURACAO-DADOS.md e PLANO-IMPLEMENTACAO-REESTRUTURACAO.md.
  */
 public record Sessao(
         ObjectId id,

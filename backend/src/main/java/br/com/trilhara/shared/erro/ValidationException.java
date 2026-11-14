@@ -2,7 +2,7 @@ package br.com.trilhara.shared.erro;
 
 /**
  * Campo de payload inválido identificado na camada de serviço → {@code 400 VALIDATION_ERROR}
- * com {@code errors[campo]} (D-04/D-05).
+ * com {@code errors[campo]}.
  *
  * <p>Use para regras que não são expressáveis por Bean Validation (dependem de estado ou de
  * limite de tamanho em bytes).</p>

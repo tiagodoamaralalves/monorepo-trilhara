@@ -12,7 +12,7 @@ import jakarta.validation.constraints.Size;
  *
  * <p>É <b>exatamente um</b> entre {@code editalId} e {@code disciplinasIniciais}: enviar os dois
  * responde {@code 400 VALIDATION_ERROR} com {@code errors.editalId}. A variante {@code disciplinas}
- * mantida na F2 por compatibilidade foi removida (D-11); o mesmo vale para o endpoint dedicado
+ * mantida na F2 por compatibilidade foi removida; o mesmo vale para o endpoint dedicado
  * {@code POST /api/trilhas/importar/{editalId}}.</p>
  */
 public record CriarTrilhaRequest(

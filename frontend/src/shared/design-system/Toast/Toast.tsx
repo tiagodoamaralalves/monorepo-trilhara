@@ -12,10 +12,10 @@ interface ProblemDetail {
 type ToastMessage = string | Error | ProblemDetail;
 type ToastVariant = 'success' | 'error' | 'warning' | 'info';
 
-/** Duração padrão de um toast (D-37). */
+/** Duração padrão de um toast. */
 const TOAST_DURACAO_MS = 5000;
 
-/** Máximo de toasts empilhados ao mesmo tempo (D-37). */
+/** Máximo de toasts empilhados ao mesmo tempo. */
 export const TOAST_MAXIMO = 3;
 
 interface ToastAction {
@@ -120,7 +120,7 @@ interface ToastNoticeProps {
 const ToastNotice: React.FC<ToastNoticeProps> = ({ toast, onDismiss, children }) => {
   const [isPaused, setIsPaused] = useState(false);
   const remainingRef = useRef(toast.duracaoMs);
-  const startTimeRef = useRef(Date.now());
+  const startTimeRef = useRef(0);
 
   useEffect(() => {
     if (isPaused) {

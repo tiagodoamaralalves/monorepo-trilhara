@@ -25,11 +25,11 @@ public class AuthContext {
     }
 
     /**
-     * ID do usuário autenticado como {@link ObjectId} nativo.
-     *
-     * <p>O valor vem exclusivamente do token (D-05); se ele não for um ObjectId válido há
-     * falha de autenticação ({@code 401}), nunca erro de identificador do cliente.</p>
-     */
+ * ID do usuário autenticado como {@link ObjectId} nativo.
+ *
+ * <p>O valor vem exclusivamente do token; se ele não for um ObjectId válido há
+ * falha de autenticação ({@code 401}), nunca erro de identificador do cliente.</p>
+ */
     public ObjectId usuarioIdObjectId() {
         if (!estaAutenticado() || !ObjectId.isValid(claims.usuarioId())) {
             throw new jakarta.ws.rs.NotAuthorizedException("Autenticação obrigatória.");

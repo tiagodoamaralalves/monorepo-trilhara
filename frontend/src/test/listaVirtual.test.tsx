@@ -124,7 +124,7 @@ function agendaVazia(): AgendaHojeDerivado {
   };
 }
 
-describe('listaVirtual (R8 / 7.4 / RI-27 / D-48)', () => {
+describe('listaVirtual', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

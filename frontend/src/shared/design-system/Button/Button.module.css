@@ -4,7 +4,7 @@
   align-items: center;
   justify-content: center;
   /* Alvo mínimo por token (SC 2.5.8); as alturas de tamanho continuam
-   * mandando quando forem maiores. */
+ * mandando quando forem maiores. */
   min-block-size: var(--target-min);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);

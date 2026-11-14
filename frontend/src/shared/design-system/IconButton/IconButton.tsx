@@ -4,13 +4,13 @@ import styles from './IconButton.module.css';
 export interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   /** Ícone obrigatório: é o conteúdo acessível visível (acompanha `aria-label`). */
   icon: React.ReactNode;
-  /** Rótulo acessível obrigatório — o ícone é decorativo (D-40). */
+  /** Rótulo acessível obrigatório — o ícone é decorativo. */
   'aria-label': string;
   variant?: 'ghost' | 'surface' | 'danger';
   size?: 'sm' | 'md';
   /** Estado de seleção (ex.: item de barra inferior ativo). */
   selected?: boolean;
-  /** Ação em andamento: desabilita e expõe `aria-busy` (D-37). */
+  /** Ação em andamento: desabilita e expõe `aria-busy`. */
   loading?: boolean;
 }
 

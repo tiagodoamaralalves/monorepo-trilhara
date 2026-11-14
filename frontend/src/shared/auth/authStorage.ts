@@ -3,7 +3,7 @@ import { registrarFalha } from '../diagnostico';
 import { assinar, definirUsuarioCorrente, publicar } from '../sync/barramento';
 
 /**
- * Sessão em memória (D-09).
+ * Sessão em memória.
  *
  * O access token e o perfil vivem **somente** em variáveis privadas deste módulo. Nada de
  * `localStorage`/`sessionStorage`: o refresh token é cookie HttpOnly e o boot restaura a
@@ -11,15 +11,15 @@ import { assinar, definirUsuarioCorrente, publicar } from '../sync/barramento';
  * `GET /api/auth/me`.
  */
 export const AUTH_CHANGE_EVENT = 'trilhara:auth-change';
-/** Logout local ou propagado por outra aba (D-21.d). */
+/** Logout local ou propagado por outra aba. */
 const AUTH_LOGOUT_EVENT = 'trilhara:logout';
-/** Conta excluída nesta aba ou em outra (D-21.d). */
+/** Conta excluída nesta aba ou em outra. */
 export const AUTH_CONTA_EXCLUIDA_EVENT = 'trilhara:conta-excluida';
 
 let accessTokenEmMemoria: string | null = null;
 let usuarioEmMemoria: UsuarioAutenticado | null = null;
 
-// Sincronização entre abas pelo barramento único (D-21), sem canal próprio.
+// Sincronização entre abas pelo barramento único, sem canal próprio.
 assinar('SESSAO_ENCERRADA', (mensagem) => {
   accessTokenEmMemoria = null;
   usuarioEmMemoria = null;

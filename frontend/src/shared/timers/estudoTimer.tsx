@@ -48,7 +48,7 @@ interface StudyTimerSnapshot {
   targetSeconds?: number;
   accumulatedElapsedMs: number;
   runningSince: number | null;
-  /** `false` sem autenticação: o cronômetro de Estudos não existe no namespace anônimo (D-21). */
+  /** `false` sem autenticação: o cronômetro de Estudos não existe no namespace anônimo. */
   ativo: boolean;
   pausas: PausasEstudo;
 }
@@ -69,7 +69,7 @@ interface StudyTimerContextValue {
   pause: () => void;
   startBreak: (type: BreakType, durationMinutes: number) => void;
   endBreak: (resumeFocus: boolean) => void;
-  /** Encerra o ciclo: **remove a chave** do usuário (D-22.1) e publica o estado zerado. */
+  /** Encerra o ciclo: **remove a chave** do usuário e publica o estado zerado. */
   reset: () => void;
   setTimerContext: (
     trilhaId: string,
@@ -106,7 +106,7 @@ function estadoVazio(): PersistedStudyTimerState {
 }
 
 /**
- * Chave de persistência do cronômetro de Estudos (D-21).
+ * Chave de persistência do cronômetro de Estudos.
  *
  * O cronômetro de Estudos **exige autenticação**: sem `usuarioId` não existe chave e nada é
  * persistido (o namespace anônimo é exclusivo do Pomodoro).
@@ -162,7 +162,7 @@ function salvarEstadoPersistido(
 ): void {
   if (typeof window === 'undefined') return;
   const key = getStudyTimerStorageKey(usuarioId);
-  // Sem autenticação não há cronômetro de Estudos persistido (D-21).
+  // Sem autenticação não há cronômetro de Estudos persistido.
   if (!key) return;
   try {
     window.localStorage.setItem(key, JSON.stringify(state));
@@ -194,7 +194,10 @@ export const StudyTimerProvider: React.FC<React.PropsWithChildren> = ({ children
 
   const usuarioIdRef = useRef<string | null>(usuarioId);
   const stateRef = useRef(state);
-  stateRef.current = state;
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   useEffect(() => {
     definirUsuarioCorrente(usuarioId);
@@ -239,7 +242,7 @@ export const StudyTimerProvider: React.FC<React.PropsWithChildren> = ({ children
     };
   }, []);
 
-  // Mensagens de outras abas: o barramento já descarta usuários diferentes (D-21).
+  // Mensagens de outras abas: o barramento já descarta usuários diferentes.
   useEffect(() => {
     const cancelar = assinar('TIMER_ESTUDOS_ATUALIZADO', (mensagem) => {
       const payload = mensagem.payload as PersistedStudyTimerState | null;
@@ -314,7 +317,7 @@ export const StudyTimerProvider: React.FC<React.PropsWithChildren> = ({ children
 
   const start = useCallback(
     async (opts?: StartTimerOptions): Promise<boolean> => {
-      // Sem autenticação o cronômetro de Estudos não existe (D-21).
+      // Sem autenticação o cronômetro de Estudos não existe.
       if (!usuarioIdRef.current) return false;
 
       const atual = stateRef.current;
@@ -426,9 +429,9 @@ export const StudyTimerProvider: React.FC<React.PropsWithChildren> = ({ children
   );
 
   /**
-   * Encerra o ciclo e **remove** a chave do usuário (D-22.1). Só é chamado após o servidor
-   * confirmar o registro da sessão (`201`/`200`).
-   */
+ * Encerra o ciclo e **remove** a chave do usuário. Só é chamado após o servidor
+ * confirmar o registro da sessão (`201`/`200`).
+ */
   const reset = useCallback(() => {
     removerEstadoPersistido(usuarioIdRef.current);
     setState(estadoVazio());

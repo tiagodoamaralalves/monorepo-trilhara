@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # env-gate.sh — Exporta as variáveis de ambiente necessárias para executar o
-# gate comum de revisão (R0..R13) de forma reprodutível nesta máquina/CI.
+# gate comum de revisão de forma reprodutível nesta máquina/CI.
 #
 # Uso:
 #   eval "$(bash scripts/env-gate.sh)"          # exporta no shell atual
@@ -31,19 +31,19 @@ RAIZ="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 
 # --- JAVA_HOME ------------------------------------------------------------
 JAVA_HOME_EFETIVO="${JAVA_HOME:-}"
-if [ -z "$JAVA_HOME_EFETIVO" ] || [ ! -x "$JAVA_HOME_EFETIVO/bin/javac" ]; then
+if [[ -z "$JAVA_HOME_EFETIVO" ]] || [[ ! -x "$JAVA_HOME_EFETIVO/bin/javac" ]]; then
   for candidato in \
     /usr/lib/jvm/java-25-openjdk-amd64 \
     /usr/lib/jvm/temurin-25-jdk-amd64 \
     /usr/lib/jvm/*25* \
     /usr/lib/jvm/*; do
-    if [ -x "$candidato/bin/javac" ] && [ -x "$candidato/bin/java" ]; then
+    if [[ -x "$candidato/bin/javac" ]] && [[ -x "$candidato/bin/java" ]]; then
       JAVA_HOME_EFETIVO="$candidato"
       break
     fi
   done
 fi
-if [ -z "$JAVA_HOME_EFETIVO" ] || [ ! -x "$JAVA_HOME_EFETIVO/bin/javac" ]; then
+if [[ -z "$JAVA_HOME_EFETIVO" ]] || [[ ! -x "$JAVA_HOME_EFETIVO/bin/javac" ]]; then
   echo "env-gate: nenhum JDK com javac encontrado. Defina JAVA_HOME para um JDK 25." >&2
   exit 1
 fi
@@ -55,15 +55,15 @@ fi
 resolver_docker() {
   local candidato
   for candidato in "${DOCKER_BIN:-}" /snap/bin/docker /usr/bin/docker /usr/local/bin/docker; do
-    [ -n "$candidato" ] || continue
-    [ -x "$candidato" ] || continue
+    [[ -n "$candidato" ]] || continue
+    [[ -x "$candidato" ]] || continue
     if "$candidato" info >/dev/null 2>&1; then
       DOCKER_BIN="$candidato"
       return 0
     fi
   done
   candidato="$(command -v docker 2>/dev/null || true)"
-  if [ -n "$candidato" ] && "$candidato" info >/dev/null 2>&1; then
+  if [[ -n "$candidato" ]] && "$candidato" info >/dev/null 2>&1; then
     DOCKER_BIN="$candidato"
     return 0
   fi
@@ -73,7 +73,7 @@ resolver_docker() {
 
 # --- MONGODB_URL ----------------------------------------------------------
 MONGODB_URL_EFETIVO="${MONGODB_URL:-}"
-if [ -z "$MONGODB_URL_EFETIVO" ]; then
+if [[ -z "$MONGODB_URL_EFETIVO" ]]; then
   # 1) porta publicada no host, se existir
   if (exec 3<>/dev/tcp/127.0.0.1/27017) 2>/dev/null; then
     MONGODB_URL_EFETIVO="mongodb://localhost:27017"
@@ -86,7 +86,7 @@ if [ -z "$MONGODB_URL_EFETIVO" ]; then
       "$DOCKER_BIN" inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' \
         "$CONTAINER_MONGO" 2>/dev/null | tr ' ' '\n' | sed '/^$/d' || true
     )"
-    if [ -z "$IP_MONGO" ]; then
+    if [[ -z "$IP_MONGO" ]]; then
       echo "env-gate: container '$CONTAINER_MONGO' não encontrado via '$DOCKER_BIN'." >&2
     fi
     for ip in $IP_MONGO; do
@@ -99,7 +99,7 @@ if [ -z "$MONGODB_URL_EFETIVO" ]; then
     echo "env-gate: nenhum cliente docker funcional (tente DOCKER_BIN=/snap/bin/docker)." >&2
   fi
 fi
-if [ -z "$MONGODB_URL_EFETIVO" ]; then
+if [[ -z "$MONGODB_URL_EFETIVO" ]]; then
   echo "env-gate: MongoDB inalcançável. Suba o container com" \
        "'${DOCKER_BIN:-docker} compose up -d mongo' ou exporte MONGODB_URL." >&2
   exit 1
@@ -112,10 +112,10 @@ fi
 RESEND_API_KEY_EFETIVO="${RESEND_API_KEY:-chave-dummy-para-gate-local}"
 
 # --- saída ----------------------------------------------------------------
-if [ "${1:-}" = "--exec" ]; then
+if [[ "${1:-}" = "--exec" ]]; then
   shift
-  [ "${1:-}" = "--" ] && shift
-  if [ "$#" -eq 0 ]; then
+  [[ "${1:-}" = "--" ]] && shift
+  if [[ "$#" -eq 0 ]]; then
     echo "env-gate: --exec exige um comando após '--'." >&2
     exit 2
   fi

@@ -18,7 +18,7 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 
 /**
- * Extração de snippet de busca de Notas (D-30).
+ * Extração de snippet de busca de Notas.
  *
  * <p>O backend devolve <strong>texto puro</strong>: nunca gera tags, nunca escapa o conteúdo
  * do usuário e nunca retorna o Markdown completo. O realce é comunicado por
@@ -34,7 +34,7 @@ import jakarta.ws.rs.core.Response;
 @ApplicationScoped
 public class NotaSnippetExtractor {
 
-    /** Tamanho máximo do snippet, incluindo as reticências (D-30a). */
+    /** Tamanho máximo do snippet, incluindo as reticências. */
     public static final int LIMITE_SNIPPET = 180;
 
     /** Contexto antes do primeiro termo encontrado. */
@@ -56,11 +56,11 @@ public class NotaSnippetExtractor {
     );
 
     /**
-     * Snippet pronto para a resposta: texto puro e intervalos realçados.
-     *
-     * @param texto     trecho de texto puro, no máximo {@value #LIMITE_SNIPPET} caracteres
-     * @param destaques intervalos {@code [inicio, fim)} em UTF-16 dentro de {@code texto}
-     */
+ * Snippet pronto para a resposta: texto puro e intervalos realçados.
+ *
+ * @param texto trecho de texto puro, no máximo {@value #LIMITE_SNIPPET} caracteres
+ * @param destaques intervalos {@code [inicio, fim)} em UTF-16 dentro de {@code texto}
+ */
     public record SnippetBusca(String texto, List<DestaqueDTO> destaques) {
     }
 
@@ -94,12 +94,12 @@ public class NotaSnippetExtractor {
     }
 
     /**
-     * Extrai o snippet e os destaques de uma página.
-     *
-     * @param conteudoMarkdown Markdown armazenado (nunca devolvido inteiro)
-     * @param termoBusca       consulta já validada
-     * @param tituloNota       fallback quando a página não tem conteúdo textual
-     */
+ * Extrai o snippet e os destaques de uma página.
+ *
+ * @param conteudoMarkdown Markdown armazenado (nunca devolvido inteiro)
+ * @param termoBusca consulta já validada
+ * @param tituloNota fallback quando a página não tem conteúdo textual
+ */
     public SnippetBusca extrairSnippet(String conteudoMarkdown, String termoBusca, String tituloNota) {
         if (termoBusca == null || termoBusca.isBlank()) {
             throw erroQueryInvalida();
@@ -154,9 +154,9 @@ public class NotaSnippetExtractor {
         return new SnippetBusca(snippet, List.copyOf(destaques));
     }
 
-    // ---------------------------------------------------------------------
+    // 
     // Internos
-    // ---------------------------------------------------------------------
+    // 
 
     private static String dobrar(String valor) {
         if (valor == null) {
@@ -180,10 +180,10 @@ public class NotaSnippetExtractor {
     }
 
     /**
-     * Localiza todos os termos no texto ignorando caixa e acentuação, devolvendo posições
-     * <strong>do texto original</strong>. Cada caractere dobrado guarda o índice original de
-     * onde veio, então termos acentuados não deslocam a janela.
-     */
+ * Localiza todos os termos no texto ignorando caixa e acentuação, devolvendo posições
+ * <strong>do texto original</strong>. Cada caractere dobrado guarda o índice original de
+ * onde veio, então termos acentuados não deslocam a janela.
+ */
     private static List<int[]> localizarOcorrencias(String texto, List<String> tokens) {
         if (tokens.isEmpty()) {
             return List.of();
@@ -240,9 +240,9 @@ public class NotaSnippetExtractor {
     }
 
     /**
-     * Remove marcação do Markdown mantendo o texto legível. Não remove nem escapa caracteres
-     * digitados pelo usuário: a resposta é texto puro e o frontend renderiza como nó de texto.
-     */
+ * Remove marcação do Markdown mantendo o texto legível. Não remove nem escapa caracteres
+ * digitados pelo usuário: a resposta é texto puro e o frontend renderiza como nó de texto.
+ */
     private String limparMarkdown(String conteudoMarkdown) {
         if (conteudoMarkdown == null) {
             return "";

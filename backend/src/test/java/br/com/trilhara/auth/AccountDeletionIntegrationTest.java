@@ -42,14 +42,14 @@ import io.restassured.response.Response;
 import jakarta.inject.Inject;
 
 /**
- * R10 — exclusão de conta nas 18 coleções filhas privadas (D-08/D-35).
+ * exclusão de conta nas 18 coleções filhas privadas.
  *
- * <p>As fixtures são dirigidas por {@link ColecaoTrilhara#filhasPrivadas()}: o mapa de
+ * <p>As fixtures são dirigidas por {@link ColecaoTrilhara#filhasPrivadas}: o mapa de
  * populadores precisa cobrir <strong>exatamente</strong> as 18 coleções filhas, e o teste falha
  * se uma fixture for esquecida (risco apontado no relato da F9).</p>
  */
 @QuarkusTest
-@DisplayName("R10 - Exclusão de conta e isolamento ponta a ponta")
+@DisplayName("Exclusão de conta e isolamento ponta a ponta")
 class AccountDeletionIntegrationTest {
 
     private static final String CONTA_ENDPOINT = "/api/auth/conta";

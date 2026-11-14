@@ -213,7 +213,7 @@
   background: var(--bg);
 }
 
-/* ── ESTILOS PARA BLOCOS DE ESTUDO NA VISÃO HOJE E LISTA VIRTUAL (FASE 7) ── */
+/* ── ESTILOS PARA BLOCOS DE ESTUDO NA VISÃO HOJE E LISTA VIRTUAL ── */
 .blocoItemRow {
   display: flex;
   align-items: center;

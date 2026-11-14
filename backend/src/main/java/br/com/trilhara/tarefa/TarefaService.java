@@ -113,11 +113,11 @@ public class TarefaService {
     private static final String CAMPO_TAREFA_ID = "tarefaId";
     private static final String CAMPO_USUARIO_ID = "usuarioId";
 
-    /** D-28: {@code GET /api/tarefas} e a lixeira usam 50 como default e 100 como máximo. */
+    /** {@code GET /api/tarefas} e a lixeira usam 50 como default e 100 como máximo. */
     private static final int TAMANHO_PADRAO_LISTAGEM = 50;
     private static final int TAMANHO_MAXIMO_LISTAGEM = 100;
     private static final Set<String> FILTROS_LISTAGEM = Set.of("TODAS", "FUTURO", "CONCLUIDAS");
-    /** D-26: {@code PERSONALIZADO} aceita apenas estes deslocamentos. */
+    /** {@code PERSONALIZADO} aceita apenas estes deslocamentos. */
     private static final Set<Integer> MINUTOS_LEMBRETE_PERMITIDOS = Set.of(0, 5, 15, 30, 60);
 
     /** Par de paginação já validado contra a norma do endpoint. */
@@ -270,7 +270,7 @@ public class TarefaService {
         return paraListaResponse(restaurada, total);
     }
 
-    /** D-33: contagens para o {@code ConfirmDialog} de exclusão da lista. */
+    /** contagens para o {@code ConfirmDialog} de exclusão da lista. */
     public ListaImpactoExclusaoResponse obterImpactoExclusaoLista(String listaIdStr, String usuarioIdStr) {
         ObjectId usuarioId = validarObjectId(usuarioIdStr, CAMPO_USUARIO_ID);
         ObjectId listaId = validarObjectId(listaIdStr, CAMPO_LISTA_ID);
@@ -301,7 +301,7 @@ public class TarefaService {
         LocalDate dataVencimento = BsonDates.toLocalDate(request.dataVencimento());
         validarGapDst(dataVencimento, request.horario(), request.fusoAgendamento());
         validarPreferenciaLembrete(request.modoLembrete(), request.lembreteMinutosAntes());
-        // D-26: o fuso IANA é capturado no momento em que o lembrete é configurado.
+        // o fuso IANA é capturado no momento em que o lembrete é configurado.
         String fusoAgendamento = resolverFusoAgendamento(request.fusoAgendamento());
 
         PrioridadeTarefa prioridade = PrioridadeTarefa.fromString(request.prioridade());
@@ -347,10 +347,10 @@ public class TarefaService {
     }
 
     /**
-     * Listagem paginada (D-28) de tarefas manuais. {@code filtro} aceita apenas
-     * {@code TODAS|FUTURO|CONCLUIDAS}; qualquer outro valor é {@code 400 VALIDATION_ERROR}.
-     * Nunca retorna blocos de cronograma (§7.4).
-     */
+ * Listagem paginada de tarefas manuais. {@code filtro} aceita apenas
+ * {@code TODAS|FUTURO|CONCLUIDAS}; qualquer outro valor é {@code 400 VALIDATION_ERROR}.
+ * Nunca retorna blocos de cronograma (§7.4).
+ */
     public PaginaTarefasDTO listarTarefas(
             String usuarioIdStr, FiltroTarefas filtro, Integer paginaParam, Integer tamanhoParam) {
         ObjectId usuarioId = validarObjectId(usuarioIdStr, CAMPO_USUARIO_ID);
@@ -431,7 +431,7 @@ public class TarefaService {
         Optional<Tarefa> localizada = tarefaRepository.buscar(usuarioId, tarefaId)
                 .filter(t -> t.deletedAt() == null);
         if (localizada.isEmpty()) {
-            // D-24.4: reenvio de ESTA_E_FUTURAS depois de a âncora ser substituída.
+            // reenvio de ESTA_E_FUTURAS depois de a âncora ser substituída.
             return resolverResultadoIdempotente(usuarioId, origemOperacaoId)
                     .orElseThrow(() -> new NotFoundException(ERRO_TAREFA_NAO_ENCONTRADA_OU_INACESSIVEL));
         }
@@ -444,7 +444,7 @@ public class TarefaService {
             String escopoStr = request.escopo() != null ? request.escopo() : escopoParam;
             EscopoRecorrencia escopo = EscopoRecorrencia.fromString(escopoStr);
             if (escopo == null) {
-                // D-24: em tarefa recorrente o escopo é obrigatório e nunca é adivinhado.
+                // em tarefa recorrente o escopo é obrigatório e nunca é adivinhado.
                 throw new ValidationException(
                         "escopo",
                         "O escopo é obrigatório para tarefa recorrente. Use ESTA, ESTA_E_FUTURAS ou TODA_A_SERIE.");
@@ -452,7 +452,7 @@ public class TarefaService {
 
             if (escopo == EscopoRecorrencia.ESTA_E_FUTURAS) {
                 if (origemOperacaoId == null || origemOperacaoId.isBlank()) {
-                    // D-24.4: toda edição ESTA_E_FUTURAS é idempotente por Idempotency-Key.
+                    // toda edição ESTA_E_FUTURAS é idempotente por Idempotency-Key.
                     var problem = ProblemDetailsFactory.criar(
                             CodigoErro.IDEMPOTENCY_KEY_REQUIRED,
                             "O cabeçalho Idempotency-Key é obrigatório para editar esta e as próximas ocorrências.",
@@ -472,7 +472,7 @@ public class TarefaService {
         }
 
         if (escopoParam != null && !escopoParam.isBlank()) {
-            // D-24: escopo é proibido em tarefa avulsa.
+            // escopo é proibido em tarefa avulsa.
             throw new ValidationException("escopo", "Tarefa avulsa não aceita escopo de recorrência.");
         }
 
@@ -508,23 +508,23 @@ public class TarefaService {
     }
 
     /**
-     * Edição no escopo {@code ESTA_E_FUTURAS} (D-24.3).
-     *
-     * <p>Operação composta sem transação multi-documento. Ordem e estados intermediários:</p>
-     * <ol>
-     *   <li>encerra a série original em {@code alvo - 1} (idempotente);</li>
-     *   <li>remove definitivamente as pendentes <strong>não desvinculadas</strong> com data
-     *       original {@code >= alvo} — elas serão regeneradas pela nova série;</li>
-     *   <li>cria (ou reencontra, por {@code origemOperacaoId}) a nova série com
-     *       {@code dataInicio = alvo} e materializa a janela.</li>
-     * </ol>
-     *
-     * <p>Falha entre 1 e 3 deixa a série cortada sem sucessora: repetir a chamada com o mesmo
-     * {@code Idempotency-Key} converge, porque o corte é idempotente e a série nova é
-     * encontrada por {@code origemOperacaoId} antes de ser criada. Um {@code E11000} do índice
-     * único parcial significa que outra execução venceu a corrida — o registro é relido e a
-     * resposta é a mesma (200), nunca 500.</p>
-     */
+ * Edição no escopo {@code ESTA_E_FUTURAS}.
+ *
+ * <p>Operação composta sem transação multi-documento. Ordem e estados intermediários:</p>
+ * <ol>
+ * <li>encerra a série original em {@code alvo - 1} (idempotente);</li>
+ * <li>remove definitivamente as pendentes <strong>não desvinculadas</strong> com data
+ * original {@code >= alvo} — elas serão regeneradas pela nova série;</li>
+ * <li>cria (ou reencontra, por {@code origemOperacaoId}) a nova série com
+ * {@code dataInicio = alvo} e materializa a janela.</li>
+ * </ol>
+ *
+ * <p>Falha entre 1 e 3 deixa a série cortada sem sucessora: repetir a chamada com o mesmo
+ * {@code Idempotency-Key} converge, porque o corte é idempotente e a série nova é
+ * encontrada por {@code origemOperacaoId} antes de ser criada. Um {@code E11000} do índice
+ * único parcial significa que outra execução venceu a corrida — o registro é relido e a
+ * resposta é a mesma (200), nunca 500.</p>
+ */
     private TarefaResponse atualizarOcorrenciaEstaEFuturas(
             ObjectId usuarioId,
             Tarefa existente,
@@ -730,14 +730,14 @@ public class TarefaService {
         if (existente.serieId() != null && !existente.desvinculadaDaSerie()) {
             EscopoRecorrencia escopo = EscopoRecorrencia.fromString(escopoParam);
             if (escopo == null) {
-                // D-24: em tarefa recorrente o escopo é obrigatório e nunca é adivinhado.
+                // em tarefa recorrente o escopo é obrigatório e nunca é adivinhado.
                 throw new ValidationException(
                         "escopo",
                         "O escopo é obrigatório para tarefa recorrente. Use ESTA, ESTA_E_FUTURAS ou TODA_A_SERIE.");
             }
 
             if (escopo == EscopoRecorrencia.ESTA_E_FUTURAS) {
-                // D-24.2: encerra a série em alvo - 1 e manda as pendentes >= alvo para a lixeira.
+                // encerra a série em alvo - 1 e manda as pendentes >= alvo para a lixeira.
                 LocalDate alvo = existente.dataOriginalOcorrencia();
                 SerieRecorrente serieOriginal = serieRepository.buscar(usuarioId, existente.serieId())
                         .orElseThrow(() -> new NotFoundException("Série recorrente de origem não encontrada."));
@@ -765,7 +765,7 @@ public class TarefaService {
             }
 
             if (escopo == EscopoRecorrencia.TODA_A_SERIE) {
-                // D-24.1: concluídas preservadas intactas (serieId e dataOriginalOcorrencia).
+                // concluídas preservadas intactas (serieId e dataOriginalOcorrencia).
                 serieRepository.moverParaLixeira(usuarioId, existente.serieId(), loteExclusaoId, agora, expiresAt);
                 tarefaRepository.moverPendentesSerieParaLixeira(usuarioId, existente.serieId(), loteExclusaoId, agora, expiresAt);
                 lembretePushService.cancelarLembretesDaSerie(
@@ -779,7 +779,7 @@ public class TarefaService {
         }
 
         if (escopoParam != null && !escopoParam.isBlank()) {
-            // D-24: escopo é proibido em tarefa avulsa.
+            // escopo é proibido em tarefa avulsa.
             throw new ValidationException("escopo", "Tarefa avulsa não aceita escopo de recorrência.");
         }
 
@@ -1177,12 +1177,12 @@ public class TarefaService {
     }
 
     /**
-     * Restauração de tarefa (D-25).
-     *
-     * <p>Se a lista original está na lixeira, restaura <strong>apenas o container</strong>
-     * (sem as irmãs do lote). Se a lista já foi purgada, a tarefa volta para a Lista Geral
-     * ({@code listaId = null}) e a resposta sinaliza {@code realocadaParaListaGeral}.</p>
-     */
+ * Restauração de tarefa.
+ *
+ * <p>Se a lista original está na lixeira, restaura <strong>apenas o container</strong>
+ * (sem as irmãs do lote). Se a lista já foi purgada, a tarefa volta para a Lista Geral
+ * ({@code listaId = null}) e a resposta sinaliza {@code realocadaParaListaGeral}.</p>
+ */
     public RestauracaoTarefaResponse restaurarTarefaDaLixeira(String tarefaIdStr, String usuarioIdStr) {
         ObjectId usuarioId = validarObjectId(usuarioIdStr, CAMPO_USUARIO_ID);
         ObjectId tarefaId = validarObjectId(tarefaIdStr, CAMPO_TAREFA_ID);
@@ -1249,9 +1249,9 @@ public class TarefaService {
     // =========================================================================
 
     /**
-     * Materializa o fuso IANA do agendamento (D-26): o valor explícito vence; na ausência, o
-     * {@code X-Timezone} da requisição é gravado — nunca o fuso implícito do servidor.
-     */
+ * Materializa o fuso IANA do agendamento: o valor explícito vence; na ausência, o
+ * {@code X-Timezone} da requisição é gravado — nunca o fuso implícito do servidor.
+ */
     private String resolverFusoAgendamento(String fusoExplicito) {
         if (fusoExplicito != null && !fusoExplicito.isBlank()) {
             return TimezoneContext.resolverZoneId(fusoExplicito).getId();
@@ -1309,10 +1309,10 @@ public class TarefaService {
     }
 
     /**
-     * Retry de {@code ESTA_E_FUTURAS} (D-24.4): a ocorrência-âncora é removida quando a série
-     * sucessora é criada, então a busca por ID falha no reenvio. Se a {@code Idempotency-Key}
-     * já produziu uma série, devolve a ocorrência inicial dela — o mesmo resultado, 200.
-     */
+ * Retry de {@code ESTA_E_FUTURAS}: a ocorrência-âncora é removida quando a série
+ * sucessora é criada, então a busca por ID falha no reenvio. Se a {@code Idempotency-Key}
+ * já produziu uma série, devolve a ocorrência inicial dela — o mesmo resultado, 200.
+ */
     private Optional<TarefaResponse> resolverResultadoIdempotente(ObjectId usuarioId, String origemOperacaoId) {
         if (origemOperacaoId == null || origemOperacaoId.isBlank()) {
             return Optional.empty();
@@ -1326,11 +1326,11 @@ public class TarefaService {
     }
 
     /**
-     * Valida {@code pagina}/{@code tamanho} contra a norma do endpoint (D-28).
-     *
-     * <p>Fora do intervalo responde {@code 400 INVALID_PAGINATION} com RFC 9457, igual a
-     * {@code SessaoService} e {@code CronogramaService}.</p>
-     */
+ * Valida {@code pagina}/{@code tamanho} contra a norma do endpoint.
+ *
+ * <p>Fora do intervalo responde {@code 400 INVALID_PAGINATION} com RFC 9457, igual a
+ * {@code SessaoService} e {@code CronogramaService}.</p>
+ */
     private PaginacaoValidada validarPaginacao(Integer paginaParam, Integer tamanhoParam, int tamanhoPadrao) {
         int pagina = paginaParam != null ? paginaParam : 1;
         int tamanho = tamanhoParam != null ? tamanhoParam : tamanhoPadrao;
@@ -1350,9 +1350,9 @@ public class TarefaService {
     }
 
     /**
-     * Valida a preferência de lembrete (D-26): {@code PERSONALIZADO} exige um dos valores
-     * canônicos; {@code HERDAR} e {@code SEM_ALERTA} nunca carregam minutos.
-     */
+ * Valida a preferência de lembrete: {@code PERSONALIZADO} exige um dos valores
+ * canônicos; {@code HERDAR} e {@code SEM_ALERTA} nunca carregam minutos.
+ */
     private void validarPreferenciaLembrete(ModoLembrete modo, Integer minutos) {
         if (modo == null) {
             return;

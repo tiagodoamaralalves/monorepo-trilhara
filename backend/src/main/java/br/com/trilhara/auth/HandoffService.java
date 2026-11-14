@@ -35,8 +35,8 @@ import jakarta.ws.rs.NotAuthorizedException;
 /**
  * Handoff SSO para ambiente local ({@code *.localhost}), onde não há cookie compartilhado.
  *
- * <p>Persistência na coleção privada {@code tokens_handoff_sso} (D-08). Os índices são
- * criados exclusivamente por {@code MongoIndexInitializer} (D-07). Consumo é atômico e de
+ * <p>Persistência na coleção privada {@code tokens_handoff_sso}. Os índices são
+ * criados exclusivamente por {@code MongoIndexInitializer}. Consumo é atômico e de
  * uso único via {@code findOneAndUpdate} com {@code consumidoEm: null} e
  * {@code expiraEm > agora}.</p>
  */
@@ -97,12 +97,12 @@ public class HandoffService {
     }
 
     /**
-     * Consome o código de handoff uma única vez.
-     *
-     * @return o {@code usuarioId} (hex) dono do código
-     * @throws NotAuthorizedException código inexistente, expirado ou já consumido
-     * @throws BadRequestException     destino do código divergente do host chamador
-     */
+ * Consome o código de handoff uma única vez.
+ *
+ * @return o {@code usuarioId} (hex) dono do código
+ * @throws NotAuthorizedException código inexistente, expirado ou já consumido
+ * @throws BadRequestException destino do código divergente do host chamador
+ */
     public String consumirHandoff(String codigoPuro, String callerHost) {
         if (codigoPuro == null || codigoPuro.isBlank()) {
             throw new BadRequestException("Código de handoff é obrigatório.");

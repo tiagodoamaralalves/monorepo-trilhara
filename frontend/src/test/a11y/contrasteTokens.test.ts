@@ -3,7 +3,7 @@ import { resolve } from 'path';
 import { describe, it, expect } from 'vitest';
 
 /**
- * Contraste dos tokens de tema (WCAG 2.2 AA) — R12.
+ * Contraste dos tokens de tema (WCAG 2.2 AA) — .
  *
  * O axe em jsdom não calcula contraste (`color-contrast` é inaplicável sem layout
  * real), então o critério "texto/fundo ≥ 4.5:1 e UI/gráfico ≥ 3:1" é provado aqui,

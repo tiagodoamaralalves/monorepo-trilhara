@@ -13,13 +13,13 @@ export interface UseRecursoResultado<T> {
 }
 
 /**
- * Ciclo de vida único de carregamento de recurso de seção/lista (D-37).
+ * Ciclo de vida único de carregamento de recurso de seção/lista.
  *
  * Regras aplicadas:
- * - a lista **nunca** começa como `[]`: `dados` é `undefined` até a primeira resposta, o
- *   que impede renderizar `EmptyState` antes de saber se há erro;
- * - refetch mantém `status: 'sucesso'` e apenas liga `recarregando` (dados atuais + spinner);
- * - erros são propagados em `erro` para `classificarErro` decidir o estado visual.
+ * a lista **nunca** começa como `[]`: `dados` é `undefined` até a primeira resposta, o
+ * que impede renderizar `EmptyState` antes de saber se há erro;
+ * refetch mantém `status: 'sucesso'` e apenas liga `recarregando` (dados atuais + spinner);
+ * erros são propagados em `erro` para `classificarErro` decidir o estado visual.
  */
 export function useRecurso<T>(
   carregar: (signal: AbortSignal) => Promise<T>,

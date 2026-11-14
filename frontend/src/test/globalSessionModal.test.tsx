@@ -130,7 +130,7 @@ function montar(usuarioId: string | null = 'user-modal') {
   );
 }
 
-describe('globalSessionModal (R6/D-22)', () => {
+describe('globalSessionModal', () => {
   beforeEach(() => {
     localStorage.clear();
     requestMock.mockReset();
@@ -220,7 +220,7 @@ describe('globalSessionModal (R6/D-22)', () => {
     await user.click(screen.getByRole('button', { name: /^Cancelar$/i }));
 
     expect(screen.getByTestId('timer-rodando')).toHaveTextContent('NAO');
-    // O tempo acumulado não é perdido ao cancelar (D-22.1).
+    // O tempo acumulado não é perdido ao cancelar.
     expect(screen.getByTestId('timer-segundos')).toHaveTextContent('600');
     const salvo = JSON.parse(localStorage.getItem(chave) ?? '{}');
     expect(salvo.runningSince).toBeNull();

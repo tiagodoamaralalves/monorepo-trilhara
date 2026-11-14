@@ -82,7 +82,7 @@ function renderizar() {
   );
 }
 
-describe('R4 — Edição da sessão mais recente (D-13 / D-38)', () => {
+describe('Edição da sessão mais recente', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });

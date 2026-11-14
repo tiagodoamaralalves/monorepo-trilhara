@@ -17,7 +17,7 @@ export interface SectionErrorCardProps {
 }
 
 /**
- * Falha recuperável de seção/lista (D-37).
+ * Falha recuperável de seção/lista.
  *
  * Use para falha de rede, 5xx, 503 e timeout — **nunca** para 401 (nesse caso abra o
  * `AuthModal`). O botão "Tentar novamente" é ligado à descrição por `aria-describedby`.

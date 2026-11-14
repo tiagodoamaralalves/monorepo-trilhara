@@ -19,7 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Inventário executável das rotas JAX-RS registradas (R0, item 3 do checklist).
+ * Inventário executável das rotas JAX-RS registradas.
  *
  * <p>Lê o código-fonte de todas as classes {@code *Resource} em
  * {@code src/main/java} e imprime verbo + caminho completo. Não é teste de
@@ -27,11 +27,11 @@ import org.junit.jupiter.api.Test;
  * posterior): aqui garantimos que o inventário é gerado, é estável e que nenhum
  * recurso fica fora por falta de {@code @Path}.</p>
  *
- * <p>Saída usada como insumo do Anexo A e do relatório da R0. O diretório base é
+ * <p>Saída usada como insumo e do relatório . O diretório base é
  * resolvido a partir de {@code user.dir} (backend/) com fallback para
  * {@code TRILHARA_RAIZ}, exportada por {@code scripts/env-gate.sh}.</p>
  */
-@DisplayName("R0 - Inventário executável de rotas JAX-RS (*Resource)")
+@DisplayName("Inventário executável de rotas JAX-RS (*Resource)")
 public class RotasInventarioTest {
 
     private static final Pattern PATH_CLASSE =
@@ -151,7 +151,7 @@ public class RotasInventarioTest {
 
         assertFalse(rotas.isEmpty(), "O inventário não pode ficar vazio (extração quebrada).");
         assertTrue(rotas.size() >= 100,
-                "Esperado pelo menos 100 métodos (baseline R0 = 108). Encontrado: " + rotas.size());
+                "Esperado pelo menos 100 métodos (baseline = 108). Encontrado: " + rotas.size());
     }
 
     @Test

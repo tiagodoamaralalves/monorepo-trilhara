@@ -37,7 +37,7 @@ import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 
 @QuarkusTest
-@DisplayName("FASE 4 - Domínio Estudos (Parte 3): Cronogramas, Coordenação de Concorrência, Geradores e APIs de Blocos")
+@DisplayName("Domínio Estudos (Parte 3): Cronogramas, Coordenação de Concorrência, Geradores e APIs de Blocos")
 class CronogramaNormalizadoIntegrationTest {
 
     private static final String API_TRILHAS = "/api/trilhas";
@@ -477,7 +477,7 @@ class CronogramaNormalizadoIntegrationTest {
 
         assertTrue(atrasadosResp.totalConcluidos() >= 0);
 
-        // D-17(e): o retry RECALCULA — o que já foi concluído não é reprocessado, então a segunda
+        // o retry RECALCULA — o que já foi concluído não é reprocessado, então a segunda
         // chamada encontra zero pendentes e não reescreve concluidoEm.
         given()
                 .header("Authorization", "Bearer " + token)

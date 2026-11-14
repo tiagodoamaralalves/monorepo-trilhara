@@ -34,7 +34,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 @ApplicationScoped
 public class BlocoCronogramaRepository {
 
-    /** R5/D-17f: norma de paginação — máximo de 100 itens por página. */
+    /** norma de paginação — máximo de 100 itens por página. */
     public static final int TAMANHO_MAXIMO_PAGINA = 100;
 
     private final MongoCollection<Document> collection;
@@ -121,12 +121,12 @@ public class BlocoCronogramaRepository {
     }
 
     /**
-     * Conclusão condicional usada pelo lote de atrasados (D-17d): o filtro exige
-     * {@code concluido: false}, de modo que uma repetição/retry nunca reescreve
-     * {@code concluidoEm} de um bloco já concluído.
-     *
-     * @return {@code true} apenas quando este chamador efetivamente concluiu o bloco
-     */
+ * Conclusão condicional usada pelo lote de atrasados: o filtro exige
+ * {@code concluido: false}, de modo que uma repetição/retry nunca reescreve
+ * {@code concluidoEm} de um bloco já concluído.
+ *
+ * @return {@code true} apenas quando este chamador efetivamente concluiu o bloco
+ */
     public boolean concluirSePendente(
             ObjectId usuarioId, ObjectId trilhaId, ObjectId cronogramaId, ObjectId blocoId, Instant agora) {
         return collection.updateOne(
@@ -164,9 +164,9 @@ public class BlocoCronogramaRepository {
     }
 
     /**
-     * Blocos pendentes de hoje limitados ao par {@code cronogramaId + versaoAtiva} publicado no
-     * ponteiro da trilha (D-18d). Staging órfão de uma geração que perdeu o lease nunca aparece.
-     */
+ * Blocos pendentes de hoje limitados ao par {@code cronogramaId + versaoAtiva} publicado no
+ * ponteiro da trilha. Staging órfão de uma geração que perdeu o lease nunca aparece.
+ */
     public List<BlocoCronograma> listarHoje(
             ObjectId usuarioId, LocalDate hojeLocal, Map<ObjectId, Long> versoesAtivasPorCronograma) {
         if (versoesAtivasPorCronograma == null || versoesAtivasPorCronograma.isEmpty()) {
@@ -212,7 +212,7 @@ public class BlocoCronogramaRepository {
         if (concluido != null) {
             filtros.add(eq("concluido", concluido));
         }
-        // D-17f: statusData é derivado da relação com hojeLocal. "ATRASADO" exclui hoje por
+        // statusData é derivado da relação com hojeLocal. "ATRASADO" exclui hoje por
         // definição, o que torna a contagem exata do lote (totalItens com tamanho=1) suficiente.
         if (statusData != null && hojeLocal != null) {
             switch (statusData) {
@@ -267,10 +267,10 @@ public class BlocoCronogramaRepository {
     }
 
     /**
-     * Atualiza os snapshots de nome/cor de uma disciplina <strong>apenas</strong> nos blocos dos
-     * cronogramas ativos da trilha (regra normativa §5.3). {@code disciplinaId} nunca é alterado e
-     * blocos passados/concluídos de cronogramas inativos permanecem como histórico visual.
-     */
+ * Atualiza os snapshots de nome/cor de uma disciplina <strong>apenas</strong> nos blocos dos
+ * cronogramas ativos da trilha (regra normativa §5.3). {@code disciplinaId} nunca é alterado e
+ * blocos passados/concluídos de cronogramas inativos permanecem como histórico visual.
+ */
     public long atualizarSnapshotsDisciplina(
             ObjectId usuarioId,
             ObjectId trilhaId,

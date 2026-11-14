@@ -9,7 +9,7 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
 /**
- * {@code ServiceUnavailableException} → {@code 503 SERVICE_UNAVAILABLE} (D-04).
+ * {@code ServiceUnavailableException} → {@code 503 SERVICE_UNAVAILABLE}.
  */
 @Provider
 public class ServiceUnavailableExceptionMapper implements ExceptionMapper<ServiceUnavailableException> {

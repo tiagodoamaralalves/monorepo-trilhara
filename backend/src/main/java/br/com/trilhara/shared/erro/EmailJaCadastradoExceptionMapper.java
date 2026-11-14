@@ -9,7 +9,7 @@ import jakarta.ws.rs.ext.Provider;
 
 /**
  * E-mail já cadastrado → {@code 409 DUPLICATE_RESOURCE} (chave única não mapeada para
- * um código de domínio específico, conforme D-04).
+ * um código de domínio específico, ).
  */
 @Provider
 public class EmailJaCadastradoExceptionMapper implements ExceptionMapper<EmailJaCadastradoException> {

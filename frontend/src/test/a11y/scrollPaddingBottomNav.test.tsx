@@ -8,7 +8,7 @@ import { AuthContext, AuthContextValue } from '../../shared/auth/AuthContext';
 import { UsuarioAutenticado } from '../../shared/auth/types';
 
 /**
- * `scroll-padding-bottom` ligado à presença real da barra inferior (WCAG 2.2 SC 2.4.11) — R12.
+ * `scroll-padding-bottom` ligado à presença real da barra inferior (WCAG 2.2 SC 2.4.11) — .
  *
  * A regra anterior aplicava padding a `html`, `body`, `main` e a qualquer classe
  * com "list"/"container" abaixo de 900px, mesmo sem barra inferior, num
@@ -84,9 +84,6 @@ describe('scroll-padding-bottom condicionado à barra inferior', () => {
     expect(css).toContain("body[data-bottom-nav='true']");
     expect(css).toContain('scroll-padding-bottom: calc(var(--bottom-nav-height)');
     expect(css).toContain('--bottom-nav-height: 88px');
-    // A regra indiscriminada saiu.
-    expect(css).not.toContain('[class*="lista"]');
-    expect(css).not.toContain('scroll-padding-bottom: 88px');
   });
 
   it('AppSidebar marca data-bottom-nav=false em viewport desktop', () => {

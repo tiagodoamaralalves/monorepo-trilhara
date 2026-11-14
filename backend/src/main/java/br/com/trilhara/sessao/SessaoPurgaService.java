@@ -8,7 +8,7 @@ import br.com.trilhara.shared.SystemScope;
 import jakarta.enterprise.context.ApplicationScoped;
 
 /**
- * Purga de tombstones de sessão (D-15).
+ * Purga de tombstones de sessão.
  *
  * <p>Um tombstone existe por {@value #RETENCAO_HORAS} horas para impedir recriação acidental em
  * retry de idempotência. Depois disso, a chave fica livre e o documento é removido
@@ -19,7 +19,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 @ApplicationScoped
 public class SessaoPurgaService {
 
-    /** Janela de retenção do tombstone, em horas (D-15). */
+    /** Janela de retenção do tombstone, em horas. */
     public static final int RETENCAO_HORAS = 24;
 
     private static final Logger LOG = Logger.getLogger(SessaoPurgaService.class.getName());
@@ -31,11 +31,11 @@ public class SessaoPurgaService {
     }
 
     /**
-     * Remove tombstones cujo {@code deletedAt} é anterior a {@code agora - 24h}.
-     *
-     * @param agora instante de referência (injetável para teste determinístico)
-     * @return quantidade de tombstones removidos definitivamente
-     */
+ * Remove tombstones cujo {@code deletedAt} é anterior a {@code agora - 24h}.
+ *
+ * @param agora instante de referência (injetável para teste determinístico)
+ * @return quantidade de tombstones removidos definitivamente
+ */
     public long purgarTombstones(Instant agora) {
         Instant referencia = agora != null ? agora : Instant.now();
         Instant limite = referencia.minus(Duration.ofHours(RETENCAO_HORAS));

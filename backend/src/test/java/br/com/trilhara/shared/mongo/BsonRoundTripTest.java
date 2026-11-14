@@ -18,7 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 
-@DisplayName("FASE 1 - Utilitários BSON e Round-Trip de Tipos (ObjectId, Instant e LocalDate)")
+@DisplayName("Utilitários BSON e Round-Trip de Tipos (ObjectId, Instant e LocalDate)")
 class BsonRoundTripTest {
 
     @Test

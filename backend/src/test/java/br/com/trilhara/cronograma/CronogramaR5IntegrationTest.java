@@ -38,13 +38,11 @@ import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 
 /**
- * R5 — critérios de aceite normativos de cronogramas, blocos e publicação.
- *
- * <p>Cada teste tem o nome exigido pelo guia da R5 e falha se o comportamento regredir.</p>
+ * Testes de integração para geração, publicação e blocos de cronogramas.
  */
 @QuarkusTest
-@DisplayName("R5 - Cronogramas normalizados: geradores, blocos, lote e ponteiro")
-class CronogramaR5IntegrationTest {
+@DisplayName("Cronogramas normalizados: geradores, blocos, lote e ponteiro")
+class CronogramaPublicacaoIntegrationTest {
 
     private static final String API_TRILHAS = "/api/trilhas";
     private static final String API_BLOCOS = "/api/blocos";

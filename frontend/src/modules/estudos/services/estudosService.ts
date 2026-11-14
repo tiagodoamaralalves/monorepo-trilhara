@@ -271,7 +271,7 @@ export const EstudosService = {
     );
   },
 
-  // ── FASE 4: CRONOGRAMAS, BLOCOS & DISPONIBILIDADE SEMANAL ──
+  // ── CRONOGRAMAS, BLOCOS & DISPONIBILIDADE SEMANAL ──
   async listarCronogramas(trilhaId: string): Promise<CronogramaDTO[]> {
     return await request<CronogramaDTO[]>(`/trilhas/${encodeURIComponent(trilhaId)}/cronogramas`);
   },
@@ -342,9 +342,9 @@ export const EstudosService = {
   },
 
   /**
-   * Contagem exata de blocos atrasados (D-17f): usa `statusData=ATRASADO` com `tamanho=1` e lê
-   * `totalItens`, evitando depender da página carregada na tela.
-   */
+ * Contagem exata de blocos atrasados: usa `statusData=ATRASADO` com `tamanho=1` e lê
+ * `totalItens`, evitando depender da página carregada na tela.
+ */
   async contarBlocosAtrasados(trilhaId: string, cronogramaId: string): Promise<number> {
     const pagina = await this.listarBlocosCronograma(trilhaId, cronogramaId, {
       statusData: 'ATRASADO',

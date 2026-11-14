@@ -4,7 +4,7 @@ import br.com.trilhara.shared.mongo.ColecaoTrilhara;
 import jakarta.enterprise.context.ApplicationScoped;
 
 /**
- * Implementação de produção do {@link FaultInjectorExclusaoConta}: no-op absoluto (D-35e).
+ * Implementação de produção do {@link FaultInjectorExclusaoConta}: no-op absoluto.
  *
  * <p>Não é {@code @Alternative}: é o bean padrão. O teste substitui por uma
  * {@code @Alternative @Priority} declarada apenas em {@code src/test}, de modo que nenhuma

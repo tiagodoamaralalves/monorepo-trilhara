@@ -1,5 +1,5 @@
 /**
- * Contratos de Notas (R9: D-29 a D-34).
+ * Contratos de Notas ( a ).
  *
  * Três coleções independentes no backend — caderno, seção e página — sem modelo embutido.
  * As listagens nunca trazem `conteudoMarkdown`: o Markdown completo chega apenas por
@@ -46,7 +46,7 @@ export interface Nota extends NotaMetadata {
   conteudoMarkdown: string;
 }
 
-/** Intervalo realçado dentro do snippet, em offsets UTF-16 do próprio snippet (D-30). */
+/** Intervalo realçado dentro do snippet, em offsets UTF-16 do próprio snippet. */
 export interface DestaqueBusca {
   inicio: number;
   fim: number;
@@ -100,7 +100,7 @@ export interface RascunhoNotaLocal {
   titulo: string;
   conteudoMarkdown: string;
   atualizadoEmLocal: string;
-  /** `atualizadoEm` do servidor no momento em que o rascunho nasceu (D-31b). */
+  /** `atualizadoEm` do servidor no momento em que o rascunho nasceu. */
   baseAtualizadoEmServidor?: string | null;
 }
 

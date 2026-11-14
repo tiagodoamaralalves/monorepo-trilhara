@@ -18,8 +18,11 @@ import { DisciplinaPesoSelector } from '../DisciplinaPesoSelector/DisciplinaPeso
 import { DisciplinaPesoButton } from '../DisciplinaPesoButton/DisciplinaPesoButton';
 import styles from './DisciplinasTopicosModal.module.css';
 
+let contadorIdLocal = 0;
+
 function gerarId(prefixo: string): string {
-  return `${prefixo}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  contadorIdLocal += 1;
+  return `${prefixo}_${Date.now()}_${contadorIdLocal.toString(36)}`;
 }
 
 export interface DisciplinasTopicosModalProps {

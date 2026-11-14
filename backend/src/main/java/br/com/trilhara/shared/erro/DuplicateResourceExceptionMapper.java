@@ -7,7 +7,7 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
 /**
- * {@code DuplicateResourceException} → {@code 409 DUPLICATE_RESOURCE} (D-04).
+ * {@code DuplicateResourceException} → {@code 409 DUPLICATE_RESOURCE}.
  */
 @Provider
 public class DuplicateResourceExceptionMapper implements ExceptionMapper<DuplicateResourceException> {

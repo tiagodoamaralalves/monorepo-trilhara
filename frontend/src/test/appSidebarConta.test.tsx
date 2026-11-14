@@ -43,7 +43,7 @@ function authValue(abrirContaModal = vi.fn()): AuthContextValue {
 
 const BRAND = { title: 'Trilhara', logoSrc: '/favicon.svg', titleAttr: 'Trilhara' };
 
-describe('R10 — entrada de Conta centralizada (D-35f)', () => {
+describe('entrada de Conta centralizada', () => {
   it('a AppSidebar expõe a entrada de Conta no desktop e no mobile sem prop de ação', async () => {
     const user = userEvent.setup();
     const abrirContaModal = vi.fn();
@@ -87,9 +87,9 @@ describe('R10 — entrada de Conta centralizada (D-35f)', () => {
   });
 
   /**
-   * O Pomodoro não usa `AppSidebar`: monta o mesmo `ContaMenuButton` no header próprio.
-   * Este caso cobre o quarto módulo (RI-36).
-   */
+ * O Pomodoro não usa `AppSidebar`: monta o mesmo `ContaMenuButton` no header próprio.
+ * Este caso cobre o quarto módulo.
+ */
   it('o header do Pomodoro (autenticado) expõe a mesma entrada de Conta', async () => {
     const user = userEvent.setup();
     const abrirContaModal = vi.fn();

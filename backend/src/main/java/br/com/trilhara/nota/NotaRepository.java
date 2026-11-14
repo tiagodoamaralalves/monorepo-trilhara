@@ -32,12 +32,12 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 /**
- * Repositório BSON da coleção {@code notas} (REQUISITOS §10, D-29).
+ * Repositório BSON da coleção {@code notas} (REQUISITOS §10, ).
  *
  * <p>Toda operação de tenant recebe {@code ObjectId usuarioId} como primeiro parâmetro
- * (D-06a) e o aplica no filtro — inclusive as consultas compostas. As únicas exceções são as
+ * e o aplica no filtro — inclusive as consultas compostas. As únicas exceções são as
  * conversões BSON e a varredura de purga por {@code expiresAt}, que é multi-tenant por
- * definição (D-06b).</p>
+ * definição.</p>
  *
  * <p>Listagens nunca projetam {@code conteudoMarkdown}: ele só é lido por
  * {@link #buscarAtiva(ObjectId, ObjectId)} e pela busca textual, que precisa do texto para
@@ -88,11 +88,11 @@ public class NotaRepository {
     }
 
     /**
-     * Lista metadados de uma seção, sem {@code conteudoMarkdown}.
-     *
-     * <p>A ordenação inclui {@code _id} como desempate estável, como exige a norma de
-     * paginação por offset.</p>
-     */
+ * Lista metadados de uma seção, sem {@code conteudoMarkdown}.
+ *
+ * <p>A ordenação inclui {@code _id} como desempate estável, como exige a norma de
+ * paginação por offset.</p>
+ */
     public List<Nota> listarMetadadosPorSecao(
             ObjectId usuarioId, ObjectId cadernoId, ObjectId secaoId, int pagina, int tamanho) {
         List<Nota> lista = new ArrayList<>();
@@ -131,9 +131,9 @@ public class NotaRepository {
     }
 
     /**
-     * Contagens de páginas por caderno em <strong>uma</strong> agregação — evita N+1 na
-     * listagem de até 500 cadernos.
-     */
+ * Contagens de páginas por caderno em <strong>uma</strong> agregação — evita N+1 na
+ * listagem de até 500 cadernos.
+ */
     public Map<ObjectId, Long> contarPorCadernosEmLote(ObjectId usuarioId, List<ObjectId> cadernoIds) {
         Map<ObjectId, Long> contagens = new HashMap<>();
         if (cadernoIds == null || cadernoIds.isEmpty()) {
@@ -179,9 +179,9 @@ public class NotaRepository {
     }
 
     /**
-     * Busca textual sobre o índice composto {@code idx_notas_usuarioId_deletedAt_text}
-     * (D-30). Sempre {@code $text}: nenhum fallback para regex ou varredura da coleção.
-     */
+ * Busca textual sobre o índice composto {@code idx_notas_usuarioId_deletedAt_text}
+ *. Sempre {@code $text}: nenhum fallback para regex ou varredura da coleção.
+ */
     public List<Document> buscaGlobal(ObjectId usuarioId, String termoBusca, int pagina, int tamanho) {
         List<Document> resultados = new ArrayList<>();
         collection.find(and(
@@ -323,7 +323,7 @@ public class NotaRepository {
         ).getDeletedCount();
     }
 
-    /** Purga definitiva por {@code expiresAt} em todos os tenants (D-06b). */
+    /** Purga definitiva por {@code expiresAt} em todos os tenants. */
     public long purgarExpirados(Instant agora) {
         return collection.deleteMany(
                 and(ne("deletedAt", null), lte("expiresAt", BsonDates.toBsonDate(agora)))

@@ -15,7 +15,7 @@ export interface ConfiguracaoLembreteModalProps {
   onSalvo?: (novoPadrao: number) => void;
 }
 
-/** Textos normativos do Anexo B por estado de permissão do dispositivo. */
+/** Textos normativos por estado de permissão do dispositivo. */
 const TEXTO_ESTADO: Record<PushPermissionState, string> = {
   unsupported: 'Este navegador não suporta notificações. Suas tarefas funcionam normalmente.',
   denied: 'As notificações estão bloqueadas nas configurações do navegador.',
@@ -79,8 +79,8 @@ export const ConfiguracaoLembreteModal: React.FC<ConfiguracaoLembreteModalProps>
       await pushService.atualizarPreferenciaGlobal(padrao);
       if (onSalvo) onSalvo(padrao);
       onClose();
-    } catch (err) {
-      setMensagemStatus(err?.message || 'Erro ao salvar preferência.');
+    } catch (err: unknown) {
+      setMensagemStatus(err instanceof Error && err.message ? err.message : 'Erro ao salvar preferência.');
     } finally {
       setSalvando(false);
     }
@@ -164,7 +164,7 @@ export const ConfiguracaoLembreteModal: React.FC<ConfiguracaoLembreteModalProps>
             </span>
           </div>
 
-          {/* Texto normativo do estado (Anexo B) */}
+          {/* Texto normativo do estado */}
           <p
             data-testid="texto-estado-push"
             style={{ margin: '8px 0 0 0', fontSize: '0.8125rem', color: 'var(--text-secondary, #94a3b8)' }}
@@ -172,7 +172,7 @@ export const ConfiguracaoLembreteModal: React.FC<ConfiguracaoLembreteModalProps>
             {TEXTO_ESTADO[permissionState]}
           </p>
 
-          {/* O pedido de permissão só acontece no clique (D-36 / Anexo B). */}
+          {/* O pedido de permissão só acontece no clique. */}
           {permissionState !== 'granted' && permissionState !== 'unsupported' && permissionState !== 'ios-nao-instalado' && (
             <div style={{ marginTop: '10px' }}>
               <Button

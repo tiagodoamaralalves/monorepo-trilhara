@@ -4,10 +4,10 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Inventário fechado das coleções do Trilhara (D-08).
+ * Inventário fechado das coleções do Trilhara.
  *
  * <p>São <strong>20 coleções: 19 privadas + 1 catálogo público</strong> ({@code editais}).
- * A exclusão de conta percorre {@link #filhasPrivadas()} (18 coleções filhas) e remove
+ * A exclusão de conta percorre {@link #filhasPrivadas} (18 coleções filhas) e remove
  * {@code usuarios} por último.</p>
  *
  * <p>A ordem de declaração é a ordem de purga: filhas antes de {@code usuarios}.</p>

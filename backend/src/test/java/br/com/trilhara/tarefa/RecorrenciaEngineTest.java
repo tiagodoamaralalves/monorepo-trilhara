@@ -16,7 +16,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 /**
- * Regras de calendário do motor de recorrência (R7 §4).
+ * Regras de calendário do motor de recorrência ( §4).
  *
  * <p>Cobre os casos que o guia exige: virada de ano, semana ISO 53, mês curto e bissexto,
  * ordinal inexistente, ordinal negativo, contagem de {@code APOS_OCORRENCIAS} e a

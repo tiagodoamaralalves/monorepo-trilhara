@@ -123,9 +123,9 @@ public class PasswordService {
     }
 
     /**
-     * Executa uma verificação real contra um hash dummy quando o usuário não existe,
-     * mitigando enumeração de contas por análise de tempo de resposta (timing attack).
-     */
+ * Executa uma verificação real contra um hash dummy quando o usuário não existe,
+ * mitigando enumeração de contas por análise de tempo de resposta (timing attack).
+ */
     public void simularVerificacaoConstante(String senhaInformada) {
         verificarSenha(senhaInformada == null || senhaInformada.isEmpty() ? "dummy" : senhaInformada, hashDummyParaTimingConstant);
     }

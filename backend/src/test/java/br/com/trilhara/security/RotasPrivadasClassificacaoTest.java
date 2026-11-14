@@ -16,14 +16,14 @@ import org.junit.jupiter.params.provider.MethodSource;
 import br.com.trilhara.shared.RotasInventarioTest;
 
 /**
- * Guarda de classificação total (R12, RI-39).
+ * Guarda de classificação total.
  *
  * <p>Toda rota inventariada pelo {@link RotasInventarioTest} precisa estar
  * classificada em <strong>um</strong> dos três conjuntos de {@link RotasPrivadas}:
  * {@code PUBLICAS}, {@code ADMIN} ou {@code LISTAGENS} — ou ter um caso anti-IDOR
  * com path param. Rota nova sem classificação quebra o build.</p>
  */
-@DisplayName("R12 - Classificação total das rotas privadas (guard da allowlist)")
+@DisplayName("Classificação total das rotas privadas (guard da allowlist)")
 class RotasPrivadasClassificacaoTest {
 
     /** Converte `GET /api/trilhas/{trilhaA}` no template inventariado `GET /api/trilhas/{trilhaId}`. */

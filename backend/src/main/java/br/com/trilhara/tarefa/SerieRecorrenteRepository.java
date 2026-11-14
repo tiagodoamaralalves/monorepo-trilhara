@@ -75,7 +75,7 @@ public class SerieRecorrenteRepository {
         return resultado;
     }
 
-    /** Séries ativas vinculadas a uma lista (impacto de exclusão, D-33). */
+    /** Séries ativas vinculadas a uma lista (impacto de exclusão, ). */
     public long contarAtivasPorLista(ObjectId usuarioId, ObjectId listaId) {
         return collection.countDocuments(and(
                 eq("usuarioId", usuarioId),

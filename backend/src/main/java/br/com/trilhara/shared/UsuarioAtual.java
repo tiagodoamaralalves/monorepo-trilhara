@@ -15,9 +15,9 @@ import java.util.Optional;
  * Fornece a identidade do usuário atualmente autenticado para os serviços de negócio.
  * 
  * Regras:
- * - Em produção/dev, a autenticação é estritamente obrigatória; lança NotAuthorizedException se não autenticado.
- * - O fallback legado "local" foi removido.
- * - Em perfil de teste (%test / LaunchMode.TEST), permite fallback fixo via configuração validado estritamente como ObjectId.
+ * Em produção/dev, a autenticação é estritamente obrigatória; lança NotAuthorizedException se não autenticado.
+ * O fallback legado "local" foi removido.
+ * Em perfil de teste (%test / LaunchMode.TEST), permite fallback fixo via configuração validado estritamente como ObjectId.
  */
 @ApplicationScoped
 public class UsuarioAtual {

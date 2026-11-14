@@ -30,10 +30,10 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 
 /**
- * Leitura canônica, atualização e exclusão de páginas, busca global e lixeira (D-30 a D-34).
+ * Leitura canônica, atualização e exclusão de páginas, busca global e lixeira ( a ).
  *
  * <p>A criação acontece apenas na rota aninhada por seção, em {@link CadernoResource}; não há
- * {@code POST /api/notas} nem leitura aninhada de página (DC-12/D-32).</p>
+ * {@code POST /api/notas} nem leitura aninhada de página.</p>
  */
 @Path("/api/notas")
 @Produces(MediaType.APPLICATION_JSON)
@@ -60,7 +60,7 @@ public class NotaResource {
             @QueryParam("q") String q,
             @QueryParam("pagina") @DefaultValue("1") int pagina,
             @QueryParam("tamanho") @DefaultValue("20") int tamanho) {
-        // D-45: busca em texto pleno limitada a 60/min por usuário (consulta $text é a mais cara).
+        // busca em texto pleno limitada a 60/min por usuário (consulta $text é a mais cara).
         rateLimitService.verificarLimiteBuscaNotas(authContext.usuarioId());
         return notaService.buscarGlobal(usuarioId(), q, pagina, tamanho);
     }
@@ -81,14 +81,14 @@ public class NotaResource {
         return notaService.restaurarItem(usuarioId(), tipo, BsonIds.parse(id, "id"));
     }
 
-    /** Esvaziamento imediato da lixeira (D-34); a UI confirma com variante {@code danger}. */
+    /** Esvaziamento imediato da lixeira; a UI confirma com variante {@code danger}. */
     @DELETE
     @Path("/lixeira/esvaziar")
     public Map<String, Long> esvaziarLixeira() {
         return notaService.esvaziarLixeira(usuarioId());
     }
 
-    /** Endpoint canônico de leitura completa (D-32). */
+    /** Endpoint canônico de leitura completa. */
     @GET
     @Path("/{id}")
     public NotaDetalheResponse buscar(@PathParam("id") String id) {

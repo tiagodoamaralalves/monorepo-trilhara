@@ -30,7 +30,7 @@ function digitar(texto: string) {
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: texto } });
 }
 
-describe('BuscaModal — D-30', () => {
+describe('BuscaModal', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();

@@ -15,7 +15,7 @@ function Harness({ carregar }: { carregar: (signal: AbortSignal) => Promise<stri
   );
 }
 
-describe('R1 — useRecurso (D-37)', () => {
+describe('useRecurso', () => {
   it('começa em carregando e nunca assume lista vazia antes da resposta', async () => {
     const carregar = vi.fn().mockResolvedValue(['a', 'b']);
     render(<Harness carregar={carregar} />);

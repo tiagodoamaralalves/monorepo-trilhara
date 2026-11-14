@@ -21,7 +21,7 @@ const respostaLogin: AuthResponse = {
   usuario: usuarioBase
 };
 
-describe('authStorage (R2/D-09) — sessão somente em memória', () => {
+describe('authStorage — sessão somente em memória', () => {
   beforeEach(() => {
     AuthStorage.__resetarParaTeste();
     localStorage.clear();

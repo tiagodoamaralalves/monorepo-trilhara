@@ -80,7 +80,7 @@ const tarefaHoje = {
   concluida: false
 };
 
-describe('pomodoroAgenda (R8 / §8)', () => {
+describe('pomodoroAgenda', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();

@@ -156,7 +156,7 @@ public class SecurityFilter implements ContainerRequestFilter, ContainerResponse
                     return true;
                 }
             }
-            // D-35: conta com exclusão em andamento é 401 em qualquer rota. A única exceção é o
+            // conta com exclusão em andamento é 401 em qualquer rota. A única exceção é o
             // retry do próprio DELETE /api/auth/conta com Idempotency-Key, que devolve 202 com o
             // mesmo operationId (o cliente não precisa repetir quando já não tem sessão).
             if (userRepository.estaEmExclusao(usuario.id())) {

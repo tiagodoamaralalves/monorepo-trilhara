@@ -8,7 +8,7 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
 /**
- * Operação administrativa sem papel exigido → {@code 403 FORBIDDEN} (D-04).
+ * Operação administrativa sem papel exigido → {@code 403 FORBIDDEN}.
  */
 @Provider
 public class ForbiddenExceptionMapper implements ExceptionMapper<ForbiddenException> {

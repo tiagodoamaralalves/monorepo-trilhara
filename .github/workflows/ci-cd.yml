@@ -10,6 +10,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+permissions:
+  contents: read
+
 jobs:
   # ──────────────────────────────────────────────────────────────────────────
   # 1. CI Frontend: Typecheck + Vite Build + Validação de Sintaxe do Caddyfile
@@ -17,6 +20,8 @@ jobs:
   frontend-ci:
     name: "Frontend (React 18 + Vite 6 + Caddyfile)"
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout do repositório
         uses: actions/checkout@v4
@@ -34,23 +39,19 @@ jobs:
       - name: Build de Produção (tsc -b + Vite)
         run: npm --prefix frontend run build
 
-      # R13/D-44: as verificações abaixo faltavam no CI, então o pipeline ficava verde
-      # com código morto, warnings de lint e dependências não usadas.
       - name: Typecheck isolado (tsc --noEmit)
         run: npm --prefix frontend run typecheck
 
-      - name: ESLint com zero warnings (D-44)
+      - name: ESLint com zero warnings
         run: npm --prefix frontend run lint -- --max-warnings 0
 
-      - name: Detecção de código morto (knip, D-44)
+      - name: Detecção de código morto (knip)
         run: npm --prefix frontend run knip
 
-      # R13/D-43: cobertura enforce via vite.config.ts -> test.coverage.thresholds.
-      - name: Testes do Frontend com cobertura enforce (D-43)
+      - name: Testes do Frontend com cobertura enforce
         run: npm --prefix frontend test -- --run --coverage
 
-      # R13/D-44: o modo `--report` foi removido — o gate agora falha em achados.
-      - name: Gate anti-legado (modo estrito, D-44)
+      - name: Gate anti-legado (modo estrito)
         run: bash scripts/verificar-legado.sh
 
       - name: Validar sintaxe do Caddyfile
@@ -60,8 +61,7 @@ jobs:
             caddy:2-alpine \
             caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
-      # R13/D-47: teste de fumaça dos cabeçalhos de segurança nas 5 origens.
-      - name: Cabeçalhos de segurança D-47 (CSP, Permissions-Policy, HSTS)
+      - name: Cabeçalhos de segurança (CSP, Permissions-Policy, HSTS)
         run: bash scripts/verificar-cabecalhos.sh
 
   # ──────────────────────────────────────────────────────────────────────────
@@ -70,6 +70,8 @@ jobs:
   backend-ci:
     name: "Backend (Java 25 + Quarkus + MongoDB 7)"
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     services:
       mongo:
         image: mongo:7-jammy
@@ -95,17 +97,13 @@ jobs:
         env:
           MONGODB_URL: mongodb://localhost:27017
           QUARKUS_MONGODB_DEVSERVICES_ENABLED: "false"
-          # trilhara.email.resend-api-key não possui default: sem valor o Quarkus
-          # aborta no startup (ConfigRecorder) e a suíte falha com 106 skips.
           RESEND_API_KEY: chave-dummy-ci
           EMAIL_FROM: nao-responda@trilhara.test
           AUTH_JWT_SECRET: ci-jwt-secret-com-pelo-menos-32-bytes-ok
           AUTH_PASSWORD_PEPPER: ci-pepper
         run: bash backend/mvnw -f backend/pom.xml verify -B
 
-      # R13/D-44: o verify já roda `dependency:analyze` no phase verify (pom.xml), que
-      # falha em dependência não declarada/usada. Step explícito para o log do CI.
-      - name: Dependências não usadas/undeclared (D-44)
+      - name: Dependências não usadas/undeclared
         env:
           MONGODB_URL: mongodb://localhost:27017
           RESEND_API_KEY: chave-dummy-ci
@@ -113,7 +111,6 @@ jobs:
           AUTH_PASSWORD_PEPPER: ci-pepper
         run: bash backend/mvnw -f backend/pom.xml dependency:analyze -B
 
-      # R13/D-43: JaCoCo em modo enforce (check no phase verify do pom.xml).
       - name: Cobertura JaCoCo (publicar relatório)
         if: always()
         uses: actions/upload-artifact@v4

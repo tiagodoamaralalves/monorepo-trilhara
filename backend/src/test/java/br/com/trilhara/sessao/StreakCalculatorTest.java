@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 import br.com.trilhara.shared.TimezoneContext;
 
 /**
- * Definição normativa de streak (D-14).
+ * Definição normativa de streak.
  *
  * <p>O streak não "quebra" enquanto o dia corrente não terminou: quando não há sessão hoje, a
  * contagem termina em ontem. A borda 23h30 em {@code America/Sao_Paulo} é exercitada com

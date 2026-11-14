@@ -2,10 +2,10 @@ import { useEffect, useRef } from 'react';
 import { unsavedChangesRegistry } from '../state/unsavedChangesRegistry';
 
 /**
- * Registra um formulário com alterações não salvas no registro global (D-41).
+ * Registra um formulário com alterações não salvas no registro global.
  *
  * ```tsx
- * useUnsavedChanges(`nota:${notaId}`, sujo, () => gravarRascunhoLocal());
+ * useUnsavedChanges(`nota:${notaId}`, sujo, => gravarRascunhoLocal);
  * ```
  *
  * Com `sujo === true` o item entra no `unsavedChangesRegistry`: `beforeunload` fica ativo e

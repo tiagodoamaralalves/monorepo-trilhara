@@ -3,7 +3,7 @@ package br.com.trilhara.cronograma;
 import jakarta.enterprise.context.ApplicationScoped;
 
 /**
- * Implementação de produção do {@link FaultInjector}: no-op absoluto (D-18c).
+ * Implementação de produção do {@link FaultInjector}: no-op absoluto.
  *
  * <p>Não é {@code @Alternative}: é o bean padrão. O teste substitui por uma
  * {@code @Alternative @Priority} declarada apenas em {@code src/test}, de modo que nenhuma classe

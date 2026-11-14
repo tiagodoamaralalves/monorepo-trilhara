@@ -12,7 +12,7 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
 /**
- * Escrita recusada pelo MongoDB (D-04).
+ * Escrita recusada pelo MongoDB.
  *
  * <p>Chave duplicada ({@code E11000}) que não foi capturada como idempotência por um
  * repositório vira {@code 409 DUPLICATE_RESOURCE}; qualquer outra falha de escrita vira

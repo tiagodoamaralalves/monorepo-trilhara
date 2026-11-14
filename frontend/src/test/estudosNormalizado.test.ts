@@ -3,10 +3,10 @@ import { EstudosService, topicosConcluidosDe } from '../modules/estudos/services
 import type { TrilhaResumoDTO, TrilhaDetalheDTO } from '../modules/estudos/types/trilhara';
 
 /**
- * Contratos de Estudos após a R3: o serviço devolve os DTOs do backend sem adaptadores
- * (D-11/DC-05) e o progresso é derivado de `topicosConcluidosIds`.
+ * Contratos de Estudos após a o serviço devolve os DTOs do backend sem adaptadores
+ * e o progresso é derivado de `topicosConcluidosIds`.
  */
-describe('EstudosService e Contratos Normalizados (R3)', () => {
+describe('EstudosService e Contratos Normalizados', () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {

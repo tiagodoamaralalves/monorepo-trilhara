@@ -178,7 +178,7 @@ public class UserService {
                 .toList();
     }
 
-    /** Preferências persistidas com defaults normativos (D-10). */
+    /** Preferências persistidas com defaults normativos. */
     public PreferenciasDTO preferenciasDe(String usuarioId) {
         ObjectId alvo = BsonIds.parse(usuarioId, "usuarioId");
         String tema = repository.obterTema(alvo).orElse(PreferenciasDTO.TEMA_PADRAO);

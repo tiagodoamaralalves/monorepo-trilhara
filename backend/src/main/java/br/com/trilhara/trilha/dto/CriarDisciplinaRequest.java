@@ -13,7 +13,7 @@ import jakarta.validation.constraints.Size;
  *
  * <p>O limite de 500 tópicos não é declarado com {@code @Size}: limite de acervo é conflito
  * de estado com os dados atuais do usuário e responde {@code 409 RESOURCE_LIMIT_EXCEEDED} no
- * serviço, nunca {@code 400} de sintaxe do payload (D-04).</p>
+ * serviço, nunca {@code 400} de sintaxe do payload.</p>
  */
 public record CriarDisciplinaRequest(
         String id,

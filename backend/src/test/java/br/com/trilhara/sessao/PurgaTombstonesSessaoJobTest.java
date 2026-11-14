@@ -23,14 +23,14 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 
 /**
- * Purga de tombstones de sessão (D-15).
+ * Purga de tombstones de sessão.
  *
  * <p>O tombstone é retido por 24h para bloquear recriação acidental em retry de idempotência;
  * depois disso, o job horário ({@link PurgaTombstonesSessaoJob}, via {@code @SystemScope})
  * remove o documento definitivamente e libera a chave.</p>
  */
 @QuarkusTest
-@DisplayName("R4 - Purga de tombstones de sessão (D-15)")
+@DisplayName("Purga de tombstones de sessão")
 class PurgaTombstonesSessaoJobTest {
 
     @Inject
@@ -56,7 +56,7 @@ class PurgaTombstonesSessaoJobTest {
         ObjectId usuarioId = new ObjectId();
         Usuario u = new Usuario(
                 usuarioId.toHexString(),
-                "Usuario Purga R4",
+                "Usuario Purga ",
                 "purga-r4-" + usuarioId.toHexString() + "@trilhara.com.br",
                 "$pbkdf2-sha512$mock",
                 List.of(Role.USER),
@@ -72,7 +72,7 @@ class PurgaTombstonesSessaoJobTest {
         return usuarioId;
     }
 
-    /** Tombstone mínimo cru: apenas os campos que D-15 permite reter. */
+    /** Tombstone mínimo cru: apenas os campos que permite reter. */
     private ObjectId inserirTombstone(ObjectId usuarioId, Instant deletedAt) {
         ObjectId id = new ObjectId();
         colecaoSessoes().insertOne(new Document("_id", id)

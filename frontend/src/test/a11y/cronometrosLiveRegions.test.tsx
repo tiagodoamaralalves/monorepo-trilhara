@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { SyncStatusBadge } from '../../shared/design-system/SyncStatusBadge/SyncStatusBadge';
 
 /**
- * Regiões vivas dos cronômetros e do indicador de sincronização (D-37/D-40).
+ * Regiões vivas dos cronômetros e do indicador de sincronização.
  *
  * Os dígitos que mudam a cada segundo ficam em `role="timer"` com
  * `aria-live="off"`; apenas mudanças de estado (início, pausa, término, erro) são

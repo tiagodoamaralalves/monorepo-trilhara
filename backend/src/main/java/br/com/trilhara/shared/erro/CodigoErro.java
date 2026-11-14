@@ -5,7 +5,7 @@ import java.util.Locale;
 import jakarta.ws.rs.core.Response;
 
 /**
- * Catálogo fechado de códigos de erro de máquina do Trilhara (D-04).
+ * Catálogo fechado de códigos de erro de máquina do Trilhara.
  *
  * <p>Cada entrada fixa o status HTTP, o {@code title} em pt-BR e o {@code type} RFC 9457
  * derivado do próprio nome: {@code urn:trilhara:problem:<code-em-kebab-case>}.</p>
@@ -77,7 +77,7 @@ public enum CodigoErro {
         return title;
     }
 
-    /** {@code urn:trilhara:problem:<code-em-kebab-case>} — URI estável por código (D-04). */
+    /** {@code urn:trilhara:problem:<code-em-kebab-case>} — URI estável por código. */
     public String typeUri() {
         return PREFIXO_TYPE + name().toLowerCase(Locale.ROOT).replace('_', '-');
     }

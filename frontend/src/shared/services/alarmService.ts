@@ -1,8 +1,8 @@
 /**
  * Serviço de Alarmes e Notificações do Cronômetro Trilhara
- * - Síntese de áudio via Web Audio API (tons harmônicos de sino, sem dependência de arquivos externos)
- * - Notificações nativas do navegador (Desktop / OS Notification API)
- * - Alerta visual de alternância no título da aba
+ * Síntese de áudio via Web Audio API (tons harmônicos de sino, sem dependência de arquivos externos)
+ * Notificações nativas do navegador (Desktop / OS Notification API)
+ * Alerta visual de alternância no título da aba
  */
 
 import { registrarFalha } from '@shared/diagnostico';
@@ -150,8 +150,8 @@ export const AlarmService = {
   // Disparos dos 3 alarmes solicitados:
 
   /**
-   * Alarme 1: Fim do tempo predefinido do bloco atual (duracaoMinutos)
-   */
+ * Alarme 1: Fim do tempo predefinido do bloco atual (duracaoMinutos)
+ */
   dispararAlarmeFimMeta(duracaoMinutos: number) {
     if (this.isSomAtivado()) {
       soundEngine.playMetaConcluida();
@@ -163,8 +163,8 @@ export const AlarmService = {
   },
 
   /**
-   * Alarme 2: Fim da pausa curta
-   */
+ * Alarme 2: Fim da pausa curta
+ */
   dispararAlarmeFimPausaCurta() {
     if (this.isSomAtivado()) {
       soundEngine.playPausaCurtaConcluida();
@@ -176,8 +176,8 @@ export const AlarmService = {
   },
 
   /**
-   * Alarme 3: Fim da pausa longa
-   */
+ * Alarme 3: Fim da pausa longa
+ */
   dispararAlarmeFimPausaLonga() {
     if (this.isSomAtivado()) {
       soundEngine.playPausaLongaConcluida();
@@ -189,8 +189,8 @@ export const AlarmService = {
   },
 
   /**
-   * Teste sonoro
-   */
+ * Teste sonoro
+ */
   tocarTeste() {
     soundEngine.playTeste();
   }

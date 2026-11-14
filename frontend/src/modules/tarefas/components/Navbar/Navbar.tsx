@@ -87,7 +87,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         />
       }
     >
-      {/* ── ÁREA DE MINHAS LISTAS E TRILHAS DE ESTUDO (FASE 7) ── */}
+      {/* ── ÁREA DE MINHAS LISTAS E TRILHAS DE ESTUDO ── */}
       <MinhasListasNav
         listas={listas}
         listaSelecionadaId={listaSelecionadaId}

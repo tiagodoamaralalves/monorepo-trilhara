@@ -17,14 +17,14 @@ import br.com.trilhara.shared.erro.ProblemDetails;
 import br.com.trilhara.shared.erro.ProblemDetailsFactory;
 
 /**
- * Catálogo fechado de erros (D-04).
+ * Catálogo fechado de erros.
  *
  * <p>Valida que cada {@link CodigoErro} produz um {@link ProblemDetails} coerente:
  * {@code status}, {@code type} no padrão {@code urn:trilhara:problem:<kebab>},
  * {@code code} igual ao nome do enum, {@code instance} normalizado e serialização sem
  * campo {@code errors} quando vazio.</p>
  */
-@DisplayName("R1 - Catálogo fechado de códigos de erro (RFC 9457)")
+@DisplayName("Catálogo fechado de códigos de erro (RFC 9457)")
 class ProblemDetailsCatalogoTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -58,7 +58,7 @@ class ProblemDetailsCatalogoTest {
     }
 
     @Test
-    @DisplayName("Catálogo não contém códigos legados removidos por D-04")
+    @DisplayName("Catálogo não contém códigos legados removidos por")
     void catalogoNaoContemCodigosLegados() {
         for (CodigoErro codigo : CodigoErro.values()) {
             assertFalse(codigo.name().equals("PAYLOAD_TOO_LARGE"), "PAYLOAD_TOO_LARGE foi removido");

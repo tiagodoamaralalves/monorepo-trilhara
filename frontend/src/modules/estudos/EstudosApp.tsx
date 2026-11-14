@@ -31,7 +31,7 @@ import {
   EDITAIS_VITRINE_FALLBACK,
   importarOuClonarEdital
 } from './data/catalogoVitrine';
-import { AvisoContaExcluida, PageBanner, useToast } from '@shared/design-system';
+import { AvisoContaExcluida, PageBanner, SectionErrorCard, useToast } from '@shared/design-system';
 import { BarChart2, BookOpen, Calendar } from 'lucide-react';
 import { EmptyJourneyState } from './components/EmptyJourneyState/EmptyJourneyState';
 import styles from './App.module.css';
@@ -214,7 +214,7 @@ export default function EstudosApp() {
     if (isAuthenticated && (paginaAtiva === 'landing' || paginaAtiva === 'login' || paginaAtiva === 'cadastro')) {
       const returnUrl = sanitizarReturnUrl(new URLSearchParams(window.location.search).get('returnUrl'));
       if (returnUrl && usuario) {
-        // D-09/D-12: navegação por handoff opaco; token nunca vai na URL.
+        // navegação por handoff opaco; token nunca vai na URL.
         void iniciarHandoffParaApp(returnUrl).then((destino) => {
           window.location.href = destino;
         });
@@ -320,10 +320,10 @@ export default function EstudosApp() {
   };
 
   /**
-   * R5/D-19: "Estudar este bloco" inicia o timer global com o `blocoId` do cronograma.
-   * A conclusão do bloco deixa de passar por estado local de planejamento — quem conclui é o
-   * `GlobalSessionModal` (PATCH idempotente), então não há mais revisão/rollback local.
-   */
+ * "Estudar este bloco" inicia o timer global com o `blocoId` do cronograma.
+ * A conclusão do bloco deixa de passar por estado local de planejamento — quem conclui é o
+ * `GlobalSessionModal` (PATCH idempotente), então não há mais revisão/rollback local.
+ */
   const iniciarCronometroPlanejado = (
     disciplinaId: string,
     registro: RegistroBlocoPendente
@@ -545,10 +545,17 @@ export default function EstudosApp() {
 
       {/* Conteúdo da Página */}
       <main className={styles.main}>
-        {statusLista === 'carregando' || (carregandoDetalhe && paginaAtiva !== 'hub' && !trilhaAtivaDetalhe) ? (
+        {(statusLista === 'carregando' && paginaAtiva !== 'hub') ||
+        (carregandoDetalhe && paginaAtiva !== 'hub' && !trilhaAtivaDetalhe) ? (
           <div className={styles.loading}>
             Carregando trilha e assuntos...
           </div>
+        ) : statusLista === 'erro' && paginaAtiva !== 'hub' ? (
+          <SectionErrorCard
+            titulo="Não foi possível carregar as trilhas"
+            descricao="Verifique sua conexão e tente novamente."
+            onRetry={() => void carregarTrilhas()}
+          />
         ) : (
           <>
             {paginaAtiva === 'hub' && (

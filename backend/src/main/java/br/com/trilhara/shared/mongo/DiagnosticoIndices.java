@@ -3,12 +3,12 @@ package br.com.trilhara.shared.mongo;
 import java.util.List;
 
 /**
- * Diagnóstico da reconciliação de índices (D-07).
+ * Diagnóstico da reconciliação de índices.
  *
  * @param conflitos índices declarados cujo nome existe com chave/opções divergentes, cuja
- *                  mesma chave já existe sob outro nome ou que falharam ao ser criados
- * @param drift     índices com prefixo {@code idx_}/{@code uk_} presentes no banco e não
- *                  declarados na tabela canônica (reportados, nunca removidos)
+ * mesma chave já existe sob outro nome ou que falharam ao ser criados
+ * @param drift índices com prefixo {@code idx_}/{@code uk_} presentes no banco e não
+ * declarados na tabela canônica (reportados, nunca removidos)
  */
 public record DiagnosticoIndices(List<ConflitoIndice> conflitos, List<String> drift) {
 

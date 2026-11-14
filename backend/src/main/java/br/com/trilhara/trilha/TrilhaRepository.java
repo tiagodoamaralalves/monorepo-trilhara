@@ -181,12 +181,12 @@ public class TrilhaRepository {
     }
 
     /**
-     * Renova o lease <strong>somente</strong> se o token ainda for o dono (fencing).
-     *
-     * <p>Base do heartbeat de 30 s (D-18a): se a renovação retornar {@code false}, o token foi
-     * perdido (lease expirado e retomado por outro worker) e a publicação precisa ser abortada
-     * sem trocar o ponteiro.</p>
-     */
+ * Renova o lease <strong>somente</strong> se o token ainda for o dono (fencing).
+ *
+ * <p>Base do heartbeat de 30 s: se a renovação retornar {@code false}, o token foi
+ * perdido (lease expirado e retomado por outro worker) e a publicação precisa ser abortada
+ * sem trocar o ponteiro.</p>
+ */
     public boolean renovarLease(ObjectId usuarioId, ObjectId trilhaId, String leaseToken, Instant expiraEm) {
         Bson filtro = and(
                 eq("_id", trilhaId),
@@ -210,13 +210,13 @@ public class TrilhaRepository {
     }
 
     /**
-     * Incrementa e devolve o contador atômico de versões do cronograma da trilha
-     * ({@code trilhas.proximaVersaoCronograma}).
-     *
-     * <p>Garante que duas gerações concorrentes nunca reutilizem a mesma {@code versaoGeracao},
-     * mesmo quando o lease é retomado após expiração. Retorna vazio quando a trilha não existe
-     * para o usuário.</p>
-     */
+ * Incrementa e devolve o contador atômico de versões do cronograma da trilha
+ * ({@code trilhas.proximaVersaoCronograma}).
+ *
+ * <p>Garante que duas gerações concorrentes nunca reutilizem a mesma {@code versaoGeracao},
+ * mesmo quando o lease é retomado após expiração. Retorna vazio quando a trilha não existe
+ * para o usuário.</p>
+ */
     public Optional<Long> proximaVersaoCronograma(ObjectId usuarioId, ObjectId trilhaId) {
         Document resultado = trilhas.findOneAndUpdate(
                 and(eq("_id", trilhaId), filtroUsuario(usuarioId)),
@@ -232,13 +232,13 @@ public class TrilhaRepository {
     }
 
     /**
-     * Troca o ponteiro de leitura de blocos da trilha ({@code cronogramaAtivoId} +
-     * {@code versaoAtivaCronograma}) em uma única operação atômica.
-     *
-     * <p><b>Fencing (D-18):</b> o filtro exige que o {@code leaseToken} ainda seja o dono do
-     * lease. Um worker que perdeu o token não altera o ponteiro, mesmo que já tenha inserido
-     * os blocos de staging.</p>
-     */
+ * Troca o ponteiro de leitura de blocos da trilha ({@code cronogramaAtivoId} +
+ * {@code versaoAtivaCronograma}) em uma única operação atômica.
+ *
+ * <p><b>Fencing:</b> o filtro exige que o {@code leaseToken} ainda seja o dono do
+ * lease. Um worker que perdeu o token não altera o ponteiro, mesmo que já tenha inserido
+ * os blocos de staging.</p>
+ */
     public boolean atualizarPonteiroCronogramaAtivo(
             ObjectId usuarioId,
             ObjectId trilhaId,
@@ -259,10 +259,10 @@ public class TrilhaRepository {
     }
 
     /**
-     * Variante sem fencing usada <strong>exclusivamente</strong> pelo reconciliador
-     * ({@code @SystemScope}, D-18b): após a morte de um worker, o lease já não pertence a ninguém,
-     * e a reconciliação precisa conseguir fechar a publicação.
-     */
+ * Variante sem fencing usada <strong>exclusivamente</strong> pelo reconciliador
+ * ({@code @SystemScope}, ): após a morte de um worker, o lease já não pertence a ninguém,
+ * e a reconciliação precisa conseguir fechar a publicação.
+ */
     public boolean atualizarPonteiroCronogramaAtivoSemFencing(
             ObjectId usuarioId, ObjectId trilhaId, ObjectId cronogramaAtivoId, Long versaoAtivaCronograma) {
         Bson filtro = and(eq("_id", trilhaId), filtroUsuario(usuarioId));
@@ -286,7 +286,7 @@ public class TrilhaRepository {
         var db = mongoClient.getDatabase(databaseName);
 
         // 1. Cronogramas e blocos são removidos pelos próprios repositórios sob o lease da
-        //    trilha (R5). Esta classe só desvincula referências de cadernos, seções e notas.
+        // trilha. Esta classe só desvincula referências de cadernos, seções e notas.
 
         // 2. Desvincula cadernos
         db.getCollection("cadernos").updateMany(
@@ -318,7 +318,7 @@ public class TrilhaRepository {
                     Updates.combine(Updates.unset(CAMPO_ORIGEM_TRILHA_ID), Updates.unset(CAMPO_ORIGEM_DISCIPLINA_ID)));
         }
 
-        // 4. Desvincula notas (referência de origem da importação de trilha, D-29).
+        // 4. Desvincula notas (referência de origem da importação de trilha, ).
         if (topicoIds != null && !topicoIds.isEmpty()) {
             db.getCollection("notas").updateMany(
                     and(

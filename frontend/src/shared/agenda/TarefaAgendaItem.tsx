@@ -28,15 +28,15 @@ export interface TarefaAgendaItemProps {
   /** Conclusão é sempre obrigatória: é a mesma ação em Tarefas e Pomodoro. */
   onAlternar: (id: string, concluida: boolean) => void;
   /**
-   * Em Pomodoro o item inteiro é um botão de contexto visual ("Definir como foco").
-   * Em Tarefas o título abre a edição.
-   */
+ * Em Pomodoro o item inteiro é um botão de contexto visual ("Definir como foco").
+ * Em Tarefas o título abre a edição.
+ */
   onSelecionar?: (tarefa: TarefaDTO) => void;
   selecionado?: boolean;
 }
 
 /**
- * Linha única de tarefa manual da Visão Hoje (D-23/D-46).
+ * Linha única de tarefa manual da Visão Hoje.
  *
  * Vive em `shared/agenda` porque Tarefas e Pomodoro precisam renderizar exatamente o mesmo
  * item; a densidade muda apenas tipografia e espaçamento, nunca o conteúdo.

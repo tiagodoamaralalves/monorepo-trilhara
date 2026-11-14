@@ -21,11 +21,11 @@ import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 
 /**
- * D-05/SEC-07: propriedade desconhecida (mass assignment) no corpo falha com
+ * propriedade desconhecida (mass assignment) no corpo falha com
  * {@code 400 VALIDATION_ERROR} e {@code errors[propriedade]} em vez de ser ignorada.
  */
 @QuarkusTest
-@DisplayName("R1 - Mass assignment e propriedade desconhecida (D-05)")
+@DisplayName("Mass assignment e propriedade desconhecida")
 class MassAssignmentTest {
 
     private static final String API_TRILHAS = "/api/trilhas";

@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Fábrica única de {@link ProblemDetails} do Trilhara (D-04).
+ * Fábrica única de {@link ProblemDetails} do Trilhara.
  *
  * <p>Todos os mapeadores delegam para cá. Isso garante que todo erro use
  * {@link ProblemDetails#MEDIA_TYPE}, {@code type} no padrão
@@ -15,9 +15,9 @@ import java.util.UUID;
  *
  * <p>Regras fixas:</p>
  * <ul>
- *   <li>{@code instance} é o path da requisição com barra inicial e <strong>sem</strong> query string;</li>
- *   <li>{@code detail} é texto em pt-BR, sem stack trace, SQL, consulta ou valor enviado pelo cliente;</li>
- *   <li>o header {@code X-Correlation-ID} acompanha toda resposta de erro 5xx.</li>
+ * <li>{@code instance} é o path da requisição com barra inicial e <strong>sem</strong> query string;</li>
+ * <li>{@code detail} é texto em pt-BR, sem stack trace, SQL, consulta ou valor enviado pelo cliente;</li>
+ * <li>o header {@code X-Correlation-ID} acompanha toda resposta de erro 5xx.</li>
  * </ul>
  */
 public final class ProblemDetailsFactory {
@@ -65,9 +65,9 @@ public final class ProblemDetailsFactory {
     }
 
     /**
-     * Normaliza o path usado como {@code instance}: barra inicial, sem query string
-     * e nunca nulo (vira {@code "/"}).
-     */
+ * Normaliza o path usado como {@code instance}: barra inicial, sem query string
+ * e nunca nulo (vira {@code "/"}).
+ */
     public static String normalizarInstance(String rawPath) {
         if (rawPath == null || rawPath.isBlank()) {
             return "/";

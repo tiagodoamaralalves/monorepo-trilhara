@@ -1,7 +1,7 @@
 package br.com.trilhara.shared.erro;
 
 /**
- * Identificador HTTP malformado (não é hexadecimal de 24 caracteres) → {@code 400 INVALID_IDENTIFIER} (D-03).
+ * Identificador HTTP malformado (não é hexadecimal de 24 caracteres) → {@code 400 INVALID_IDENTIFIER}.
  *
  * <p>Recurso de outro usuário ou inexistente continua respondendo {@code 404 NOT_FOUND},
  * sem revelar existência.</p>

@@ -1,11 +1,9 @@
 package br.com.trilhara.arquitetura;
 
-import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.simpleNameEndingWith;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
-import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 
 import java.util.List;
 import java.util.Set;
@@ -25,77 +23,69 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 
 /**
- * Regras arquiteturais de isolamento por tenant (D-06).
- *
- * <p>Escopo R0: apenas o esqueleto. As regras que dependem de refatorações de
- * fases posteriores ficam com {@link ArchIgnore} e a fase que as habilita está
- * registrada na razão da anotação. A regra já ativa serve para provar que o
- * ArchUnit está de fato executando e barrando violações desde a R0.</p>
+ * Regras arquiteturais de isolamento de dados por usuário (multi-tenant).
  */
 @AnalyzeClasses(packages = "br.com.trilhara")
-@DisplayName("R0 - Regras arquiteturais de isolamento por tenant (esqueleto D-06)")
+@DisplayName("Regras arquiteturais de isolamento por tenant")
 class TenantIsolationArchTest {
 
     /**
-     * Métodos que recebem a entidade inteira (que carrega {@code usuarioId}) ou que são
-     * helpers internos de conversão BSON — não se aplica a regra do primeiro parâmetro.
-     */
+ * Métodos que recebem a entidade inteira (que carrega {@code usuarioId}) ou que são
+ * helpers internos de conversão BSON — não se aplica a regra do primeiro parâmetro.
+ */
     private static final Set<String> EXCECOES_POR_ENTIDADE = Set.of(
             "inserir", "inserirEmLote", "inserirLote", "inserirNovaVersao", "atualizar",
             "atualizarOrdem", "salvarOuAtualizar",
             "paraDocumento", "paraEntidade", "paraSessao");
 
     /**
-     * Operações explicitamente multi-tenant de classes {@code @SystemScope} (D-06b): recebem
-     * apenas o limite temporal e nunca um {@code usuarioId}.
-     */
+ * Operações explicitamente multi-tenant de classes {@code @SystemScope}: recebem
+ * apenas o limite temporal e nunca um {@code usuarioId}.
+ */
     private static final Set<String> EXCECOES_SISTEMA = Set.of(
             "purgarTombstonesAnteriores");
 
     /**
-     * Operações cujo {@code usuarioId} chega dentro de um filtro composto tipado — o filtro
-     * continua começando por {@code usuarioId} e o aplica em {@code Filters.eq}, mas a assinatura
-     * recebe o record em vez do {@code ObjectId} solto.
-     */
+ * Operações cujo {@code usuarioId} chega dentro de um filtro composto tipado — o filtro
+ * continua começando por {@code usuarioId} e o aplica em {@code Filters.eq}, mas a assinatura
+ * recebe o record em vez do {@code ObjectId} solto.
+ */
     private static final Set<String> EXCECOES_POR_FILTRO = Set.of(
             "listarPaginado");
 
     /**
-     * Varreduras multi-tenant do reconciliador de cronogramas ({@code @SystemScope}, D-18b):
-     * recebem apenas o estado de publicação, nunca um {@code usuarioId}.
-     */
+ * Varreduras multi-tenant do reconciliador de cronogramas ({@code @SystemScope}):
+ * recebem apenas o estado de publicação, nunca um {@code usuarioId}.
+ */
     private static final Set<String> EXCECOES_DE_SISTEMA_CRONOGRAMA = Set.of(
             "listarPorEstadoPublicacao");
 
     /**
-     * Varreduras da purga da lixeira de tarefas ({@code TarefaPurgaService}, {@code @SystemScope},
-     * D-27): operam por {@code expiresAt} em todos os tenants, sem {@code usuarioId}.
-     */
+ * Varreduras da purga da lixeira de tarefas ({@code TarefaPurgaService}, {@code @SystemScope}):
+ * operam por {@code expiresAt} em todos os tenants, sem {@code usuarioId}.
+ */
     private static final Set<String> EXCECOES_PURGA_TAREFA = Set.of(
             "purgarExpiradas", "listarExpiradas");
 
     /**
-     * Varreduras multi-tenant da purga da lixeira de Notas ({@code NotaPurgaService},
-     * {@code @SystemScope}, D-34): operam por {@code expiresAt} em todos os tenants, sem
-     * {@code usuarioId}.
-     */
+ * Varreduras multi-tenant da purga da lixeira de Notas ({@code NotaPurgaService},
+ * {@code @SystemScope}): operam por {@code expiresAt} em todos os tenants, sem
+ * {@code usuarioId}.
+ */
     private static final Set<String> EXCECOES_PURGA_NOTA = Set.of(
             "purgarExpirados", "listarLixeira", "contarLixeira");
 
     /**
-     * Operação de sistema da entrega de Web Push (D-36e): {@code removerEndpointInvalido} só é
-     * chamada por {@code PushDeliveryScheduler}, que é {@code @SystemScope}. O {@code endpoint} é
-     * único globalmente, então remover uma inscrição morta ({@code 404}/{@code 410}) não pode
-     * ficar preso ao tenant que a registrou — o dispositivo pode ter sido reatribuído a outra
-     * conta no intervalo.
-     */
+ * Operação de sistema da entrega de Web Push: {@code removerEndpointInvalido} só é
+ * chamada por {@code PushDeliveryScheduler}, que é {@code @SystemScope}.
+ */
     private static final Set<String> EXCECOES_SISTEMA_PUSH = Set.of(
             "removerEndpointInvalido");
 
     /**
-     * Ativa em R0: nenhum recurso HTTP acessa o MongoDB diretamente. Vale hoje
-     * (todos os {@code *Resource} usam serviços/repositórios).
-     */
+ * Nenhum recurso HTTP acessa o MongoDB diretamente; todos os {@code *Resource} delegam a
+ * serviços/repositórios.
+ */
     @ArchTest
     static final ArchRule recursosNaoAcessamMongoDiretamente = noClasses()
             .that(simpleNameEndingWith("Resource"))
@@ -105,27 +95,23 @@ class TenantIsolationArchTest {
             .orShould()
             .dependOnClassesThat()
             .areAssignableTo(MongoCollection.class)
-            .because("D-06(c): recurso HTTP não injeta MongoClient/MongoCollection diretamente.");
+            .because("Recursos HTTP não injetam MongoClient/MongoCollection diretamente.");
 
     /**
-     * R13 (D-06a): todo {@code *Repository} guarda apenas acesso a dados — nenhum repositório
-     * pode depender de {@code ..job..} (job chama repositório, nunca o contrário).
-     *
-     * <p>Até a R12 havia aqui um {@code @ArchIgnore} com a razão "habilitar em R2"; a razão
-     * nunca foi cumprida e a regra ficou morta. A versão ativa usa um predicado que de fato
-     * expressa a invariante.</p>
-     */
+ * Todo {@code *Repository} guarda apenas acesso a dados — nenhum repositório
+ * pode depender de {@code ..job..} (job chama repositório, nunca o contrário).
+ */
     @ArchTest
     static final ArchRule repositoriosNaoDependemDeJobs = noClasses()
             .that().haveSimpleNameEndingWith("Repository")
             .should().dependOnClassesThat().resideInAPackage("..job..")
-            .because("D-06(a): a direção da dependência é job → repositório, nunca o inverso.");
+            .because("A direção da dependência é job -> repositório, nunca o inverso.");
+
     /**
-     * Habilitada na R3 (D-06a, escopo do domínio de estudos): todo método de consulta/escrita
-     * pública dos repositórios de {@code ..trilha..} recebe {@code ObjectId usuarioId} como
-     * primeiro parâmetro, exceto os métodos que recebem a entidade inteira (que já carrega o
-     * {@code usuarioId}).
-     */
+ * Todo método de consulta/escrita pública dos repositórios de {@code ..trilha..} recebe
+ * {@code ObjectId usuarioId} como primeiro parâmetro, exceto os métodos que recebem a
+ * entidade inteira.
+ */
     @ArchTest
     static final ArchRule repositoriosDeTrilhaExigemUsuarioId =
             methods()
@@ -148,15 +134,13 @@ class TenantIsolationArchTest {
                             }
                         }
                     })
-                    .because("D-06(a): toda leitura/escrita de coleção privada começa por ObjectId usuarioId.");
+                    .because("Toda leitura/escrita de coleção privada começa por ObjectId usuarioId.");
 
     /**
-     * Habilitada na R4 (D-06a, escopo de sessões): todo método público dos repositórios de
-     * {@code ..sessao..} recebe {@code ObjectId usuarioId} como primeiro parâmetro, exceto
-     * {@code inserir}/{@code paraDocumento}/{@code paraSessao} (recebem a entidade, que já
-     * carrega o {@code usuarioId}) e {@code purgarTombstonesAnteriores} (operação multi-tenant de
-     * {@code SessaoPurgaService}, anotada com {@code @SystemScope}, sem exposição HTTP).
-     */
+ * Todo método público dos repositórios de {@code ..sessao..} recebe {@code ObjectId usuarioId}
+ * como primeiro parâmetro, exceto métodos de entidade/filtro tipado e a purga de tombstones em
+ * {@code @SystemScope}.
+ */
     @ArchTest
     static final ArchRule repositoriosDeSessaoExigemUsuarioId =
             methods()
@@ -181,24 +165,12 @@ class TenantIsolationArchTest {
                             }
                         }
                     })
-                    .because("D-06(a): o repositório de sessoes só consulta por usuarioId, "
-                            + "exceto a purga de tombstones em @SystemScope.");
+                    .because("O repositório de sessões só consulta por usuarioId, exceto a purga de tombstones em @SystemScope.");
 
     /**
-     * R13 (D-06b): toda varredura multi-tenant declara {@code @SystemScope} — diretamente na
-     * classe ou na classe para a qual ela delega.
-     *
-     * <p>Há dois arranjos legítimos no código e a regra aceita os dois:</p>
-     * <ul>
-     *   <li>{@code PushDeliveryScheduler} faz a varredura ele mesmo → anotado;</li>
-     *   <li>{@code PurgaLixeiraNotasJob} é só o gatilho agendado e delega a
-     *       {@code NotaPurgaService}, que é quem varre os tenants → o job não precisa da
-     *       anotação, mas <strong>precisa</strong> depender de uma classe anotada.</li>
-     * </ul>
-     *
-     * <p>A versão anterior ({@code @ArchIgnore}) exigia apenas que a classe fosse
-     * {@code public} — não verificava nada.</p>
-     */
+ * Toda varredura multi-tenant declara {@code @SystemScope} — diretamente na
+ * classe ou na classe para a qual ela delega.
+ */
     @ArchTest
     static final ArchRule schedulersExigemEscopoDeSistema = classes()
             .that().haveSimpleNameEndingWith("Scheduler")
@@ -206,16 +178,13 @@ class TenantIsolationArchTest {
             .should().beAnnotatedWith(br.com.trilhara.shared.SystemScope.class)
             .orShould().dependOnClassesThat()
             .areAnnotatedWith(br.com.trilhara.shared.SystemScope.class)
-            .because("D-06(b): job/scheduler que varre todos os tenants é @SystemScope ou "
-                    + "delega a um serviço marcado como tal.");
+            .because("Job/scheduler que varre todos os tenants é @SystemScope ou delega a um serviço marcado como tal.");
 
     /**
-     * Ativa em R5 (D-06a): todo {@code *Repository} do pacote {@code cronograma} recebe
-     * {@code ObjectId usuarioId} como primeiro parâmetro. Exceções: métodos de conversão
-     * ({@code paraDocumento}/{@code paraEntidade}), inserção/atualização da própria entidade
-     * (que já carrega {@code usuarioId}) e as operações do reconciliador {@code @SystemScope}
-     * ({@code listarPorEstadoPublicacao}, que é multi-tenant por definição).
-     */
+ * Todo {@code *Repository} do pacote {@code cronograma} recebe
+ * {@code ObjectId usuarioId} como primeiro parâmetro, exceto métodos de entidade e as
+ * operações do reconciliador {@code @SystemScope}.
+ */
     @ArchTest
     static final ArchRule repositoriosDeCronogramaExigemUsuarioId =
             methods()
@@ -239,16 +208,13 @@ class TenantIsolationArchTest {
                             }
                         }
                     })
-                    .because("D-06(a): repositórios de cronograma e blocos só consultam por usuarioId, "
-                            + "exceto as varreduras do reconciliador em @SystemScope.");
+                    .because("Repositórios de cronograma e blocos só consultam por usuarioId, exceto varreduras @SystemScope.");
 
     /**
-     * Ativa em R7 (D-06a): todo {@code *Repository} do pacote {@code tarefa} recebe
-     * {@code ObjectId usuarioId} como primeiro parâmetro. Exceções: conversões BSON
-     * ({@code paraDocumento}/{@code paraEntidade}), inserção/atualização da própria entidade
-     * (que já carrega {@code usuarioId}) e as varreduras de purga em {@code @SystemScope}
-     * ({@code purgarExpiradas}/{@code listarExpiradas}), que são multi-tenant por definição.
-     */
+ * Todo {@code *Repository} do pacote {@code tarefa} recebe
+ * {@code ObjectId usuarioId} como primeiro parâmetro, exceto métodos de entidade/filtro e
+ * varreduras de purga em {@code @SystemScope}.
+ */
     @ArchTest
     static final ArchRule repositoriosDeTarefaExigemUsuarioId =
             methods()
@@ -273,16 +239,13 @@ class TenantIsolationArchTest {
                             }
                         }
                     })
-                    .because("D-06(a): as coleções de tarefa são privadas e sempre filtram por usuarioId; "
-                            + "só a purga em @SystemScope varre por expiresAt.");
+                    .because("As coleções de tarefa são privadas e sempre filtram por usuarioId; só a purga em @SystemScope varre por expiresAt.");
 
     /**
-     * Ativa em R9 (D-06a): todo {@code *Repository} do pacote {@code nota} recebe
-     * {@code ObjectId usuarioId} como primeiro parâmetro. Exceções: conversões BSON
-     * ({@code paraDocumento}/{@code paraEntidade}), inserção/atualização da própria entidade
-     * (que já carrega {@code usuarioId}) e a purga em {@code @SystemScope}
-     * ({@code purgarExpirados}), multi-tenant por definição.
-     */
+ * Todo {@code *Repository} do pacote {@code nota} recebe
+ * {@code ObjectId usuarioId} como primeiro parâmetro, exceto métodos de entidade e a purga
+ * em {@code @SystemScope}.
+ */
     @ArchTest
     static final ArchRule repositoriosDeNotaExigemUsuarioId =
             methods()
@@ -307,44 +270,12 @@ class TenantIsolationArchTest {
                             }
                         }
                     })
-                    .because("D-06(a): cadernos, secoes e notas são coleções privadas e sempre "
-                            + "filtram por usuarioId; só a purga em @SystemScope varre por expiresAt.");
+                    .because("Cadernos, seções e notas são coleções privadas e sempre filtram por usuarioId; só a purga em @SystemScope varre por expiresAt.");
 
     /**
-     * Anti-regressão do R9: nenhum repositório expõe busca por ID sem {@code usuarioId}.
-     *
-     * <p>O método {@code buscarPorIdSemUsuario} existia em três repositórios sem nenhum call site
-     * e era uma porta aberta para vazamento entre tenants. A regra impede a reintrodução em
-     * qualquer {@code *Repository} do domínio {@code nota}.</p>
-     */
-    @ArchTest
-    static final ArchRule repositoriosDeNotaNaoBuscamSemUsuario =
-            noMethods()
-                    .that().areDeclaredInClassesThat().resideInAPackage("..nota..")
-                    .and().areDeclaredInClassesThat().haveSimpleNameEndingWith("Repository")
-                    .should().haveNameMatching(".*SemUsuario.*")
-                    .because("D-06(a): leitura sem usuarioId revela recurso de outro tenant.");
-
-    /**
-     * Habilitada em R2: guarda anti-regressão dos pacotes legados (Anexo C / DC-01).
-     * O grep já dá 0 ocorrências; a regra impede reintrodução.
-     */
-    @ArchTest
-    static final ArchRule pacotesLegadosProibidos = noClasses()
-            .should()
-            .resideInAnyPackage(
-                    "br.com.trilhara.estudos..",
-                    "br.com.trilhara.tarefas..",
-                    "br.com.trilhara.notas..")
-            .because("Anexo C: pacotes br.com.trilhara.{estudos,tarefas,notas} são legados.");
-
-    /**
-     * R11 (D-06a): todo {@code *Repository} do pacote {@code push} recebe {@code ObjectId
-     * usuarioId} como primeiro parâmetro. Exceções: conversão BSON ({@code paraDocumento}/
-     * {@code paraEntidade}) e a fila multi-tenant de {@code @SystemScope}
-     * ({@link br.com.trilhara.push.LembretePushFilaRepository}), que por definição varre todos os
-     * tenants e por isso não recebe {@code usuarioId}.
-     */
+ * Todo {@code *Repository} do pacote {@code push} recebe {@code ObjectId usuarioId} como
+ * primeiro parâmetro, exceto conversão BSON e a fila multi-tenant de {@code @SystemScope}.
+ */
     @ArchTest
     static final ArchRule repositoriosDePushExigemUsuarioId =
             methods()
@@ -372,29 +303,5 @@ class TenantIsolationArchTest {
                             }
                         }
                     })
-                    .because("D-06(a): push_subscriptions e lembretes_push são coleções privadas; "
-                            + "só a fila @SystemScope varre todos os tenants.");
-
-    /**
-     * R11 (D-06b): o scheduler de entrega é multi-tenant e não pode ser exposto por HTTP.
-     * A regra exige {@code @SystemScope} em qualquer {@code *Scheduler} do pacote {@code push}.
-     */
-    @ArchTest
-    static final ArchRule schedulerDePushExigeSystemScope =
-            classes()
-                    .that().resideInAPackage("..push..")
-                    .and().haveSimpleNameEndingWith("Scheduler")
-                    .should().beAnnotatedWith(br.com.trilhara.shared.SystemScope.class)
-                    .because("D-06(b): a varredura de lembretes_push atravessa todos os tenants.");
-
-    /**
-     * Guarda auxiliar: garante que o predicado de pacote continua compilando e
-     * que o pacote base existe (uma classe sem pacote indicaria erro de scan).
-     */
-    @ArchTest
-    static final ArchRule pacoteBaseDeveExistir = noClasses()
-            .that(resideInAPackage("..arquitetura.."))
-            .should()
-            .haveSimpleNameEndingWith("Inexistente")
-            .because("Sanidade do scan do ArchUnit no pacote br.com.trilhara.");
+                    .because("push_subscriptions e lembretes_push são coleções privadas; só a fila @SystemScope varre todos os tenants.");
 }

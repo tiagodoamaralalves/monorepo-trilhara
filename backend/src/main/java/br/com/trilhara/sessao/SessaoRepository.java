@@ -131,13 +131,13 @@ public class SessaoRepository {
     }
 
     /**
-     * Converte a sessão em tombstone mínimo por 24h (D-15).
-     *
-     * <p>Após a operação sobram apenas {@code _id, usuarioId, trilhaId, chaveIdempotencia,
-     * requestHash, deletedAt}; todo o conteúdo pessoal e de métricas é removido com
-     * {@code $unset}. Por isso um tombstone nunca aparece em listagem, agregação ou no cálculo
-     * da sessão nº 1 — todas essas consultas filtram {@code deletedAt: null}.</p>
-     */
+ * Converte a sessão em tombstone mínimo por 24h.
+ *
+ * <p>Após a operação sobram apenas {@code _id, usuarioId, trilhaId, chaveIdempotencia,
+ * requestHash, deletedAt}; todo o conteúdo pessoal e de métricas é removido com
+ * {@code $unset}. Por isso um tombstone nunca aparece em listagem, agregação ou no cálculo
+ * da sessão nº 1 — todas essas consultas filtram {@code deletedAt: null}.</p>
+ */
     public boolean marcarTombstone(ObjectId usuarioId, ObjectId trilhaId, ObjectId sessaoId, Instant agora) {
         Bson filtro = and(
                 eq("_id", sessaoId),
@@ -162,14 +162,14 @@ public class SessaoRepository {
     }
 
     /**
-     * Remove definitivamente tombstones cujo {@code deletedAt} é anterior ao limite (D-15).
-     *
-     * <p>Operação de escopo de sistema (sem {@code usuarioId}), executada apenas pelo
-     * {@code PurgaTombstonesSessaoJob} anotado com {@code @SystemScope}. O filtro é explícito:
-     * {@code deletedAt} existe e é anterior a {@code limite}. Sessões vivas nunca são tocadas.</p>
-     *
-     * @return quantidade de tombstones apagados
-     */
+ * Remove definitivamente tombstones cujo {@code deletedAt} é anterior ao limite.
+ *
+ * <p>Operação de escopo de sistema (sem {@code usuarioId}), executada apenas pelo
+ * {@code PurgaTombstonesSessaoJob} anotado com {@code @SystemScope}. O filtro é explícito:
+ * {@code deletedAt} existe e é anterior a {@code limite}. Sessões vivas nunca são tocadas.</p>
+ *
+ * @return quantidade de tombstones apagados
+ */
     public long purgarTombstonesAnteriores(Instant limite) {
         return sessoes.deleteMany(and(
                 ne(CAMPO_DELETED_AT, null),
@@ -220,9 +220,9 @@ public class SessaoRepository {
     }
 
     /**
-     * Contagem de sessões da trilha, exibida na confirmação de exclusão da trilha (D-38).
-     * Assinatura começa por {@code usuarioId} e o filtro o inclui (D-06a).
-     */
+ * Contagem de sessões da trilha, exibida na confirmação de exclusão da trilha.
+ * Assinatura começa por {@code usuarioId} e o filtro o inclui.
+ */
     public long contarPorTrilha(ObjectId usuarioId, ObjectId trilhaId) {
         return sessoes.countDocuments(and(
                 eq(CAMPO_USUARIO_ID, usuarioId),
@@ -420,12 +420,12 @@ public class SessaoRepository {
     }
 
     /**
-     * Série temporal agregada por dia no Mongo e rebucketizada em Java conforme a granularidade
-     * (RI-09). Rebucketizar em Java — em vez de agrupar por data truncada no pipeline — mantém
-     * os totais idênticos em {@code DIA}, {@code SEMANA} e {@code MES}, porque
-     * {@code dataSessao} é data de calendário ({@code yyyy-MM-dd}) e o bucket é aritmética de
-     * calendário, sem depender de fuso ou {@code $dateFromString}.
-     */
+ * Série temporal agregada por dia no Mongo e rebucketizada em Java conforme a granularidade
+ *. Rebucketizar em Java — em vez de agrupar por data truncada no pipeline — mantém
+ * os totais idênticos em {@code DIA}, {@code SEMANA} e {@code MES}, porque
+ * {@code dataSessao} é data de calendário ({@code yyyy-MM-dd}) e o bucket é aritmética de
+ * calendário, sem depender de fuso ou {@code $dateFromString}.
+ */
     private List<SerieTemporalPontoDTO> calcularSerieTemporal(Bson matchFiltro, Granularidade granularidade) {
         List<Bson> pipelineSerie = List.of(
                 Aggregates.match(matchFiltro),
@@ -470,9 +470,9 @@ public class SessaoRepository {
     }
 
     /**
-     * Dias distintos com ao menos uma sessão válida da trilha, usados pelo streak (D-14).
-     * Ignora o filtro de período: o streak é sempre global da trilha.
-     */
+ * Dias distintos com ao menos uma sessão válida da trilha, usados pelo streak.
+ * Ignora o filtro de período: o streak é sempre global da trilha.
+ */
     private Set<LocalDate> diasComEstudo(ObjectId usuarioId, ObjectId trilhaId) {
         Set<LocalDate> dias = new HashSet<>();
         sessoes.distinct(CAMPO_DATA_SESSAO, and(

@@ -5,7 +5,7 @@ import {
   SessaoRegistradaDTO
 } from '../contracts/domainContracts';
 
-/** Resultado da etapa 1 já concluída em uma abertura anterior do modal (D-22.4/§6.4). */
+/** Resultado da etapa 1 já concluída em uma abertura anterior do modal. */
 interface SessaoJaSalva {
   id: string;
   trilhaId?: string;
@@ -32,13 +32,13 @@ export interface ResultadoFluxo {
 }
 
 /**
- * Serviço único de registro de sessão e conclusão de bloco (F5/R6).
+ * Serviço único de registro de sessão e conclusão de bloco.
  *
- * - `registrarSessao` é o **único** caminho para `POST /api/trilhas/{trilhaId}/sessoes`, com a
- *   chave de idempotência no cabeçalho `Idempotency-Key` **e** no corpo (contrato do backend);
- * - `executarFluxo` orquestra as duas etapas e **não reverte** a sessão quando a conclusão do
- *   bloco falha: devolve `sessaoSalva: true` + `erro` para retry exclusivo da etapa 2;
- * - a chave é sempre responsabilidade do chamador (`GlobalSessionModal` a gera na abertura).
+ * `registrarSessao` é o **único** caminho para `POST /api/trilhas/{trilhaId}/sessoes`, com a
+ * chave de idempotência no cabeçalho `Idempotency-Key` **e** no corpo (contrato do backend);
+ * `executarFluxo` orquestra as duas etapas e **não reverte** a sessão quando a conclusão do
+ * bloco falha: devolve `sessaoSalva: true` + `erro` para retry exclusivo da etapa 2;
+ * a chave é sempre responsabilidade do chamador (`GlobalSessionModal` a gera na abertura).
  */
 export const sessaoGlobalService = {
   async registrarSessao(
@@ -70,11 +70,11 @@ export const sessaoGlobalService = {
   },
 
   /**
-   * Executa o fluxo de duas etapas com retry isolado da conclusão.
-   *
-   * A etapa 2 nunca rejeita: a falha é reportada em `erro` com `sessaoSalva: true`, para que o
-   * modal ofereça **"Tentar concluir bloco novamente"** sem reenviar a sessão.
-   */
+ * Executa o fluxo de duas etapas com retry isolado da conclusão.
+ *
+ * A etapa 2 nunca rejeita: a falha é reportada em `erro` com `sessaoSalva: true`, para que o
+ * modal ofereça **"Tentar concluir bloco novamente"** sem reenviar a sessão.
+ */
   async executarFluxo(params: ExecutarFluxoParams): Promise<ResultadoFluxo> {
     let sessaoId = params.sessaoSalva?.id;
 

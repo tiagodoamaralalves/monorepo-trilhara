@@ -14,7 +14,7 @@ import br.com.trilhara.nota.dto.DestaqueDTO;
 import jakarta.ws.rs.WebApplicationException;
 
 /**
- * Snippet de busca (D-30): texto puro, ≤ 180 caracteres e offsets corretos mesmo com acento.
+ * Snippet de busca: texto puro, ≤ 180 caracteres e offsets corretos mesmo com acento.
  */
 class NotaSnippetExtractorTest {
 

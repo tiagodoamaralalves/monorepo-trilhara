@@ -9,7 +9,7 @@ import jakarta.ws.rs.container.ContainerResponseFilter;
 import jakarta.ws.rs.ext.Provider;
 
 /**
- * Garante {@code X-Correlation-ID} em toda resposta (D-04).
+ * Garante {@code X-Correlation-ID} em toda resposta.
  *
  * <p>Se o cliente enviar o cabeçalho, ele é ecoado; caso contrário um UUID é gerado.
  * O mesmo valor é exposto ao frontend via {@code Access-Control-Expose-Headers}.</p>

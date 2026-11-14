@@ -935,8 +935,8 @@
 
 
 /* =========================================================================
-   ESTILOS FASE 4: CRONOGRAMAS, TABELA DE BLOCOS, PAGINAÇÃO E SOBRECARGA
-   ========================================================================= */
+ ESTILOS CRONOGRAMAS, TABELA DE BLOCOS, PAGINAÇÃO E SOBRECARGA
+ ========================================================================= */
 
 .overloadAlert {
   display: flex;
@@ -1157,7 +1157,7 @@
   font-weight: 600;
 }
 
-/* FASE 4: CRONOGRAMAS, BLOCOS E FORMULARIOS MODERNOS */
+/* CRONOGRAMAS, BLOCOS E FORMULARIOS MODERNOS */
 .header {
   display: flex;
   justify-content: space-between;

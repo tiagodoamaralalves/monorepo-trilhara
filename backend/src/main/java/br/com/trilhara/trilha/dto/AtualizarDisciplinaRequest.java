@@ -10,7 +10,7 @@ import jakarta.validation.constraints.Size;
 
 /**
  * Payload de atualização de disciplina. O limite de 500 tópicos é validado no serviço como
- * {@code 409 RESOURCE_LIMIT_EXCEEDED} (limite de acervo, não erro de sintaxe — D-04).
+ * {@code 409 RESOURCE_LIMIT_EXCEEDED} (limite de acervo, não erro de sintaxe — ).
  */
 public record AtualizarDisciplinaRequest(
         @NotBlank(message = "O nome da disciplina é obrigatório.")

@@ -8,7 +8,7 @@ import jakarta.ws.rs.ext.Provider;
 
 /**
  * Argumento ilegal é bug de programação, não erro do cliente → {@code 500 INTERNAL_ERROR}
- * com {@code detail} neutro (D-04). Exceções de domínio explícitas têm mapper próprio.
+ * com {@code detail} neutro. Exceções de domínio explícitas têm mapper próprio.
  */
 @Provider
 public class IllegalArgumentExceptionMapper implements ExceptionMapper<IllegalArgumentException> {

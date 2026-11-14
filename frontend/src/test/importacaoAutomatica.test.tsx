@@ -68,7 +68,7 @@ describe('Sugestão automática de importação — preferência local', () => {
   });
 });
 
-describe('ImportarTrilhaModal — reimportação confirmada (D-29)', () => {
+describe('ImportarTrilhaModal — reimportação confirmada', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();

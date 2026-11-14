@@ -5,7 +5,7 @@ import java.util.List;
 /**
  * DTO para transporte de disciplina detalhada com seus tópicos e contadores.
  *
- * <p>O vínculo de caderno ({@code cadernoLink}) foi removido de {@code Disciplina} (DC-04):
+ * <p>O vínculo de caderno ({@code cadernoLink}) foi removido de {@code Disciplina}:
  * a relação entre estudos e notas passa a ser feita por {@code GET /api/cadernos?origemTrilhaId=},
  * nunca por uma URL arbitrária guardada na disciplina.</p>
  */

@@ -23,7 +23,7 @@ export interface ImportarTrilhaModalProps {
 }
 
 /**
- * Importação (e reimportação confirmada) de trilha como caderno (D-29).
+ * Importação (e reimportação confirmada) de trilha como caderno.
  *
  * Quando a trilha escolhida já tem caderno ativo vinculado, o import normal responde
  * `409 TRAIL_ALREADY_IMPORTED`; aqui o usuário confirma explicitamente e a requisição segue com

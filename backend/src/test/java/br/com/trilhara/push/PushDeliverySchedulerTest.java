@@ -32,7 +32,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 
 /**
- * R11 — scheduler de entrega (D-36b / §11).
+ * scheduler de entrega.
  *
  * <p>As asserções usam datas relativas a {@code agora} porque a janela útil de 15 minutos e o
  * backoff são medidos a partir de {@code instanteEntregaUtc}.</p>

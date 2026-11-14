@@ -52,7 +52,7 @@ public record SerieRecorrente(
         diasDaSemana = diasDaSemana == null
                 ? List.of()
                 : Collections.unmodifiableList(new ArrayList<>(diasDaSemana));
-        // D-26: ausência nunca significa "herdar"; o default do modelo é HERDAR explícito.
+        // ausência nunca significa "herdar"; o default do modelo é HERDAR explícito.
         modoLembrete = modoLembrete == null ? ModoLembrete.HERDAR : modoLembrete;
     }
 }

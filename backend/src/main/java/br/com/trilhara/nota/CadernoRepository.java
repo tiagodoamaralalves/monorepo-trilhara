@@ -33,7 +33,7 @@ import jakarta.inject.Inject;
 @ApplicationScoped
 public class CadernoRepository {
 
-    /** Teto normativo da listagem de cadernos por usuário (D-29: 500 cadernos/usuário). */
+    /** Teto normativo da listagem de cadernos por usuário (500 cadernos/usuário). */
     public static final int LIMITE_LISTAGEM = 500;
 
     private final MongoCollection<Document> collection;
@@ -89,12 +89,12 @@ public class CadernoRepository {
     }
 
     /**
-     * Cadernos ativos, opcionalmente filtrados pela trilha de origem (R9/D-29).
-     *
-     * <p>{@code origemTrilhaId} nulo ou ausente não filtra. O teto de {@value #LIMITE_LISTAGEM}
-     * é o limite normativo da listagem: cadernos são poucos por usuário (máximo 500) e a
-     * listagem não é paginada.</p>
-     */
+ * Cadernos ativos, opcionalmente filtrados pela trilha de origem.
+ *
+ * <p>{@code origemTrilhaId} nulo ou ausente não filtra. O teto de {@value #LIMITE_LISTAGEM}
+ * é o limite normativo da listagem: cadernos são poucos por usuário (máximo 500) e a
+ * listagem não é paginada.</p>
+ */
     public List<Caderno> listarAtivos(ObjectId usuarioId, ObjectId origemTrilhaId, int limite) {
         List<Caderno> lista = new ArrayList<>();
         List<Bson> predicados = new ArrayList<>();
@@ -142,7 +142,7 @@ public class CadernoRepository {
         return lista;
     }
 
-    /** Cadernos ativos do usuário — usado no teto de 500 cadernos (D-29). */
+    /** Cadernos ativos do usuário — usado no teto de 500 cadernos. */
     public long contarAtivos(ObjectId usuarioId) {
         return collection.countDocuments(and(
                 eq("usuarioId", usuarioId),
@@ -150,7 +150,7 @@ public class CadernoRepository {
         ));
     }
 
-    /** Títulos de cadernos ativos — usado para desempatar "Restauradas (2)", "(3)"… (D-34). */
+    /** Títulos de cadernos ativos — usado para desempatar "Restauradas (2)", "(3)"…. */
     public List<String> titulosAtivos(ObjectId usuarioId) {
         List<String> titulos = new ArrayList<>();
         collection.find(and(eq("usuarioId", usuarioId), eq("deletedAt", null)))
@@ -199,10 +199,10 @@ public class CadernoRepository {
     }
 
     /**
-     * Cadernos ativos vinculados à trilha, exibidos na confirmação de exclusão da trilha (D-38).
-     * O vínculo é apenas desfeito na exclusão da trilha — o caderno nunca é apagado por ela.
-     * Assinatura começa por {@code usuarioId} e o filtro o inclui (D-06a).
-     */
+ * Cadernos ativos vinculados à trilha, exibidos na confirmação de exclusão da trilha.
+ * O vínculo é apenas desfeito na exclusão da trilha — o caderno nunca é apagado por ela.
+ * Assinatura começa por {@code usuarioId} e o filtro o inclui.
+ */
     public long contarAtivosPorOrigemTrilha(ObjectId usuarioId, ObjectId origemTrilhaId) {
         return collection.countDocuments(and(
                 eq("usuarioId", usuarioId),

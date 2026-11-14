@@ -5,7 +5,7 @@ import { ApiError } from './api';
 import { UsuarioAutenticado } from './types';
 import styles from './ContaModal.module.css';
 
-/** Mensagens inline do fluxo de exclusão (D-35). */
+/** Mensagens inline do fluxo de exclusão. */
 function mensagemDeErro(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.status === 401) {
@@ -42,9 +42,7 @@ export const ContaModal: React.FC<ContaModalProps> = ({
   onExcluirConta
 }) => {
   const confirmContext = useContext(ConfirmContext);
-  const confirm = confirmContext?.confirm ?? (async (opts) => {
-    return typeof window !== 'undefined' ? window.confirm(opts.description) : true;
-  });
+  const confirm = confirmContext?.confirm ?? (async () => true);
   const [etapaConfirmacao, setEtapaConfirmacao] = useState<boolean>(false);
   const [senha, setSenha] = useState<string>('');
   const [confirmacaoTexto, setConfirmacaoTexto] = useState<string>('');

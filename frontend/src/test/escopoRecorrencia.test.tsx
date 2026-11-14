@@ -7,7 +7,7 @@ vi.mock('../modules/tarefas/services/api', () => ({
 
 import { request } from '../modules/tarefas/services/api';
 
-describe('escopoRecorrencia (D-24)', () => {
+describe('escopoRecorrencia', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

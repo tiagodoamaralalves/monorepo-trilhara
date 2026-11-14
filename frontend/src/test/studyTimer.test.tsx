@@ -80,7 +80,7 @@ function montar(usuarioId: string | null) {
   );
 }
 
-describe('studyTimer (R6/D-21) — cronômetro de Estudos exige autenticação', () => {
+describe('studyTimer — cronômetro de Estudos exige autenticação', () => {
   beforeEach(() => {
     localStorage.clear();
     __resetarParaTeste();
@@ -219,7 +219,7 @@ describe('studyTimer (R6/D-21) — cronômetro de Estudos exige autenticação',
     });
   });
 
-  it('reset remove a chave do usuário (D-22.1)', async () => {
+  it('reset remove a chave do usuário', async () => {
     const user = userEvent.setup();
     montar('user-reset');
     await user.click(screen.getByTestId('iniciar'));

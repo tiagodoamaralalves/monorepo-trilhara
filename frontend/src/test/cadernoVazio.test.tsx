@@ -4,7 +4,7 @@ import { EmptyState, Button } from '../shared/design-system';
 import { Plus, Trash2, Folder } from 'lucide-react';
 
 /**
- * Estado vazio de caderno sem seções (REQUISITOS §10.1 / Anexo B).
+ * Estado vazio de caderno sem seções (REQUISITOS §10.1 / ).
  *
  * O caderno pode ficar com zero seções ativas quando a última é movida para a lixeira; o estado
  * orienta criar uma seção ou abrir a lixeira. A trava legada que impedia excluir a última seção
@@ -34,7 +34,7 @@ function CadernoVazio({ onNovaSecao, onAbrirLixeira }: {
 }
 
 describe('Caderno sem seções — estado vazio normativo', () => {
-  it('exibe o título e a descrição do Anexo B', () => {
+  it('exibe o título e a descrição', () => {
     render(<CadernoVazio onNovaSecao={() => undefined} onAbrirLixeira={() => undefined} />);
 
     expect(screen.getByText('Este caderno não tem seções')).toBeInTheDocument();

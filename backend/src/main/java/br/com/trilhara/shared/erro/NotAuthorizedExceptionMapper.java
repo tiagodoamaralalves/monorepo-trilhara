@@ -9,7 +9,7 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
 /**
- * Falta de autenticação, sessão revogada ou conta em exclusão → {@code 401 UNAUTHORIZED} (D-04).
+ * Falta de autenticação, sessão revogada ou conta em exclusão → {@code 401 UNAUTHORIZED}.
  */
 @Provider
 public class NotAuthorizedExceptionMapper implements ExceptionMapper<NotAuthorizedException> {

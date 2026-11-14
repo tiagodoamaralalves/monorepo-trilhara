@@ -32,18 +32,18 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 
 /**
- * FASE 11 — Teste de Performance e Plano de Índices com explain("executionStats") no MongoDB 7.
+ * Teste de Performance e Plano de Índices com explain("executionStats") no MongoDB 7.
  * 
  * Perfil Opt-in:
  * Não roda na suíte unitária padrão (mvn test).
  * Para executar:
- *   ./mvnw test -Dtest=MongoExplainBenchmarkTest -Dbenchmark=true
+ * ./mvnw test -Dtest=MongoExplainBenchmarkTest -Dbenchmark=true
  */
 @QuarkusTest
 @Tag("benchmark")
 @EnabledIfSystemProperty(named = "benchmark", matches = "true")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@DisplayName("R12 - Benchmark de Índices e ExecutionStats no MongoDB 7 (Perfil Opt-in)")
+@DisplayName("Benchmark de Índices e ExecutionStats no MongoDB 7 (Perfil Opt-in)")
 public class MongoExplainBenchmarkTest {
 
     private static final Logger LOG = Logger.getLogger(MongoExplainBenchmarkTest.class);
@@ -102,13 +102,12 @@ public class MongoExplainBenchmarkTest {
     }
 
     /**
-     * Insere a massa representativa exigida na FASE 11:
-     * - Trilha com 20 disciplinas e 2.000 tópicos (100 tópicos por disciplina)
-     * - Cronograma de 366 dias com 24 blocos/dia = 8.784 blocos
-     * - 2.190 sessões de estudo / ano (6 sessões/dia * 365 dias)
-     * - Caderno com 300 páginas de notas em Markdown (10 seções * 30 páginas)
-     * - Séries recorrentes com tarefas ativas e agendamentos
-     */
+ * Insere a massa representativa exigida na * Trilha com 20 disciplinas e 2.000 tópicos (100 tópicos por disciplina)
+ * Cronograma de 366 dias com 24 blocos/dia = 8.784 blocos
+ * 2.190 sessões de estudo / ano (6 sessões/dia * 365 dias)
+ * Caderno com 300 páginas de notas em Markdown (10 seções * 30 páginas)
+ * Séries recorrentes com tarefas ativas e agendamentos
+ */
     private void inserirCargaSintetica() {
         MongoDatabase db = getDatabase();
         Date agora = Date.from(Instant.now());
@@ -268,9 +267,9 @@ public class MongoExplainBenchmarkTest {
     }
 
     /**
-     * Executa o `explain` {@link #REPETICOES} vezes e devolve a primeira leitura do plano
-     * vencedor + as latências observadas (para p50/p95).
-     */
+ * Executa o `explain` {@link #REPETICOES} vezes e devolve a primeira leitura do plano
+ * vencedor + as latências observadas (para p50/p95).
+ */
     private PlanoVencedor medir(String colecao, Document filtro, Document sort, Integer limit) {
         List<Long> latencias = new ArrayList<>(REPETICOES);
         PlanoVencedor plano = null;
@@ -287,7 +286,7 @@ public class MongoExplainBenchmarkTest {
 
     private List<Long> ultimasLatencias = List.of();
 
-    // ─── Consultas críticas (R12) ───────────────────────────────────────────
+    // ─── Consultas críticas ───────────────────────────────────────────
     // Cada teste mede 20 repetições, arquiva o plano vencedor no relatório e
     // assevera o índice por IGUALDADE (não por substring): um COLLSCAN
     // vencedor com o índice apenas num plano rejeitado falha aqui.
@@ -484,7 +483,7 @@ public class MongoExplainBenchmarkTest {
                 plano, ultimasLatencias);
     }
 
-    /** Arquiva `docs/benchmarks/explain-AAAA-MM-DD.md` ao fim de TODA a execução (R12). */
+    /** Arquiva `docs/benchmarks/explain-AAAA-MM-DD.md` ao fim de TODA a execução. */
     @AfterAll
     void arquivarRelatorio() throws IOException {
         if (relatorio.possuiRegistros()) {

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { classificarErro, ehCodigoErro, extrairErrosDeCampo, erroDoCampo, CODIGOS_ERRO } from '../shared/api';
 import { ApiError, normalizarCodigo } from '../shared/auth/api';
 
-describe('R1 — classificação de erros (D-37)', () => {
+describe('classificação de erros', () => {
   it('classifica falha de transporte como rede', () => {
     expect(classificarErro(new ApiError({ status: 0, code: 'NETWORK_ERROR', detail: 'sem rede' }))).toBe('rede');
   });
@@ -37,7 +37,7 @@ describe('R1 — classificação de erros (D-37)', () => {
   });
 });
 
-describe('R1 — catálogo de códigos no cliente', () => {
+describe('catálogo de códigos no cliente', () => {
   it('reconhece somente códigos do catálogo fechado', () => {
     expect(ehCodigoErro('VALIDATION_ERROR')).toBe(true);
     expect(ehCodigoErro('BAD_REQUEST')).toBe(false);
@@ -45,7 +45,7 @@ describe('R1 — catálogo de códigos no cliente', () => {
     expect(ehCodigoErro(42)).toBe(false);
   });
 
-  it('não contém códigos removidos por D-04', () => {
+  it('não contém códigos removidos por', () => {
     expect(CODIGOS_ERRO).not.toContain('PAYLOAD_TOO_LARGE');
     expect(CODIGOS_ERRO).not.toContain('SCHEDULE_LIMIT_EXCEEDED');
     expect(CODIGOS_ERRO).not.toContain('BAD_REQUEST');
@@ -58,7 +58,7 @@ describe('R1 — catálogo de códigos no cliente', () => {
   });
 });
 
-describe('R1 — extração de erros de campo', () => {
+describe('extração de erros de campo', () => {
   it('extrai errors por campo de um ProblemDetails', () => {
     const erro = new ApiError({
       status: 400,

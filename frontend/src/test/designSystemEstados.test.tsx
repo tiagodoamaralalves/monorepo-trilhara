@@ -7,7 +7,7 @@ import { FieldError } from '../shared/design-system/FieldError/FieldError';
 import { SectionErrorCard } from '../shared/design-system/SectionErrorCard/SectionErrorCard';
 import { useDelayedFlag } from '../shared/hooks/useDelayedFlag';
 
-describe('R1 — Skeleton (D-37)', () => {
+describe('Skeleton', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
@@ -54,7 +54,7 @@ describe('R1 — Skeleton (D-37)', () => {
   });
 });
 
-describe('R1 — useDelayedFlag', () => {
+describe('useDelayedFlag', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
@@ -73,7 +73,7 @@ describe('R1 — useDelayedFlag', () => {
   });
 });
 
-describe('R1 — Spinner e EmptyState', () => {
+describe('Spinner e EmptyState', () => {
   it('Spinner expõe role=status e rótulo acessível', () => {
     render(<Spinner />);
     expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
@@ -103,7 +103,7 @@ describe('R1 — Spinner e EmptyState', () => {
   });
 });
 
-describe('R1 — SectionErrorCard', () => {
+describe('SectionErrorCard', () => {
   it('chama onRetry e liga o botão à descrição', () => {
     const onRetry = vi.fn();
     render(

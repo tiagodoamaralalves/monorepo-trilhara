@@ -23,9 +23,9 @@ describe('API compartilhada: contratos base e cabeçalhos', () => {
 
   it('smoke test: ambiente Vitest e jsdom funcional', () => {
     const div = document.createElement('div');
-    div.textContent = 'Trilhara FASE 0';
+    div.textContent = 'Trilhara';
     document.body.appendChild(div);
-    expect(document.body.textContent).toContain('Trilhara FASE 0');
+    expect(document.body.textContent).toContain('Trilhara');
     document.body.removeChild(div);
   });
 
@@ -44,8 +44,9 @@ describe('API compartilhada: contratos base e cabeçalhos', () => {
     const resultado = await request<{ ok: boolean }>('/test-endpoint');
     expect(resultado).toEqual({ ok: true });
     expect(cabecalhosEnviados).not.toBeNull();
-    expect(cabecalhosEnviados?.get('X-Timezone')).toBe(timezoneDetectado);
-    expect(cabecalhosEnviados?.get('X-Timezone')).toBeTruthy();
+    const cabecalhos = cabecalhosEnviados as unknown as Headers;
+    expect(cabecalhos.get('X-Timezone')).toBe(timezoneDetectado);
+    expect(cabecalhos.get('X-Timezone')).toBeTruthy();
   });
 
   it('deve mapear resposta RFC 9457 em ApiError com status, code, detail e errors', async () => {

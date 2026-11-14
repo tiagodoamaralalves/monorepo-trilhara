@@ -13,13 +13,13 @@ function suportaMatchMedia(): boolean {
  * devem ser desligadas para quem registra a preferência. Uso típico:
  *
  * ```tsx
- * const reduzirMovimento = useReducedMotion();
+ * const reduzirMovimento = useReducedMotion;
  * alertarTitulo('Pausa finalizada', { reduzirMovimento });
  * ```
  *
- * - lê o valor inicial de `matchMedia` e acompanha mudanças em tempo real;
- * - degrada para `false` sem `matchMedia` (jsdom antigo, SSR), mantendo o
- *   comportamento padrão em vez de quebrar o render.
+ * lê o valor inicial de `matchMedia` e acompanha mudanças em tempo real;
+ * degrada para `false` sem `matchMedia` (jsdom antigo, SSR), mantendo o
+ * comportamento padrão em vez de quebrar o render.
  */
 export function useReducedMotion(): boolean {
   const [reduzido, setReduzido] = useState<boolean>(() =>

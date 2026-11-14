@@ -30,10 +30,10 @@ function montarProps(overrides: Partial<React.ComponentProps<typeof HubView>> = 
 }
 
 /**
- * Hub: estados de D-37 — `Skeleton card` na primeira carga, `EmptyState` só com 2xx vazio e
+ * Hub: estados de `Skeleton card` na primeira carga, `EmptyState` só com 2xx vazio e
  * `SectionErrorCard` com retry em falha recuperável.
  */
-describe('Hub — estados de carregamento, vazio e erro (R3)', () => {
+describe('Hub — estados de carregamento, vazio e erro', () => {
   it('exibe skeleton de cards durante a primeira carga', async () => {
     render(<HubView {...montarProps({ status: 'carregando' })} />);
 

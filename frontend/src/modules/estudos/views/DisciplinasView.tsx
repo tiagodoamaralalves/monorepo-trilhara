@@ -9,7 +9,6 @@ import {
 import {
   Button,
   Badge,
-  Input,
   DisciplineLabel,
   PageBanner,
   Modal,
@@ -42,19 +41,11 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
     editada: Disciplina;
   } | null>(null);
 
-  const [disciplinaQuestoes, setDisciplinaQuestoes] = useState<Disciplina | null>(null);
   const [modalDisciplinasLoteAberto, setModalDisciplinasLoteAberto] = useState(false);
   const [formatoDisciplinasLote, setFormatoDisciplinasLote] = useState<'txt' | 'json'>('txt');
   const [disciplinasLoteRaw, setDisciplinasLoteRaw] = useState('');
   const [erroDisciplinasLote, setErroDisciplinasLote] = useState('');
   const [salvandoDisciplinasLote, setSalvandoDisciplinasLote] = useState(false);
-  const [totalQ, setTotalQ] = useState('');
-  const [acertosQ, setAcertosQ] = useState('');
-  const [salvandoQuestoes, setSalvandoQuestoes] = useState(false);
-  const [carregandoQuestoes, setCarregandoQuestoes] = useState(false);
-  const [erroCarregamentoQuestoes, setErroCarregamentoQuestoes] = useState('');
-  const [erroQuestoes, setErroQuestoes] = useState('');
-  const [tentativaQuestoes, setTentativaQuestoes] = useState(0);
   const [resumoQuestoes, setResumoQuestoes] = useState<
     Record<string, { questoes: number; acertos: number }>
   >({});
@@ -92,41 +83,9 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
     return () => {
       active = false;
     };
-  }, [trilha.id, tentativaQuestoes]);
+  }, [trilha.id]);
 
-  useEffect(() => {
-    if (!disciplinaQuestoes) return;
-
-    let active = true;
-    setCarregandoQuestoes(true);
-    setErroCarregamentoQuestoes('');
-    setErroQuestoes('');
-    setTotalQ('');
-    setAcertosQ('');
-
-    EstudosService.obterEstatisticas(trilha.id, { periodo: 'tudo' })
-      .then((estatisticas) => {
-        if (!active) return;
-        const estatistica = (estatisticas.porDisciplina || []).find((item) => item.disciplinaId === disciplinaQuestoes.id);
-        setTotalQ(String(estatistica?.totalQuestoes ?? 0));
-        setAcertosQ(String(estatistica?.totalAcertos ?? 0));
-      })
-      .catch((err: unknown) => {
-        if (!active) return;
-        const mensagem = err instanceof Error ? err.message : 'Não foi possível carregar as questões atuais.';
-        setErroCarregamentoQuestoes(mensagem);
-        toast.error(mensagem);
-      })
-      .finally(() => {
-        if (active) setCarregandoQuestoes(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [disciplinaQuestoes, trilha.id, tentativaQuestoes, toast]);
-
-  /** D-39: marcar/desmarcar tópico é otimista com rollback + toast em falha. */
+  /** marcar/desmarcar tópico é otimista com rollback + toast em falha. */
   const aplicarTopicosConcluidos = (ids: ReadonlySet<string>) => {
     const topicosConcluidosIds = [...ids];
     onTrilhaAtualizada({
@@ -333,11 +292,6 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
     }
   };
 
-  const handleAbrirQuestoes = (disc: Disciplina) => {
-    setCarregandoQuestoes(true);
-    setDisciplinaQuestoes(disc);
-  };
-
   const obterResumoQuestoes = (disciplinaId: string) => {
     const resumo = resumoQuestoes[disciplinaId];
     const percentual = resumo && resumo.questoes > 0
@@ -353,25 +307,6 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
             ? 'warning' as const
             : 'danger' as const
     };
-  };
-
-  const handleSalvarQuestoes = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!disciplinaQuestoes || carregandoQuestoes) return;
-
-    // O vínculo com caderno saiu de Disciplina (DC-04): aqui só atualizamos questões.
-    setErroQuestoes('');
-    setSalvandoQuestoes(true);
-    try {
-      const atualizada = await EstudosService.buscarTrilha(trilha.id);
-      onTrilhaAtualizada(atualizada);
-      toast.success('Estatísticas de questões atualizadas!');
-      setDisciplinaQuestoes(null);
-    } catch (err) {
-      toast.error(err instanceof Error ? err : 'Erro ao atualizar as questões.');
-    } finally {
-      setSalvandoQuestoes(false);
-    }
   };
 
   const abrirNovaDisciplina = () => {
@@ -395,12 +330,12 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
   };
 
   /**
-   * "Abrir no Notas" (R3/R9): SSO para o app de Notas já filtrado pela trilha.
-   *
-   * O handoff leva o access token para o outro subdomínio; o parâmetro `origemTrilhaId` é o
-   * que `NotasApp` lê na carga inicial para listar só o caderno vinculado a esta trilha.
-   * Sem trilha carregada, o botão é inerte — não inventamos um ID.
-   */
+ * "Abrir no Notas": SSO para o app de Notas já filtrado pela trilha.
+ *
+ * O handoff leva o access token para o outro subdomínio; o parâmetro `origemTrilhaId` é o
+ * que `NotasApp` lê na carga inicial para listar só o caderno vinculado a esta trilha.
+ * Sem trilha carregada, o botão é inerte — não inventamos um ID.
+ */
   const abrirNotasDaTrilha = async () => {
     if (!trilha.id) return;
     try {
@@ -543,20 +478,6 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
   const pctAcertosConsolidado = totalQuestoesConsolidadas > 0
     ? Math.round((totalAcertosConsolidados / totalQuestoesConsolidadas) * 100)
     : null;
-  const totalQuestoesNumero = Number(totalQ);
-  const acertosQuestoesNumero = Number(acertosQ);
-  const taxaQuestoes = totalQ !== '' && acertosQ !== '' &&
-    Number.isInteger(totalQuestoesNumero) && Number.isInteger(acertosQuestoesNumero) &&
-    totalQuestoesNumero > 0
-    ? Math.round((acertosQuestoesNumero / totalQuestoesNumero) * 100)
-    : null;
-  const classeTaxaQuestoes = taxaQuestoes === null
-    ? ''
-    : taxaQuestoes >= 80
-      ? styles.successText
-      : taxaQuestoes >= 60
-        ? styles.warningText
-        : styles.errorText;
   const modeloDisciplinasJson = `[
   {
     "disciplina": "Direito Administrativo",
@@ -802,18 +723,13 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
                     >
                       {concluidosDisc} / {topicos.length} assuntos ({pctDisc}%)
                     </Badge>
-                    <Button
-                      size="sm"
+                    <Badge
                       variant={obterResumoQuestoes(disc.id).variant}
-                      className={styles.questoesScoreButton}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleAbrirQuestoes(disc);
-                      }}
+                      size="md"
                       aria-label={`${obterResumoQuestoes(disc.id).percentual}% de acerto`}
                     >
                       {obterResumoQuestoes(disc.id).percentual}% de acerto
-                    </Button>
+                    </Badge>
                   </div>
                 </div>
 
@@ -823,73 +739,6 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
         })
       )}
       </div>
-
-      {disciplinaQuestoes && (
-        <FormModal
-          isOpen={true}
-          onClose={() => setDisciplinaQuestoes(null)}
-          title={`Questões: ${disciplinaQuestoes.nome}`}
-          subtitle="Confira as estatísticas consolidadas de questões da disciplina."
-          icon={<Award size={20} />}
-          onSubmit={handleSalvarQuestoes}
-          submitText="Atualizar"
-          loading={salvandoQuestoes}
-          error={erroQuestoes}
-        >
-          <>
-            {carregandoQuestoes && (
-              <p className={styles.calculationText} role="status">Carregando os dados atuais de questões...</p>
-            )}
-            {erroCarregamentoQuestoes && (
-              <div className={styles.questoesLoadError} role="alert">
-                <span>Não foi possível carregar os dados atuais: {erroCarregamentoQuestoes}</span>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setTentativaQuestoes((tentativa) => tentativa + 1)}
-                >
-                  Tentar novamente
-                </Button>
-              </div>
-            )}
-            {!carregandoQuestoes && !erroCarregamentoQuestoes && (
-              <p className={styles.calculationText}>
-                Atualmente registrados: <strong>{totalQ || 0}</strong> questões,{' '}
-                <strong>{acertosQ || 0}</strong> acertos.
-              </p>
-            )}
-            <div className={styles.formGrid}>
-              <Input
-                label="Total de Questões Resolvidas"
-                type="number"
-                disabled={true}
-                helperText="Computado automaticamente a partir das sessões de estudo."
-                value={totalQ}
-              />
-              <Input
-                label="Quantidade de Acertos"
-                type="number"
-                disabled={true}
-                helperText="Computado automaticamente a partir das sessões de estudo."
-                value={acertosQ}
-              />
-            </div>
-
-            {!carregandoQuestoes && !erroCarregamentoQuestoes && (
-              <p className={styles.calculationText}>
-                Taxa de acerto ao vivo:{' '}
-                <strong className={classeTaxaQuestoes || styles.neutralText}>
-                  {taxaQuestoes === null ? '—' : `${taxaQuestoes}%`}
-                </strong>
-                {acertosQuestoesNumero <= totalQuestoesNumero && (
-                  totalQuestoesNumero > 0 && <> ({totalQuestoesNumero - acertosQuestoesNumero} erros). O servidor registra a diferença no histórico.</>
-                )}
-              </p>
-            )}
-          </>
-        </FormModal>
-      )}
 
       {modalDisciplinasLote}
       <DisciplinasTopicosModal

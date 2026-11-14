@@ -15,7 +15,7 @@ import {
 } from './types';
 
 /**
- * Persiste o tema no servidor (D-10) com rollback em caso de falha.
+ * Persiste o tema no servidor com rollback em caso de falha.
  *
  * O `localStorage` continua sendo apenas cache de primeiro paint; a fonte da verdade é
  * `PUT /api/usuarios/me/preferencias/tema`.
@@ -71,7 +71,7 @@ export const AuthService = {
   },
   async logout(): Promise<void> {
     try {
-      // SEC-12 / D-36e: a inscrição push deste dispositivo pertence à sessão que está saindo.
+      // a inscrição push deste dispositivo pertence à sessão que está saindo.
       // Best-effort com timeout interno: falha ou lentidão nunca bloqueiam o logout.
       await pushService.removerInscricaoDoDispositivo();
       await request('/auth/logout', { method: 'POST', body: '{}' });
@@ -125,12 +125,12 @@ export const AuthService = {
   },
 
   /**
-   * Restaura a sessão no boot **sem** token persistido (D-09).
-   *
-   * 1. Se já houver access token em memória (outra aba do mesmo bundle), valida com `/auth/me`.
-   * 2. Caso contrário, `POST /api/auth/refresh` (cookie HttpOnly, single-flight em `api.ts`)
-   *    e então confirma o perfil com `GET /api/auth/me`.
-   */
+ * Restaura a sessão no boot **sem** token persistido.
+ *
+ * 1. Se já houver access token em memória (outra aba do mesmo bundle), valida com `/auth/me`.
+ * 2. Caso contrário, `POST /api/auth/refresh` (cookie HttpOnly, single-flight em `api.ts`)
+ * e então confirma o perfil com `GET /api/auth/me`.
+ */
   async verificarSessaoSilenciosa(): Promise<UsuarioAutenticado | null> {
     const tokenEmMemoria = AuthStorage.obterAccessToken();
 
@@ -162,12 +162,12 @@ export const AuthService = {
   },
 
   /**
-   * Solicita a exclusão definitiva da conta (D-35).
-   *
-   * <p>A chave de idempotência vai <strong>somente</strong> no cabeçalho `Idempotency-Key`.
-   * `semRefresh` impede que o 401 pós-202 seja tratado como "sessão expirada": depois do aceite
-   * as credenciais já foram revogadas, então o 401 significa "exclusão em andamento".</p>
-   */
+ * Solicita a exclusão definitiva da conta.
+ *
+ * <p>A chave de idempotência vai <strong>somente</strong> no cabeçalho `Idempotency-Key`.
+ * `semRefresh` impede que o 401 pós-202 seja tratado como "sessão expirada": depois do aceite
+ * as credenciais já foram revogadas, então o 401 significa "exclusão em andamento".</p>
+ */
   async excluirConta(payload: {
     senha: string;
     confirmacao?: string;

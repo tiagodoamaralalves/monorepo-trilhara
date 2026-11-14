@@ -26,19 +26,19 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.NotFoundException;
 
 /**
- * Importação, reimportação e sincronização explícita de trilhas de Estudos (D-29).
+ * Importação, reimportação e sincronização explícita de trilhas de Estudos.
  *
  * <p>Regras cravadas:</p>
  * <ul>
- *   <li>Importar sem {@code reimportar=true} quando já existe caderno ativo vinculado responde
- *       {@code 409 TRAIL_ALREADY_IMPORTED} com {@code errors.cadernoId} — nunca cria
- *       silenciosamente um segundo caderno;</li>
- *   <li>Reimportar desvincula o caderno antigo (limpando {@code origemTrilhaId} e
- *       {@code origemDisciplinaId} das seções dele) sem apagar conteúdo, e cria um novo caderno
- *       com {@code titulo = trilha.nome} — sem sufixo de data;</li>
- *   <li>Sincronizar renomeia caderno/seções vinculadas, cria seções com páginas vazias apenas
- *       para disciplinas novas e desvincula disciplinas removidas. <strong>Nunca</strong> cria
- *       nem altera notas de tópicos em seções existentes.</li>
+ * <li>Importar sem {@code reimportar=true} quando já existe caderno ativo vinculado responde
+ * {@code 409 TRAIL_ALREADY_IMPORTED} com {@code errors.cadernoId} — nunca cria
+ * silenciosamente um segundo caderno;</li>
+ * <li>Reimportar desvincula o caderno antigo (limpando {@code origemTrilhaId} e
+ * {@code origemDisciplinaId} das seções dele) sem apagar conteúdo, e cria um novo caderno
+ * com {@code titulo = trilha.nome} — sem sufixo de data;</li>
+ * <li>Sincronizar renomeia caderno/seções vinculadas, cria seções com páginas vazias apenas
+ * para disciplinas novas e desvincula disciplinas removidas. <strong>Nunca</strong> cria
+ * nem altera notas de tópicos em seções existentes.</li>
  * </ul>
  *
  * <p>Não há transação multi-documento: a importação grava caderno, seções e páginas em
@@ -74,11 +74,11 @@ public class NotaSincronizacaoService {
     }
 
     /**
-     * Importa (ou reimporta) uma trilha como caderno novo (D-29).
-     *
-     * @param reimportar quando {@code true}, desvincula o caderno ativo existente e cria outro;
-     *                   quando {@code false} e já existe vínculo ativo, responde 409
-     */
+ * Importa (ou reimporta) uma trilha como caderno novo.
+ *
+ * @param reimportar quando {@code true}, desvincula o caderno ativo existente e cria outro;
+ * quando {@code false} e já existe vínculo ativo, responde 409
+ */
     public CadernoResponse importarTrilha(ObjectId usuarioId, ObjectId trilhaId, boolean reimportar) {
         Document trilhaDoc = trilhaRepository.buscarEntidade(usuarioId, trilhaId)
                 .orElseThrow(() -> new NotFoundException("Trilha de estudo não encontrada."));
@@ -151,11 +151,11 @@ public class NotaSincronizacaoService {
     }
 
     /**
-     * Desvincula o caderno de uma trilha preservando todo o conteúdo (D-29): o caderno deixa de
-     * referenciar a trilha e suas seções perdem {@code origemDisciplinaId}. As notas permanecem
-     * intactas, e a referência de origem de tópico não é tocada aqui — ela só é limpada quando
-     * a trilha é excluída.
-     */
+ * Desvincula o caderno de uma trilha preservando todo o conteúdo: o caderno deixa de
+ * referenciar a trilha e suas seções perdem {@code origemDisciplinaId}. As notas permanecem
+ * intactas, e a referência de origem de tópico não é tocada aqui — ela só é limpada quando
+ * a trilha é excluída.
+ */
     private void desvincularCaderno(ObjectId usuarioId, Caderno caderno) {
         cadernoRepository.desvincularTrilha(usuarioId, caderno.origemTrilhaId());
         secaoRepository.desvincularOrigemDisciplinaPorCaderno(usuarioId, caderno.id());
@@ -193,10 +193,10 @@ public class NotaSincronizacaoService {
     }
 
     /**
-     * Sincronização explícita (D-29): renomeia o caderno e as seções vinculadas, cria seções com
-     * uma página vazia por tópico apenas para disciplinas novas, e desvincula seções de
-     * disciplinas removidas. Páginas de seções existentes nunca são criadas nem alteradas.
-     */
+ * Sincronização explícita: renomeia o caderno e as seções vinculadas, cria seções com
+ * uma página vazia por tópico apenas para disciplinas novas, e desvincula seções de
+ * disciplinas removidas. Páginas de seções existentes nunca são criadas nem alteradas.
+ */
     public SincronizacaoTrilhaResponse sincronizarTrilha(ObjectId usuarioId, ObjectId cadernoId) {
         Caderno caderno = cadernoRepository.buscarAtivo(usuarioId, cadernoId)
                 .orElseThrow(() -> new NotFoundException(ERRO_CADERNO_NAO_ENCONTRADO));

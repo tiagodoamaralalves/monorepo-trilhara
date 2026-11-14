@@ -1,17 +1,17 @@
 /* ============================================================================
-   Fontes self-hosted (R13/D-47).
+ Fontes self-hosted.
 
-   Antes a aplicacao carregava Inter, JetBrains Mono e Nunito de
-   fonts.googleapis.com + fonts.gstatic.com. A CSP exigida por D-47 e
-   `default-src 'self'; style-src 'self' 'unsafe-inline'`, que bloquearia essas
-   origens — e liberar `fonts.googleapis.com` na CSP reabriria uma origem externa
-   justamente no cabecalho que existe para fechar.
+ Antes a aplicacao carregava Inter, JetBrains Mono e Nunito de
+ fonts.googleapis.com + fonts.gstatic.com. A CSP exigida por e
+ `default-src 'self'; style-src 'self' 'unsafe-inline'`, que bloquearia essas
+ origens — e liberar `fonts.googleapis.com` na CSP reabriria uma origem externa
+ justamente no cabecalho que existe para fechar.
 
-   Os .woff2 vieram do proprio Google Fonts (subsets latin e latin-ext, o que
-   cobre pt-BR) e sao servidos por /fonts/* na mesma origem. Nenhuma requisicao
-   cross-origin de fonte, nenhuma folha de estilo externa, `font-display: swap`
-   preservado.
-   ============================================================================ */
+ Os .woff2 vieram do proprio Google Fonts (subsets latin e latin-ext, o que
+ cobre pt-BR) e sao servidos por /fonts/* na mesma origem. Nenhuma requisicao
+ cross-origin de fonte, nenhuma folha de estilo externa, `font-display: swap`
+ preservado.
+ ============================================================================ */
 
 /* Inter 400 800 — latin-ext */
 @font-face {

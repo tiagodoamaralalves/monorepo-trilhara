@@ -33,7 +33,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 /**
- * Web Push do usuário autenticado (D-36).
+ * Web Push do usuário autenticado.
  *
  * <p>Rotas: {@code GET /config}, {@code POST|DELETE /subscriptions} e
  * {@code PUT /preferencias}. Todas exigem autenticação; a inscrição de outro usuário não existe
@@ -45,7 +45,7 @@ import jakarta.ws.rs.core.Response;
 @Autenticado
 public class PushResource {
 
-    /** Conjunto fechado de antecedências aceitas (D-26). */
+    /** Conjunto fechado de antecedências aceitas. */
     static final Set<Integer> MINUTOS_ACEITOS = Set.of(0, 5, 15, 30, 60);
 
     private final AuthContext authContext;
@@ -88,10 +88,10 @@ public class PushResource {
     }
 
     /**
-     * Upsert por {@code endpoint} (D-36e). Se o {@code endpoint} já pertence a outro usuário,
-     * ele é <strong>reatribuído</strong> ao usuário autenticado — o dispositivo físico é o mesmo
-     * e a inscrição push não pode continuar entregando para a conta anterior.
-     */
+ * Upsert por {@code endpoint}. Se o {@code endpoint} já pertence a outro usuário,
+ * ele é <strong>reatribuído</strong> ao usuário autenticado — o dispositivo físico é o mesmo
+ * e a inscrição push não pode continuar entregando para a conta anterior.
+ */
     @POST
     @Path("/subscriptions")
     public Response registrarInscricao(PushSubscriptionRequest request) {
@@ -123,9 +123,9 @@ public class PushResource {
     }
 
     /**
-     * Remove a inscrição deste dispositivo (logout, D-36e). Endpoint de outro usuário ou
-     * inexistente responde {@code 404} sem revelar existência.
-     */
+ * Remove a inscrição deste dispositivo (logout, ). Endpoint de outro usuário ou
+ * inexistente responde {@code 404} sem revelar existência.
+ */
     @DELETE
     @Path("/subscriptions")
     public Response removerInscricao(RemoverInscricaoPushRequest request) {
@@ -167,9 +167,9 @@ public class PushResource {
     }
 
     /**
-     * {@code p256dh} é chave pública P-256 não comprimida (65 bytes) e {@code auth} tem 16 bytes,
-     * ambos em base64url sem padding (RFC 8291 §3.2).
-     */
+ * {@code p256dh} é chave pública P-256 não comprimida (65 bytes) e {@code auth} tem 16 bytes,
+ * ambos em base64url sem padding (RFC 8291 §3.2).
+ */
     private void validarChaves(String p256dh, String auth) {
         byte[] chavePublica = decodificarBase64Url(p256dh);
         if (chavePublica != null && (chavePublica.length != 65 || chavePublica[0] != 0x04)) {

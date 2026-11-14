@@ -54,7 +54,7 @@ function propsBase(overrides: Partial<AgendaHojeProps> = {}): AgendaHojeProps {
   };
 }
 
-describe('AgendaHoje (R8 / §9 / D-37)', () => {
+describe('AgendaHoje', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

@@ -15,12 +15,12 @@ import br.com.trilhara.shared.erro.CodigoErro;
 import br.com.trilhara.shared.erro.DomainConflictException;
 
 /**
- * Heartbeat de renovação do lease de uma trilha (D-18a).
+ * Heartbeat de renovação do lease de uma trilha.
  *
  * <p>Enquanto uma publicação versionada está em andamento, o lease precisa continuar pertencendo
  * ao mesmo token. Um {@link ScheduledExecutorService} renova o lease a cada
  * {@link LeaseTrilhaService#INTERVALO_RENOVACAO_SEGUNDOS} segundos. Se a renovação falhar (token
- * roubado após expiração), o heartbeat marca a perda e {@link #verificarVivo()} passa a lançar
+ * roubado após expiração), o heartbeat marca a perda e {@link #verificarVivo} passa a lançar
  * {@code 409 SCHEDULE_GENERATION_IN_PROGRESS}: a publicação é abortada <strong>sem</strong> trocar
  * o ponteiro.</p>
  *
@@ -103,9 +103,9 @@ public final class LeaseHeartbeat implements AutoCloseable {
     }
 
     /**
-     * Confirma, contra o banco, que o token ainda é o dono. Chamado antes de cada etapa da
-     * publicação: barra tanto a perda detectada pelo heartbeat quanto a expiração silenciosa.
-     */
+ * Confirma, contra o banco, que o token ainda é o dono. Chamado antes de cada etapa da
+ * publicação: barra tanto a perda detectada pelo heartbeat quanto a expiração silenciosa.
+ */
     public void verificarVivo() {
         if (!vivo.get() || !leaseService.aindaDetem(usuarioId, trilhaId, token)) {
             vivo.set(false);

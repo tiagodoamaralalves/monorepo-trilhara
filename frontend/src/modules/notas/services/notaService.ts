@@ -16,7 +16,7 @@ import {
   TipoItemLixeira
 } from '../types/nota';
 
-/** Envelope normativo de paginação por offset (D-28). */
+/** Envelope normativo de paginação por offset. */
 export interface PaginaNotas {
   itens: NotaMetadata[];
   pagina: number;
@@ -65,7 +65,7 @@ export const NotaService = {
     });
   },
 
-  /** Contagens exibidas no ConfirmDialog antes de mover o caderno para a lixeira (D-33). */
+  /** Contagens exibidas no ConfirmDialog antes de mover o caderno para a lixeira. */
   async obterImpactoExclusaoCaderno(id: string): Promise<CadernoImpactoExclusao> {
     return request<CadernoImpactoExclusao>(`/cadernos/${encodeURIComponent(id)}/impacto-exclusao`);
   },
@@ -76,12 +76,12 @@ export const NotaService = {
     });
   },
 
-  // ── IMPORTAÇÃO E SINCRONIZAÇÃO DE TRILHA (D-29) ──
+  // ── IMPORTAÇÃO E SINCRONIZAÇÃO DE TRILHA ──
 
   /**
-   * Importa uma trilha. Sem `reimportar`, uma trilha já vinculada responde
-   * `409 TRAIL_ALREADY_IMPORTED` com `errors.cadernoId`.
-   */
+ * Importa uma trilha. Sem `reimportar`, uma trilha já vinculada responde
+ * `409 TRAIL_ALREADY_IMPORTED` com `errors.cadernoId`.
+ */
   async importarTrilha(trilhaId: string, reimportar = false): Promise<Caderno> {
     const qs = reimportar ? '?reimportar=true' : '';
     return request<Caderno>(`/cadernos/importar-trilha/${encodeURIComponent(trilhaId)}${qs}`, {
@@ -133,7 +133,7 @@ export const NotaService = {
 
   // ── PÁGINAS ──
 
-  /** Metadados paginados — sem `conteudoMarkdown` (D-29). */
+  /** Metadados paginados — sem `conteudoMarkdown`. */
   async listarNotasPorSecao(
     cadernoId: string,
     secaoId: string,
@@ -148,7 +148,7 @@ export const NotaService = {
     );
   },
 
-  /** Único caminho de leitura completa da página (D-32). */
+  /** Único caminho de leitura completa da página. */
   async buscarNota(id: string, opcoes: OpcoesRequisicao = {}): Promise<Nota> {
     return request<Nota>(`/notas/${encodeURIComponent(id)}`, { signal: opcoes.signal });
   },
@@ -172,9 +172,9 @@ export const NotaService = {
   },
 
   /**
-   * Atualiza uma página. O `signal` permite abortar o PUT pendente na troca de nota
-   * (D-31c) sem perder o rascunho local, que é gravado antes do abort.
-   */
+ * Atualiza uma página. O `signal` permite abortar o PUT pendente na troca de nota
+ * sem perder o rascunho local, que é gravado antes do abort.
+ */
   async atualizarNota(
     id: string,
     dados: { titulo?: string; conteudoMarkdown?: string },
@@ -193,7 +193,7 @@ export const NotaService = {
     });
   },
 
-  // ── BUSCA GLOBAL (D-30) ──
+  // ── BUSCA GLOBAL ──
 
   async buscarGlobal(
     termo: string,
@@ -207,7 +207,7 @@ export const NotaService = {
     );
   },
 
-  // ── LIXEIRA HIERÁRQUICA (D-34) ──
+  // ── LIXEIRA HIERÁRQUICA ──
 
   async listarLixeira(pagina = 1, tamanho = 20): Promise<LixeiraNotasResponse> {
     return request<LixeiraNotasResponse>(`/notas/lixeira?pagina=${pagina}&tamanho=${tamanho}`);
@@ -235,7 +235,7 @@ export const NotaService = {
     }>('/notas/lixeira/esvaziar', { method: 'DELETE' });
   },
 
-  // ── RASCUNHOS DE CONTINGÊNCIA (D-31) ──
+  // ── RASCUNHOS DE CONTINGÊNCIA ──
 
   obterChaveRascunho(usuarioId: string, notaId: string): string {
     return `trilhara:u:${usuarioId}:nota_draft:${notaId}`;

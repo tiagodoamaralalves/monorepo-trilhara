@@ -7,7 +7,7 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 
 /**
- * Horário local inexistente por gap de DST → {@code 400 INVALID_LOCAL_DATETIME} (D-04).
+ * Horário local inexistente por gap de DST → {@code 400 INVALID_LOCAL_DATETIME}.
  */
 public class InvalidLocalDatetimeException extends WebApplicationException {
 

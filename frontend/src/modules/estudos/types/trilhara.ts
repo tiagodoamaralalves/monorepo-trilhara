@@ -45,7 +45,7 @@ export type Topico = DisciplinaDTO['topicos'][number];
 
 /**
  * Progresso de uma trilha é o conjunto de IDs de tópicos concluídos, derivado de
- * `topicosConcluidosIds` (D-11). Nunca um mapa `{ topicoId: { done } }`.
+ * `topicosConcluidosIds`. Nunca um mapa `{ topicoId: { done } }`.
  */
 export type ProgressoTrilha = ReadonlySet<string>;
 
@@ -75,7 +75,7 @@ export interface PaginaEditais {
  * Projeção de sessão usada pela UI.
  *
  * Derivados (`erros`, `percentualAcerto`) vêm calculados na leitura; `minutos`, `inicio` e `tipo`
- * não existem mais — a fonte de verdade é `duracaoSegundos` e `dataSessao` (F3/R4).
+ * não existem mais — a fonte de verdade é `duracaoSegundos` e `dataSessao`.
  */
 export interface Sessao {
   id: string;
@@ -106,7 +106,7 @@ export interface RegistroBlocoPendente {
   duracaoMinutos: number;
 }
 
-/** Reexporta o contrato único de perfil (D-09/D-10), evitando duplicata de tipo. */
+/** Reexporta o contrato único de perfil, evitando duplicata de tipo. */
 export type { UsuarioAutenticado } from '@shared/auth/types';
 
 export type PaginaAtiva =

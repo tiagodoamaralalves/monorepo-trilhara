@@ -153,7 +153,7 @@ public class AuthService {
     }
 
     public AuthResponse renovarToken(String refreshTokenPuro, String userAgent, String ip) {
-        // D-45: 10/min por IP. Antes da rotação para que uma rajada não consuma a família de
+        // 10/min por IP. Antes da rotação para que uma rajada não consuma a família de
         // tokens nem derrube a sessão da vítima por falso "reuso".
         rateLimitService.verificarLimiteRefresh(ip);
 
@@ -222,9 +222,9 @@ public class AuthService {
     }
 
     /**
-     * Inicia o fluxo de recuperação de senha gerando um token de uso único (single-use)
-     * com expiração curta. Nunca revela se o e-mail existe ou não.
-     */
+ * Inicia o fluxo de recuperação de senha gerando um token de uso único (single-use)
+ * com expiração curta. Nunca revela se o e-mail existe ou não.
+ */
     public Optional<String> solicitarRecuperacaoSenha(RecuperarSenhaRequest request, String ip) {
         if (request == null || request.email() == null || request.email().isBlank()) {
             throw new BadRequestException("O e-mail é obrigatório.");

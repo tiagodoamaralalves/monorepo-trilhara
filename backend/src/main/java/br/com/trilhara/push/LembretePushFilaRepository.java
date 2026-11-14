@@ -27,7 +27,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 /**
- * Fila multi-tenant de entrega de lembretes (D-36b, D-06b).
+ * Fila multi-tenant de entrega de lembretes.
  *
  * <p>A varredura atravessa todos os tenants por {@code {estado, instanteEntregaUtc}} e por isso
  * vive em uma classe {@link SystemScope}, sem exposição HTTP. O acesso por tenant permanece em
@@ -55,9 +55,9 @@ public class LembretePushFilaRepository {
     }
 
     /**
-     * Candidatos prontos para processamento: {@code PENDENTE} cujo backoff já venceu, ou
-     * {@code PROCESSANDO} com lease expirado (worker morto).
-     */
+ * Candidatos prontos para processamento: {@code PENDENTE} cujo backoff já venceu, ou
+ * {@code PROCESSANDO} com lease expirado (worker morto).
+ */
     public List<LembretePush> listarCandidatosEnvio(Instant agora, int limite) {
         List<LembretePush> lista = new ArrayList<>();
         collection.find(filtroCandidatos(agora))
@@ -113,12 +113,12 @@ public class LembretePushFilaRepository {
     }
 
     /**
-     * Claim atômico {@code PENDENTE|LEASE_EXPIRADO -> PROCESSANDO} com lease.
-     *
-     * <p>{@code findOneAndUpdate} garante que dois workers nunca processam o mesmo item: apenas
-     * o primeiro encontra o documento no estado esperado. {@code tentativas} é incrementado no
-     * claim, portanto a versão devolvida já carrega o número da tentativa em curso.</p>
-     */
+ * Claim atômico {@code PENDENTE|LEASE_EXPIRADO -> PROCESSANDO} com lease.
+ *
+ * <p>{@code findOneAndUpdate} garante que dois workers nunca processam o mesmo item: apenas
+ * o primeiro encontra o documento no estado esperado. {@code tentativas} é incrementado no
+ * claim, portanto a versão devolvida já carrega o número da tentativa em curso.</p>
+ */
     public Optional<LembretePush> claim(ObjectId id, String leaseToken, Instant agora, Instant leaseAte) {
         var filtro = and(eq("_id", id), filtroCandidatos(agora));
         var update = Updates.combine(
@@ -136,9 +136,9 @@ public class LembretePushFilaRepository {
     }
 
     /**
-     * Conclusão definitiva. Somente o detentor do lease pode concluir — o filtro por
-     * {@code leaseToken} é o fencing da concorrência.
-     */
+ * Conclusão definitiva. Somente o detentor do lease pode concluir — o filtro por
+ * {@code leaseToken} é o fencing da concorrência.
+ */
     public boolean concluir(ObjectId id, String leaseToken, String estado, Instant agora) {
         var update = Updates.combine(
                 Updates.set("estado", estado),
@@ -150,9 +150,9 @@ public class LembretePushFilaRepository {
     }
 
     /**
-     * Devolve ao estado {@code PENDENTE} preservando {@code instanteEntregaUtc}: o backoff é
-     * derivado de {@code tentativas}, já incrementado no claim.
-     */
+ * Devolve ao estado {@code PENDENTE} preservando {@code instanteEntregaUtc}: o backoff é
+ * derivado de {@code tentativas}, já incrementado no claim.
+ */
     public boolean devolverParaPendente(ObjectId id, String leaseToken, Instant agora) {
         var update = Updates.combine(
                 Updates.set("estado", LembretePush.ESTADO_PENDENTE),

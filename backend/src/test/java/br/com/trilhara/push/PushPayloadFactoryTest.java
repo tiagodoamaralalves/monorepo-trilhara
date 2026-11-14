@@ -8,7 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * R11 — payload e allowlist de URL (D-36d).
+ * payload e allowlist de URL.
  */
 class PushPayloadFactoryTest {
 
@@ -29,7 +29,7 @@ class PushPayloadFactoryTest {
         assertTrue(json.contains("\"tarefaId\":\"" + ID + "\""));
         assertTrue(json.contains("\"titulo\":\"Estudar constitucional\""));
         assertTrue(json.contains("\"url\":\"https://tarefas.trilhara.app/?tarefaId=" + ID + "\""),
-                "A URL do payload é absoluta (D-36d), nunca relativa.");
+                "A URL do payload é absoluta, nunca relativa.");
     }
 
     @Test

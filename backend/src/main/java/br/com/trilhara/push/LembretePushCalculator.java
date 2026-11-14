@@ -19,13 +19,13 @@ public final class LembretePushCalculator {
     }
 
     /**
-     * Calcula o instante de entrega em UTC para um lembrete com base na data de vencimento,
-     * horário local, fuso horário IANA e minutos de antecedência.
-     * 
-     * Trata estritamente as regras de DST:
-     * - Gap DST (horário inexistente): lança InvalidLocalDatetimeException (HTTP 400 INVALID_LOCAL_DATETIME).
-     * - Overlap DST (horário duplicado): escolhe deterministicamente a ocorrência anterior (offset de verão).
-     */
+ * Calcula o instante de entrega em UTC para um lembrete com base na data de vencimento,
+ * horário local, fuso horário IANA e minutos de antecedência.
+ * 
+ * Trata estritamente as regras de DST:
+ * Gap DST (horário inexistente): lança InvalidLocalDatetimeException (HTTP 400 INVALID_LOCAL_DATETIME).
+ * Overlap DST (horário duplicado): escolhe deterministicamente a ocorrência anterior (offset de verão).
+ */
     public static Instant calcularInstanteEntregaUtc(
             LocalDate dataVencimento,
             LocalTime horario,

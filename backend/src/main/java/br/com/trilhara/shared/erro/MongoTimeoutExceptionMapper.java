@@ -12,7 +12,7 @@ import jakarta.ws.rs.ext.Provider;
 
 /**
  * Timeout de servidor/seleção do MongoDB → {@code 503 SERVICE_UNAVAILABLE} com
- * {@code X-Correlation-ID} (D-04).
+ * {@code X-Correlation-ID}.
  */
 @Provider
 public class MongoTimeoutExceptionMapper implements ExceptionMapper<MongoTimeoutException> {

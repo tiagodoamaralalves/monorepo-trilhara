@@ -1,5 +1,5 @@
 /**
- * Formatação numérica e textual (D-42).
+ * Formatação numérica e textual.
  */
 
 const formatadorPercentual = new Intl.NumberFormat('pt-BR', {

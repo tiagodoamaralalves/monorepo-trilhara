@@ -2,7 +2,7 @@ type RoleUsuario = 'USER' | 'ADMIN';
 
 export type TemaPreferencia = 'dark' | 'light' | 'system';
 
-/** Preferências persistidas no servidor (D-10). */
+/** Preferências persistidas no servidor. */
 export interface PreferenciasUsuario {
   tema: TemaPreferencia;
   disponibilidadeSemanalMinutos: number[];
@@ -11,7 +11,7 @@ export interface PreferenciasUsuario {
 
 /**
  * Perfil autenticado — contrato único de login, cadastro, refresh, handoff e `/auth/me`
- * (D-09/D-10). Vive somente em memória.
+ *. Vive somente em memória.
  */
 export interface UsuarioAutenticado {
   id: string;

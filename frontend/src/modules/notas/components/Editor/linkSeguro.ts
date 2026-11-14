@@ -1,6 +1,6 @@
 import { Mark } from '@tiptap/core';
 
-/** Protocolos aceitos em links de nota (D-30c). Qualquer outro descarta a marcação. */
+/** Protocolos aceitos em links de nota. Qualquer outro descarta a marcação. */
 const PROTOCOLOS_PERMITIDOS = ['http:', 'https:', 'mailto:'] as const;
 
 /**
@@ -31,22 +31,22 @@ export function protocoloDeLinkPermitido(href: unknown): boolean {
 }
 
 /**
- * Mark `link` restrito do editor de Notas (D-30c).
+ * Mark `link` restrito do editor de Notas.
  *
  * Por que existe: o `tiptap-markdown` só registra os utilitários de serialização de link —
  * o mark em si não entra no schema, então `[texto](url)` seria descartado na leitura. Este mark
  * usa o mesmo nome canônico (`link`) para herdar esse serializador e adiciona a política que
  * falta:
  *
- * - **allowlist de protocolos** (`http:`, `https:`, `mailto:`); qualquer outro `href` perde a
- *   marcação e o texto permanece legível — cobre `javascript:`, `data:` e `vbscript:` vindos de
- *   Markdown colado ou de `setContent`;
- * - `rel="noopener noreferrer nofollow"` e `target="_blank"` **sempre** aplicados na
- *   renderização, nunca herdados do documento de entrada;
- * - colagem passa pelo schema do ProseMirror (`html: false` no `Markdown`), então nós e marcações
- *   desconhecidas são descartados.
+ * **allowlist de protocolos** (`http:`, `https:`, `mailto:`); qualquer outro `href` perde a
+ * marcação e o texto permanece legível — cobre `javascript:`, `data:` e `vbscript:` vindos de
+ * Markdown colado ou de `setContent`;
+ * `rel="noopener noreferrer nofollow"` e `target="_blank"` **sempre** aplicados na
+ * renderização, nunca herdados do documento de entrada;
+ * colagem passa pelo schema do ProseMirror (`html: false` no `Markdown`), então nós e marcações
+ * desconhecidas são descartados.
  *
- * Não declara `addStorage().markdown`: herdar o serializador do `tiptap-markdown` é o que
+ * Não declara `addStorage.markdown`: herdar o serializador do `tiptap-markdown` é o que
  * mantém `[texto](url)` intacto no Markdown salvo.
  */
 export const LinkSeguro = Mark.create({

@@ -72,7 +72,7 @@ function montar() {
   );
 }
 
-describe('deep link ?tarefaId= (D-36f)', () => {
+describe('deep link ?tarefaId=', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.history.replaceState(null, '', `/?tarefaId=${TAREFA_ID}`);

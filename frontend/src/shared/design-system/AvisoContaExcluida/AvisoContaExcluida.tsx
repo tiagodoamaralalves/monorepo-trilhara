@@ -7,7 +7,7 @@ import {
 import styles from './AvisoContaExcluida.module.css';
 
 /**
- * Aviso exibido na tela pública após o `202` da exclusão de conta (D-35g).
+ * Aviso exibido na tela pública após o `202` da exclusão de conta.
  *
  * <p>Não é `SectionErrorCard` (não é falha) nem `Toast` (precisa sobreviver ao redirecionamento):
  * é um banner informativo da tela pública, com o parâmetro removido da URL após a primeira

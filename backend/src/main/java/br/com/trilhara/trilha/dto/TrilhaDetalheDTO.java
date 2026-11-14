@@ -10,11 +10,11 @@ import java.util.Set;
  * Conforme PLANO-IMPLEMENTACAO-REESTRUTURACAO.md §2.3.
  *
  * <p>O progresso é expresso apenas por {@code topicosConcluidosIds}: o mapa legado
- * {@code progresso: { topicoId: { done, doneAt } }} foi removido (D-11). Identificadores de
- * usuário são omitidos do contrato público (D-06).</p>
+ * {@code progresso: { topicoId: { done, doneAt } }} foi removido. Identificadores de
+ * usuário são omitidos do contrato público.</p>
  *
  * <p>A agenda de estudo é exposta por {@code cronogramaAtivoResumo} e pelos endpoints de
- * cronograma/blocos; o array legado de agendas foi removido (R5/DC-15).</p>
+ * cronograma/blocos; o array legado de agendas foi removido.</p>
  */
 public record TrilhaDetalheDTO(
         String id,

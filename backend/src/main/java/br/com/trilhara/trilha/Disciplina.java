@@ -17,7 +17,7 @@ import jakarta.validation.constraints.Size;
  * Entidade normalizada da coleção 'disciplinas'.
  * Conforme REQUISITOS-REESTRUTURACAO-DADOS.md §4.1 e PLANO-IMPLEMENTACAO-REESTRUTURACAO.md §2.2.
  *
- * <p>O campo {@code cadernoLink} foi removido (DC-04): vínculo entre disciplina e notas é
+ * <p>O campo {@code cadernoLink} foi removido: vínculo entre disciplina e notas é
  * derivado de {@code cadernos.origemTrilhaId}, nunca de uma URL guardada na disciplina. O limite
  * de 500 tópicos pertence ao serviço ({@code 409 RESOURCE_LIMIT_EXCEEDED}), não ao BSON.</p>
  */

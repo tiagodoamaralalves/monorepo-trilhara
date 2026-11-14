@@ -8,7 +8,7 @@ import jakarta.ws.rs.ext.Provider;
 
 /**
  * {@code InvalidIdentifierException} → {@code 400 INVALID_IDENTIFIER} com
- * {@code errors[campo]} (D-03).
+ * {@code errors[campo]}.
  */
 @Provider
 public class InvalidIdentifierExceptionMapper implements ExceptionMapper<InvalidIdentifierException> {

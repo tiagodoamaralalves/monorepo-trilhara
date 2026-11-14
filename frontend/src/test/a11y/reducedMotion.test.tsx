@@ -4,10 +4,10 @@ import { useReducedMotion } from '../../shared/hooks/useReducedMotion';
 import { alertarTitulo, restaurarTituloAba } from '../../shared/services/alertaTitulo';
 
 /**
- * `prefers-reduced-motion` (WCAG 2.2 §12.1.5) — R12.
+ * `prefers-reduced-motion` (WCAG 2.2 §12.1.5) — .
  *
  * A F11 só tinha a media query em CSS, o que não impede animação dirigida por JS
- * (a alternância do título da aba). Aqui: `useReducedMotion()` lê o
+ * (a alternância do título da aba). Aqui: `useReducedMotion` lê o
  * `matchMedia` e, quando `reduce` está ativo, `alertarTitulo` **não alterna** o
  * título — ele fica com a mensagem estática, ainda informando o término.
  */

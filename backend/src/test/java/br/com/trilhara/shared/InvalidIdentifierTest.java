@@ -22,11 +22,11 @@ import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 
 /**
- * D-03: ID malformado em path é {@code 400 INVALID_IDENTIFIER} (não 404) e ID válido
+ * ID malformado em path é {@code 400 INVALID_IDENTIFIER} (não 404) e ID válido
  * inexistente/fora do tenant é {@code 404 NOT_FOUND}, sem revelar existência.
  */
 @QuarkusTest
-@DisplayName("R1 - Identificadores HTTP (D-03)")
+@DisplayName("Identificadores HTTP")
 class InvalidIdentifierTest {
 
     private static final String API_TRILHAS = "/api/trilhas";

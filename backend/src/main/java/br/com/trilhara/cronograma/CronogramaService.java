@@ -113,7 +113,7 @@ public class CronogramaService {
     public CronogramaDTO criar(String trilhaIdStr, CriarCronogramaRequest request) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
 
-        // D-45: geração de cronograma limitada a 30/min por usuário. Fica antes do lease para
+        // geração de cronograma limitada a 30/min por usuário. Fica antes do lease para
         // que uma rajada não chegue nem a disputar a trava da trilha.
         rateLimitService.verificarLimiteCriacaoCronograma(usuarioId.toHexString());
 
@@ -411,7 +411,7 @@ public class CronogramaService {
             return List.of();
         }
 
-        // D-18d: a leitura usa o par cronogramaId + versaoAtivaCronograma do ponteiro da trilha;
+        // a leitura usa o par cronogramaId + versaoAtivaCronograma do ponteiro da trilha;
         // o flag `ativo` nunca é usado sozinho como fonte de leitura.
         List<BlocoCronograma> blocos = blocoCronogramaRepository.listarHoje(
                 usuarioId, hojeLocal, versoesAtivasPorCronograma);
@@ -453,7 +453,7 @@ public class CronogramaService {
         LocalDate hojeLocal = timezoneContext.hojeLocal();
 
         // Bloco de versão não publicada responde 404: leitura/escrita sempre pela versão do
-        // ponteiro da trilha (D-18d), sem revelar staging órfão.
+        // ponteiro da trilha, sem revelar staging órfão.
         exigirBlocoPublicado(usuarioId, bloco);
 
         // Operação idempotente: repetição no mesmo estado não altera timestamps nem concluidoEm
@@ -471,13 +471,13 @@ public class CronogramaService {
     }
 
     /**
-     * "Concluir atrasados sem sessão" conforme D-17.
-     *
-     * <p>Operação naturalmente idempotente: setar {@code concluido=true} onde {@code false}. Não há
-     * coleção de operações; {@code operationId} existe apenas para correlação de log. O
-     * processamento adquire o lease da trilha (mesmo mecanismo da geração) e atualiza bloco a bloco
-     * com {@code concluido:false} no filtro, de modo que um retry não reprocessa o que já concluiu.</p>
-     */
+ * "Concluir atrasados sem sessão" .
+ *
+ * <p>Operação naturalmente idempotente: setar {@code concluido=true} onde {@code false}. Não há
+ * coleção de operações; {@code operationId} existe apenas para correlação de log. O
+ * processamento adquire o lease da trilha (mesmo mecanismo da geração) e atualiza bloco a bloco
+ * com {@code concluido:false} no filtro, de modo que um retry não reprocessa o que já concluiu.</p>
+ */
     public ConcluirAtrasadosResponse concluirAtrasados(
             String trilhaIdStr, String cronogramaIdStr, UUID operationId) {
 
@@ -486,7 +486,7 @@ public class CronogramaService {
         ObjectId cronogramaId = BsonIds.parse(cronogramaIdStr, "cronogramaId");
 
         String leaseToken = UUID.randomUUID().toString();
-        // Lease ocupado ⇒ 409 SCHEDULE_GENERATION_IN_PROGRESS (D-17c)
+        // Lease ocupado ⇒ 409 SCHEDULE_GENERATION_IN_PROGRESS
         adquirirLeaseOuFalhar(usuarioId, trilhaId, leaseToken);
 
         try {
@@ -615,7 +615,7 @@ public class CronogramaService {
             calculada = dataFimInformada;
         } else if ("ATE_PROVA".equalsIgnoreCase(tipoPeriodo)) {
             LocalDate dataProva = BsonDates.toLocalDate(trilhaDoc.getString("dataProva"));
-            // D-20: "Até a prova" depende de dataProva ESTRITAMENTE posterior a dataInicio.
+            // "Até a prova" depende de dataProva ESTRITAMENTE posterior a dataInicio.
             calculada = dataProva != null && dataProva.isAfter(dataInicio)
                     ? dataProva
                     : dataInicio.plusDays(29);
@@ -635,13 +635,13 @@ public class CronogramaService {
     }
 
     /**
-     * Executa as etapas 2..6 da publicação versionada sob o heartbeat do lease.
-     *
-     * <p>Falha antes da troca do ponteiro deixa o cronograma em {@code PREPARANDO} com staging
-     * órfão (o reconciliador limpa). Falha depois da troca marca {@code RECUPERACAO_NECESSARIA}:
-     * o leitor pode ver a versão nova, mas flags e staging precisam ser reconciliados de forma
-     * idempotente (D-18b).</p>
-     */
+ * Executa as etapas 2..6 da publicação versionada sob o heartbeat do lease.
+ *
+ * <p>Falha antes da troca do ponteiro deixa o cronograma em {@code PREPARANDO} com staging
+ * órfão (o reconciliador limpa). Falha depois da troca marca {@code RECUPERACAO_NECESSARIA}:
+ * o leitor pode ver a versão nova, mas flags e staging precisam ser reconciliados de forma
+ * idempotente.</p>
+ */
     private CronogramaDTO publicar(
             LeaseHeartbeat heartbeat,
             ObjectId usuarioId,
@@ -751,9 +751,9 @@ public class CronogramaService {
     }
 
     /**
-     * Bloco fora da versão publicada no ponteiro da trilha responde {@code 404} (D-18d), sem
-     * revelar staging órfão nem versões antigas.
-     */
+ * Bloco fora da versão publicada no ponteiro da trilha responde {@code 404}, sem
+ * revelar staging órfão nem versões antigas.
+ */
     private void exigirBlocoPublicado(ObjectId usuarioId, BlocoCronograma bloco) {
         Document trilhaDoc = trilhaRepository.buscarEntidade(usuarioId, bloco.trilhaId())
                 .orElseThrow(() -> new NotFoundException(ERRO_BLOCO_NAO_ENCONTRADO));
@@ -778,7 +778,7 @@ public class CronogramaService {
                         .build());
     }
 
-    /** Valida {@code statusData} contra os três valores derivados de {@code hojeLocal} (D-17f). */
+    /** Valida {@code statusData} contra os três valores derivados de {@code hojeLocal}. */
     private String normalizarStatusData(String statusData) {
         if (statusData == null || statusData.isBlank()) {
             return null;

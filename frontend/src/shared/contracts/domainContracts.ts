@@ -1,5 +1,5 @@
 /**
- * Contratos de domínio compartilhados e congelados na FASE 0.
+ * Contratos de domínio compartilhados e congelados .
  * Conforme PLANO-IMPLEMENTACAO-REESTRUTURACAO.md e REQUISITOS-REESTRUTURACAO-DADOS.md.
  */
 
@@ -37,10 +37,10 @@ export interface GlobalSessionModalOpenParams {
   disciplinaCor?: string;
   onSuccess?: (sessao?: SessaoRegistradaDTO, blocoConcluido?: boolean) => void;
   /**
-   * D-48: chamado quando a conclusão do bloco responde 404 (bloco de versão substituída).
-   * O chamador recarrega lista/agenda e mostra o toast normativo; a sessão já salva **não**
-   * é reenviada.
-   */
+ * chamado quando a conclusão do bloco responde 404 (bloco de versão substituída).
+ * O chamador recarrega lista/agenda e mostra o toast normativo; a sessão já salva **não**
+ * é reenviada.
+ */
   onBlocoObsoleto?: () => void;
   triggerElement?: HTMLElement | null;
 }
@@ -109,7 +109,7 @@ interface SerieTemporalPontoDTO {
   totalAcertos: number;
 }
 
-/** Granularidade do agrupamento da série temporal (RI-09). */
+/** Granularidade do agrupamento da série temporal. */
 type GranularidadeSerie = 'DIA' | 'SEMANA' | 'MES';
 
 export interface EstatisticasTrilhaDTO {
@@ -156,7 +156,7 @@ export interface BlocoHojeDTO {
 export type SyncStatusState = 'salvo' | 'salvando' | 'alteracoes-locais' | 'erro';
 
 // =========================================================================
-// CONTRATOS FASE 2: TRILHAS, DISCIPLINAS E PROGRESSO NORMALIZADOS
+// CONTRATOS TRILHAS, DISCIPLINAS E PROGRESSO NORMALIZADOS
 // =========================================================================
 
 interface CronogramaAtivoResumoDTO {
@@ -280,7 +280,7 @@ export interface TrilhaImpactoExclusaoDTO {
 
 
 // =========================================================================
-// CONTRATOS FASE 4: CRONOGRAMAS, BLOCOS E DISPONIBILIDADE SEMANAL
+// CONTRATOS CRONOGRAMAS, BLOCOS E DISPONIBILIDADE SEMANAL
 // =========================================================================
 
 export type ModalidadeCronograma = 'SEQUENCIAL' | 'PONDERADO' | 'MANUAL';
@@ -419,7 +419,7 @@ export interface SerieRecorrenteDTO {
   atualizadoEm?: string;
 }
 
-/** Modelo explícito de lembrete (D-26): ausência de minutos nunca significa "herdar". */
+/** Modelo explícito de lembrete: ausência de minutos nunca significa "herdar". */
 export type ModoLembrete = 'HERDAR' | 'SEM_ALERTA' | 'PERSONALIZADO';
 
 export interface TarefaDTO {
@@ -449,7 +449,7 @@ export interface TarefaDTO {
   atualizadoEm?: string;
 }
 
-/** Resposta de GET /api/tarefas/hoje (D-23): apenas tarefas PENDENTES. */
+/** Resposta de GET /api/tarefas/hoje: apenas tarefas PENDENTES. */
 export interface TarefasHojeDTO {
   hojeLocal: string;
   atrasadas: TarefaDTO[];
@@ -457,7 +457,7 @@ export interface TarefasHojeDTO {
   semData: TarefaDTO[];
 }
 
-/** Resposta de GET /api/tarefas/lixeira (D-28): tarefas paginadas + metadados. */
+/** Resposta de GET /api/tarefas/lixeira: tarefas paginadas + metadados. */
 export interface LixeiraTarefasDTO {
   tarefas: TarefaDTO[];
   listas: ListaTarefasDTO[];
@@ -468,13 +468,13 @@ export interface LixeiraTarefasDTO {
   totalPaginas: number;
 }
 
-/** Resposta de POST /api/tarefas/lixeira/{id}/restaurar (D-25). */
+/** Resposta de POST /api/tarefas/lixeira/{id}/restaurar. */
 export interface RestauracaoTarefaDTO {
   tarefa: TarefaDTO;
   realocadaParaListaGeral: boolean;
 }
 
-/** Resposta de GET /api/listas-tarefas/{id}/impacto-exclusao (D-33). */
+/** Resposta de GET /api/listas-tarefas/{id}/impacto-exclusao. */
 export interface ListaImpactoExclusaoDTO {
   id: string;
   nome: string;

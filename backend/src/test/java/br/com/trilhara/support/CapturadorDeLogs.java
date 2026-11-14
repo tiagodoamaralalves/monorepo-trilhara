@@ -8,13 +8,13 @@ import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 
 /**
- * Captura linhas de log da JVM durante um teste (R10/D-35c).
+ * Captura linhas de log da JVM durante um teste.
  *
  * <p>Anexado ao logger raiz, acumula as mensagens formatadas de todos os loggers. Usado por
  * {@code AccountDeletionIntegrationTest#logsNaoContemUsuarioId} para provar que nenhum
  * identificador pessoal vaza nos logs da exclusão de conta.</p>
  *
- * <p>Uso: {@code try (CapturadorDeLogs logs = CapturadorDeLogs.iniciar()) { ... }}</p>
+ * <p>Uso: {@code try (CapturadorDeLogs logs = CapturadorDeLogs.iniciar) { ... }}</p>
  */
 public final class CapturadorDeLogs extends Handler implements AutoCloseable {
 

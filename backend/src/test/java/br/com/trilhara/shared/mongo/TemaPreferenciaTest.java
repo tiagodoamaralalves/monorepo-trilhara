@@ -13,10 +13,10 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 
 /**
- * R2 — preferência de tema persistida no servidor (D-10).
+ * preferência de tema persistida no servidor.
  */
 @QuarkusTest
-@DisplayName("R2 - Preferência de tema (usuarios.preferencias.tema)")
+@DisplayName("Preferência de tema (usuarios.preferencias.tema)")
 class TemaPreferenciaTest {
 
     private static final String ROTA = "/api/usuarios/me/preferencias/tema";

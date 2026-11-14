@@ -30,10 +30,10 @@ function trilhaCom(idsConcluidos: string[]): TrilhaDetalheDTO {
 }
 
 /**
- * D-39: marcar/desmarcar tópico é otimista com rollback + toast de erro. O estado do `Set`
+ * marcar/desmarcar tópico é otimista com rollback + toast de erro. O estado do `Set`
  * muda antes da resposta e volta ao valor anterior quando a API falha.
  */
-describe('Tópico — atualização otimista com rollback (D-39)', () => {
+describe('Tópico — atualização otimista com rollback', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });

@@ -8,7 +8,7 @@ export type ThemeResolvido = 'dark' | 'light';
 const STORAGE_THEME_ANON_KEY = 'trilhara:anon:tema';
 const THEME_CHANGE_EVENT = 'trilhara:theme-change';
 
-/** Cache local por usuário (D-10); visitante usa `trilhara:anon:tema`. */
+/** Cache local por usuário; visitante usa `trilhara:anon:tema`. */
 export function chaveCacheTema(usuarioId?: string | null): string {
   return usuarioId ? `trilhara:u:${usuarioId}:tema` : STORAGE_THEME_ANON_KEY;
 }
@@ -107,7 +107,7 @@ export function useTheme() {
     aplicarTema(theme);
   }, [theme]);
 
-  // Preferência do servidor manda: aplica e regrava o cache local por usuário (D-10).
+  // Preferência do servidor manda: aplica e regrava o cache local por usuário.
   useEffect(() => {
     if (!usuario?.preferencias?.tema) return;
     const doServidor = usuario.preferencias.tema;

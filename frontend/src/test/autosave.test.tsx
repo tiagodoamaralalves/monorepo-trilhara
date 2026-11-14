@@ -26,7 +26,7 @@ function montarHook(overrides: Partial<Parameters<typeof useAutosaveNota>[0]> = 
   return { ...hook, salvar, props };
 }
 
-describe('useAutosaveNota — D-31', () => {
+describe('useAutosaveNota', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     localStorage.clear();

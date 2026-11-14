@@ -34,7 +34,7 @@ import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 
 /**
- * Contratos de tarefas manuais, recorrência e lixeira (R7 / D-23 a D-28).
+ * Contratos de tarefas manuais, recorrência e lixeira.
  *
  * <p>Cada teste é nomeado conforme o critério de aceite correspondente do guia de revisão.</p>
  */
@@ -77,7 +77,7 @@ class TarefaIntegrationTest {
         tokenB = tokenService.gerarAccessToken(userRepository.buscarPorId(usuarioB).orElseThrow());
     }
 
-    // ── D-23: Hoje somente pendentes ─────────────────────────────────────────
+    // ── Hoje somente pendentes ─────────────────────────────────────────
 
     @Test
     @DisplayName("hojeNaoContemConcluidas: GET /api/tarefas/hoje devolve apenas PENDENTE e deletedAt nulo")
@@ -106,7 +106,7 @@ class TarefaIntegrationTest {
                 .body("atrasadas", hasSize(0));
     }
 
-    // ── D-24.1: TODA_A_SERIE preserva serieId das concluídas ─────────────────
+    // ── TODA_A_SERIE preserva serieId das concluídas ─────────────────
 
     @Test
     @DisplayName("todaASeriePreservaSerieIdDasConcluidas: exclusão de série não desvincula concluídas")
@@ -133,7 +133,7 @@ class TarefaIntegrationTest {
                 .body("concluida", equalTo(true));
     }
 
-    // ── D-24.3: ESTA_E_FUTURAS na edição preserva as desvinculadas ───────────
+    // ── ESTA_E_FUTURAS na edição preserva as desvinculadas ───────────
 
     @Test
     @DisplayName("estaEFuturasEdicaoPreservaDesvinculadas: edição mantém ocorrência editada individualmente")
@@ -169,7 +169,7 @@ class TarefaIntegrationTest {
                 .body("desvinculadaDaSerie", equalTo(true));
     }
 
-    // ── D-24.4: idempotência de ESTA_E_FUTURAS ───────────────────────────────
+    // ── idempotência de ESTA_E_FUTURAS ───────────────────────────────
 
     @Test
     @DisplayName("estaEFuturasRetryComMesmaChaveNaoDuplicaSerie: retry devolve 200 e a mesma série")
@@ -244,7 +244,7 @@ class TarefaIntegrationTest {
                 .body("code", equalTo("VALIDATION_ERROR"));
     }
 
-    // ── D-24.5 e D-27: materialização concorrente e séries suspensas ─────────
+    // ── materialização concorrente e séries suspensas ─────────
 
     @Test
     @DisplayName("materializacaoConcorrenteNaoDuplicaNemRetorna500: 10 GETs paralelos não duplicam ocorrências")
@@ -326,7 +326,7 @@ class TarefaIntegrationTest {
                         "Série sobrevivente deve ir para a Lista Geral (listaId nulo)"));
     }
 
-    // ── D-25: restauração ───────────────────────────────────────────────────
+    // ── restauração ───────────────────────────────────────────────────
 
     @Test
     @DisplayName("restaurarTarefaComListaNaLixeiraRestauraSoContainer: irmãs do lote permanecem na lixeira")
@@ -382,7 +382,7 @@ class TarefaIntegrationTest {
                 .body("realocadaParaListaGeral", equalTo(true));
     }
 
-    // ── Validação de referências e paginação (D-28) ─────────────────────────
+    // ── Validação de referências e paginação ─────────────────────────
 
     @Test
     @DisplayName("listaIdDeOutroUsuarioRetorna400: lista de outro tenant não é aceita no body")
@@ -470,7 +470,7 @@ class TarefaIntegrationTest {
     }
 
     @Test
-    @DisplayName("impactoExclusaoListaContaTarefasESeries: D-33 devolve contagens por conclusão")
+    @DisplayName("impactoExclusaoListaContaTarefasESeries: devolve contagens por conclusão")
     void impactoExclusaoListaContaTarefasESeries() {
         String listaId = criarLista(tokenA, "Lista com impacto");
         String ativa = criarTarefa(tokenA, """

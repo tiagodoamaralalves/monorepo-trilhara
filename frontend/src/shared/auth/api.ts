@@ -17,7 +17,7 @@ export interface ApiErrorDetalhes {
 }
 
 /**
- * Erro de API já normalizado para o catálogo do produto (D-04).
+ * Erro de API já normalizado para o catálogo do produto.
  *
  * `code` está **sempre** presente: `NETWORK_ERROR` para falha de transporte
  * (`status: 0`) e `UNKNOWN` quando o backend responde algo fora do catálogo.
@@ -32,7 +32,7 @@ export class ApiError extends Error {
   readonly title?: string;
   readonly instance?: string;
   readonly correlationId?: string;
-  /** Segundos informados em `Retry-After` (429), quando presentes (D-04/D-45). */
+  /** Segundos informados em `Retry-After` (429), quando presentes. */
   readonly retryAfterSeconds?: number;
 
   constructor(detalhes: ApiErrorDetalhes) {
@@ -81,11 +81,11 @@ const ROTAS_AUTH_PUBLICAS = new Set([
 /** Opções adicionais do cliente HTTP que não pertencem a `RequestInit`. */
 export interface OpcoesRequisicao extends RequestInit {
   /**
-   * Não tenta renovar o token nem dispara `AUTH_REQUIRED_EVENT` no 401.
-   *
-   * Usado exclusivamente por `DELETE /api/auth/conta` (D-35): depois do 202 as credenciais já
-   * foram revogadas, então o 401 significa "exclusão em andamento" — nunca "sessão expirada".
-   */
+ * Não tenta renovar o token nem dispara `AUTH_REQUIRED_EVENT` no 401.
+ *
+ * Usado exclusivamente por `DELETE /api/auth/conta`: depois do 202 as credenciais já
+ * foram revogadas, então o 401 significa "exclusão em andamento" — nunca "sessão expirada".
+ */
   semRefresh?: boolean;
 }
 

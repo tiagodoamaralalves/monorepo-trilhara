@@ -22,7 +22,7 @@ import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 
 /**
- * R13/D-04 — nenhum identificador pessoal em log de nível {@code INFO} ou superior.
+ * nenhum identificador pessoal em log de nível {@code INFO} ou superior.
  *
  * <p>Substitui a cobertura pontual de {@code AccountDeletionIntegrationTest#logsNaoContemUsuarioId}
  * (que cobre só a exclusão de conta) por uma varredura do ciclo de vida auditável: login, leitura
@@ -34,7 +34,7 @@ import jakarta.inject.Inject;
  * não gera falso positivo e o mesmo objeto gera falha garantida.</p>
  */
 @QuarkusTest
-@DisplayName("R13 - Logs sem PII em INFO+ (D-04)")
+@DisplayName("Logs sem PII em INFO+")
 class LogSemPiiTest {
 
     /** Formato de e-mail: se um destinatário real escapar, este padrão casa. */
@@ -82,9 +82,9 @@ class LogSemPiiTest {
         assertFalse(capturado.contains(token),
                 cenario + ": o access token não pode aparecer em log");
         assertFalse(PADRAO_OBJECTID.matcher(capturado).find(),
-                cenario + ": nenhum ObjectId em hex pode aparecer em log (D-04)");
+                cenario + ": nenhum ObjectId em hex pode aparecer em log");
         assertFalse(PADRAO_TOKEN.matcher(capturado).find(),
-                cenario + ": nenhum token/código pode aparecer em log (D-04)");
+                cenario + ": nenhum token/código pode aparecer em log");
     }
 
     @Test

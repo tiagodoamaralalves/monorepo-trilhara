@@ -11,7 +11,7 @@ import jakarta.ws.rs.ext.Provider;
 
 /**
  * Último recurso: qualquer exceção não tratada vira {@code 500 INTERNAL_ERROR} neutro e
- * correlacionável (D-04). Nunca expõe stack trace, SQL, consulta ou dado pessoal.
+ * correlacionável. Nunca expõe stack trace, SQL, consulta ou dado pessoal.
  */
 @Provider
 public class GlobalThrowableMapper implements ExceptionMapper<Throwable> {

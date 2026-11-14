@@ -36,14 +36,14 @@ import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 
 /**
- * R5/D-18 — publicação de cronograma resiliente.
+ * publicação de cronograma resiliente.
  *
  * <p>Prova, para cada uma das 6 etapas da publicação versionada, que uma falha injetada nunca
  * publica estado intermediário: o leitor vê a versão anterior (falha antes do ponteiro) ou a nova
  * completa (falha depois), e o reconciliador converge de forma idempotente.</p>
  */
 @QuarkusTest
-@DisplayName("R5 - Publicação de cronograma resiliente (D-18)")
+@DisplayName("Publicação de cronograma resiliente")
 class PublicacaoCronogramaFaultInjectionTest {
 
     private static final String API_TRILHAS = "/api/trilhas";
@@ -86,7 +86,7 @@ class PublicacaoCronogramaFaultInjectionTest {
     private String tokenPara(ObjectId usuarioId) {
         Usuario u = new Usuario(
                 usuarioId.toHexString(),
-                "Usuario R5 Publ",
+                "Usuario Publ",
                 "r5-publ-" + usuarioId.toHexString() + "@trilhara.com.br",
                 "$pbkdf2-sha512$mock",
                 List.of(br.com.trilhara.auth.Role.USER),
@@ -99,7 +99,7 @@ class PublicacaoCronogramaFaultInjectionTest {
     private String criarTrilha(String token) {
         String payload = """
                 {
-                  "nome": "Trilha R5 %s",
+                  "nome": "Trilha %s",
                   "cargo": "Analista",
                   "banca": "FGV",
                   "dataProva": "2027-06-30",
@@ -139,9 +139,9 @@ class PublicacaoCronogramaFaultInjectionTest {
                 disciplinas.get(1).idHex());
     }
     /**
-     * Para cada etapa 1..6: a falha injetada interrompe a publicação, o leitor nunca vê estado
-     * intermediário e a reconciliação converge.
-     */
+ * Para cada etapa 1..6: a falha injetada interrompe a publicação, o leitor nunca vê estado
+ * intermediário e a reconciliação converge.
+ */
     @ParameterizedTest(name = "falhaNaEtapa{0}_leitorVeVersaoAnteriorOuNovaCompleta")
     @EnumSource(EtapaPublicacao.class)
     @DisplayName("falha em cada etapa nunca publica estado intermediário")

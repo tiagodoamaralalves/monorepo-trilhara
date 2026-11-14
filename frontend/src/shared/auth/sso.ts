@@ -117,8 +117,8 @@ export function obterUrlAppNotas(): string {
 
 /**
  * Inicia a transição SSO para outro módulo Trilhara.
- * - Em produção: navega diretamente, pois o cookie SSO compartilhado (.trilhara.com.br) autentica a sessão.
- * - Em localhost: se autenticado, emite código de handoff de uso único via POST /api/auth/handoff.
+ * Em produção: navega diretamente, pois o cookie SSO compartilhado (.trilhara.com.br) autentica a sessão.
+ * Em localhost: se autenticado, emite código de handoff de uso único via POST /api/auth/handoff.
  */
 export async function iniciarHandoffParaApp(urlDestino: string): Promise<string> {
   if (typeof window === 'undefined') return urlDestino;

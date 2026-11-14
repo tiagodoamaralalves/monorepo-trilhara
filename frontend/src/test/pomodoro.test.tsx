@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getPomodoroTimerStorageKey } from '../modules/pomodoro/PomodoroApp';
 import { __resetarParaTeste, definirUsuarioCorrente } from '../shared/sync/barramento';
 
-describe('pomodoro (R6/D-21) — namespace anônimo separado do cronômetro de Estudos', () => {
+describe('pomodoro — namespace anônimo separado do cronômetro de Estudos', () => {
   beforeEach(() => {
     localStorage.clear();
     __resetarParaTeste();

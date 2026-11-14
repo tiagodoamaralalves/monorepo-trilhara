@@ -9,7 +9,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 
 /**
- * Gatilho do reconciliador de cronogramas (D-18b).
+ * Gatilho do reconciliador de cronogramas.
  *
  * <p>Roda no <strong>startup</strong> (para fechar publicações interrompidas por um desligamento) e
  * a cada 5 minutos. A execução agendada é apenas o gatilho; a lógica vive em

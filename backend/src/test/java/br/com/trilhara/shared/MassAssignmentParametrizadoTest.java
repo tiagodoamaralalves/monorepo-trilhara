@@ -24,9 +24,9 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 
 /**
- * R13/D-05 — mass assignment parametrizado para <strong>todo</strong> DTO de request.
+ * mass assignment parametrizado para <strong>todo</strong> DTO de request.
  *
- * <p>A R1 provou mass assignment em uma única rota ({@code POST /api/trilhas}). Este teste
+ * <p>A provou mass assignment em uma única rota ({@code POST /api/trilhas}). Este teste
  * fecha a lacuna enumerando por reflexão todos os records {@code *Request} de
  * {@code br.com.trilhara.**.dto} e verificando que cada um declara <em>apenas</em> campos
  * funcionais: nenhum campo de sistema ({@code usuarioId}, {@code _id}, {@code criadoEm},
@@ -38,18 +38,18 @@ import jakarta.inject.Inject;
  * (provada em {@code MassAssignmentTest}); esta é a defesa que impede o campo de existir.</p>
  */
 @QuarkusTest
-@DisplayName("R13 - Mass assignment parametrizado em todos os DTOs de request (D-05)")
+@DisplayName("Mass assignment parametrizado em todos os DTOs de request")
 class MassAssignmentParametrizadoTest {
 
     /**
-     * Campos que jamais podem existir num DTO de entrada: o servidor os deriva.
-     *
-     * <p>{@code id} <strong>não</strong> entra nesta lista: D-01/§3 exigem que o {@code id} de
-     * tópico embutido seja uma string estável gerada no cliente ({@code new ObjectId()
-     * .toHexString()}), e é por isso que {@code CriarTopicoRequest}/{@code CriarDisciplinaRequest}
-     * declaram {@code id}. O que não pode existir é o campo de <em>tenant</em> e os metadados
-     * de servidor.</p>
-     */
+ * Campos que jamais podem existir num DTO de entrada: o servidor os deriva.
+ *
+ * <p>{@code id} <strong>não</strong> entra nesta lista: exigem que o {@code id} de
+ * tópico embutido seja uma string estável gerada no cliente ({@code new ObjectId
+ * .toHexString}), e é por isso que {@code CriarTopicoRequest}/{@code CriarDisciplinaRequest}
+ * declaram {@code id}. O que não pode existir é o campo de <em>tenant</em> e os metadados
+ * de servidor.</p>
+ */
     private static final List<String> CAMPOS_PROIBIDOS = List.of(
             "usuarioId", "_id", "criadoEm", "atualizadoEm", "deletedAt",
             "expiraEm", "consumidoEm", "versaoGeracao");
@@ -94,12 +94,12 @@ class MassAssignmentParametrizadoTest {
     }
 
     /**
-     * Enumera os records de request por reflexão, sem lista escrita a mão.
-     *
-     * <p>Os pacotes são varridos a partir do diretório de classes de teste
-     * ({@code target/classes}), que o próprio Maven produz antes da suíte. Assim, um DTO novo
-     * entra automaticamente no teste sem edição — e um DTO que aceite campo de sistema falha.</p>
-     */
+ * Enumera os records de request por reflexão, sem lista escrita a mão.
+ *
+ * <p>Os pacotes são varridos a partir do diretório de classes de teste
+ * ({@code target/classes}), que o próprio Maven produz antes da suíte. Assim, um DTO novo
+ * entra automaticamente no teste sem edição — e um DTO que aceite campo de sistema falha.</p>
+ */
     private static List<Class<?>> dtosDeRequest() {
         List<Class<?>> encontrados = new ArrayList<>();
         Path raiz = Paths.get("target", "classes");

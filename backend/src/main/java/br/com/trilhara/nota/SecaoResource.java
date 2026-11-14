@@ -51,7 +51,7 @@ public class SecaoResource {
         return notaService.atualizarSecao(usuarioId(), BsonIds.parse(id, "id"), request);
     }
 
-    /** Contagens exibidas no {@code ConfirmDialog} antes de mover a seção para a lixeira (D-33). */
+    /** Contagens exibidas no {@code ConfirmDialog} antes de mover a seção para a lixeira. */
     @GET
     @Path("/{id}/impacto-exclusao")
     public SecaoImpactoExclusaoResponse impactoExclusao(@PathParam("id") String id) {

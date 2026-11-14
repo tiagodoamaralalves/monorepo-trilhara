@@ -1,4 +1,4 @@
-/** Mensagem normativa exibida após o aceite da exclusão (D-35g / Anexo B). */
+/** Mensagem normativa exibida após o aceite da exclusão. */
 export const MENSAGEM_CONTA_EXCLUIDA =
   'Sua conta está sendo excluída. Isso pode levar alguns minutos.';
 

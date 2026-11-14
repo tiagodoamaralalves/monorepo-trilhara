@@ -10,6 +10,7 @@ import { useGlobalSessionModal } from './GlobalSessionModalContext';
 import { sessaoGlobalService } from '../../services/sessaoGlobalService';
 import { useStudyTimer } from '../../timers/estudoTimer';
 import { AUTH_REQUIRED_EVENT } from '../../auth/api';
+import { AUTH_CHANGE_EVENT, AuthStorage } from '../../auth/authStorage';
 import { classificarErro, extrairErrosDeCampo } from '../../api';
 import { publicar } from '../../sync/barramento';
 import { useUnsavedChanges } from '../../hooks';
@@ -102,7 +103,7 @@ export const GlobalSessionModal: React.FC = () => {
   const modoComBloco = Boolean(params?.blocoId);
 
 
-  // Inicialização ao abrir modal (D-22): a chave de idempotência nasce aqui e só muda em uma
+  // Inicialização ao abrir modal: a chave de idempotência nasce aqui e só muda em uma
   // nova abertura; nos modos com timer o cronômetro é **pausado**, nunca zerado.
   useEffect(() => {
     if (!isOpen || !params) return;
@@ -134,7 +135,7 @@ export const GlobalSessionModal: React.FC = () => {
     setIsSaving(false);
     setSujo(false);
 
-    // D-22.1: pausa o cronômetro ao abrir; o tempo acumulado permanece para retry/cancelamento.
+    // pausa o cronômetro ao abrir; o tempo acumulado permanece para retry/cancelamento.
     if (params.modo === 'ESTUDOS_TIMER' || params.modo === 'BLOCO_TIMER') {
       pausarTimer();
     }
@@ -202,9 +203,9 @@ export const GlobalSessionModal: React.FC = () => {
   }, [fecharModal]);
 
   /**
-   * D-22.2: com campos alterados pede confirmação ("Descartar registro?"); sem alterações
-   * fecha direto. Cancelar mantém o timer pausado com o tempo acumulado (D-22.1).
-   */
+ * com campos alterados pede confirmação ("Descartar registro?"); sem alterações
+ * fecha direto. Cancelar mantém o timer pausado com o tempo acumulado.
+ */
   const handleFechar = useCallback(async () => {
     if (isSaving) return;
     if (!sujo || sessaoSalva) {
@@ -267,14 +268,14 @@ export const GlobalSessionModal: React.FC = () => {
   const numAcertos = acertos.trim() === '' ? undefined : Number(acertos);
 
   const errosDerivados = useMemo(() => {
-    if (numQuestoes === undefined || isNaN(numQuestoes)) return null;
-    const ac = numAcertos !== undefined && !isNaN(numAcertos) ? numAcertos : 0;
+    if (numQuestoes === undefined || Number.isNaN(numQuestoes)) return null;
+    const ac = numAcertos !== undefined && !Number.isNaN(numAcertos) ? numAcertos : 0;
     return Math.max(0, numQuestoes - ac);
   }, [numQuestoes, numAcertos]);
 
   const aproveitamentoPercentual = useMemo(() => {
-    if (numQuestoes === undefined || isNaN(numQuestoes) || numQuestoes <= 0) return null;
-    const ac = numAcertos !== undefined && !isNaN(numAcertos) ? numAcertos : 0;
+    if (numQuestoes === undefined || Number.isNaN(numQuestoes) || numQuestoes <= 0) return null;
+    const ac = numAcertos !== undefined && !Number.isNaN(numAcertos) ? numAcertos : 0;
     return ((ac / numQuestoes) * 100).toFixed(1);
   }, [numQuestoes, numAcertos]);
 
@@ -282,7 +283,7 @@ export const GlobalSessionModal: React.FC = () => {
     ? (Number(horas) || 0) * 3600 + (Number(minutos) || 0) * 60
     : duracaoOriginalSegundos;
 
-  /** Mapeia um erro da API para o estado do modal (D-22.5). */
+  /** Mapeia um erro da API para o estado do modal. */
   const tratarErro = useCallback((falha: unknown): void => {
     const categoria = classificarErro(falha);
     setErro(falha);
@@ -336,12 +337,12 @@ export const GlobalSessionModal: React.FC = () => {
   );
 
   /**
-   * D-48: 404 ao concluir bloco significa que o cronograma foi regenerado e aquele bloco
-   * pertence a uma versão substituída. Recarrega lista/agenda e avisa; a sessão já salva
-   * nunca é reenviada e nenhum retry é oferecido.
-   *
-   * @returns `true` quando a falha era de bloco obsoleto e já foi tratada.
-   */
+ * 404 ao concluir bloco significa que o cronograma foi regenerado e aquele bloco
+ * pertence a uma versão substituída. Recarrega lista/agenda e avisa; a sessão já salva
+ * nunca é reenviada e nenhum retry é oferecido.
+ *
+ * @returns `true` quando a falha era de bloco obsoleto e já foi tratada.
+ */
   const tratarBlocoObsoleto = useCallback(
     (falha: unknown): boolean => {
       if (classificarErro(falha) !== 'nao-encontrado') return false;
@@ -361,7 +362,7 @@ export const GlobalSessionModal: React.FC = () => {
     (sessao: SessaoRegistradaDTO | undefined, blocoConcluido: boolean) => {
       setSessaoSalva(true);
       setSujo(false);
-      // D-22.1: só depois de 201/200 dos dois passos o cronômetro é zerado.
+      // só depois de 201/200 dos dois passos o cronômetro é zerado.
       if (modoComTimer && blocoConcluido !== false) resetarTimer();
       publicar('AGENDA_INVALIDADA', null);
       publicar('SESSAO_ENCERRADA', null);
@@ -371,7 +372,7 @@ export const GlobalSessionModal: React.FC = () => {
     [fecharAgora, modoComTimer, params, resetarTimer]
   );
 
-  /** Ação secundária: apenas em modos com bloco (§6.4 / D-22.3). */
+  /** Ação secundária: apenas em modos com bloco (§6.4 / ). */
   const handleConcluirSemSalvar = async () => {
     if (!params?.blocoId || isSaving) return;
     setIsSaving(true);
@@ -421,7 +422,7 @@ export const GlobalSessionModal: React.FC = () => {
     setErrosCampo([]);
     setErro(null);
 
-    // Validações locais com erro inline por campo (D-22.5).
+    // Validações locais com erro inline por campo.
     const validacoes: ErroCampo[] = [];
     if (duracaoTotalSegundos < 60) {
       validacoes.push({
@@ -432,14 +433,14 @@ export const GlobalSessionModal: React.FC = () => {
     if (params.modo === 'MANUAL' && dataSessao > obterHojeISO()) {
       validacoes.push({ campo: 'dataSessao', mensagem: 'A data da sessão não pode ser futura.' });
     }
-    if (numQuestoes !== undefined && (isNaN(numQuestoes) || numQuestoes < 0)) {
+    if (numQuestoes !== undefined && (Number.isNaN(numQuestoes) || numQuestoes < 0)) {
       validacoes.push({
         campo: 'questoes',
         mensagem: 'O número de questões deve ser zero ou positivo.'
       });
     }
     if (numAcertos !== undefined) {
-      if (isNaN(numAcertos) || numAcertos < 0) {
+      if (Number.isNaN(numAcertos) || numAcertos < 0) {
         validacoes.push({
           campo: 'acertos',
           mensagem: 'O número de acertos deve ser zero ou positivo.'
@@ -463,7 +464,7 @@ export const GlobalSessionModal: React.FC = () => {
     setIsSaving(true);
 
     try {
-      // Criação inline (D-22.4): os IDs ficam em `criadosInline` e um retry nunca recria.
+      // Criação inline: os IDs ficam em `criadosInline` e um retry nunca recria.
       if (trilhaEfetivaId === '__nova__' || !trilhaEfetivaId) {
         if (criadosInline.trilhaId) {
           trilhaEfetivaId = criadosInline.trilhaId;
@@ -555,7 +556,7 @@ export const GlobalSessionModal: React.FC = () => {
             true
           );
         } else {
-          // D-48: bloco de versão substituída — recarrega e encerra sem reenviar a sessão.
+          // bloco de versão substituída — recarrega e encerra sem reenviar a sessão.
           if (resultado.erro && tratarBlocoObsoleto(resultado.erro)) return;
           setBlocoPendente(true);
           if (resultado.erro) tratarErro(resultado.erro);
@@ -570,6 +571,20 @@ export const GlobalSessionModal: React.FC = () => {
       setIsSaving(false);
     }
   };
+
+  useEffect(() => {
+    if (!aguardandoLogin || !isOpen) return;
+    const aoAutenticar = () => {
+      if (AuthStorage.obterAccessToken()) {
+        setAguardandoLogin(false);
+        void handleSubmit();
+      }
+    };
+    window.addEventListener(AUTH_CHANGE_EVENT, aoAutenticar);
+    return () => {
+      window.removeEventListener(AUTH_CHANGE_EVENT, aoAutenticar);
+    };
+  });
 
   const getTituloModal = () => {
     if (!params) return 'Sessão de Estudo';
@@ -757,7 +772,7 @@ export const GlobalSessionModal: React.FC = () => {
             </>
           )}
 
-          {/* Duração em Horas e Minutos (D-22: segundos originais preservados) */}
+          {/* Duração em Horas e Minutos (segundos originais preservados) */}
           <div className={styles.formGrid}>
             <div className={styles.formGroup}>
               <label className={styles.label} htmlFor="sessao-horas">Horas</label>
@@ -874,7 +889,7 @@ export const GlobalSessionModal: React.FC = () => {
           </div>
 
           {/* Métricas Derivadas em Tempo Real */}
-          {numQuestoes !== undefined && !isNaN(numQuestoes) && numQuestoes > 0 && (
+          {numQuestoes !== undefined && !Number.isNaN(numQuestoes) && numQuestoes > 0 && (
             <div className={styles.statsGrid}>
               <div className={styles.statItem}>
                 <span className={styles.statLabel}>Erros</span>

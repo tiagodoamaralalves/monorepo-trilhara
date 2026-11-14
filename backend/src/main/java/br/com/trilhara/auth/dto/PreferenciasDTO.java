@@ -5,11 +5,11 @@ import java.util.List;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
 /**
- * Preferências do usuário expostas ao cliente (D-10).
+ * Preferências do usuário expostas ao cliente.
  *
- * @param tema                          {@code dark}, {@code light} ou {@code system}
+ * @param tema {@code dark}, {@code light} ou {@code system}
  * @param disponibilidadeSemanalMinutos 7 inteiros (Seg–Dom), 0 a 1440
- * @param padraoLembreteMinutosAntes    padrão global de lembrete de tarefas
+ * @param padraoLembreteMinutosAntes padrão global de lembrete de tarefas
  */
 @Schema(name = "PreferenciasDTO", description = "Preferências persistidas do usuário")
 public record PreferenciasDTO(

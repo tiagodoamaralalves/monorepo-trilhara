@@ -1,7 +1,7 @@
 /**
  * Compatibilidade de import para os módulos de Estudos.
  *
- * A implementação canônica vive em `@shared/format` (D-42). Este arquivo apenas reexporta,
+ * A implementação canônica vive em `@shared/format`. Este arquivo apenas reexporta,
  * para que os call sites antigos não dupliquem regra de formatação.
  */
 export {

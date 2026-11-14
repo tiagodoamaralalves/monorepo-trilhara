@@ -1,32 +1,12 @@
-#!/bin/sh
-set -eu
+#!/usr/bin/env bash
+set -euo pipefail
 
-ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+ROOT_DIR="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 PID_FILE="$ROOT_DIR/scripts/.quarkus-dev.pid"
 
-if [ -n "${JAVA_HOME-}" ] && [ -x "$JAVA_HOME/bin/java" ] && [ -x "$JAVA_HOME/bin/javac" ]; then
-  :
-elif command -v java >/dev/null 2>&1 && command -v javac >/dev/null 2>&1; then
-  JAVA_HOME=$(CDPATH= cd -- "$(dirname "$(command -v java)")/.." && pwd)
-else
-  JAVA_HOME=""
-  for candidate in /usr/lib/jvm/* /home/wsl/.vscode-server/extensions/redhat.java-*/jre/*; do
-    if [ -x "$candidate/bin/java" ] && [ -x "$candidate/bin/javac" ]; then
-      JAVA_HOME="$candidate"
-      break
-    fi
-  done
-fi
+eval "$(bash "$ROOT_DIR/scripts/env-gate.sh")"
 
-if [ -z "$JAVA_HOME" ] || [ ! -x "$JAVA_HOME/bin/java" ] || [ ! -x "$JAVA_HOME/bin/javac" ]; then
-  echo "JDK não encontrado. Instale o Java 25 ou configure JAVA_HOME apontando para um JDK." >&2
-  exit 1
-fi
-
-export JAVA_HOME
-export PATH="$JAVA_HOME/bin:$PATH"
-
-if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+if [[ -f "$PID_FILE" ]] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
   echo "Quarkus já está em execução."
   exit 0
 fi

@@ -68,11 +68,11 @@ export interface AppSwitcherProps {
 }
 
 /**
- * Alternador de módulos (D-12) no padrão WAI-ARIA APG *Menu Button*.
+ * Alternador de módulos no padrão WAI-ARIA APG *Menu Button*.
  *
  * Teclado: Enter/Espaço/↓ abre e foca o primeiro item; ↑/↓ circulam; Home/End vão aos
  * extremos; Escape fecha e devolve o foco ao botão; Tab fecha. Antes de navegar consulta o
- * `unsavedChangesRegistry` (D-41) e pede confirmação quando há alterações não salvas.
+ * `unsavedChangesRegistry` e pede confirmação quando há alterações não salvas.
  */
 export const AppSwitcher: React.FC<AppSwitcherProps> = ({
   moduloAtual,
@@ -132,7 +132,7 @@ export const AppSwitcher: React.FC<AppSwitcherProps> = ({
         return;
       }
 
-      // D-12/D-41: grava rascunhos e confirma antes de destruir o estado em memória.
+      // grava rascunhos e confirma antes de destruir o estado em memória.
       unsavedChangesRegistry.flushTodos();
 
       if (unsavedChangesRegistry.temAlteracoes() && confirmContext) {

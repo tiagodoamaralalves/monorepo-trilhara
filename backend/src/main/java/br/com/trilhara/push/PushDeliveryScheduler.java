@@ -20,18 +20,18 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 /**
- * Entrega dos lembretes Web Push (D-36b).
+ * Entrega dos lembretes Web Push.
  *
  * <p>Executa a cada 30 s ({@code trilhara.push.scheduler.interval}), adquire cada item
  * atomicamente com lease de 60 s e só conclui como detentor do lease. Regras:</p>
  * <ul>
- *   <li>atraso acima de 15 min em relação a {@code instanteEntregaUtc} →
- *       {@code EXPIRADO_FORA_DA_JANELA} <strong>sem</strong> enviar;</li>
- *   <li>falha transitória → volta a {@code PENDENTE} com {@code tentativas + 1}; a próxima
- *       tentativa é {@code min(2^n s, restante da janela)} e é derivada do próprio
- *       {@code instanteEntregaUtc}, que nunca é reescrito;</li>
- *   <li>{@code 404}/{@code 410} do provedor → remove a inscrição e continua;</li>
- *   <li>envio com {@code TTL: 900} e {@code Urgency: normal}.</li>
+ * <li>atraso acima de 15 min em relação a {@code instanteEntregaUtc} →
+ * {@code EXPIRADO_FORA_DA_JANELA} <strong>sem</strong> enviar;</li>
+ * <li>falha transitória → volta a {@code PENDENTE} com {@code tentativas + 1}; a próxima
+ * tentativa é {@code min(2^n s, restante da janela)} e é derivada do próprio
+ * {@code instanteEntregaUtc}, que nunca é reescrito;</li>
+ * <li>{@code 404}/{@code 410} do provedor → remove a inscrição e continua;</li>
+ * <li>envio com {@code TTL: 900} e {@code Urgency: normal}.</li>
  * </ul>
  *
  * <p>Classe {@link SystemScope}: varre todos os tenants. A varredura está em
@@ -43,7 +43,7 @@ public class PushDeliveryScheduler {
 
     private static final Logger LOG = Logger.getLogger(PushDeliveryScheduler.class);
 
-    /** Janela útil de entrega (D-36 / §11): notificação atrasada além disso não é enviada. */
+    /** Janela útil de entrega: notificação atrasada além disso não é enviada. */
     static final Duration JANELA_UTIL_MAXIMA = Duration.ofMinutes(15);
     static final Duration LEASE_DURATION = Duration.ofSeconds(60);
     /** TTL do cabeçalho RFC 8030: igual à janela útil. */
@@ -114,9 +114,9 @@ public class PushDeliveryScheduler {
     }
 
     /**
-     * Processa uma versão já adquirida. Só o detentor do lease conclui (fencing por
-     * {@code leaseToken} no repositório da fila).
-     */
+ * Processa uma versão já adquirida. Só o detentor do lease conclui (fencing por
+ * {@code leaseToken} no repositório da fila).
+ */
     private void processarLembreteUnitario(LembretePush lembrete, String leaseToken, Instant agora) {
         Instant limiteJanela = lembrete.instanteEntregaUtc().plus(JANELA_UTIL_MAXIMA);
 
@@ -132,7 +132,7 @@ public class PushDeliveryScheduler {
         List<PushSubscription> subscriptions = pushSubscriptionRepository.listarPorUsuario(lembrete.usuarioId());
         if (subscriptions.isEmpty()) {
             // Nada foi entregue: FALHA_FINAL (ENVIADO significa entrega efetiva ao provedor).
-            // D-04/R13: o usuarioId não pode aparecer em log; pseudônimo preserva a correlação.
+            // o usuarioId não pode aparecer em log; pseudônimo preserva a correlação.
             LOG.infof("event=PUSH_SEM_INSCRICOES lembrete=%s conta=%s",
                     lembrete.id(), Pseudonimo.de(lembrete.usuarioId().toHexString()));
             filaRepository.concluir(lembrete.id(), leaseToken, LembretePush.ESTADO_FALHA_FINAL, agora);
@@ -148,7 +148,7 @@ public class PushDeliveryScheduler {
 
         // Fencing de versão: se uma versão mais nova já existe, esta foi substituída e não pode
         // entregar. Cobre a janela entre `inserirNovaVersao` e `cancelarPendentesAnteriores` sem
-        // transação multi-documento (D-36a).
+        // transação multi-documento.
         Optional<LembretePush> vigente =
                 lembretePushRepository.buscarVersaoVigente(lembrete.usuarioId(), lembrete.tarefaId());
         if (vigente.isPresent() && vigente.get().versaoAgendamento() > lembrete.versaoAgendamento()) {
@@ -194,13 +194,13 @@ public class PushDeliveryScheduler {
     }
 
     /**
-     * Falha transitória com backoff exponencial limitado à janela.
-     *
-     * <p>O item volta a {@code PENDENTE} e o backoff é aplicado pelo filtro da fila a partir de
-     * {@code atualizadoEm + min(2^n s, restante da janela)}. Se o restante da janela não comporta
-     * nem 1 segundo, não há tempo hábil: o lembrete termina em {@code FALHA_FINAL} em vez de
-     * ficar pendente indefinidamente.</p>
-     */
+ * Falha transitória com backoff exponencial limitado à janela.
+ *
+ * <p>O item volta a {@code PENDENTE} e o backoff é aplicado pelo filtro da fila a partir de
+ * {@code atualizadoEm + min(2^n s, restante da janela)}. Se o restante da janela não comporta
+ * nem 1 segundo, não há tempo hábil: o lembrete termina em {@code FALHA_FINAL} em vez de
+ * ficar pendente indefinidamente.</p>
+ */
     private void tratarFalhaTransitoria(
             LembretePush lembrete, String leaseToken, Instant agora, Instant limiteJanela) {
         long restanteJanelaSegundos = Duration.between(agora, limiteJanela).toSeconds();

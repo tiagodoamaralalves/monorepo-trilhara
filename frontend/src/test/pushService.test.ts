@@ -11,7 +11,7 @@ type WindowComPush = Window & { PushManager?: unknown; Notification?: unknown };
 type NavigatorComStandalone = Navigator & { standalone?: boolean };
 
 /**
- * R11 — detecção de suporte, estado de permissão e pedido explícito (D-36 / Anexo B).
+ * detecção de suporte, estado de permissão e pedido explícito.
  */
 describe('pushService — suporte, permissão e registro do SW', () => {
   const originalNotification = window.Notification;

@@ -18,7 +18,7 @@
   align-items: center;
   margin-top: 2px;
   /* Alvo mínimo (SC 2.5.8) no wrapper: mantém a caixa visual em 20px,
-   * mas garante área clicável de 24px (40px em pointer: coarse). */
+ * mas garante área clicável de 24px (40px em pointer: coarse). */
   min-inline-size: var(--target-min);
   min-block-size: var(--target-min);
 }

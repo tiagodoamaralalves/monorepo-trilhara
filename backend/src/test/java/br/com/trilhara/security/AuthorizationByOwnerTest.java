@@ -30,7 +30,7 @@ import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 
 @QuarkusTest
-@DisplayName("R12 - Auditoria de Autorização por Proprietário (Anti-IDOR / 404 sem vazar existência)")
+@DisplayName("Auditoria de Autorização por Proprietário (Anti-IDOR / 404 sem vazar existência)")
 public class AuthorizationByOwnerTest {
 
     @Inject
@@ -697,7 +697,7 @@ public class AuthorizationByOwnerTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // R12 — Casos dirigidos pela allowlist (RI-39)
+    // Casos dirigidos pela allowlist
     // ─────────────────────────────────────────────────────────────────────
 
     /** Substitui os marcadores da allowlist pelos IDs reais do usuário A. */
@@ -725,7 +725,7 @@ public class AuthorizationByOwnerTest {
 
     @org.junit.jupiter.params.ParameterizedTest(name = "[{index}] {4}")
     @org.junit.jupiter.params.provider.MethodSource("casosAllowlist")
-    @DisplayName("R12 — Toda rota privada da allowlist: B usando IDs de A recebe 404 (nunca 200/204/403/500)")
+    @DisplayName("Toda rota privada da allowlist: B usando IDs de A recebe 404 (nunca 200/204/403/500)")
     void auditarRotaDaAllowlist(String metodo, String caminho, boolean comCorpo,
                                 int statusEsperado, String descricao) {
         io.restassured.specification.RequestSpecification requisicao = given()
@@ -826,7 +826,7 @@ public class AuthorizationByOwnerTest {
 
     @org.junit.jupiter.params.ParameterizedTest(name = "[{index}] {0}")
     @org.junit.jupiter.params.provider.MethodSource("listagensSemId")
-    @DisplayName("R12 — Listagens sem ID: B não recebe nenhum item de A")
+    @DisplayName("Listagens sem ID: B não recebe nenhum item de A")
     void auditarListagemSemId(String rota, String marcadorTituloDeA) {
         String corpo = given()
                 .header("Authorization", "Bearer " + tokenB)

@@ -18,11 +18,11 @@ import com.mongodb.client.MongoDatabase;
 import br.com.trilhara.shared.mongo.ColecaoTrilhara;
 
 /**
- * Fixtures de AccountDeletionIntegrationTest (R10/D-35).
+ * Fixtures de AccountDeletionIntegrationTest.
  *
  * <p>O mapa de populadores e dirigido pelo enum: cada colecao filha privada de
- * {@link ColecaoTrilhara#filhasPrivadas()} precisa de exatamente um populador, e
- * {@link #validarCobertura()} falha quando uma colecao nova e declarada sem fixture.</p>
+ * {@link ColecaoTrilhara#filhasPrivadas} precisa de exatamente um populador, e
+ * {@link #validarCobertura} falha quando uma colecao nova e declarada sem fixture.</p>
  */
 final class FixturesConta {
 

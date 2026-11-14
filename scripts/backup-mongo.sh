@@ -7,12 +7,33 @@ RETENTION_DAYS="${RETENTION_DAYS:-14}"
 TIMESTAMP="$(date -u +"%Y%m%d_%H%M%S")"
 BACKUP_FILE="$BACKUP_DIR/trilhara_mongo_${TIMESTAMP}.archive.gz"
 
+resolver_docker() {
+  local candidato
+  for candidato in "${DOCKER_BIN:-}" /snap/bin/docker /usr/bin/docker /usr/local/bin/docker; do
+    [[ -n "$candidato" ]] || continue
+    [[ -x "$candidato" ]] || continue
+    if "$candidato" info >/dev/null 2>&1; then
+      DOCKER_BIN="$candidato"
+      return 0
+    fi
+  done
+  candidato="$(command -v docker 2>/dev/null || true)"
+  if [[ -n "$candidato" ]] && "$candidato" info >/dev/null 2>&1; then
+    DOCKER_BIN="$candidato"
+    return 0
+  fi
+  echo "Erro: nenhum daemon Docker ativo foi encontrado." >&2
+  return 1
+}
+
+resolver_docker
+
 mkdir -p "$BACKUP_DIR"
 umask 077
 
 echo "[$(date -Is)] Iniciando backup consistente do MongoDB (trilhara)..."
 
-docker compose -f "$ROOT_DIR/docker-compose.yml" exec -T mongo \
+"$DOCKER_BIN" compose -f "$ROOT_DIR/docker-compose.yml" exec -T mongo \
   mongodump --db=trilhara --archive --gzip > "$BACKUP_FILE"
 
 # Valida a integridade do arquivo gzip gerado e garante que não está vazio

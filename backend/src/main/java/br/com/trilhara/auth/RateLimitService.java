@@ -15,17 +15,17 @@ public class RateLimitService {
 
     private static final int LIMITE_CHAVES = 10_000;
 
-    /** D-45: exclusão de conta / verificação de senha — 5 tentativas por 15 minutos/usuário. */
+    /** exclusão de conta / verificação de senha — 5 tentativas por 15 minutos/usuário. */
     private static final int LIMITE_EXCLUSAO_CONTA = 5;
     private static final long JANELA_EXCLUSAO_CONTA_SEGUNDOS = 15 * 60;
 
-    /** D-45: login/refresh/handoff — 10 por minuto por IP. */
+    /** login/refresh/handoff — 10 por minuto por IP. */
     private static final int LIMITE_AUTH_POR_IP = 10;
-    /** D-45: `handoff/consume` — janela mais larga que a emissão (20/min/IP). */
+    /** `handoff/consume` — janela mais larga que a emissão (20/min/IP). */
     private static final int LIMITE_HANDOFF_CONSUMO_POR_IP = 20;
-    /** D-45: busca de notas — 60 por minuto por usuário. */
+    /** busca de notas — 60 por minuto por usuário. */
     private static final int LIMITE_BUSCA_NOTAS = 60;
-    /** D-45: criação de trilha/cronograma — 30 por minuto por usuário. */
+    /** criação de trilha/cronograma — 30 por minuto por usuário. */
     private static final int LIMITE_CRIACAO_ESTRUTURA = 30;
     private static final long JANELA_PADRAO_SEGUNDOS = 60;
 
@@ -70,13 +70,13 @@ public class RateLimitService {
     }
 
     /**
-     * D-45: {@code DELETE /api/auth/conta} e qualquer verificação de senha nesse fluxo são
-     * limitados a <strong>5 tentativas por 15 minutos por usuário</strong>, independentes da
-     * janela global de login/cadastro.
-     *
-     * <p>Protege a senha atual contra brute-force por meio do endpoint de exclusão, que aceita
-     * reautenticação server-side.</p>
-     */
+ * {@code DELETE /api/auth/conta} e qualquer verificação de senha nesse fluxo são
+ * limitados a <strong>5 tentativas por 15 minutos por usuário</strong>, independentes da
+ * janela global de login/cadastro.
+ *
+ * <p>Protege a senha atual contra brute-force por meio do endpoint de exclusão, que aceita
+ * reautenticação server-side.</p>
+ */
     public void verificarLimiteExclusaoConta(String usuarioId) {
         registrarEVerificar("exclusao-conta:usuario:" + normalizar(usuarioId), LIMITE_EXCLUSAO_CONTA,
                 JANELA_EXCLUSAO_CONTA_SEGUNDOS);
@@ -93,56 +93,56 @@ public class RateLimitService {
     }
 
     // ========================================================================
-    // D-45 — limitadores exigidos pela decisão e ausentes até a R13
+    // limitadores exigidos pela decisão e ausentes 
     // ========================================================================
 
     /**
-     * D-45: {@code POST /api/auth/refresh} — <strong>10/min por IP</strong>.
-     *
-     * <p>O refresh é a rota mais chamada da renovação de sessão (single-flight por aba, 5 s
-     * de throttle) e não tinha limite algum; um atacante com refresh token roubado podia
-     * forçar rotações em paralelo até disparar a revogação por reuso da vítima.</p>
-     */
+ * {@code POST /api/auth/refresh} — <strong>10/min por IP</strong>.
+ *
+ * <p>O refresh é a rota mais chamada da renovação de sessão (single-flight por aba, 5 s
+ * de throttle) e não tinha limite algum; um atacante com refresh token roubado podia
+ * forçar rotações em paralelo até disparar a revogação por reuso da vítima.</p>
+ */
     public void verificarLimiteRefresh(String ip) {
         registrarEVerificar("refresh:ip:" + normalizar(ip), LIMITE_AUTH_POR_IP, JANELA_PADRAO_SEGUNDOS);
     }
 
     /**
-     * D-45: {@code POST /api/auth/handoff} (emissão) — <strong>10/min por IP</strong>.
-     *
-     * <p>Cada emissão grava um código persistido; sem limite, o endpoint autenticado vira
-     * vetor de escrita em massa em {@code tokens_handoff_sso}.</p>
-     */
+ * {@code POST /api/auth/handoff} (emissão) — <strong>10/min por IP</strong>.
+ *
+ * <p>Cada emissão grava um código persistido; sem limite, o endpoint autenticado vira
+ * vetor de escrita em massa em {@code tokens_handoff_sso}.</p>
+ */
     public void verificarLimiteHandoffEmissao(String ip) {
         registrarEVerificar("handoff-emissao:ip:" + normalizar(ip), LIMITE_AUTH_POR_IP,
                 JANELA_PADRAO_SEGUNDOS);
     }
 
     /**
-     * D-45: {@code POST /api/auth/handoff/consume} — <strong>20/min por IP</strong>.
-     *
-     * <p>Limite mais alto que a emissão porque o consumo pode ser tentado por várias abas
-     * simultâneas da origem de destino. Não é um limite de adivinhação do código (o código é
-     * opaco e de uso único), e sim de contenção de carga.</p>
-     */
+ * {@code POST /api/auth/handoff/consume} — <strong>20/min por IP</strong>.
+ *
+ * <p>Limite mais alto que a emissão porque o consumo pode ser tentado por várias abas
+ * simultâneas da origem de destino. Não é um limite de adivinhação do código (o código é
+ * opaco e de uso único), e sim de contenção de carga.</p>
+ */
     public void verificarLimiteHandoffConsumo(String ip) {
         registrarEVerificar("handoff-consumo:ip:" + normalizar(ip), LIMITE_HANDOFF_CONSUMO_POR_IP,
                 JANELA_PADRAO_SEGUNDOS);
     }
 
-    /** D-45: {@code GET /api/notas/busca} — <strong>60/min por usuário</strong>. */
+    /** {@code GET /api/notas/busca} — <strong>60/min por usuário</strong>. */
     public void verificarLimiteBuscaNotas(String usuarioId) {
         registrarEVerificar("busca-notas:usuario:" + normalizar(usuarioId), LIMITE_BUSCA_NOTAS,
                 JANELA_PADRAO_SEGUNDOS);
     }
 
-    /** D-45: {@code POST /api/trilhas} — <strong>30/min por usuário</strong>. */
+    /** {@code POST /api/trilhas} — <strong>30/min por usuário</strong>. */
     public void verificarLimiteCriacaoTrilha(String usuarioId) {
         registrarEVerificar("criacao-trilha:usuario:" + normalizar(usuarioId), LIMITE_CRIACAO_ESTRUTURA,
                 JANELA_PADRAO_SEGUNDOS);
     }
 
-    /** D-45: {@code POST /api/trilhas/{trilhaId}/cronogramas} — <strong>30/min por usuário</strong>. */
+    /** {@code POST /api/trilhas/{trilhaId}/cronogramas} — <strong>30/min por usuário</strong>. */
     public void verificarLimiteCriacaoCronograma(String usuarioId) {
         registrarEVerificar("criacao-cronograma:usuario:" + normalizar(usuarioId), LIMITE_CRIACAO_ESTRUTURA,
                 JANELA_PADRAO_SEGUNDOS);
@@ -152,7 +152,7 @@ public class RateLimitService {
         registrarEVerificar(chave, limiteMaximo, janelaSegundos);
     }
 
-    /** Variante com janela própria por chave (D-45 exige 15 min para exclusão de conta). */
+    /** Variante com janela própria por chave. */
     private void registrarEVerificar(String chave, int limiteMaximo, long janelaDaChaveSegundos) {
         Instant agora = Instant.now();
         Instant corte = agora.minusSeconds(janelaDaChaveSegundos);

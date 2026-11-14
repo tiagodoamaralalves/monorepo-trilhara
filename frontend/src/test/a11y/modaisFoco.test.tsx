@@ -14,7 +14,7 @@ import { AuthContext, AuthContextValue } from '../../shared/auth/AuthContext';
 import { StudyTimerProvider } from '../../shared/timers/estudoTimer';
 
 /**
- * Acessibilidade dos modais (D-40 / WCAG 2.2 SC 2.1.2 e 2.4.3).
+ * Acessibilidade dos modais.
  *
  * Cobre *focus trap*, fechamento por `Escape` bloqueado durante salvamento e
  * devolução determinística de foco ao elemento disparador em `Modal`,

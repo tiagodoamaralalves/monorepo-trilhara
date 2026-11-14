@@ -1,5 +1,5 @@
 /**
- * Formatação de durações (D-42).
+ * Formatação de durações.
  *
  * `formatarDuracao(segundos)` → "45 s" (< 60), "12 min", "1 h 05 min".
  */

@@ -5,14 +5,14 @@ import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 
 /**
- * Granularidade da série temporal das estatísticas (RI-09).
+ * Granularidade da série temporal das estatísticas.
  *
  * <p>Regra de escolha, derivada apenas do intervalo efetivamente consultado:</p>
  * <ul>
- *   <li>período {@code tudo} (sem início/fim) → {@link #MES};</li>
- *   <li>até 31 dias inclusive → {@link #DIA};</li>
- *   <li>até 180 dias inclusive → {@link #SEMANA} (semana ISO, chave = segunda-feira);</li>
- *   <li>acima de 180 dias → {@link #MES} (chave = {@code yyyy-MM-01}).</li>
+ * <li>período {@code tudo} (sem início/fim) → {@link #MES};</li>
+ * <li>até 31 dias inclusive → {@link #DIA};</li>
+ * <li>até 180 dias inclusive → {@link #SEMANA} (semana ISO, chave = segunda-feira);</li>
+ * <li>acima de 180 dias → {@link #MES} (chave = {@code yyyy-MM-01}).</li>
  * </ul>
  *
  * <p>A troca de granularidade muda apenas o agrupamento da série; os totais globais e por
@@ -31,11 +31,11 @@ public enum Granularidade {
     public static final int LIMITE_SEMANA_DIAS = 180;
 
     /**
-     * Resolve a granularidade do intervalo.
-     *
-     * @param dataInicio início do período; {@code null} junto com {@code dataFim} significa "tudo"
-     * @param dataFim    fim do período
-     */
+ * Resolve a granularidade do intervalo.
+ *
+ * @param dataInicio início do período; {@code null} junto com {@code dataFim} significa "tudo"
+ * @param dataFim fim do período
+ */
     public static Granularidade para(LocalDate dataInicio, LocalDate dataFim) {
         if (dataInicio == null || dataFim == null) {
             return MES;
@@ -51,11 +51,11 @@ public enum Granularidade {
     }
 
     /**
-     * Chave do bucket à qual a data de calendário pertence.
-     *
-     * @return {@code yyyy-MM-dd} em {@link #DIA}, segunda-feira ISO em {@link #SEMANA}
-     *         e {@code yyyy-MM-01} em {@link #MES}
-     */
+ * Chave do bucket à qual a data de calendário pertence.
+ *
+ * @return {@code yyyy-MM-dd} em {@link #DIA}, segunda-feira ISO em {@link #SEMANA}
+ * e {@code yyyy-MM-01} em {@link #MES}
+ */
     public String chave(LocalDate data) {
         return switch (this) {
             case DIA -> data.toString();
