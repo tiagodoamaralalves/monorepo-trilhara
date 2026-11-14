@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Size;
 
 /**
  * Representa um tópico embutido dentro de um documento de disciplina na coleção 'disciplinas'.
- * Conforme REQUISITOS-REESTRUTURACAO-DADOS.md §4.1 e PLANO-IMPLEMENTACAO-REESTRUTURACAO.md §2.2.
  */
 public record TopicoEmbutido(
         @NotBlank @Size(max = 24, message = "O ID do tópico deve ter 24 caracteres hexadecimais.") String id,

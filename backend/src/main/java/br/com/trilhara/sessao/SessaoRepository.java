@@ -72,7 +72,7 @@ public class SessaoRepository {
 
     public SessaoRepository(
             MongoClient client,
-            @ConfigProperty(name = "quarkus.mongodb.database") String database) {
+            @ConfigProperty(name = "quarkus.mongodb.database", defaultValue = "trilhara") String database) {
         this.sessoes = client.getDatabase(database).getCollection("sessoes");
     }
 
@@ -134,7 +134,7 @@ public class SessaoRepository {
  * Converte a sessão em tombstone mínimo por 24h.
  *
  * <p>Após a operação sobram apenas {@code _id, usuarioId, trilhaId, chaveIdempotencia,
- * requestHash, deletedAt}; todo o conteúdo pessoal e de métricas é removido com
+ * requestHash, deletedAt}; integralmente o conteúdo pessoal e de métricas é removido com
  * {@code $unset}. Por isso um tombstone nunca aparece em listagem, agregação ou no cálculo
  * da sessão nº 1 — todas essas consultas filtram {@code deletedAt: null}.</p>
  */
@@ -407,8 +407,8 @@ public class SessaoRepository {
                 return a.disciplinaRemovida() ? 1 : -1;
             }
             if (!a.disciplinaRemovida()) {
-                ObjectId idA = BsonIds.parse(a.disciplinaId(), "disciplinaId");
-                ObjectId idB = BsonIds.parse(b.disciplinaId(), "disciplinaId");
+                ObjectId idA = BsonIds.parse(a.disciplinaId(), CAMPO_DISCIPLINA_ID);
+                ObjectId idB = BsonIds.parse(b.disciplinaId(), CAMPO_DISCIPLINA_ID);
                 int oA = ordemMap.getOrDefault(idA, 0);
                 int oB = ordemMap.getOrDefault(idB, 0);
                 return Integer.compare(oA, oB);
@@ -439,25 +439,17 @@ public class SessaoRepository {
         // TreeMap mantém a ordenação ascendente estável da série por chave de bucket.
         Map<String, long[]> buckets = new TreeMap<>();
         for (Document doc : sessoes.aggregate(pipelineSerie)) {
-            String dataStr = doc.getString("_id");
-            if (dataStr == null) {
-                continue;
-            }
-            LocalDate data;
-            try {
-                data = LocalDate.parse(dataStr);
-            } catch (DateTimeParseException _) {
-                // ignora datas corrompidas, assim como o cálculo de streak
-                continue;
-            }
-            long stSegundos = ((Number) doc.get(CAMPO_TOTAL_SEGUNDOS)).longValue();
-            long stQuestoes = ((Number) doc.get(CAMPO_TOTAL_QUESTOES)).longValue();
-            long stAcertos = ((Number) doc.get(CAMPO_TOTAL_ACERTOS)).longValue();
+            LocalDate data = parsearDataOpcional(doc.getString("_id"));
+            if (data != null) {
+                long stSegundos = ((Number) doc.get(CAMPO_TOTAL_SEGUNDOS)).longValue();
+                long stQuestoes = ((Number) doc.get(CAMPO_TOTAL_QUESTOES)).longValue();
+                long stAcertos = ((Number) doc.get(CAMPO_TOTAL_ACERTOS)).longValue();
 
-            long[] acumulado = buckets.computeIfAbsent(granularidade.chave(data), _ -> new long[3]);
-            acumulado[0] += stSegundos;
-            acumulado[1] += stQuestoes;
-            acumulado[2] += stAcertos;
+                long[] acumulado = buckets.computeIfAbsent(granularidade.chave(data), _ -> new long[3]);
+                acumulado[0] += stSegundos;
+                acumulado[1] += stQuestoes;
+                acumulado[2] += stAcertos;
+            }
         }
 
         List<SerieTemporalPontoDTO> serieTemporal = new ArrayList<>(buckets.size());
@@ -467,6 +459,17 @@ public class SessaoRepository {
                 (int) acumulado[1],
                 (int) acumulado[2])));
         return serieTemporal;
+    }
+
+    private static LocalDate parsearDataOpcional(String dataStr) {
+        if (dataStr == null) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(dataStr);
+        } catch (DateTimeParseException _) {
+            return null;
+        }
     }
 
     /**

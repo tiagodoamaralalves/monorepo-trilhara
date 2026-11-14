@@ -21,6 +21,7 @@ import br.com.trilhara.auth.dto.SessaoAtivaResponse;
 import br.com.trilhara.auth.dto.UsuarioResponse;
 import br.com.trilhara.shared.Pseudonimo;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.NotAuthorizedException;
 import jakarta.ws.rs.core.Response;
@@ -41,13 +42,12 @@ public class AuthService {
     private final RateLimitService rateLimitService;
     private final long expiracaoResetMinutos;
 
+    @Inject
     public AuthService(
             UserService userService,
             PasswordService passwordService,
             TokenService tokenService,
             RefreshTokenService refreshTokenService,
-            TokenRecuperacaoRepository tokenRecuperacaoRepository,
-            TokenConfirmacaoEmailRepository tokenConfirmacaoEmailRepository,
             EmailService emailService,
             RateLimitService rateLimitService,
             @ConfigProperty(name = "trilhara.auth.reset.expiration-minutes", defaultValue = "15") long expiracaoResetMinutos) {
@@ -55,8 +55,8 @@ public class AuthService {
         this.passwordService = passwordService;
         this.tokenService = tokenService;
         this.refreshTokenService = refreshTokenService;
-        this.tokenRecuperacaoRepository = tokenRecuperacaoRepository;
-        this.tokenConfirmacaoEmailRepository = tokenConfirmacaoEmailRepository;
+        this.tokenRecuperacaoRepository = emailService.tokenRecuperacaoRepository();
+        this.tokenConfirmacaoEmailRepository = emailService.tokenConfirmacaoEmailRepository();
         this.emailService = emailService;
         this.rateLimitService = rateLimitService;
         this.expiracaoResetMinutos = Math.max(5, expiracaoResetMinutos);
@@ -146,7 +146,7 @@ public class AuthService {
         }
 
         Usuario usuarioLimpo = userService.registrarSucessoLogin(usuario, agora);
-        rateLimitService.limparTentativasLogin(ip, emailNormalizado);
+        rateLimitService.limparTentativasLogin(emailNormalizado);
         LOG.infof("event=LOGIN_SUCESSO conta=%s ip=%s", Pseudonimo.de(usuarioLimpo.id()), ip);
 
         return emitirRespostaAutenticacao(usuarioLimpo, userAgent, ip);

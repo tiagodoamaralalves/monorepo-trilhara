@@ -31,7 +31,7 @@ public final class Pseudonimo {
             String hex = HexFormat.of()
                     .formatHex(digest.digest(identificador.getBytes(StandardCharsets.UTF_8)));
             return hex.substring(0, TAMANHO_PSEUDONIMO);
-        } catch (NoSuchAlgorithmException e) {
+        } catch (NoSuchAlgorithmException _) {
             return "-";
         }
     }

@@ -81,7 +81,7 @@ public class AccountDeletionService {
  * A 19ª coleção privada ({@code usuarios}) é purgada por último após a limpeza das filhas.
  * Fonte única: {@link ColecaoTrilhara#filhasPrivadas}.
  */
-    public static final List<String> COLECOES_FILHAS = ColecaoTrilhara.nomesFilhasPrivadas();
+    protected static final List<String> COLECOES_FILHAS = ColecaoTrilhara.nomesFilhasPrivadas();
 
     public static final String COLECAO_USUARIOS = "usuarios";
     public static final String COLECAO_EDITAIS = "editais";
@@ -183,7 +183,7 @@ public class AccountDeletionService {
                 Updates.combine(
                         Updates.set("ativo", false),
                         Updates.set(CAMPO_EXCLUSAO_CONTA, exclusaoDoc),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(agora))
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(agora))
                 )
         );
 
@@ -393,7 +393,7 @@ public class AccountDeletionService {
                                     BsonDates.toBsonDate(Instant.now()))
                     )
             );
-        } catch (Exception secundaria) {
+        } catch (Exception _) {
             LOG.debug("Falha secundária ignorada ao persistir estado de erro na exclusão de conta.");
         }
     }
@@ -422,8 +422,8 @@ public class AccountDeletionService {
     }
 
     private static boolean podeTentarAgora(Document exclusao, Instant agora) {
-        java.util.Date proxima = exclusao.getDate(CAMPO_PROXIMA_TENTATIVA);
-        return proxima == null || !proxima.toInstant().isAfter(agora);
+        Instant proxima = BsonDates.toInstant(exclusao.getDate(CAMPO_PROXIMA_TENTATIVA));
+        return proxima == null || !proxima.isAfter(agora);
     }
 
     @PreDestroy

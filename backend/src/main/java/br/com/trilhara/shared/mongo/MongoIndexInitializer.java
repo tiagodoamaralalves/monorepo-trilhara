@@ -94,7 +94,7 @@ public class MongoIndexInitializer {
 
         for (IndicesCanonicos.IndiceCanonico indice : IndicesCanonicos.todos()) {
             String colecao = indice.colecao().nome();
-            declaradosPorColecao.computeIfAbsent(colecao, k -> new HashSet<>()).add(indice.nome());
+            declaradosPorColecao.computeIfAbsent(colecao, _ -> new HashSet<>()).add(indice.nome());
 
             MongoCollection<Document> collection = database.getCollection(colecao);
             Document existente = buscarPorNome(collection, indice.nome());

@@ -6,6 +6,8 @@ package br.com.trilhara.shared.erro;
  */
 public class TrashItemExpiredException extends RuntimeException {
 
+    private static final long serialVersionUID = 1L;
+
     private static final String DETAIL_PADRAO =
             "O item da lixeira expirou após o período de 30 dias ou não foi encontrado.";
 

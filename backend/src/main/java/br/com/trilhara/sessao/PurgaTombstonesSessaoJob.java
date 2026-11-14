@@ -1,6 +1,7 @@
 package br.com.trilhara.sessao;
 
 import java.time.Instant;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import io.quarkus.scheduler.Scheduled;
@@ -25,7 +26,7 @@ public class PurgaTombstonesSessaoJob {
     }
 
     @Scheduled(
-            every = "{trilhara.jobs.purga-tombstones-sessao.every:1h}",
+            every = "${trilhara.jobs.purga-tombstones-sessao.every:1h}",
             concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     public void executarAgendado() {
         executarPurga(Instant.now());
@@ -34,7 +35,7 @@ public class PurgaTombstonesSessaoJob {
     public long executarPurga(Instant agora) {
         LOG.fine("Iniciando purga horária de tombstones de sessão...");
         long totalPurgados = purgaService.purgarTombstones(agora);
-        LOG.fine("Purga de tombstones de sessão concluída. Removidos: " + totalPurgados);
+        LOG.log(Level.FINE, "Purga de tombstones de sessão concluída. Removidos: {0}", totalPurgados);
         return totalPurgados;
     }
 }

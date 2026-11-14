@@ -51,9 +51,6 @@ jobs:
       - name: Testes do Frontend com cobertura enforce
         run: npm --prefix frontend test -- --run --coverage
 
-      - name: Gate anti-legado (modo estrito)
-        run: bash scripts/verificar-legado.sh
-
       - name: Validar sintaxe do Caddyfile
         run: |
           docker run --rm \

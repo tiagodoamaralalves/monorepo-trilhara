@@ -29,7 +29,6 @@ import jakarta.inject.Inject;
 
 /**
  * Repositório direto BSON para a coleção normalizada 'trilhas'.
- * Atende REQUISITOS-REESTRUTURACAO-DADOS.md §4.1 e PLANO-IMPLEMENTACAO-REESTRUTURACAO.md §2.2.
  */
 @ApplicationScoped
 public class TrilhaRepository {
@@ -68,7 +67,6 @@ public class TrilhaRepository {
     private static final String CAMPO_ORIGEM_DISCIPLINA_ID = "origemDisciplinaId";
     private static final String CAMPO_ORIGEM_TRILHA_ID = "origemTrilhaId";
     private static final String CAMPO_PROXIMA_VERSAO_CRONOGRAMA = "proximaVersaoCronograma";
-    private static final String CAMPO_TRILHA_ID = "trilhaId";
     private static final String CAMPO_USER_ID = "userId";
     private static final String CAMPO_USUARIO_ID = "usuarioId";
     private static final String CAMPO_VERSAO_ATIVA_CRONOGRAMA = "versaoAtivaCronograma";

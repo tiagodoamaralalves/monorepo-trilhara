@@ -83,7 +83,7 @@ public class TokenService {
             payload.put("exp", exp);
             payload.put("jti", UUID.randomUUID().toString());
             if (usuario.senhaAlteradaEm() != null) {
-                payload.put("pwd_iat", usuario.senhaAlteradaEm().toEpochMilli());
+                payload.put(CLAIM_PWD_IAT, usuario.senhaAlteradaEm().toEpochMilli());
             }
 
             String headerB64 = B64_ENCODER.encodeToString(mapper.writeValueAsBytes(header));
@@ -96,6 +96,8 @@ public class TokenService {
             throw new IllegalStateException("Erro ao gerar access token JWT.", exception);
         }
     }
+
+    private static final String CLAIM_PWD_IAT = "pwd_iat";
 
     public ClaimsToken validarAccessToken(String token) {
         return validarAccessToken(token, Instant.now());
@@ -111,87 +113,105 @@ public class TokenService {
         }
 
         try {
-            byte[] headerBytes = B64_DECODER.decode(partes[0]);
-            JsonNode headerNode = mapper.readTree(headerBytes);
-            String alg = headerNode.path("alg").asText("");
-            String typ = headerNode.path("typ").asText("");
-            if (!"HS256".equals(alg) || !"JWT".equals(typ)) {
-                throw new TokenInvalidoException("Algoritmo ou cabeçalho JWT não suportado.");
-            }
+            validarCabecalhoEAssinatura(partes);
+            JsonNode payloadNode = mapper.readTree(B64_DECODER.decode(partes[1]));
+            String sub = validarClaimsIdentidade(payloadNode);
+            long[] tempos = validarClaimsTemporais(payloadNode, agora);
 
-            String conteudoAssinado = partes[0] + "." + partes[1];
-            byte[] assinaturaRecebida = B64_DECODER.decode(partes[2]);
-            byte[] assinaturaEsperada = assinar(conteudoAssinado);
-
-            if (!MessageDigest.isEqual(assinaturaEsperada, assinaturaRecebida)) {
-                throw new TokenInvalidoException("Assinatura do token JWT inválida.");
-            }
-
-            byte[] payloadBytes = B64_DECODER.decode(partes[1]);
-            JsonNode payloadNode = mapper.readTree(payloadBytes);
-
-            String iss = payloadNode.path("iss").asText("");
-            if (!issuer.equals(iss)) {
-                throw new TokenInvalidoException("Emissor (iss) do token inválido.");
-            }
-
-            String aud = payloadNode.path("aud").asText("");
-            if (!audience.equals(aud)) {
-                throw new TokenInvalidoException("Audiência (aud) do token inválida.");
-            }
-
-            String sub = payloadNode.path("sub").asText("");
-            if (sub.isBlank()) {
-                throw new TokenInvalidoException("Identificador do usuário (sub) ausente no token.");
-            }
-
-            if (!payloadNode.hasNonNull("exp") || !payloadNode.hasNonNull("iat")) {
-                throw new TokenInvalidoException("Claims temporais obrigatórias ausentes no token.");
-            }
-
-            long epochAgora = agora.getEpochSecond();
-            long exp = payloadNode.get("exp").asLong();
-            long iat = payloadNode.get("iat").asLong();
-            long nbf = payloadNode.path("nbf").asLong(iat);
-
-            if (epochAgora > exp) {
-                throw new TokenInvalidoException("Token de acesso expirado.");
-            }
-            if (epochAgora + clockSkewSeconds < nbf || epochAgora + clockSkewSeconds < iat) {
-                throw new TokenInvalidoException("Token de acesso com timestamp futuro inválido.");
-            }
-
-            List<Role> roles = new ArrayList<>();
-            JsonNode rolesNode = payloadNode.path("roles");
-            if (rolesNode.isArray()) {
-                for (JsonNode r : rolesNode) {
-                    try {
-                        roles.add(Role.valueOf(r.asText()));
-                    } catch (IllegalArgumentException ignored) {
-                        // Ignora role desconhecida
-                    }
-                }
-            }
-            if (roles.isEmpty()) {
-                roles.add(Role.USER);
-            }
-
+            List<Role> roles = extrairRoles(payloadNode);
             String email = payloadNode.path("email").asText("");
             String jti = payloadNode.path("jti").asText("");
-            Long pwdIat = payloadNode.hasNonNull("pwd_iat") ? payloadNode.get("pwd_iat").asLong() : null;
+            Long pwdIat = payloadNode.hasNonNull(CLAIM_PWD_IAT) ? payloadNode.get(CLAIM_PWD_IAT).asLong() : null;
 
             return new ClaimsToken(
                     sub,
                     email,
                     List.copyOf(roles),
                     jti,
-                    Instant.ofEpochSecond(iat),
-                    Instant.ofEpochSecond(exp),
+                    Instant.ofEpochSecond(tempos[0]),
+                    Instant.ofEpochSecond(tempos[1]),
                     pwdIat != null ? Instant.ofEpochMilli(pwdIat) : null);
         } catch (TokenInvalidoException exception) {
             throw exception;
-        } catch (Exception exception) {
+        } catch (Exception _) {
             throw new TokenInvalidoException("Token de acesso inválido ou malformado.");
+        }
+    }
+
+    private void validarCabecalhoEAssinatura(String[] partes) throws Exception {
+        byte[] headerBytes = B64_DECODER.decode(partes[0]);
+        JsonNode headerNode = mapper.readTree(headerBytes);
+        String alg = headerNode.path("alg").asText("");
+        String typ = headerNode.path("typ").asText("");
+        if (!"HS256".equals(alg) || !"JWT".equals(typ)) {
+            throw new TokenInvalidoException("Algoritmo ou cabeçalho JWT não suportado.");
+        }
+
+        String conteudoAssinado = partes[0] + "." + partes[1];
+        byte[] assinaturaRecebida = B64_DECODER.decode(partes[2]);
+        byte[] assinaturaEsperada = assinar(conteudoAssinado);
+
+        if (!MessageDigest.isEqual(assinaturaEsperada, assinaturaRecebida)) {
+            throw new TokenInvalidoException("Assinatura do token JWT inválida.");
+        }
+    }
+
+    private String validarClaimsIdentidade(JsonNode payloadNode) {
+        String iss = payloadNode.path("iss").asText("");
+        if (!issuer.equals(iss)) {
+            throw new TokenInvalidoException("Emissor (iss) do token inválido.");
+        }
+
+        String aud = payloadNode.path("aud").asText("");
+        if (!audience.equals(aud)) {
+            throw new TokenInvalidoException("Audiência (aud) do token inválida.");
+        }
+
+        String sub = payloadNode.path("sub").asText("");
+        if (sub.isBlank()) {
+            throw new TokenInvalidoException("Identificador do usuário (sub) ausente no token.");
+        }
+        return sub;
+    }
+
+    private long[] validarClaimsTemporais(JsonNode payloadNode, Instant agora) {
+        if (!payloadNode.hasNonNull("exp") || !payloadNode.hasNonNull("iat")) {
+            throw new TokenInvalidoException("Claims temporais obrigatórias ausentes no token.");
+        }
+
+        long epochAgora = agora.getEpochSecond();
+        long exp = payloadNode.get("exp").asLong();
+        long iat = payloadNode.get("iat").asLong();
+        long nbf = payloadNode.path("nbf").asLong(iat);
+
+        if (epochAgora > exp) {
+            throw new TokenInvalidoException("Token de acesso expirado.");
+        }
+        if (epochAgora + clockSkewSeconds < nbf || epochAgora + clockSkewSeconds < iat) {
+            throw new TokenInvalidoException("Token de acesso com timestamp futuro inválido.");
+        }
+        return new long[] { iat, exp };
+    }
+
+    private static List<Role> extrairRoles(JsonNode payloadNode) {
+        List<Role> roles = new ArrayList<>();
+        JsonNode rolesNode = payloadNode.path("roles");
+        if (rolesNode.isArray()) {
+            for (JsonNode r : rolesNode) {
+                adicionarRoleSeValida(roles, r.asText());
+            }
+        }
+        if (roles.isEmpty()) {
+            roles.add(Role.USER);
+        }
+        return roles;
+    }
+
+    private static void adicionarRoleSeValida(List<Role> roles, String roleTexto) {
+        try {
+            roles.add(Role.valueOf(roleTexto));
+        } catch (IllegalArgumentException _) {
+            // Ignora role desconhecida
         }
     }
 
@@ -212,6 +232,8 @@ public class TokenService {
     }
 
     public static class TokenInvalidoException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
         public TokenInvalidoException(String message) {
             super(message);
         }

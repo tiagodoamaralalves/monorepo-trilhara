@@ -1,5 +1,5 @@
 /**
- * Contratos de Notas ( a ).
+ * Contratos de Notas.
  *
  * Três coleções independentes no backend — caderno, seção e página — sem modelo embutido.
  * As listagens nunca trazem `conteudoMarkdown`: o Markdown completo chega apenas por

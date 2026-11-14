@@ -2,6 +2,7 @@ package br.com.trilhara.sessao;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import br.com.trilhara.shared.SystemScope;
@@ -41,7 +42,7 @@ public class SessaoPurgaService {
         Instant limite = referencia.minus(Duration.ofHours(RETENCAO_HORAS));
         long removidos = repository.purgarTombstonesAnteriores(limite);
         if (removidos > 0) {
-            LOG.fine("Purga de tombstones de sessão concluída. Tombstones removidos: " + removidos);
+            LOG.log(Level.FINE, "Purga de tombstones de sessão concluída. Tombstones removidos: {0}", removidos);
         }
         return removidos;
     }

@@ -117,7 +117,7 @@ public class NotaSnippetExtractor {
         }
 
         int primeiroInicio = ocorrencias.get(0)[0];
-        int inicio = Math.clamp(primeiroInicio - CONTEXTO_ANTES, 0, texto.length());
+        int inicio = Math.clamp((long) primeiroInicio - CONTEXTO_ANTES, 0, texto.length());
         boolean temPrefixo = inicio > 0;
         int orcamento = LIMITE_SNIPPET
                 - (temPrefixo ? RETICENCIAS.length() : 0)
@@ -126,15 +126,8 @@ public class NotaSnippetExtractor {
         boolean temSufixo = fim < texto.length();
 
         String trecho = texto.substring(inicio, fim);
-        int brancoInicial = 0;
-        while (brancoInicial < trecho.length() && Character.isWhitespace(trecho.charAt(brancoInicial))) {
-            brancoInicial++;
-        }
-        int brancoFinal = 0;
-        while (brancoFinal < trecho.length() - brancoInicial
-                && Character.isWhitespace(trecho.charAt(trecho.length() - 1 - brancoFinal))) {
-            brancoFinal++;
-        }
+        int brancoInicial = contarEspacosIniciais(trecho);
+        int brancoFinal = contarEspacosFinais(trecho, brancoInicial);
         String corpo = trecho.substring(brancoInicial, trecho.length() - brancoFinal);
 
         String prefixo = temPrefixo ? RETICENCIAS : "";
@@ -142,16 +135,41 @@ public class NotaSnippetExtractor {
         String snippet = prefixo + corpo + sufixo;
 
         int deslocamento = prefixo.length() - inicio - brancoInicial;
+        List<DestaqueDTO> destaques = calcularDestaques(
+                ocorrencias, deslocamento, prefixo.length(), corpo.length());
+
+        return new SnippetBusca(snippet, List.copyOf(destaques));
+    }
+
+    private static int contarEspacosIniciais(String trecho) {
+        int brancoInicial = 0;
+        while (brancoInicial < trecho.length() && Character.isWhitespace(trecho.charAt(brancoInicial))) {
+            brancoInicial++;
+        }
+        return brancoInicial;
+    }
+
+    private static int contarEspacosFinais(String trecho, int brancoInicial) {
+        int brancoFinal = 0;
+        while (brancoFinal < trecho.length() - brancoInicial
+                && Character.isWhitespace(trecho.charAt(trecho.length() - 1 - brancoFinal))) {
+            brancoFinal++;
+        }
+        return brancoFinal;
+    }
+
+    private static List<DestaqueDTO> calcularDestaques(
+            List<int[]> ocorrencias, int deslocamento, int tamanhoPrefixo, int tamanhoCorpo) {
         List<DestaqueDTO> destaques = new ArrayList<>();
+        int limiteCorpo = tamanhoPrefixo + tamanhoCorpo;
         for (int[] ocorrencia : ocorrencias) {
             int de = ocorrencia[0] + deslocamento;
             int ate = ocorrencia[1] + deslocamento;
-            if (de >= prefixo.length() && ate <= prefixo.length() + corpo.length() && de < ate) {
+            if (de >= tamanhoPrefixo && ate <= limiteCorpo && de < ate) {
                 destaques.add(new DestaqueDTO(de, ate));
             }
         }
-
-        return new SnippetBusca(snippet, List.copyOf(destaques));
+        return destaques;
     }
 
     // 
@@ -255,7 +273,7 @@ public class NotaSnippetExtractor {
                 .replaceAll("(?m)^#{1,6}\\s*", "")
                 .replaceAll("(?m)^\\s*[>*+-]\\s+", " ")
                 .replaceAll("[*_~]", "")
-                .replaceAll("\\|", " ")
+                .replace("|", " ")
                 .replaceAll("[\\t\\n\\r]+", " ")
                 .replaceAll(" {2,}", " ")
                 .trim();

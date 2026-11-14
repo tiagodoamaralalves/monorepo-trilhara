@@ -26,10 +26,10 @@ import jakarta.ws.rs.core.Response;
 @Autenticado
 public class SerieRecorrenteResource {
 
-    private final TarefaService service;
+    private final SerieRecorrenteService service;
     private final AuthContext authContext;
 
-    public SerieRecorrenteResource(TarefaService service, AuthContext authContext) {
+    public SerieRecorrenteResource(SerieRecorrenteService service, AuthContext authContext) {
         this.service = service;
         this.authContext = authContext;
     }

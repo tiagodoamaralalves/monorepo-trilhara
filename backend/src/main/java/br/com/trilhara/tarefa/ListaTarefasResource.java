@@ -28,10 +28,10 @@ import jakarta.ws.rs.core.Response;
 @Autenticado
 public class ListaTarefasResource {
 
-    private final TarefaService service;
+    private final ListaTarefasService service;
     private final AuthContext authContext;
 
-    public ListaTarefasResource(TarefaService service, AuthContext authContext) {
+    public ListaTarefasResource(ListaTarefasService service, AuthContext authContext) {
         this.service = service;
         this.authContext = authContext;
     }

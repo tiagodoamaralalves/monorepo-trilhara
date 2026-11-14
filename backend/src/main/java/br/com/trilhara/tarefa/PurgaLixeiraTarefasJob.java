@@ -1,6 +1,7 @@
 package br.com.trilhara.tarefa;
 
 import java.time.Instant;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import io.quarkus.scheduler.Scheduled;
@@ -24,7 +25,7 @@ public class PurgaLixeiraTarefasJob {
         this.purgaService = purgaService;
     }
 
-    @Scheduled(cron = "{trilhara.jobs.purga-lixeira-tarefas.cron:0 30 3 * * ?}")
+    @Scheduled(cron = "${trilhara.jobs.purga-lixeira-tarefas.cron:0 30 3 * * ?}")
     public void executarAgendado() {
         executarPurga(Instant.now());
     }
@@ -32,7 +33,7 @@ public class PurgaLixeiraTarefasJob {
     public int executarPurga(Instant agora) {
         LOG.fine("Iniciando purga diária de itens expirados da lixeira de tarefas...");
         int totalPurgados = purgaService.purgarExpiradas(agora);
-        LOG.fine("Purga de lixeira concluída. Itens removidos definitivamente: " + totalPurgados);
+        LOG.log(Level.FINE, "Purga de lixeira concluída. Itens removidos definitivamente: {0}", totalPurgados);
         return totalPurgados;
     }
 }

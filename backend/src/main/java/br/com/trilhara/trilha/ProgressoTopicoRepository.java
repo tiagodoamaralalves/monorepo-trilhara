@@ -29,26 +29,30 @@ import jakarta.enterprise.context.ApplicationScoped;
 
 /**
  * Repositório direto BSON para a coleção normalizada 'progresso_topicos'.
- * Atende REQUISITOS-REESTRUTURACAO-DADOS.md §4.2 e PLANO-IMPLEMENTACAO-REESTRUTURACAO.md §2.2.
  */
 @ApplicationScoped
 public class ProgressoTopicoRepository {
+
+    private static final String CAMPO_USUARIO_ID = "usuarioId";
+    private static final String CAMPO_TRILHA_ID = "trilhaId";
+    private static final String CAMPO_TOPICO_ID = "topicoId";
+    private static final String CAMPO_DISCIPLINA_ID = "disciplinaId";
 
     private final MongoCollection<Document> collection;
 
     public ProgressoTopicoRepository(
             MongoClient client,
-            @ConfigProperty(name = "quarkus.mongodb.database") String database) {
+            @ConfigProperty(name = "quarkus.mongodb.database", defaultValue = "trilhara") String database) {
         this.collection = client.getDatabase(database).getCollection("progresso_topicos");
     }
 
     public boolean marcarConcluido(ObjectId usuarioId, ObjectId trilhaId, ObjectId disciplinaId, String topicoId) {
-        Document filter = new Document("usuarioId", usuarioId)
-                .append("trilhaId", trilhaId)
-                .append("topicoId", topicoId);
+        Document filter = new Document(CAMPO_USUARIO_ID, usuarioId)
+                .append(CAMPO_TRILHA_ID, trilhaId)
+                .append(CAMPO_TOPICO_ID, topicoId);
 
         Document setOnInsert = new Document("_id", new ObjectId())
-                .append("disciplinaId", disciplinaId)
+                .append(CAMPO_DISCIPLINA_ID, disciplinaId)
                 .append("concluidoEm", BsonDates.toBsonDate(Instant.now()));
 
         Document update = new Document("$setOnInsert", setOnInsert);
@@ -58,17 +62,17 @@ public class ProgressoTopicoRepository {
 
     public boolean desmarcarConcluido(ObjectId usuarioId, ObjectId trilhaId, String topicoId) {
         return collection.deleteOne(and(
-                eq("usuarioId", usuarioId),
-                eq("trilhaId", trilhaId),
-                eq("topicoId", topicoId))).getDeletedCount() > 0;
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_TRILHA_ID, trilhaId),
+                eq(CAMPO_TOPICO_ID, topicoId))).getDeletedCount() > 0;
     }
 
     public Set<String> listarTopicosConcluidosIds(ObjectId usuarioId, ObjectId trilhaId) {
         Set<String> ids = new HashSet<>();
-        collection.find(and(eq("usuarioId", usuarioId), eq("trilhaId", trilhaId)))
-                .projection(Projections.include("topicoId"))
+        collection.find(and(eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_TRILHA_ID, trilhaId)))
+                .projection(Projections.include(CAMPO_TOPICO_ID))
                 .forEach(doc -> {
-                    String topicoId = doc.getString("topicoId");
+                    String topicoId = doc.getString(CAMPO_TOPICO_ID);
                     if (topicoId != null) {
                         ids.add(topicoId);
                     }
@@ -78,19 +82,19 @@ public class ProgressoTopicoRepository {
 
     public List<ProgressoTopico> listarPorTrilha(ObjectId usuarioId, ObjectId trilhaId) {
         List<ProgressoTopico> lista = new ArrayList<>();
-        collection.find(and(eq("usuarioId", usuarioId), eq("trilhaId", trilhaId)))
+        collection.find(and(eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_TRILHA_ID, trilhaId)))
                 .forEach(doc -> lista.add(paraEntidade(doc)));
         return lista;
     }
 
     public long contarConcluidosPorTrilha(ObjectId usuarioId, ObjectId trilhaId) {
-        return collection.countDocuments(and(eq("usuarioId", usuarioId), eq("trilhaId", trilhaId)));
+        return collection.countDocuments(and(eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_TRILHA_ID, trilhaId)));
     }
 
     public Map<ObjectId, Long> contarConcluidosPorDisciplina(ObjectId usuarioId, ObjectId trilhaId) {
         Map<ObjectId, Long> contadores = new HashMap<>();
         List<org.bson.conversions.Bson> pipeline = List.of(
-                Aggregates.match(and(eq("usuarioId", usuarioId), eq("trilhaId", trilhaId))),
+                Aggregates.match(and(eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_TRILHA_ID, trilhaId))),
                 Aggregates.group("$disciplinaId", Accumulators.sum("total", 1))
         );
         collection.aggregate(pipeline).forEach(doc -> {
@@ -108,31 +112,31 @@ public class ProgressoTopicoRepository {
             return 0;
         }
         return collection.deleteMany(and(
-                eq("usuarioId", usuarioId),
-                eq("trilhaId", trilhaId),
-                in("topicoId", topicoIds))).getDeletedCount();
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_TRILHA_ID, trilhaId),
+                in(CAMPO_TOPICO_ID, topicoIds))).getDeletedCount();
     }
 
     public long excluirPorDisciplina(ObjectId usuarioId, ObjectId trilhaId, ObjectId disciplinaId) {
         return collection.deleteMany(and(
-                eq("usuarioId", usuarioId),
-                eq("trilhaId", trilhaId),
-                eq("disciplinaId", disciplinaId))).getDeletedCount();
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_TRILHA_ID, trilhaId),
+                eq(CAMPO_DISCIPLINA_ID, disciplinaId))).getDeletedCount();
     }
 
     public long excluirPorTrilha(ObjectId usuarioId, ObjectId trilhaId) {
         return collection.deleteMany(and(
-                eq("usuarioId", usuarioId),
-                eq("trilhaId", trilhaId))).getDeletedCount();
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_TRILHA_ID, trilhaId))).getDeletedCount();
     }
 
     private ProgressoTopico paraEntidade(Document doc) {
         return new ProgressoTopico(
                 doc.getObjectId("_id"),
-                doc.getObjectId("usuarioId"),
-                doc.getObjectId("trilhaId"),
-                doc.getObjectId("disciplinaId"),
-                doc.getString("topicoId"),
+                doc.getObjectId(CAMPO_USUARIO_ID),
+                doc.getObjectId(CAMPO_TRILHA_ID),
+                doc.getObjectId(CAMPO_DISCIPLINA_ID),
+                doc.getString(CAMPO_TOPICO_ID),
                 BsonDates.lerInstant(doc, "concluidoEm"));
     }
 }

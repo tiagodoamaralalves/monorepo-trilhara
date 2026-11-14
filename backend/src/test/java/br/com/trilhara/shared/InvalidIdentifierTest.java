@@ -18,7 +18,6 @@ import br.com.trilhara.auth.TokenService;
 import br.com.trilhara.auth.UserRepository;
 import br.com.trilhara.auth.Usuario;
 import io.quarkus.test.junit.QuarkusTest;
-import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 
 /**

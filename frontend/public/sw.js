@@ -69,7 +69,7 @@ self.addEventListener('notificationclick', (event) => {
   const mesmaOrigem = new URL(targetUrl, self.location.origin).origin === self.location.origin;
 
   // Foca uma aba existente da MESMA origem ou abre a URL. Nunca conclui a tarefa: o clique é
-  // apenas navegação (D-36d).
+  // apenas navegação.
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {

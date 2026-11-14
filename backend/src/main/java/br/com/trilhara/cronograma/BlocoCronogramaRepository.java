@@ -37,6 +37,33 @@ public class BlocoCronogramaRepository {
     /** norma de paginação — máximo de 100 itens por página. */
     public static final int TAMANHO_MAXIMO_PAGINA = 100;
 
+    private static final String CAMPO_USUARIO_ID = "usuarioId";
+    private static final String CAMPO_TRILHA_ID = "trilhaId";
+    private static final String CAMPO_CRONOGRAMA_ID = "cronogramaId";
+    private static final String CAMPO_VERSAO_GERACAO = "versaoGeracao";
+    private static final String CAMPO_CONCLUIDO = "concluido";
+    private static final String CAMPO_CONCLUIDO_EM = "concluidoEm";
+    private static final String CAMPO_ATUALIZADO_EM = "atualizadoEm";
+    private static final String CAMPO_ORDEM = "ordem";
+    private static final String CAMPO_DISCIPLINA_ID = "disciplinaId";
+    private static final String CAMPO_DISCIPLINA_NOME_SNAPSHOT = "disciplinaNomeSnapshot";
+    private static final String CAMPO_DISCIPLINA_COR_SNAPSHOT = "disciplinaCorSnapshot";
+    private static final String CAMPO_DATA = "data";
+    private static final String CAMPO_CRIADO_EM = "criadoEm";
+
+    public record FiltroPaginacaoBlocos(
+            ObjectId trilhaId,
+            ObjectId cronogramaId,
+            long versaoGeracao,
+            Boolean concluido,
+            String statusData,
+            LocalDate hojeLocal,
+            LocalDate dataInicio,
+            LocalDate dataFim,
+            int pagina,
+            int tamanho) {
+    }
+
     private final MongoCollection<Document> collection;
 
     public BlocoCronogramaRepository(
@@ -65,57 +92,57 @@ public class BlocoCronogramaRepository {
 
     public long contarPorVersao(ObjectId usuarioId, ObjectId trilhaId, ObjectId cronogramaId, long versaoGeracao) {
         return collection.countDocuments(and(
-                eq("usuarioId", usuarioId),
-                eq("trilhaId", trilhaId),
-                eq("cronogramaId", cronogramaId),
-                eq("versaoGeracao", versaoGeracao)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_TRILHA_ID, trilhaId),
+                eq(CAMPO_CRONOGRAMA_ID, cronogramaId),
+                eq(CAMPO_VERSAO_GERACAO, versaoGeracao)
         ));
     }
 
     public long excluirVersoesDiferentes(ObjectId usuarioId, ObjectId trilhaId, ObjectId cronogramaId, long versaoManter) {
         return collection.deleteMany(and(
-                eq("usuarioId", usuarioId),
-                eq("trilhaId", trilhaId),
-                eq("cronogramaId", cronogramaId),
-                ne("versaoGeracao", versaoManter)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_TRILHA_ID, trilhaId),
+                eq(CAMPO_CRONOGRAMA_ID, cronogramaId),
+                ne(CAMPO_VERSAO_GERACAO, versaoManter)
         )).getDeletedCount();
     }
 
     public long excluirPorCronograma(ObjectId usuarioId, ObjectId trilhaId, ObjectId cronogramaId) {
         return collection.deleteMany(and(
-                eq("usuarioId", usuarioId),
-                eq("trilhaId", trilhaId),
-                eq("cronogramaId", cronogramaId)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_TRILHA_ID, trilhaId),
+                eq(CAMPO_CRONOGRAMA_ID, cronogramaId)
         )).getDeletedCount();
     }
 
     public long excluirPorTrilha(ObjectId usuarioId, ObjectId trilhaId) {
         return collection.deleteMany(and(
-                eq("usuarioId", usuarioId),
-                eq("trilhaId", trilhaId)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_TRILHA_ID, trilhaId)
         )).getDeletedCount();
     }
 
     public long excluirPorUsuario(ObjectId usuarioId) {
-        return collection.deleteMany(eq("usuarioId", usuarioId)).getDeletedCount();
+        return collection.deleteMany(eq(CAMPO_USUARIO_ID, usuarioId)).getDeletedCount();
     }
 
     public Optional<BlocoCronograma> buscarPorId(ObjectId usuarioId, ObjectId blocoId) {
         Document doc = collection.find(and(
                 eq("_id", blocoId),
-                eq("usuarioId", usuarioId)
+                eq(CAMPO_USUARIO_ID, usuarioId)
         )).first();
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
 
     public boolean atualizarConclusao(ObjectId usuarioId, ObjectId blocoId, boolean concluido, Instant concluidoEm) {
         Bson atualizacao = Updates.combine(
-                Updates.set("concluido", concluido),
-                Updates.set("concluidoEm", concluidoEm != null ? BsonDates.toBsonDate(concluidoEm) : null),
-                Updates.set("atualizadoEm", BsonDates.toBsonDate(Instant.now()))
+                Updates.set(CAMPO_CONCLUIDO, concluido),
+                Updates.set(CAMPO_CONCLUIDO_EM, concluidoEm != null ? BsonDates.toBsonDate(concluidoEm) : null),
+                Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))
         );
         return collection.updateOne(
-                and(eq("_id", blocoId), eq("usuarioId", usuarioId)),
+                and(eq("_id", blocoId), eq(CAMPO_USUARIO_ID, usuarioId)),
                 atualizacao
         ).getMatchedCount() > 0;
     }
@@ -132,15 +159,15 @@ public class BlocoCronogramaRepository {
         return collection.updateOne(
                 and(
                         eq("_id", blocoId),
-                        eq("usuarioId", usuarioId),
-                        eq("trilhaId", trilhaId),
-                        eq("cronogramaId", cronogramaId),
-                        eq("concluido", false)
+                        eq(CAMPO_USUARIO_ID, usuarioId),
+                        eq(CAMPO_TRILHA_ID, trilhaId),
+                        eq(CAMPO_CRONOGRAMA_ID, cronogramaId),
+                        eq(CAMPO_CONCLUIDO, false)
                 ),
                 Updates.combine(
-                        Updates.set("concluido", true),
-                        Updates.set("concluidoEm", BsonDates.toBsonDate(agora)),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(agora))
+                        Updates.set(CAMPO_CONCLUIDO, true),
+                        Updates.set(CAMPO_CONCLUIDO_EM, BsonDates.toBsonDate(agora)),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(agora))
                 )
         ).getModifiedCount() > 0;
     }
@@ -150,14 +177,14 @@ public class BlocoCronogramaRepository {
             return List.of();
         }
         Bson filtro = and(
-                eq("usuarioId", usuarioId),
-                eq("data", hojeLocal.toString()),
-                eq("concluido", false),
-                in("cronogramaId", cronogramasAtivosIds)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_DATA, hojeLocal.toString()),
+                eq(CAMPO_CONCLUIDO, false),
+                in(CAMPO_CRONOGRAMA_ID, cronogramasAtivosIds)
         );
         List<BlocoCronograma> resultado = new ArrayList<>();
         // Note: Sort by ordem ASC, _id ASC (trilhaNome is sorted in service layer after joining trilhas)
-        for (Document doc : collection.find(filtro).sort(Sorts.ascending("ordem", "_id"))) {
+        for (Document doc : collection.find(filtro).sort(Sorts.ascending(CAMPO_ORDEM, "_id"))) {
             resultado.add(paraEntidade(doc));
         }
         return Collections.unmodifiableList(resultado);
@@ -174,17 +201,17 @@ public class BlocoCronogramaRepository {
         }
         List<Bson> alvos = new ArrayList<>(versoesAtivasPorCronograma.size());
         versoesAtivasPorCronograma.forEach((cronogramaId, versao) -> alvos.add(and(
-                eq("cronogramaId", cronogramaId),
-                eq("versaoGeracao", versao != null ? versao : 1L))));
+                eq(CAMPO_CRONOGRAMA_ID, cronogramaId),
+                eq(CAMPO_VERSAO_GERACAO, versao != null ? versao : 1L))));
 
         Bson filtro = and(
-                eq("usuarioId", usuarioId),
-                eq("data", hojeLocal.toString()),
-                eq("concluido", false),
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_DATA, hojeLocal.toString()),
+                eq(CAMPO_CONCLUIDO, false),
                 or(alvos)
         );
         List<BlocoCronograma> resultado = new ArrayList<>();
-        for (Document doc : collection.find(filtro).sort(Sorts.ascending("ordem", "_id"))) {
+        for (Document doc : collection.find(filtro).sort(Sorts.ascending(CAMPO_ORDEM, "_id"))) {
             resultado.add(paraEntidade(doc));
         }
         return Collections.unmodifiableList(resultado);
@@ -192,55 +219,46 @@ public class BlocoCronogramaRepository {
 
     public ResultadoPaginado<BlocoCronograma> listarPaginado(
             ObjectId usuarioId,
-            ObjectId trilhaId,
-            ObjectId cronogramaId,
-            long versaoGeracao,
-            Boolean concluido,
-            String statusData,
-            LocalDate hojeLocal,
-            LocalDate dataInicio,
-            LocalDate dataFim,
-            int pagina,
-            int tamanho) {
+            FiltroPaginacaoBlocos filtro) {
 
         List<Bson> filtros = new ArrayList<>();
-        filtros.add(eq("usuarioId", usuarioId));
-        filtros.add(eq("trilhaId", trilhaId));
-        filtros.add(eq("cronogramaId", cronogramaId));
-        filtros.add(eq("versaoGeracao", versaoGeracao));
+        filtros.add(eq(CAMPO_USUARIO_ID, usuarioId));
+        filtros.add(eq(CAMPO_TRILHA_ID, filtro.trilhaId()));
+        filtros.add(eq(CAMPO_CRONOGRAMA_ID, filtro.cronogramaId()));
+        filtros.add(eq(CAMPO_VERSAO_GERACAO, filtro.versaoGeracao()));
 
-        if (concluido != null) {
-            filtros.add(eq("concluido", concluido));
+        if (filtro.concluido() != null) {
+            filtros.add(eq(CAMPO_CONCLUIDO, filtro.concluido()));
         }
         // statusData é derivado da relação com hojeLocal. "ATRASADO" exclui hoje por
         // definição, o que torna a contagem exata do lote (totalItens com tamanho=1) suficiente.
-        if (statusData != null && hojeLocal != null) {
-            switch (statusData) {
-                case "ATRASADO" -> filtros.add(lt("data", hojeLocal.toString()));
-                case "HOJE" -> filtros.add(eq("data", hojeLocal.toString()));
-                case "FUTURO" -> filtros.add(gt("data", hojeLocal.toString()));
+        if (filtro.statusData() != null && filtro.hojeLocal() != null) {
+            switch (filtro.statusData()) {
+                case "ATRASADO" -> filtros.add(lt(CAMPO_DATA, filtro.hojeLocal().toString()));
+                case "HOJE" -> filtros.add(eq(CAMPO_DATA, filtro.hojeLocal().toString()));
+                case "FUTURO" -> filtros.add(gt(CAMPO_DATA, filtro.hojeLocal().toString()));
                 default -> {
                     // valor já validado na camada de serviço
                 }
             }
         }
-        if (dataInicio != null) {
-            filtros.add(gte("data", dataInicio.toString()));
+        if (filtro.dataInicio() != null) {
+            filtros.add(gte(CAMPO_DATA, filtro.dataInicio().toString()));
         }
-        if (dataFim != null) {
-            filtros.add(lte("data", dataFim.toString()));
+        if (filtro.dataFim() != null) {
+            filtros.add(lte(CAMPO_DATA, filtro.dataFim().toString()));
         }
 
         Bson filtroComposto = and(filtros);
         long total = collection.countDocuments(filtroComposto);
 
-        int p = Math.max(1, pagina);
-        int t = Math.max(1, Math.min(TAMANHO_MAXIMO_PAGINA, tamanho));
+        int p = Math.max(1, filtro.pagina());
+        int t = Math.clamp(filtro.tamanho(), 1, TAMANHO_MAXIMO_PAGINA);
         int skip = (p - 1) * t;
 
         List<BlocoCronograma> itens = new ArrayList<>();
         for (Document doc : collection.find(filtroComposto)
-                .sort(Sorts.ascending("data", "ordem", "_id"))
+                .sort(Sorts.ascending(CAMPO_DATA, CAMPO_ORDEM, "_id"))
                 .skip(skip)
                 .limit(t)) {
             itens.add(paraEntidade(doc));
@@ -252,15 +270,15 @@ public class BlocoCronogramaRepository {
     public List<BlocoCronograma> listarAtrasadosPendentes(
             ObjectId usuarioId, ObjectId trilhaId, ObjectId cronogramaId, long versaoGeracao, LocalDate dataHoje) {
         Bson filtro = and(
-                eq("usuarioId", usuarioId),
-                eq("trilhaId", trilhaId),
-                eq("cronogramaId", cronogramaId),
-                eq("versaoGeracao", versaoGeracao),
-                eq("concluido", false),
-                lt("data", dataHoje.toString())
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_TRILHA_ID, trilhaId),
+                eq(CAMPO_CRONOGRAMA_ID, cronogramaId),
+                eq(CAMPO_VERSAO_GERACAO, versaoGeracao),
+                eq(CAMPO_CONCLUIDO, false),
+                lt(CAMPO_DATA, dataHoje.toString())
         );
         List<BlocoCronograma> resultado = new ArrayList<>();
-        for (Document doc : collection.find(filtro).sort(Sorts.ascending("data", "ordem", "_id"))) {
+        for (Document doc : collection.find(filtro).sort(Sorts.ascending(CAMPO_DATA, CAMPO_ORDEM, "_id"))) {
             resultado.add(paraEntidade(doc));
         }
         return Collections.unmodifiableList(resultado);
@@ -283,15 +301,15 @@ public class BlocoCronogramaRepository {
         }
         return collection.updateMany(
                 and(
-                        eq("usuarioId", usuarioId),
-                        eq("trilhaId", trilhaId),
-                        eq("disciplinaId", disciplinaId),
-                        in("cronogramaId", cronogramasAtivosIds)
+                        eq(CAMPO_USUARIO_ID, usuarioId),
+                        eq(CAMPO_TRILHA_ID, trilhaId),
+                        eq(CAMPO_DISCIPLINA_ID, disciplinaId),
+                        in(CAMPO_CRONOGRAMA_ID, cronogramasAtivosIds)
                 ),
                 Updates.combine(
-                        Updates.set("disciplinaNomeSnapshot", novoNome),
-                        Updates.set("disciplinaCorSnapshot", novaCor),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(Instant.now()))
+                        Updates.set(CAMPO_DISCIPLINA_NOME_SNAPSHOT, novoNome),
+                        Updates.set(CAMPO_DISCIPLINA_COR_SNAPSHOT, novaCor),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))
                 )
         ).getModifiedCount();
     }
@@ -299,11 +317,11 @@ public class BlocoCronogramaRepository {
     public long excluirBlocosFuturosPendentesDisciplina(
             ObjectId usuarioId, ObjectId trilhaId, ObjectId disciplinaId, LocalDate dataHoje) {
         return collection.deleteMany(and(
-                eq("usuarioId", usuarioId),
-                eq("trilhaId", trilhaId),
-                eq("disciplinaId", disciplinaId),
-                eq("concluido", false),
-                gte("data", dataHoje.toString())
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_TRILHA_ID, trilhaId),
+                eq(CAMPO_DISCIPLINA_ID, disciplinaId),
+                eq(CAMPO_CONCLUIDO, false),
+                gte(CAMPO_DATA, dataHoje.toString())
         )).getDeletedCount();
     }
 
@@ -313,10 +331,10 @@ public class BlocoCronogramaRepository {
             return List.of();
         }
         Bson filtro = and(
-                eq("usuarioId", usuarioId),
-                eq("concluido", false),
-                gte("data", dataHoje.toString()),
-                in("cronogramaId", cronogramasAtivosIds)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_CONCLUIDO, false),
+                gte(CAMPO_DATA, dataHoje.toString()),
+                in(CAMPO_CRONOGRAMA_ID, cronogramasAtivosIds)
         );
         List<BlocoCronograma> resultado = new ArrayList<>();
         for (Document doc : collection.find(filtro)) {
@@ -330,42 +348,42 @@ public class BlocoCronogramaRepository {
         if (b.id() != null) {
             doc.put("_id", b.id());
         }
-        doc.put("usuarioId", b.usuarioId());
-        doc.put("trilhaId", b.trilhaId());
-        doc.put("cronogramaId", b.cronogramaId());
-        doc.put("versaoGeracao", b.versaoGeracao());
-        doc.put("data", b.data() != null ? b.data().toString() : null);
-        doc.put("ordem", b.ordem());
-        doc.put("disciplinaId", b.disciplinaId());
-        doc.put("disciplinaNomeSnapshot", b.disciplinaNomeSnapshot());
-        doc.put("disciplinaCorSnapshot", b.disciplinaCorSnapshot());
+        doc.put(CAMPO_USUARIO_ID, b.usuarioId());
+        doc.put(CAMPO_TRILHA_ID, b.trilhaId());
+        doc.put(CAMPO_CRONOGRAMA_ID, b.cronogramaId());
+        doc.put(CAMPO_VERSAO_GERACAO, b.versaoGeracao());
+        doc.put(CAMPO_DATA, b.data() != null ? b.data().toString() : null);
+        doc.put(CAMPO_ORDEM, b.ordem());
+        doc.put(CAMPO_DISCIPLINA_ID, b.disciplinaId());
+        doc.put(CAMPO_DISCIPLINA_NOME_SNAPSHOT, b.disciplinaNomeSnapshot());
+        doc.put(CAMPO_DISCIPLINA_COR_SNAPSHOT, b.disciplinaCorSnapshot());
         doc.put("duracaoMinutos", b.duracaoMinutos());
-        doc.put("concluido", b.concluido());
+        doc.put(CAMPO_CONCLUIDO, b.concluido());
         if (b.concluidoEm() != null) {
-            doc.put("concluidoEm", BsonDates.toBsonDate(b.concluidoEm()));
+            doc.put(CAMPO_CONCLUIDO_EM, BsonDates.toBsonDate(b.concluidoEm()));
         }
-        doc.put("criadoEm", BsonDates.toBsonDate(b.criadoEm() != null ? b.criadoEm() : Instant.now()));
-        doc.put("atualizadoEm", BsonDates.toBsonDate(b.atualizadoEm() != null ? b.atualizadoEm() : Instant.now()));
+        doc.put(CAMPO_CRIADO_EM, BsonDates.toBsonDate(b.criadoEm() != null ? b.criadoEm() : Instant.now()));
+        doc.put(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(b.atualizadoEm() != null ? b.atualizadoEm() : Instant.now()));
         return doc;
     }
 
     private BlocoCronograma paraEntidade(Document doc) {
         return new BlocoCronograma(
                 doc.getObjectId("_id"),
-                doc.getObjectId("usuarioId"),
-                doc.getObjectId("trilhaId"),
-                doc.getObjectId("cronogramaId"),
-                doc.getLong("versaoGeracao") != null ? doc.getLong("versaoGeracao") : 1L,
-                BsonDates.toLocalDate(doc.getString("data")),
-                doc.getInteger("ordem", 1),
-                doc.getObjectId("disciplinaId"),
-                doc.getString("disciplinaNomeSnapshot"),
-                doc.getString("disciplinaCorSnapshot"),
+                doc.getObjectId(CAMPO_USUARIO_ID),
+                doc.getObjectId(CAMPO_TRILHA_ID),
+                doc.getObjectId(CAMPO_CRONOGRAMA_ID),
+                doc.getLong(CAMPO_VERSAO_GERACAO) != null ? doc.getLong(CAMPO_VERSAO_GERACAO) : 1L,
+                BsonDates.toLocalDate(doc.getString(CAMPO_DATA)),
+                doc.getInteger(CAMPO_ORDEM, 1),
+                doc.getObjectId(CAMPO_DISCIPLINA_ID),
+                doc.getString(CAMPO_DISCIPLINA_NOME_SNAPSHOT),
+                doc.getString(CAMPO_DISCIPLINA_COR_SNAPSHOT),
                 doc.getInteger("duracaoMinutos", 60),
-                doc.getBoolean("concluido", false),
-                BsonDates.lerInstant(doc, "concluidoEm"),
-                BsonDates.lerInstant(doc, "criadoEm"),
-                BsonDates.lerInstant(doc, "atualizadoEm")
+                doc.getBoolean(CAMPO_CONCLUIDO, false),
+                BsonDates.lerInstant(doc, CAMPO_CONCLUIDO_EM),
+                BsonDates.lerInstant(doc, CAMPO_CRIADO_EM),
+                BsonDates.lerInstant(doc, CAMPO_ATUALIZADO_EM)
         );
     }
 

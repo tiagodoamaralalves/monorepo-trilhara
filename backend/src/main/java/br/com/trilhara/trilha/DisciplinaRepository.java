@@ -23,16 +23,21 @@ import jakarta.enterprise.context.ApplicationScoped;
 
 /**
  * Repositório direto BSON para a coleção normalizada 'disciplinas'.
- * Atende REQUISITOS-REESTRUTURACAO-DADOS.md §4.1 e PLANO-IMPLEMENTACAO-REESTRUTURACAO.md §2.2.
  */
 @ApplicationScoped
 public class DisciplinaRepository {
+
+    private static final String CAMPO_USUARIO_ID = "usuarioId";
+    private static final String CAMPO_TRILHA_ID = "trilhaId";
+    private static final String CAMPO_ORDEM = "ordem";
+    private static final String CAMPO_TOPICOS = "topicos";
+    private static final String CAMPO_ATUALIZADO_EM = "atualizadoEm";
 
     private final MongoCollection<Document> collection;
 
     public DisciplinaRepository(
             MongoClient client,
-            @ConfigProperty(name = "quarkus.mongodb.database") String database) {
+            @ConfigProperty(name = "quarkus.mongodb.database", defaultValue = "trilhara") String database) {
         this.collection = client.getDatabase(database).getCollection("disciplinas");
     }
 
@@ -50,8 +55,8 @@ public class DisciplinaRepository {
 
     public List<Disciplina> listarPorTrilha(ObjectId usuarioId, ObjectId trilhaId) {
         List<Disciplina> lista = new ArrayList<>();
-        collection.find(and(eq("usuarioId", usuarioId), eq("trilhaId", trilhaId)))
-                .sort(Sorts.ascending("ordem"))
+        collection.find(and(eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_TRILHA_ID, trilhaId)))
+                .sort(Sorts.ascending(CAMPO_ORDEM))
                 .forEach(doc -> lista.add(paraEntidade(doc)));
         return lista;
     }
@@ -59,21 +64,21 @@ public class DisciplinaRepository {
     public Optional<Disciplina> buscarPorId(ObjectId usuarioId, ObjectId trilhaId, ObjectId disciplinaId) {
         Document doc = collection.find(and(
                 eq("_id", disciplinaId),
-                eq("usuarioId", usuarioId),
-                eq("trilhaId", trilhaId))).first();
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_TRILHA_ID, trilhaId))).first();
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
 
     public Optional<Disciplina> buscarPorTopicoId(ObjectId usuarioId, ObjectId trilhaId, String topicoId) {
         Document doc = collection.find(and(
-                eq("usuarioId", usuarioId),
-                eq("trilhaId", trilhaId),
-                elemMatch("topicos", eq("id", topicoId)))).first();
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_TRILHA_ID, trilhaId),
+                elemMatch(CAMPO_TOPICOS, eq("id", topicoId)))).first();
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
 
     public long contarPorTrilha(ObjectId usuarioId, ObjectId trilhaId) {
-        return collection.countDocuments(and(eq("usuarioId", usuarioId), eq("trilhaId", trilhaId)));
+        return collection.countDocuments(and(eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_TRILHA_ID, trilhaId)));
     }
 
     public boolean atualizar(Disciplina disciplina) {
@@ -81,39 +86,39 @@ public class DisciplinaRepository {
         for (TopicoEmbutido topico : disciplina.topicos()) {
             topicosDoc.add(new Document("id", topico.id())
                     .append("nome", topico.nome())
-                    .append("ordem", topico.ordem()));
+                    .append(CAMPO_ORDEM, topico.ordem()));
         }
 
         Document setDoc = new Document("nome", disciplina.nome())
                 .append("cor", disciplina.cor())
                 .append("peso", disciplina.peso())
-                .append("ordem", disciplina.ordem())
-                .append("topicos", topicosDoc)
-                .append("atualizadoEm", BsonDates.toBsonDate(disciplina.atualizadoEm() != null ? disciplina.atualizadoEm() : Instant.now()));
+                .append(CAMPO_ORDEM, disciplina.ordem())
+                .append(CAMPO_TOPICOS, topicosDoc)
+                .append(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(disciplina.atualizadoEm() != null ? disciplina.atualizadoEm() : Instant.now()));
 
         return collection.updateOne(
-                and(eq("_id", disciplina.id()), eq("usuarioId", disciplina.usuarioId()), eq("trilhaId", disciplina.trilhaId())),
+                and(eq("_id", disciplina.id()), eq(CAMPO_USUARIO_ID, disciplina.usuarioId()), eq(CAMPO_TRILHA_ID, disciplina.trilhaId())),
                 new Document("$set", setDoc)).getMatchedCount() > 0;
     }
 
     public boolean atualizarOrdem(ObjectId usuarioId, ObjectId trilhaId, ObjectId disciplinaId, int novaOrdem) {
         return collection.updateOne(
-                and(eq("_id", disciplinaId), eq("usuarioId", usuarioId), eq("trilhaId", trilhaId)),
+                and(eq("_id", disciplinaId), eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_TRILHA_ID, trilhaId)),
                 Updates.combine(
-                        Updates.set("ordem", novaOrdem),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(Instant.now()))
+                        Updates.set(CAMPO_ORDEM, novaOrdem),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))
                 )).getMatchedCount() > 0;
     }
 
     public boolean excluir(ObjectId usuarioId, ObjectId trilhaId, ObjectId disciplinaId) {
         return collection.deleteOne(and(
                 eq("_id", disciplinaId),
-                eq("usuarioId", usuarioId),
-                eq("trilhaId", trilhaId))).getDeletedCount() > 0;
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_TRILHA_ID, trilhaId))).getDeletedCount() > 0;
     }
 
     public long excluirTodasDaTrilha(ObjectId usuarioId, ObjectId trilhaId) {
-        return collection.deleteMany(and(eq("usuarioId", usuarioId), eq("trilhaId", trilhaId))).getDeletedCount();
+        return collection.deleteMany(and(eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_TRILHA_ID, trilhaId))).getDeletedCount();
     }
 
     private Document paraDocumento(Disciplina disciplina) {
@@ -121,41 +126,41 @@ public class DisciplinaRepository {
         for (TopicoEmbutido topico : disciplina.topicos()) {
             topicosDoc.add(new Document("id", topico.id())
                     .append("nome", topico.nome())
-                    .append("ordem", topico.ordem()));
+                    .append(CAMPO_ORDEM, topico.ordem()));
         }
         return new Document("_id", disciplina.id())
-                .append("usuarioId", disciplina.usuarioId())
-                .append("trilhaId", disciplina.trilhaId())
+                .append(CAMPO_USUARIO_ID, disciplina.usuarioId())
+                .append(CAMPO_TRILHA_ID, disciplina.trilhaId())
                 .append("nome", disciplina.nome())
                 .append("cor", disciplina.cor())
                 .append("peso", disciplina.peso())
-                .append("ordem", disciplina.ordem())
-                .append("topicos", topicosDoc)
+                .append(CAMPO_ORDEM, disciplina.ordem())
+                .append(CAMPO_TOPICOS, topicosDoc)
                 .append("criadoEm", BsonDates.toBsonDate(disciplina.criadoEm() != null ? disciplina.criadoEm() : Instant.now()))
-                .append("atualizadoEm", BsonDates.toBsonDate(disciplina.atualizadoEm() != null ? disciplina.atualizadoEm() : Instant.now()));
+                .append(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(disciplina.atualizadoEm() != null ? disciplina.atualizadoEm() : Instant.now()));
     }
 
     private Disciplina paraEntidade(Document doc) {
         ObjectId id = doc.getObjectId("_id");
-        ObjectId usuarioId = doc.getObjectId("usuarioId");
-        ObjectId trilhaId = doc.getObjectId("trilhaId");
+        ObjectId usuarioId = doc.getObjectId(CAMPO_USUARIO_ID);
+        ObjectId trilhaId = doc.getObjectId(CAMPO_TRILHA_ID);
         String nome = doc.getString("nome");
         String cor = doc.getString("cor");
         Integer peso = doc.getInteger("peso", 1);
-        Integer ordem = doc.getInteger("ordem", 0);
+        Integer ordem = doc.getInteger(CAMPO_ORDEM, 0);
 
         List<TopicoEmbutido> topicos = new ArrayList<>();
-        List<Document> topicosDoc = doc.getList("topicos", Document.class);
+        List<Document> topicosDoc = doc.getList(CAMPO_TOPICOS, Document.class);
         if (topicosDoc != null) {
             for (Document tDoc : topicosDoc) {
                 topicos.add(new TopicoEmbutido(
                         tDoc.getString("id"),
                         tDoc.getString("nome"),
-                        tDoc.getInteger("ordem", 0)));
+                        tDoc.getInteger(CAMPO_ORDEM, 0)));
             }
         }
         Instant criadoEm = BsonDates.lerInstant(doc, "criadoEm");
-        Instant atualizadoEm = BsonDates.lerInstant(doc, "atualizadoEm");
+        Instant atualizadoEm = BsonDates.lerInstant(doc, CAMPO_ATUALIZADO_EM);
 
         return new Disciplina(id, usuarioId, trilhaId, nome, cor, peso, ordem, topicos, criadoEm, atualizadoEm);
     }

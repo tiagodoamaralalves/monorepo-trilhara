@@ -7,7 +7,6 @@ import static com.mongodb.client.model.Filters.or;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,6 +22,7 @@ import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 
 import br.com.trilhara.shared.SystemScope;
+import br.com.trilhara.shared.mongo.BsonDates;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -45,12 +45,17 @@ public class LembretePushFilaRepository {
     /** Teto do backoff em segundos: nunca ultrapassa a janela útil de 15 minutos (900 s). */
     static final long BACKOFF_MAXIMO_SEGUNDOS = 900L;
 
+    private static final String CAMPO_ESTADO = "estado";
+    private static final String CAMPO_LEASE_ATE = "leaseAte";
+    private static final String CAMPO_LEASE_TOKEN = "leaseToken";
+    private static final String CAMPO_ATUALIZADO_EM = "atualizadoEm";
+
     private final MongoCollection<Document> collection;
 
     @Inject
     public LembretePushFilaRepository(
             MongoClient mongoClient,
-            @ConfigProperty(name = "quarkus.mongodb.database") String databaseName) {
+            @ConfigProperty(name = "quarkus.mongodb.database", defaultValue = "trilhara") String databaseName) {
         this.collection = mongoClient.getDatabase(databaseName).getCollection("lembretes_push");
     }
 
@@ -69,7 +74,7 @@ public class LembretePushFilaRepository {
 
     /** Filtro de elegibilidade da fila, compartilhado por leitura e claim. */
     static org.bson.conversions.Bson filtroCandidatos(Instant agora) {
-        Date dateAgora = Date.from(agora);
+        Object dateAgora = BsonDates.toBsonDate(agora);
         long agoraMillis = agora.toEpochMilli();
 
         // Toda a aritmética é feita em milissegundos (long): somar double a Date no $add do
@@ -104,12 +109,12 @@ public class LembretePushFilaRepository {
                 primeiraTentativa, backoffVencidoExpr)));
 
         return or(
-                and(eq("estado", LembretePush.ESTADO_PENDENTE),
+                and(eq(CAMPO_ESTADO, LembretePush.ESTADO_PENDENTE),
                         lte("instanteEntregaUtc", dateAgora),
                         podeProcessar),
-                and(eq("estado", LembretePush.ESTADO_PENDENTE), janelaFechada),
-                and(eq("estado", LembretePush.ESTADO_PROCESSANDO),
-                        lte("leaseAte", dateAgora)));
+                and(eq(CAMPO_ESTADO, LembretePush.ESTADO_PENDENTE), janelaFechada),
+                and(eq(CAMPO_ESTADO, LembretePush.ESTADO_PROCESSANDO),
+                        lte(CAMPO_LEASE_ATE, dateAgora)));
     }
 
     /**
@@ -122,11 +127,11 @@ public class LembretePushFilaRepository {
     public Optional<LembretePush> claim(ObjectId id, String leaseToken, Instant agora, Instant leaseAte) {
         var filtro = and(eq("_id", id), filtroCandidatos(agora));
         var update = Updates.combine(
-                Updates.set("estado", LembretePush.ESTADO_PROCESSANDO),
-                Updates.set("leaseToken", leaseToken),
-                Updates.set("leaseAte", Date.from(leaseAte)),
+                Updates.set(CAMPO_ESTADO, LembretePush.ESTADO_PROCESSANDO),
+                Updates.set(CAMPO_LEASE_TOKEN, leaseToken),
+                Updates.set(CAMPO_LEASE_ATE, BsonDates.toBsonDate(leaseAte)),
                 Updates.inc("tentativas", 1),
-                Updates.set("atualizadoEm", Date.from(agora)));
+                Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(agora)));
 
         Document doc = collection.findOneAndUpdate(
                 filtro,
@@ -141,12 +146,12 @@ public class LembretePushFilaRepository {
  */
     public boolean concluir(ObjectId id, String leaseToken, String estado, Instant agora) {
         var update = Updates.combine(
-                Updates.set("estado", estado),
-                Updates.set("leaseToken", null),
-                Updates.set("leaseAte", null),
-                Updates.set("atualizadoEm", Date.from(agora)));
+                Updates.set(CAMPO_ESTADO, estado),
+                Updates.set(CAMPO_LEASE_TOKEN, null),
+                Updates.set(CAMPO_LEASE_ATE, null),
+                Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(agora)));
         return collection.updateOne(
-                and(eq("_id", id), eq("leaseToken", leaseToken)), update).getModifiedCount() > 0;
+                and(eq("_id", id), eq(CAMPO_LEASE_TOKEN, leaseToken)), update).getModifiedCount() > 0;
     }
 
     /**
@@ -155,11 +160,11 @@ public class LembretePushFilaRepository {
  */
     public boolean devolverParaPendente(ObjectId id, String leaseToken, Instant agora) {
         var update = Updates.combine(
-                Updates.set("estado", LembretePush.ESTADO_PENDENTE),
-                Updates.set("leaseToken", null),
-                Updates.set("leaseAte", null),
-                Updates.set("atualizadoEm", Date.from(agora)));
+                Updates.set(CAMPO_ESTADO, LembretePush.ESTADO_PENDENTE),
+                Updates.set(CAMPO_LEASE_TOKEN, null),
+                Updates.set(CAMPO_LEASE_ATE, null),
+                Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(agora)));
         return collection.updateOne(
-                and(eq("_id", id), eq("leaseToken", leaseToken)), update).getModifiedCount() > 0;
+                and(eq("_id", id), eq(CAMPO_LEASE_TOKEN, leaseToken)), update).getModifiedCount() > 0;
     }
 }

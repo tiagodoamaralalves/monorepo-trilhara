@@ -1,13 +1,15 @@
 package br.com.trilhara.shared.mongo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import org.bson.Document;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -58,7 +60,7 @@ class InventarioColecoesTest {
     @DisplayName("todas as 20 coleções declaradas possuem índices canônicos")
     void todasAsColecoesDeclaradasPossuemIndices() {
         for (ColecaoTrilhara colecao : ColecaoTrilhara.values()) {
-            assertTrue(!IndicesCanonicos.porColecao(colecao).isEmpty(),
+            assertFalse(IndicesCanonicos.porColecao(colecao).isEmpty(),
                     "Coleção sem índice declarado: " + colecao.nome());
         }
         assertEquals(20, ColecaoTrilhara.values().length);
@@ -70,10 +72,10 @@ class InventarioColecoesTest {
     void inventarioNaoDuplicaNomes() {
         assertEquals(ColecaoTrilhara.values().length,
                 ColecaoTrilhara.nomes().stream().distinct().count());
-        assertTrue(ColecaoTrilhara.porNome("handoff_tokens") == null,
+        assertNull(ColecaoTrilhara.porNome("handoff_tokens"),
                 "handoff_tokens foi substituída por tokens_handoff_sso");
-        assertTrue(ColecaoTrilhara.porNome("tokens_handoff_sso") != null);
-        assertTrue(ColecaoTrilhara.porNome("editais") != null);
+        assertNotNull(ColecaoTrilhara.porNome("tokens_handoff_sso"));
+        assertNotNull(ColecaoTrilhara.porNome("editais"));
     }
 
     @Test
@@ -82,9 +84,9 @@ class InventarioColecoesTest {
         List<String> filhas = ColecaoTrilhara.nomesFilhasPrivadas();
         assertEquals(18, filhas.size());
         assertEquals(filhas.size(), filhas.stream().distinct().count());
-        assertTrue(!filhas.contains(ColecaoTrilhara.USUARIOS.nome()),
+        assertFalse(filhas.contains(ColecaoTrilhara.USUARIOS.nome()),
                 "usuarios é removida por último, fora da lista de filhas");
-        assertTrue(!filhas.contains(ColecaoTrilhara.EDITAIS.nome()),
+        assertFalse(filhas.contains(ColecaoTrilhara.EDITAIS.nome()),
                 "editais é catálogo público e não pode ser purgado");
         assertEquals(ColecaoTrilhara.values().length - 2, filhas.size());
     }

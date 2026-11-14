@@ -5,8 +5,8 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
@@ -322,7 +322,7 @@ class TarefaIntegrationTest {
         assertTrue(listaRepository.buscarQualquerStatus(new ObjectId(listaId)).isEmpty(),
                 "A lista expirada deve ser removida definitivamente");
         serieRepository.buscar(new ObjectId(usuarioA), new ObjectId(serieId))
-                .ifPresent(serie -> assertTrue(serie.listaId() == null,
+                .ifPresent(serie -> assertNull(serie.listaId(),
                         "Série sobrevivente deve ir para a Lista Geral (listaId nulo)"));
     }
 
@@ -473,7 +473,7 @@ class TarefaIntegrationTest {
     @DisplayName("impactoExclusaoListaContaTarefasESeries: devolve contagens por conclusão")
     void impactoExclusaoListaContaTarefasESeries() {
         String listaId = criarLista(tokenA, "Lista com impacto");
-        String ativa = criarTarefa(tokenA, """
+        criarTarefa(tokenA, """
                 {"titulo":"Ativa","prioridade":"MEDIA","listaId":"%s"}
                 """.formatted(listaId));
         String aConcluir = criarTarefa(tokenA, """

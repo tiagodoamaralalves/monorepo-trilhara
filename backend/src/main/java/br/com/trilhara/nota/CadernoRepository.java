@@ -28,13 +28,21 @@ import jakarta.inject.Inject;
 
 /**
  * Repositório direto BSON para a coleção normalizada 'cadernos'.
- * Conforme REQUISITOS-REESTRUTURACAO-DADOS.md §10 e PLANO-IMPLEMENTACAO-REESTRUTURACAO.md §8.2.
  */
 @ApplicationScoped
 public class CadernoRepository {
 
     /** Teto normativo da listagem de cadernos por usuário (500 cadernos/usuário). */
     public static final int LIMITE_LISTAGEM = 500;
+
+    private static final String CAMPO_USUARIO_ID = "usuarioId";
+    private static final String CAMPO_DELETED_AT = "deletedAt";
+    private static final String CAMPO_ORIGEM_TRILHA_ID = "origemTrilhaId";
+    private static final String CAMPO_ATUALIZADO_EM = "atualizadoEm";
+    private static final String CAMPO_EXPIRES_AT = "expiresAt";
+    private static final String CAMPO_TITULO = "titulo";
+    private static final String CAMPO_LOTE_EXCLUSAO_ID = "loteExclusaoId";
+    private static final String CAMPO_CRIADO_EM = "criadoEm";
 
     private final MongoCollection<Document> collection;
 
@@ -52,7 +60,7 @@ public class CadernoRepository {
     public boolean atualizar(Caderno caderno) {
         Document doc = paraDocumento(caderno);
         return collection.replaceOne(
-                and(eq("_id", caderno.id()), eq("usuarioId", caderno.usuarioId())),
+                and(eq("_id", caderno.id()), eq(CAMPO_USUARIO_ID, caderno.usuarioId())),
                 doc,
                 new ReplaceOptions().upsert(false)
         ).getMatchedCount() > 0;
@@ -61,8 +69,8 @@ public class CadernoRepository {
     public Optional<Caderno> buscarAtivo(ObjectId usuarioId, ObjectId id) {
         Document doc = collection.find(and(
                 eq("_id", id),
-                eq("usuarioId", usuarioId),
-                eq("deletedAt", null)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_DELETED_AT, null)
         )).first();
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
@@ -70,16 +78,16 @@ public class CadernoRepository {
     public Optional<Caderno> buscarQualquerStatus(ObjectId usuarioId, ObjectId id) {
         Document doc = collection.find(and(
                 eq("_id", id),
-                eq("usuarioId", usuarioId)
+                eq(CAMPO_USUARIO_ID, usuarioId)
         )).first();
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
 
     public Optional<Caderno> buscarAtivoPorOrigemTrilha(ObjectId usuarioId, ObjectId origemTrilhaId) {
         Document doc = collection.find(and(
-                eq("usuarioId", usuarioId),
-                eq("origemTrilhaId", origemTrilhaId),
-                eq("deletedAt", null)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_ORIGEM_TRILHA_ID, origemTrilhaId),
+                eq(CAMPO_DELETED_AT, null)
         )).first();
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
@@ -98,13 +106,13 @@ public class CadernoRepository {
     public List<Caderno> listarAtivos(ObjectId usuarioId, ObjectId origemTrilhaId, int limite) {
         List<Caderno> lista = new ArrayList<>();
         List<Bson> predicados = new ArrayList<>();
-        predicados.add(eq("usuarioId", usuarioId));
-        predicados.add(eq("deletedAt", null));
+        predicados.add(eq(CAMPO_USUARIO_ID, usuarioId));
+        predicados.add(eq(CAMPO_DELETED_AT, null));
         if (origemTrilhaId != null) {
-            predicados.add(eq("origemTrilhaId", origemTrilhaId));
+            predicados.add(eq(CAMPO_ORIGEM_TRILHA_ID, origemTrilhaId));
         }
         collection.find(and(predicados))
-                .sort(Sorts.orderBy(Sorts.descending("atualizadoEm"), Sorts.descending("_id")))
+                .sort(Sorts.orderBy(Sorts.descending(CAMPO_ATUALIZADO_EM), Sorts.descending("_id")))
                 .limit(limite)
                 .forEach(doc -> lista.add(paraEntidade(doc)));
         return lista;
@@ -113,29 +121,29 @@ public class CadernoRepository {
     public List<Caderno> listarLixeira(ObjectId usuarioId, Instant agora) {
         List<Caderno> lista = new ArrayList<>();
         collection.find(and(
-                eq("usuarioId", usuarioId),
-                ne("deletedAt", null),
-                gt("expiresAt", BsonDates.toBsonDate(agora))
-        )).sort(Sorts.orderBy(Sorts.descending("deletedAt"), Sorts.descending("_id")))
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                ne(CAMPO_DELETED_AT, null),
+                gt(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(agora))
+        )).sort(Sorts.orderBy(Sorts.descending(CAMPO_DELETED_AT), Sorts.descending("_id")))
           .forEach(doc -> lista.add(paraEntidade(doc)));
         return lista;
     }
 
     public long contarLixeira(ObjectId usuarioId, Instant agora) {
         return collection.countDocuments(and(
-                eq("usuarioId", usuarioId),
-                ne("deletedAt", null),
-                gt("expiresAt", BsonDates.toBsonDate(agora))
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                ne(CAMPO_DELETED_AT, null),
+                gt(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(agora))
         ));
     }
 
     public List<Caderno> listarLixeira(ObjectId usuarioId, Instant agora, int pagina, int tamanho) {
         List<Caderno> lista = new ArrayList<>();
         collection.find(and(
-                eq("usuarioId", usuarioId),
-                ne("deletedAt", null),
-                gt("expiresAt", BsonDates.toBsonDate(agora))
-        )).sort(Sorts.orderBy(Sorts.descending("deletedAt"), Sorts.descending("_id")))
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                ne(CAMPO_DELETED_AT, null),
+                gt(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(agora))
+        )).sort(Sorts.orderBy(Sorts.descending(CAMPO_DELETED_AT), Sorts.descending("_id")))
           .skip(Math.max(0, (pagina - 1) * tamanho))
           .limit(tamanho)
           .forEach(doc -> lista.add(paraEntidade(doc)));
@@ -145,18 +153,18 @@ public class CadernoRepository {
     /** Cadernos ativos do usuário — usado no teto de 500 cadernos. */
     public long contarAtivos(ObjectId usuarioId) {
         return collection.countDocuments(and(
-                eq("usuarioId", usuarioId),
-                eq("deletedAt", null)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_DELETED_AT, null)
         ));
     }
 
     /** Títulos de cadernos ativos — usado para desempatar "Restauradas (2)", "(3)"…. */
     public List<String> titulosAtivos(ObjectId usuarioId) {
         List<String> titulos = new ArrayList<>();
-        collection.find(and(eq("usuarioId", usuarioId), eq("deletedAt", null)))
-                .projection(new Document("titulo", 1))
+        collection.find(and(eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_DELETED_AT, null)))
+                .projection(new Document(CAMPO_TITULO, 1))
                 .forEach(doc -> {
-                    String titulo = doc.getString("titulo");
+                    String titulo = doc.getString(CAMPO_TITULO);
                     if (titulo != null) {
                         titulos.add(titulo);
                     }
@@ -166,34 +174,34 @@ public class CadernoRepository {
 
     public boolean moverParaLixeira(ObjectId usuarioId, ObjectId id, String loteExclusaoId, Instant agora, Instant expiresAt) {
         return collection.updateOne(
-                and(eq("_id", id), eq("usuarioId", usuarioId), eq("deletedAt", null)),
+                and(eq("_id", id), eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_DELETED_AT, null)),
                 Updates.combine(
-                        Updates.set("deletedAt", BsonDates.toBsonDate(agora)),
-                        Updates.set("expiresAt", BsonDates.toBsonDate(expiresAt)),
-                        Updates.set("loteExclusaoId", loteExclusaoId),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(agora))
+                        Updates.set(CAMPO_DELETED_AT, BsonDates.toBsonDate(agora)),
+                        Updates.set(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(expiresAt)),
+                        Updates.set(CAMPO_LOTE_EXCLUSAO_ID, loteExclusaoId),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(agora))
                 )
         ).getModifiedCount() > 0;
     }
 
     public boolean restaurar(ObjectId usuarioId, ObjectId id) {
         return collection.updateOne(
-                and(eq("_id", id), eq("usuarioId", usuarioId)),
+                and(eq("_id", id), eq(CAMPO_USUARIO_ID, usuarioId)),
                 Updates.combine(
-                        Updates.unset("deletedAt"),
-                        Updates.unset("expiresAt"),
-                        Updates.unset("loteExclusaoId"),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(Instant.now()))
+                        Updates.unset(CAMPO_DELETED_AT),
+                        Updates.unset(CAMPO_EXPIRES_AT),
+                        Updates.unset(CAMPO_LOTE_EXCLUSAO_ID),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))
                 )
         ).getModifiedCount() > 0;
     }
 
     public void desvincularTrilha(ObjectId usuarioId, ObjectId origemTrilhaId) {
         collection.updateMany(
-                and(eq("usuarioId", usuarioId), eq("origemTrilhaId", origemTrilhaId)),
+                and(eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_ORIGEM_TRILHA_ID, origemTrilhaId)),
                 Updates.combine(
-                        Updates.unset("origemTrilhaId"),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(Instant.now()))
+                        Updates.unset(CAMPO_ORIGEM_TRILHA_ID),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))
                 )
         );
     }
@@ -205,46 +213,46 @@ public class CadernoRepository {
  */
     public long contarAtivosPorOrigemTrilha(ObjectId usuarioId, ObjectId origemTrilhaId) {
         return collection.countDocuments(and(
-                eq("usuarioId", usuarioId),
-                eq("origemTrilhaId", origemTrilhaId),
-                eq("deletedAt", null)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_ORIGEM_TRILHA_ID, origemTrilhaId),
+                eq(CAMPO_DELETED_AT, null)
         ));
     }
 
     public long esvaziarLixeira(ObjectId usuarioId) {
         return collection.deleteMany(
-                and(eq("usuarioId", usuarioId), ne("deletedAt", null))
+                and(eq(CAMPO_USUARIO_ID, usuarioId), ne(CAMPO_DELETED_AT, null))
         ).getDeletedCount();
     }
 
     public long purgarExpirados(Instant agora) {
         return collection.deleteMany(
-                and(ne("deletedAt", null), lte("expiresAt", BsonDates.toBsonDate(agora)))
+                and(ne(CAMPO_DELETED_AT, null), lte(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(agora)))
         ).getDeletedCount();
     }
 
     public Document paraDocumento(Caderno c) {
         Document doc = new Document("_id", c.id() != null ? c.id() : new ObjectId())
-                .append("usuarioId", c.usuarioId())
-                .append("titulo", c.titulo())
+                .append(CAMPO_USUARIO_ID, c.usuarioId())
+                .append(CAMPO_TITULO, c.titulo())
                 .append("cor", c.cor())
-                .append("criadoEm", BsonDates.toBsonDate(c.criadoEm()))
-                .append("atualizadoEm", BsonDates.toBsonDate(c.atualizadoEm()));
+                .append(CAMPO_CRIADO_EM, BsonDates.toBsonDate(c.criadoEm()))
+                .append(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(c.atualizadoEm()));
 
         if (c.icone() != null) {
             doc.append("icone", c.icone());
         }
         if (c.origemTrilhaId() != null) {
-            doc.append("origemTrilhaId", c.origemTrilhaId());
+            doc.append(CAMPO_ORIGEM_TRILHA_ID, c.origemTrilhaId());
         }
         if (c.deletedAt() != null) {
-            doc.append("deletedAt", BsonDates.toBsonDate(c.deletedAt()));
+            doc.append(CAMPO_DELETED_AT, BsonDates.toBsonDate(c.deletedAt()));
         }
         if (c.expiresAt() != null) {
-            doc.append("expiresAt", BsonDates.toBsonDate(c.expiresAt()));
+            doc.append(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(c.expiresAt()));
         }
         if (c.loteExclusaoId() != null) {
-            doc.append("loteExclusaoId", c.loteExclusaoId());
+            doc.append(CAMPO_LOTE_EXCLUSAO_ID, c.loteExclusaoId());
         }
         return doc;
     }
@@ -253,16 +261,16 @@ public class CadernoRepository {
         if (doc == null) return null;
         return new Caderno(
                 doc.getObjectId("_id"),
-                doc.getObjectId("usuarioId"),
-                doc.getString("titulo"),
+                doc.getObjectId(CAMPO_USUARIO_ID),
+                doc.getString(CAMPO_TITULO),
                 doc.getString("cor"),
                 doc.getString("icone"),
-                doc.getObjectId("origemTrilhaId"),
-                BsonDates.lerInstant(doc, "deletedAt"),
-                BsonDates.lerInstant(doc, "expiresAt"),
-                doc.getString("loteExclusaoId"),
-                BsonDates.lerInstant(doc, "criadoEm"),
-                BsonDates.lerInstant(doc, "atualizadoEm")
+                doc.getObjectId(CAMPO_ORIGEM_TRILHA_ID),
+                BsonDates.lerInstant(doc, CAMPO_DELETED_AT),
+                BsonDates.lerInstant(doc, CAMPO_EXPIRES_AT),
+                doc.getString(CAMPO_LOTE_EXCLUSAO_ID),
+                BsonDates.lerInstant(doc, CAMPO_CRIADO_EM),
+                BsonDates.lerInstant(doc, CAMPO_ATUALIZADO_EM)
         );
     }
 }

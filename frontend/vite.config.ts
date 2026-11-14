@@ -26,10 +26,9 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    maxWorkers: 4,
     testTimeout: 30000,
     hookTimeout: 30000,
-    testTimeout: 60000,
-    hookTimeout: 60000,
     coverage: {
       provider: 'v8',
       reporter: ['text-summary', 'lcov', 'html'],

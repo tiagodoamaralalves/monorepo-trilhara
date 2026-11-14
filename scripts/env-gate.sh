@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # env-gate.sh — Exporta as variáveis de ambiente necessárias para executar o
-# gate comum de revisão de forma reprodutível nesta máquina/CI.
+# backend Quarkus e os testes locais de forma reprodutível nesta máquina/CI.
 #
 # Uso:
 #   eval "$(bash scripts/env-gate.sh)"          # exporta no shell atual

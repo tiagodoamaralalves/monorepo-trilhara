@@ -28,7 +28,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.MongoClient;
 
 import br.com.trilhara.auth.Role;
@@ -45,7 +44,7 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
- * Integração do domínio Notas ( a ).
+ * Integração do domínio Notas.
  *
  * <p>Cobre os contratos congelados na revisão: guarda de reimportação, sincronização sem tocar
  * páginas existentes, busca com snippet texto puro + destaques, endpoint canônico de página,
@@ -91,8 +90,6 @@ class NotaResourceTest {
     @Inject
     @ConfigProperty(name = "quarkus.mongodb.database", defaultValue = "trilhara")
     String databaseName;
-
-    private final ObjectMapper jsonMapper = new ObjectMapper();
 
     private String tokenUsuarioA;
     private String tokenUsuarioB;
@@ -849,7 +846,6 @@ class NotaResourceTest {
                 .then().statusCode(200);
 
         // Purga definitiva de seção e caderno (mantendo a página na lixeira).
-        Instant passado = Instant.now().minus(40, ChronoUnit.DAYS);
         var banco = mongoClient.getDatabase(databaseName);
         banco.getCollection("secoes").deleteOne(new Document("_id", new ObjectId(secaoId)));
         banco.getCollection("cadernos").deleteOne(new Document("_id", new ObjectId(cadernoId)));

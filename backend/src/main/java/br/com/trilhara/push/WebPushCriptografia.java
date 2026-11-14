@@ -52,6 +52,7 @@ public final class WebPushCriptografia {
     static final byte[] INFO_CEK = "Content-Encoding: aes128gcm".getBytes(StandardCharsets.UTF_8);
     static final byte[] INFO_NONCE = "Content-Encoding: nonce".getBytes(StandardCharsets.UTF_8);
 
+    private static final String ALGORITMO_HMAC_SHA256 = "HmacSHA256";
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private WebPushCriptografia() {
@@ -151,11 +152,11 @@ public final class WebPushCriptografia {
 
     /** HKDF-SHA256 (RFC 5869) com {@code salt} obrigatório. */
     static byte[] hkdf(byte[] salt, byte[] info, byte[] ikm, int tamanho) throws GeneralSecurityException {
-        Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(new SecretKeySpec(salt.length == 0 ? new byte[32] : salt, "HmacSHA256"));
+        Mac mac = Mac.getInstance(ALGORITMO_HMAC_SHA256);
+        mac.init(new SecretKeySpec(salt.length == 0 ? new byte[32] : salt, ALGORITMO_HMAC_SHA256));
         byte[] prk = mac.doFinal(ikm);
 
-        mac.init(new SecretKeySpec(prk, "HmacSHA256"));
+        mac.init(new SecretKeySpec(prk, ALGORITMO_HMAC_SHA256));
         byte[] saida = new byte[tamanho];
         byte[] bloco = new byte[0];
         int preenchido = 0;

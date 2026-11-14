@@ -60,11 +60,11 @@ public class PushDeliveryScheduler {
     @ConfigProperty(name = "trilhara.push.habilitado", defaultValue = "true")
     boolean pushHabilitado;
 
-    @ConfigProperty(name = "trilhara.push.vapid.public-key")
-    java.util.Optional<String> vapidPublicKey;
+    @ConfigProperty(name = "trilhara.push.vapid.public-key", defaultValue = "")
+    java.util.Optional<String> vapidPublicKey = java.util.Optional.empty();
 
-    @ConfigProperty(name = "trilhara.push.vapid.private-key")
-    java.util.Optional<String> vapidPrivateKey;
+    @ConfigProperty(name = "trilhara.push.vapid.private-key", defaultValue = "")
+    java.util.Optional<String> vapidPrivateKey = java.util.Optional.empty();
 
     @Inject
     public PushDeliveryScheduler(
@@ -82,7 +82,7 @@ public class PushDeliveryScheduler {
         this.payloadFactory = payloadFactory;
     }
 
-    @Scheduled(every = "{trilhara.push.scheduler.interval:30s}")
+    @Scheduled(every = "${trilhara.push.scheduler.interval:30s}")
     public void executarScheduler() {
         if (!isPushHabilitado()) {
             return;
@@ -218,8 +218,8 @@ public class PushDeliveryScheduler {
         if (!pushHabilitado) {
             return false;
         }
-        boolean temPublica = vapidPublicKey != null && vapidPublicKey.isPresent() && !vapidPublicKey.get().isBlank();
-        boolean temPrivada = vapidPrivateKey != null && vapidPrivateKey.isPresent() && !vapidPrivateKey.get().isBlank();
+        boolean temPublica = vapidPublicKey.isPresent() && !vapidPublicKey.get().isBlank();
+        boolean temPrivada = vapidPrivateKey.isPresent() && !vapidPrivateKey.get().isBlank();
         return temPublica && temPrivada;
     }
 }

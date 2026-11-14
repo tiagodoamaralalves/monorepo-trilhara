@@ -103,7 +103,7 @@ public class LeaseTrilhaService {
  * que a próxima operação concorrente poderá tentar novamente.</p>
  */
     public void executarComLease(ObjectId usuarioId, ObjectId trilhaId, Runnable operacao) {
-        executarComLease(usuarioId, trilhaId, (String _token) -> operacao.run());
+        executarComLease(usuarioId, trilhaId, (String _) -> operacao.run());
     }
 
     /**

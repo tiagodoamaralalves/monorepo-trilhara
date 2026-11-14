@@ -6,7 +6,6 @@ import static com.mongodb.client.model.Filters.gt;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,10 +21,20 @@ import com.mongodb.client.model.ReplaceOptions;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 
+import br.com.trilhara.shared.mongo.BsonDates;
 import jakarta.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped
 public class RefreshTokenRepository {
+
+    private static final String CAMPO_TOKEN_HASH = "tokenHash";
+    private static final String CAMPO_FAMILIA_ID = "familiaId";
+    private static final String CAMPO_REVOGADO_EM = "revogadoEm";
+    private static final String CAMPO_MOTIVO_REVOGACAO = "motivoRevogacao";
+    private static final String CAMPO_USUARIO_ID = "usuarioId";
+    private static final String CAMPO_EXPIRA_EM = "expiraEm";
+    private static final String CAMPO_ULTIMO_USO_EM = "ultimoUsoEm";
+    private static final String CAMPO_CRIADO_EM = "criadoEm";
 
     private final MongoCollection<Document> tokens;
 
@@ -53,7 +62,7 @@ public class RefreshTokenRepository {
         if (tokenHash == null || tokenHash.isBlank()) {
             return Optional.empty();
         }
-        return Optional.ofNullable(tokens.find(eq("tokenHash", tokenHash)).first())
+        return Optional.ofNullable(tokens.find(eq(CAMPO_TOKEN_HASH, tokenHash)).first())
                 .map(this::paraRefreshToken);
     }
 
@@ -62,18 +71,18 @@ public class RefreshTokenRepository {
             return 0;
         }
         return tokens.updateMany(
-                and(eq("familiaId", familiaId), Filters.eq("revogadoEm", null)),
+                and(eq(CAMPO_FAMILIA_ID, familiaId), Filters.eq(CAMPO_REVOGADO_EM, null)),
                 Updates.combine(
-                        Updates.set("revogadoEm", Date.from(agora)),
-                        Updates.set("motivoRevogacao", motivo)))
+                        Updates.set(CAMPO_REVOGADO_EM, BsonDates.toBsonDate(agora)),
+                        Updates.set(CAMPO_MOTIVO_REVOGACAO, motivo)))
                 .getModifiedCount();
     }
 
     private static Bson filtroUsuario(String usuarioId) {
         if (ObjectId.isValid(usuarioId)) {
-            return Filters.or(eq("usuarioId", new ObjectId(usuarioId)), eq("usuarioId", usuarioId));
+            return Filters.or(eq(CAMPO_USUARIO_ID, new ObjectId(usuarioId)), eq(CAMPO_USUARIO_ID, usuarioId));
         }
-        return eq("usuarioId", usuarioId);
+        return eq(CAMPO_USUARIO_ID, usuarioId);
     }
 
     public long revogarFamiliaDoUsuario(String usuarioId, String familiaId, Instant agora, String motivo) {
@@ -81,10 +90,10 @@ public class RefreshTokenRepository {
             return 0;
         }
         return tokens.updateMany(
-                and(filtroUsuario(usuarioId), eq("familiaId", familiaId), Filters.eq("revogadoEm", null)),
+                and(filtroUsuario(usuarioId), eq(CAMPO_FAMILIA_ID, familiaId), Filters.eq(CAMPO_REVOGADO_EM, null)),
                 Updates.combine(
-                        Updates.set("revogadoEm", Date.from(agora)),
-                        Updates.set("motivoRevogacao", motivo)))
+                        Updates.set(CAMPO_REVOGADO_EM, BsonDates.toBsonDate(agora)),
+                        Updates.set(CAMPO_MOTIVO_REVOGACAO, motivo)))
                 .getModifiedCount();
     }
 
@@ -93,10 +102,10 @@ public class RefreshTokenRepository {
             return 0;
         }
         return tokens.updateMany(
-                and(filtroUsuario(usuarioId), Filters.eq("revogadoEm", null)),
+                and(filtroUsuario(usuarioId), Filters.eq(CAMPO_REVOGADO_EM, null)),
                 Updates.combine(
-                        Updates.set("revogadoEm", Date.from(agora)),
-                        Updates.set("motivoRevogacao", motivo)))
+                        Updates.set(CAMPO_REVOGADO_EM, BsonDates.toBsonDate(agora)),
+                        Updates.set(CAMPO_MOTIVO_REVOGACAO, motivo)))
                 .getModifiedCount();
     }
 
@@ -107,9 +116,9 @@ public class RefreshTokenRepository {
         }
         tokens.find(and(
                 filtroUsuario(usuarioId),
-                Filters.eq("revogadoEm", null),
-                gt("expiraEm", Date.from(agora))))
-                .sort(Sorts.descending("ultimoUsoEm"))
+                Filters.eq(CAMPO_REVOGADO_EM, null),
+                gt(CAMPO_EXPIRA_EM, BsonDates.toBsonDate(agora))))
+                .sort(Sorts.descending(CAMPO_ULTIMO_USO_EM))
                 .forEach(doc -> resultado.add(paraRefreshToken(doc)));
         return resultado;
     }
@@ -117,52 +126,46 @@ public class RefreshTokenRepository {
     private Document paraDocumento(RefreshToken t) {
         Document doc = new Document();
         doc.put("_id", new ObjectId(t.id()));
-        doc.put("tokenHash", t.tokenHash());
-        doc.put("familiaId", t.familiaId());
+        doc.put(CAMPO_TOKEN_HASH, t.tokenHash());
+        doc.put(CAMPO_FAMILIA_ID, t.familiaId());
         if (ObjectId.isValid(t.usuarioId())) {
-            doc.put("usuarioId", new ObjectId(t.usuarioId()));
+            doc.put(CAMPO_USUARIO_ID, new ObjectId(t.usuarioId()));
         } else {
-            doc.put("usuarioId", t.usuarioId());
+            doc.put(CAMPO_USUARIO_ID, t.usuarioId());
         }
         doc.put("userAgent", t.userAgent());
         doc.put("ip", t.ip());
-        doc.put("criadoEm", Date.from(t.criadoEm()));
-        doc.put("ultimoUsoEm", Date.from(t.ultimoUsoEm() != null ? t.ultimoUsoEm() : t.criadoEm()));
-        doc.put("expiraEm", Date.from(t.expiraEm()));
-        doc.put("revogadoEm", t.revogadoEm() != null ? Date.from(t.revogadoEm()) : null);
+        doc.put(CAMPO_CRIADO_EM, BsonDates.toBsonDate(t.criadoEm()));
+        doc.put(CAMPO_ULTIMO_USO_EM, BsonDates.toBsonDate(t.ultimoUsoEm() != null ? t.ultimoUsoEm() : t.criadoEm()));
+        doc.put(CAMPO_EXPIRA_EM, BsonDates.toBsonDate(t.expiraEm()));
+        doc.put(CAMPO_REVOGADO_EM, BsonDates.toBsonDate(t.revogadoEm()));
         doc.put("substituidoPorHash", t.substituidoPorHash());
-        doc.put("motivoRevogacao", t.motivoRevogacao());
+        doc.put(CAMPO_MOTIVO_REVOGACAO, t.motivoRevogacao());
         return doc;
     }
 
     private RefreshToken paraRefreshToken(Document doc) {
         return new RefreshToken(
                 doc.getObjectId("_id").toHexString(),
-                doc.getString("tokenHash"),
-                doc.getString("familiaId"),
+                doc.getString(CAMPO_TOKEN_HASH),
+                doc.getString(CAMPO_FAMILIA_ID),
                 extrairUsuarioId(doc),
                 doc.getString("userAgent"),
                 doc.getString("ip"),
-                paraInstant(doc.getDate("criadoEm")),
-                paraInstant(doc.getDate("ultimoUsoEm")),
-                paraInstant(doc.getDate("expiraEm")),
-                paraInstant(doc.getDate("revogadoEm")),
+                BsonDates.toInstant(doc.getDate(CAMPO_CRIADO_EM)),
+                BsonDates.toInstant(doc.getDate(CAMPO_ULTIMO_USO_EM)),
+                BsonDates.toInstant(doc.getDate(CAMPO_EXPIRA_EM)),
+                BsonDates.toInstant(doc.getDate(CAMPO_REVOGADO_EM)),
                 doc.getString("substituidoPorHash"),
-                doc.getString("motivoRevogacao"));
+                doc.getString(CAMPO_MOTIVO_REVOGACAO));
     }
 
     private static String extrairUsuarioId(Document doc) {
-        Object val = doc.get("usuarioId");
+        Object val = doc.get(CAMPO_USUARIO_ID);
         if (val instanceof ObjectId oid) {
             return oid.toHexString();
         }
-        return doc.getString("usuarioId");
+        return doc.getString(CAMPO_USUARIO_ID);
     }
-
-    private static Instant paraInstant(Date data) {
-        return data != null ? data.toInstant() : null;
-    }
-
-
 }
 

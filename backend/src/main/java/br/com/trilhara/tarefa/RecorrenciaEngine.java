@@ -6,7 +6,6 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -89,7 +88,7 @@ public class RecorrenciaEngine {
             return;
         }
 
-        Collections.sort(candidatas);
+        candidatas.sort(null);
         processarCandidatas(serie, candidatas, dataInicio, alvo);
     }
 

@@ -29,8 +29,14 @@ public class TimezoneContext {
 
     private ZoneId zoneId;
     private Clock clock;
+    private UsuarioAtual usuarioAtual;
 
     public TimezoneContext() {
+    }
+
+    @Inject
+    public TimezoneContext(UsuarioAtual usuarioAtual) {
+        this.usuarioAtual = usuarioAtual;
     }
 
     public TimezoneContext(HttpHeaders httpHeaders) {
@@ -53,9 +59,6 @@ public class TimezoneContext {
     public void setClock(Clock clock) {
         this.clock = clock;
     }
-
-    @Inject
-    private UsuarioAtual usuarioAtual;
 
     public ZoneId zoneId() {
         if (zoneId == null) {

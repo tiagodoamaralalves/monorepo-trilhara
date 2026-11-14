@@ -10,7 +10,7 @@ import jakarta.ws.rs.ext.Provider;
 /**
  * Requisição sintaticamente inválida → {@code 400 VALIDATION_ERROR}.
  *
- * <p>O código legado {@code BAD_REQUEST} foi eliminado do catálogo: todo 400 do produto é
+ * <p>O código legado {@code BAD_REQUEST} foi eliminado do catálogo: qualquer 400 do produto é
  * falha de validação do payload. Mensagens genéricas do container ({@code HTTP 400 ...})
  * são substituídas por um {@code detail} neutro.</p>
  */

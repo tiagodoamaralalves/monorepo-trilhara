@@ -1,12 +1,12 @@
 package br.com.trilhara.cronograma;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.logging.Logger;
 
 import org.bson.types.ObjectId;
 
 import br.com.trilhara.shared.SystemScope;
+import br.com.trilhara.shared.mongo.BsonDates;
 import br.com.trilhara.trilha.TrilhaRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -52,8 +52,9 @@ public class CronogramaReconciliacaoService {
 
     /** Executa a reconciliação e devolve quantos cronogramas foram tratados. */
     public int reconciliar(Instant agora) {
+        Instant referencia = agora != null ? agora : Instant.now();
         int tratados = 0;
-        tratados += reconciliarPreparandoOrfaos();
+        tratados += reconciliarPreparandoOrfaos(referencia);
         tratados += reconciliarRecuperacaoNecessaria();
         return tratados;
     }
@@ -62,7 +63,7 @@ public class CronogramaReconciliacaoService {
  * {@code PREPARANDO} cujo lease da trilha expirou: nenhum worker vai publicar essa versão.
  * Remove os blocos do staging e devolve o cronograma ao estado publicado anterior.
  */
-    int reconciliarPreparandoOrfaos() {
+    int reconciliarPreparandoOrfaos(Instant referencia) {
         int tratados = 0;
         for (Cronograma cronograma : cronogramaRepository.listarPorEstadoPublicacao(ESTADO_PREPARANDO)) {
             Long versaoPreparada = cronograma.versaoPreparada();
@@ -74,7 +75,7 @@ public class CronogramaReconciliacaoService {
                         cronograma.usuarioId(), cronograma.id(), ESTADO_ATIVO);
                 continue;
             }
-            if (leaseExpirado(cronograma.usuarioId(), cronograma.trilhaId())) {
+            if (leaseExpirado(cronograma.usuarioId(), cronograma.trilhaId(), referencia)) {
                 blocoCronogramaRepository.excluirPorCronograma(
                         cronograma.usuarioId(), cronograma.trilhaId(), cronograma.id());
                 cronogramaRepository.atualizarEstadoPublicacao(
@@ -119,11 +120,11 @@ public class CronogramaReconciliacaoService {
         return tratados;
     }
 
-    private boolean leaseExpirado(ObjectId usuarioId, ObjectId trilhaId) {
+    private boolean leaseExpirado(ObjectId usuarioId, ObjectId trilhaId, Instant referencia) {
         return trilhaRepository.buscarEntidade(usuarioId, trilhaId)
                 .map(doc -> {
-                    java.util.Date ate = doc.getDate("geracaoCronogramaEmAndamentoAte");
-                    return ate == null || ate.toInstant().isBefore(Instant.now());
+                    Instant ate = BsonDates.toInstant(doc.getDate("geracaoCronogramaEmAndamentoAte"));
+                    return ate == null || ate.isBefore(referencia);
                 })
                 .orElse(true);
     }

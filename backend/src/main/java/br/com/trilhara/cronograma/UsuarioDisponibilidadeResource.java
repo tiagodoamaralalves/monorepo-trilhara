@@ -19,8 +19,12 @@ import jakarta.ws.rs.core.MediaType;
 @Autenticado
 public class UsuarioDisponibilidadeResource {
 
+    private final CronogramaService service;
+
     @Inject
-    CronogramaService service;
+    public UsuarioDisponibilidadeResource(CronogramaService service) {
+        this.service = service;
+    }
 
     @GET
     public DisponibilidadeSemanalDTO obterDisponibilidadeSemanal() {

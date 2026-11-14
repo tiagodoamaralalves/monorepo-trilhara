@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -32,20 +33,34 @@ public class EmailService {
     private final String frontendUrlPadrao;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
+    private final TokenRecuperacaoRepository tokenRecuperacaoRepository;
+    private final TokenConfirmacaoEmailRepository tokenConfirmacaoEmailRepository;
 
     @Inject
     public EmailService(
-            @ConfigProperty(name = "trilhara.email.resend-api-key", defaultValue = "") String resendApiKey,
+            @ConfigProperty(name = "trilhara.email.resend-api-key") Optional<String> resendApiKey,
             @ConfigProperty(name = "trilhara.email.from", defaultValue = "Trilhara <onboarding@resend.dev>") String remetente,
             @ConfigProperty(name = "trilhara.email.frontend-url", defaultValue = "http://localhost:5173") String frontendUrlPadrao,
-            ObjectMapper objectMapper) {
-        this.resendApiKey = resendApiKey != null ? resendApiKey.trim() : "";
+            ObjectMapper objectMapper,
+            TokenRecuperacaoRepository tokenRecuperacaoRepository,
+            TokenConfirmacaoEmailRepository tokenConfirmacaoEmailRepository) {
+        this.resendApiKey = resendApiKey.map(String::trim).orElse("");
         this.remetente = remetente != null ? remetente.trim() : "Trilhara <onboarding@resend.dev>";
         this.frontendUrlPadrao = frontendUrlPadrao != null ? frontendUrlPadrao.trim() : "http://localhost:5173";
         this.objectMapper = objectMapper;
+        this.tokenRecuperacaoRepository = tokenRecuperacaoRepository;
+        this.tokenConfirmacaoEmailRepository = tokenConfirmacaoEmailRepository;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
+    }
+
+    TokenRecuperacaoRepository tokenRecuperacaoRepository() {
+        return tokenRecuperacaoRepository;
+    }
+
+    TokenConfirmacaoEmailRepository tokenConfirmacaoEmailRepository() {
+        return tokenConfirmacaoEmailRepository;
     }
 
     /**

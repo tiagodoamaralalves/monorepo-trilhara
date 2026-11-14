@@ -37,7 +37,9 @@ public record Cronograma(
         diasAtivosSemana = diasAtivosSemana == null ? List.of() : List.copyOf(diasAtivosSemana);
         disciplinasParticipantesIds = disciplinasParticipantesIds == null ? List.of() : List.copyOf(disciplinasParticipantesIds);
         semanaModeloManual = semanaModeloManual == null ? Map.of() : Collections.unmodifiableMap(semanaModeloManual);
-        estadoPublicacao = estadoPublicacao == null ? (ativo ? "ATIVO" : "PREPARANDO") : estadoPublicacao;
+        if (estadoPublicacao == null) {
+            estadoPublicacao = ativo ? "ATIVO" : "PREPARANDO";
+        }
     }
 
     public String idHex() {

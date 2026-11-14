@@ -151,7 +151,7 @@ public class NotaSincronizacaoService {
     }
 
     /**
- * Desvincula o caderno de uma trilha preservando todo o conteúdo: o caderno deixa de
+ * Desvincula o caderno de uma trilha preservando integralmente o conteúdo: o caderno deixa de
  * referenciar a trilha e suas seções perdem {@code origemDisciplinaId}. As notas permanecem
  * intactas, e a referência de origem de tópico não é tocada aqui — ela só é limpada quando
  * a trilha é excluída.

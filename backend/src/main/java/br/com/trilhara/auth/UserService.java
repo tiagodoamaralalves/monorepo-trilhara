@@ -21,7 +21,7 @@ import jakarta.ws.rs.NotFoundException;
 public class UserService {
 
     private static final Pattern PADRAO_EMAIL = Pattern.compile(
-            "^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,63}$");
+            "^[a-zA-Z0-9_+&*-]++(?:\\.[a-zA-Z0-9_+&*-]++)*+@(?:[a-zA-Z0-9-]++\\.)++[a-zA-Z]{2,63}$");
 
     private final UserRepository repository;
     private final PasswordService passwordService;

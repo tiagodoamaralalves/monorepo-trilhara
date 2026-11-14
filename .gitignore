@@ -55,7 +55,7 @@ dist/
 **/.vite/
 *.tsbuildinfo
 .eslintcache
-# Relatórios de cobertura (R13/D-43)
+# Relatórios de cobertura
 coverage/
 frontend/coverage/
 

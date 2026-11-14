@@ -73,6 +73,8 @@ public class TrilhaService {
     private static final String ERRO_TOPICO_NAO_ENCONTRADO = "Tópico não encontrado na trilha";
     private static final String CAMPO_CARGO = "cargo";
     private static final String CAMPO_AREA_CARGO = "areaCargo";
+    private static final String CAMPO_TRILHA_ID = "trilhaId";
+    private static final String CAMPO_DISCIPLINA_ID = "disciplinaId";
     private static final String MSG_REORDENACAO_INTEGRA =
             "A reordenação deve conter todas as disciplinas ativas da trilha exatamente uma vez.";
     private static final String MSG_LIMITE_TOPICOS =
@@ -157,7 +159,7 @@ public class TrilhaService {
 
     public TrilhaDetalheDTO buscarDetalhe(String trilhaIdStr) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
 
         Document doc = repository.buscarEntidade(usuarioId, trilhaId)
                 .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
@@ -401,7 +403,7 @@ public class TrilhaService {
 
     public TrilhaDetalheDTO atualizarMetadados(String trilhaIdStr, AtualizarMetadadosTrilhaRequest request) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
 
         Document doc = repository.buscarEntidade(usuarioId, trilhaId)
                 .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
@@ -424,7 +426,7 @@ public class TrilhaService {
  */
     public TrilhaImpactoExclusaoDTO obterImpactoExclusao(String trilhaIdStr) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
 
         repository.buscarEntidade(usuarioId, trilhaId)
                 .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
@@ -457,7 +459,7 @@ public class TrilhaService {
  */
     public void excluirTrilha(String trilhaIdStr) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
 
         repository.buscarEntidade(usuarioId, trilhaId)
                 .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
@@ -490,7 +492,7 @@ public class TrilhaService {
 
     public DisciplinaDTO criarDisciplina(String trilhaIdStr, CriarDisciplinaRequest request) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
 
         repository.buscarEntidade(usuarioId, trilhaId)
                 .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
@@ -537,8 +539,8 @@ public class TrilhaService {
 
     public DisciplinaDTO atualizarDisciplina(String trilhaIdStr, String disciplinaIdStr, AtualizarDisciplinaRequest request) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
-        ObjectId disciplinaId = BsonIds.parse(disciplinaIdStr, "disciplinaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
+        ObjectId disciplinaId = BsonIds.parse(disciplinaIdStr, CAMPO_DISCIPLINA_ID);
 
         Disciplina existente = disciplinaRepository.buscarPorId(usuarioId, trilhaId, disciplinaId)
                 .orElseThrow(() -> new NotFoundException(ERRO_DISCIPLINA_NAO_ENCONTRADA));
@@ -578,7 +580,7 @@ public class TrilhaService {
             }
             topicosDTO.add(new TopicoDTO(t.id(), t.nome(), t.ordem(), concluido));
         }
-        double pct = !novosTopicos.isEmpty() ? ((double) dConcluidos / novosTopicos.size()) * 100.0 : 0.0;
+        double pct = novosTopicos.isEmpty() ? 0.0 : ((double) dConcluidos / novosTopicos.size()) * 100.0;
 
         return new DisciplinaDTO(
                 disciplinaId.toHexString(),
@@ -634,7 +636,7 @@ public class TrilhaService {
 
     public void reordenarDisciplinas(String trilhaIdStr, ReordenarDisciplinasRequest request) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
 
         repository.buscarEntidade(usuarioId, trilhaId)
                 .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
@@ -648,7 +650,7 @@ public class TrilhaService {
 
         List<ObjectId> ordemValidada = new ArrayList<>(idsRecebidos.size());
         for (String id : idsRecebidos) {
-            ordemValidada.add(BsonIds.parse(id, "disciplinaId"));
+            ordemValidada.add(BsonIds.parse(id, CAMPO_DISCIPLINA_ID));
         }
 
         Set<String> conjuntoRecebido = new HashSet<>(idsRecebidos);
@@ -677,8 +679,8 @@ public class TrilhaService {
  */
     public void excluirDisciplina(String trilhaIdStr, String disciplinaIdStr) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
-        ObjectId disciplinaId = BsonIds.parse(disciplinaIdStr, "disciplinaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
+        ObjectId disciplinaId = BsonIds.parse(disciplinaIdStr, CAMPO_DISCIPLINA_ID);
 
         disciplinaRepository.buscarPorId(usuarioId, trilhaId, disciplinaId)
                 .orElseThrow(() -> new NotFoundException(ERRO_DISCIPLINA_NAO_ENCONTRADA));
@@ -702,7 +704,7 @@ public class TrilhaService {
  */
     public ProgressoTopicoDTO marcarTopicoConcluido(String trilhaIdStr, String topicoId) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
         String topicoIdValidado = validarTopicoId(topicoId);
 
         repository.buscarEntidade(usuarioId, trilhaId)
@@ -725,7 +727,7 @@ public class TrilhaService {
  */
     public void desmarcarTopicoConcluido(String trilhaIdStr, String topicoId) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
         String topicoIdValidado = validarTopicoId(topicoId);
 
         repository.buscarEntidade(usuarioId, trilhaId)

@@ -48,7 +48,7 @@ public class ConstraintViolationExceptionMapper implements ExceptionMapper<Const
         for (ConstraintViolation<?> violation : exception.getConstraintViolations()) {
             String campo = obterNomeCampo(violation);
             String mensagem = violation.getMessage() != null ? violation.getMessage() : "Valor inválido";
-            errors.computeIfAbsent(campo, ignored -> new ArrayList<>()).add(mensagem);
+            errors.computeIfAbsent(campo, _ -> new ArrayList<>()).add(mensagem);
         }
         return errors;
     }

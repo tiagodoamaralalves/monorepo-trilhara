@@ -24,11 +24,14 @@ import jakarta.ws.rs.core.MediaType;
 @Autenticado
 public class UsuarioPreferenciasResource {
 
-    @Inject
-    AuthContext authContext;
+    private final AuthContext authContext;
+    private final UserService userService;
 
     @Inject
-    UserService userService;
+    public UsuarioPreferenciasResource(AuthContext authContext, UserService userService) {
+        this.authContext = authContext;
+        this.userService = userService;
+    }
 
     @PUT
     @Path("/tema")

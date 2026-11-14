@@ -4,7 +4,6 @@ import static com.mongodb.client.model.Filters.eq;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -21,10 +20,20 @@ import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 
+import br.com.trilhara.shared.mongo.BsonDates;
 import jakarta.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped
 public class UserRepository {
+
+    private static final String CAMPO_EMAIL = "email";
+    private static final String CAMPO_CRIADO_EM = "criadoEm";
+    private static final String CAMPO_FALHAS_LOGIN = "falhasLoginConsecutivas";
+    private static final String CAMPO_ATUALIZADO_EM = "atualizadoEm";
+    private static final String CAMPO_BLOQUEADO_ATE = "bloqueadoAte";
+    private static final String CAMPO_ROLES = "roles";
+    private static final String CAMPO_PREFERENCIAS = "preferencias";
+    private static final String CAMPO_SENHA_ALTERADA_EM = "senhaAlteradaEm";
 
     private final MongoCollection<Document> usuarios;
 
@@ -67,7 +76,7 @@ public class UserRepository {
         if (emailNormalizado == null || emailNormalizado.isBlank()) {
             return Optional.empty();
         }
-        return Optional.ofNullable(usuarios.find(eq("email", emailNormalizado)).first())
+        return Optional.ofNullable(usuarios.find(eq(CAMPO_EMAIL, emailNormalizado)).first())
                 .map(this::paraUsuario);
     }
 
@@ -75,7 +84,7 @@ public class UserRepository {
         if (emailNormalizado == null || emailNormalizado.isBlank()) {
             return false;
         }
-        return usuarios.countDocuments(eq("email", emailNormalizado)) > 0;
+        return usuarios.countDocuments(eq(CAMPO_EMAIL, emailNormalizado)) > 0;
     }
 
     /**
@@ -96,7 +105,7 @@ public class UserRepository {
 
     public List<Usuario> listar(int pagina, int tamanho) {
         List<Usuario> lista = new ArrayList<>();
-        usuarios.find().sort(Sorts.descending("criadoEm"))
+        usuarios.find().sort(Sorts.descending(CAMPO_CRIADO_EM))
                 .skip(pagina * tamanho).limit(tamanho)
                 .forEach(doc -> lista.add(paraUsuario(doc)));
         return lista;
@@ -108,8 +117,8 @@ public class UserRepository {
         }
         return Optional.ofNullable(usuarios.findOneAndUpdate(
                 eq("_id", new ObjectId(id)),
-                Updates.combine(Updates.inc("falhasLoginConsecutivas", 1),
-                        Updates.set("atualizadoEm", Date.from(agora))),
+                Updates.combine(Updates.inc(CAMPO_FALHAS_LOGIN, 1),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(agora))),
                 new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER)))
                 .map(this::paraUsuario);
     }
@@ -118,7 +127,7 @@ public class UserRepository {
         if (id == null || !ObjectId.isValid(id)) {
             return;
         }
-        usuarios.updateOne(eq("_id", new ObjectId(id)), Updates.set("bloqueadoAte", Date.from(ate)));
+        usuarios.updateOne(eq("_id", new ObjectId(id)), Updates.set(CAMPO_BLOQUEADO_ATE, BsonDates.toBsonDate(ate)));
     }
 
     public void atualizarRoles(String id, List<Role> roles) {
@@ -126,8 +135,8 @@ public class UserRepository {
             return;
         }
         usuarios.updateOne(eq("_id", new ObjectId(id)), Updates.combine(
-                Updates.set("roles", roles.stream().map(Role::name).toList()),
-                Updates.set("atualizadoEm", Date.from(Instant.now()))));
+                Updates.set(CAMPO_ROLES, roles.stream().map(Role::name).toList()),
+                Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))));
     }
 
     public List<Integer> obterDisponibilidadeSemanal(ObjectId usuarioId) {
@@ -135,7 +144,7 @@ public class UserRepository {
         if (doc == null) {
             return List.of(0, 0, 0, 0, 0, 0, 0);
         }
-        Document pref = doc.get("preferencias", Document.class);
+        Document pref = doc.get(CAMPO_PREFERENCIAS, Document.class);
         if (pref == null) {
             return List.of(0, 0, 0, 0, 0, 0, 0);
         }
@@ -151,7 +160,7 @@ public class UserRepository {
                 eq("_id", usuarioId),
                 Updates.combine(
                         Updates.set("preferencias.disponibilidadeSemanalMinutos", minutos),
-                        Updates.set("atualizadoEm", Date.from(Instant.now()))
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))
                 )
         );
     }
@@ -161,7 +170,7 @@ public class UserRepository {
         if (doc == null) {
             return 15;
         }
-        Document pref = doc.get("preferencias", Document.class);
+        Document pref = doc.get(CAMPO_PREFERENCIAS, Document.class);
         if (pref == null) {
             return 15;
         }
@@ -174,22 +183,22 @@ public class UserRepository {
                 eq("_id", usuarioId),
                 Updates.combine(
                         Updates.set("preferencias.padraoLembreteMinutosAntes", minutos),
-                        Updates.set("atualizadoEm", Date.from(Instant.now()))
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))
                 )
         );
     }
 
     /** Tema persistido em {@code usuarios.preferencias.tema}. */
-    public java.util.Optional<String> obterTema(ObjectId usuarioId) {
+    public Optional<String> obterTema(ObjectId usuarioId) {
         Document doc = usuarios.find(eq("_id", usuarioId)).first();
         if (doc == null) {
-            return java.util.Optional.empty();
+            return Optional.empty();
         }
-        Document pref = doc.get("preferencias", Document.class);
+        Document pref = doc.get(CAMPO_PREFERENCIAS, Document.class);
         if (pref == null) {
-            return java.util.Optional.empty();
+            return Optional.empty();
         }
-        return java.util.Optional.ofNullable(pref.getString("tema"));
+        return Optional.ofNullable(pref.getString("tema"));
     }
 
     public void salvarTema(ObjectId usuarioId, String tema) {
@@ -197,7 +206,7 @@ public class UserRepository {
                 eq("_id", usuarioId),
                 Updates.combine(
                         Updates.set("preferencias.tema", tema),
-                        Updates.set("atualizadoEm", Date.from(Instant.now()))
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))
                 )
         );
     }
@@ -212,27 +221,27 @@ public class UserRepository {
         Document doc = new Document();
         doc.put("_id", new ObjectId(u.id()));
         doc.put("nome", u.nome());
-        doc.put("email", u.email());
+        doc.put(CAMPO_EMAIL, u.email());
         doc.put("senhaHash", u.senhaHash());
-        doc.put("roles", u.roles().stream().map(Role::name).toList());
+        doc.put(CAMPO_ROLES, u.roles().stream().map(Role::name).toList());
         doc.put("ativo", u.ativo());
         doc.put("emailVerificado", u.emailVerificado());
-        doc.put("falhasLoginConsecutivas", u.falhasLoginConsecutivas());
-        doc.put("bloqueadoAte", u.bloqueadoAte() != null ? Date.from(u.bloqueadoAte()) : null);
-        doc.put("senhaAlteradaEm", u.senhaAlteradaEm() != null ? Date.from(u.senhaAlteradaEm()) : null);
-        doc.put("criadoEm", u.criadoEm() != null ? Date.from(u.criadoEm()) : Date.from(Instant.now()));
-        doc.put("atualizadoEm", u.atualizadoEm() != null ? Date.from(u.atualizadoEm()) : Date.from(Instant.now()));
+        doc.put(CAMPO_FALHAS_LOGIN, u.falhasLoginConsecutivas());
+        doc.put(CAMPO_BLOQUEADO_ATE, BsonDates.toBsonDate(u.bloqueadoAte()));
+        doc.put(CAMPO_SENHA_ALTERADA_EM, BsonDates.toBsonDate(u.senhaAlteradaEm()));
+        doc.put(CAMPO_CRIADO_EM, BsonDates.toBsonDate(u.criadoEm() != null ? u.criadoEm() : Instant.now()));
+        doc.put(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(u.atualizadoEm() != null ? u.atualizadoEm() : Instant.now()));
         return doc;
     }
 
     private Usuario paraUsuario(Document doc) {
         ObjectId objectId = doc.getObjectId("_id");
-        List<String> rolesRaw = doc.getList("roles", String.class, List.of(Role.USER.name()));
+        List<String> rolesRaw = doc.getList(CAMPO_ROLES, String.class, List.of(Role.USER.name()));
         List<Role> roles = rolesRaw.stream()
                 .map(r -> {
                     try {
                         return Role.valueOf(r);
-                    } catch (IllegalArgumentException e) {
+                    } catch (IllegalArgumentException _) {
                         return Role.USER;
                     }
                 })
@@ -242,25 +251,23 @@ public class UserRepository {
         return new Usuario(
                 objectId.toHexString(),
                 doc.getString("nome"),
-                doc.getString("email"),
+                doc.getString(CAMPO_EMAIL),
                 doc.getString("senhaHash"),
                 roles,
                 doc.getBoolean("ativo", true),
                 doc.getBoolean("emailVerificado", false),
-                doc.getInteger("falhasLoginConsecutivas", 0),
-                paraInstant(doc.getDate("bloqueadoAte")),
-                paraInstant(doc.getDate("senhaAlteradaEm")),
-                paraInstant(doc.getDate("criadoEm")),
-                paraInstant(doc.getDate("atualizadoEm")));
-    }
-
-    private static Instant paraInstant(Date data) {
-        return data != null ? data.toInstant() : null;
+                doc.getInteger(CAMPO_FALHAS_LOGIN, 0),
+                BsonDates.toInstant(doc.getDate(CAMPO_BLOQUEADO_ATE)),
+                BsonDates.toInstant(doc.getDate(CAMPO_SENHA_ALTERADA_EM)),
+                BsonDates.toInstant(doc.getDate(CAMPO_CRIADO_EM)),
+                BsonDates.toInstant(doc.getDate(CAMPO_ATUALIZADO_EM)));
     }
 
 
 
     public static class EmailJaCadastradoException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
         public EmailJaCadastradoException(String message) {
             super(message);
         }

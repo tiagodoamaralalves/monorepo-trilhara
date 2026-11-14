@@ -4,7 +4,7 @@ import { EmptyState, Button } from '../shared/design-system';
 import { Plus, Trash2, Folder } from 'lucide-react';
 
 /**
- * Estado vazio de caderno sem seções (REQUISITOS §10.1 / ).
+ * Estado vazio de caderno sem seções.
  *
  * O caderno pode ficar com zero seções ativas quando a última é movida para a lixeira; o estado
  * orienta criar uma seção ou abrir a lixeira. A trava legada que impedia excluir a última seção

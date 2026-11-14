@@ -27,11 +27,22 @@ import jakarta.enterprise.context.ApplicationScoped;
 @ApplicationScoped
 public class SerieRecorrenteRepository {
 
+    private static final String CAMPO_USUARIO_ID = "usuarioId";
+    private static final String CAMPO_ORIGEM_OPERACAO_ID = "origemOperacaoId";
+    private static final String CAMPO_DELETED_AT = "deletedAt";
+    private static final String CAMPO_ATIVA = "ativa";
+    private static final String CAMPO_CRIADO_EM = "criadoEm";
+    private static final String CAMPO_LISTA_ID = "listaId";
+    private static final String CAMPO_EXPIRES_AT = "expiresAt";
+    private static final String CAMPO_LOTE_EXCLUSAO_ID = "loteExclusaoId";
+    private static final String CAMPO_ATUALIZADO_EM = "atualizadoEm";
+    private static final String CAMPO_TITULO = "titulo";
+
     private final MongoCollection<Document> collection;
 
     public SerieRecorrenteRepository(
             MongoClient client,
-            @ConfigProperty(name = "quarkus.mongodb.database") String database) {
+            @ConfigProperty(name = "quarkus.mongodb.database", defaultValue = "trilhara") String database) {
         this.collection = client.getDatabase(database).getCollection("series_recorrentes");
     }
 
@@ -43,14 +54,14 @@ public class SerieRecorrenteRepository {
     public boolean atualizar(SerieRecorrente serie) {
         Document doc = paraDocumento(serie);
         return collection.replaceOne(
-                and(eq("_id", serie.id()), eq("usuarioId", serie.usuarioId())),
+                and(eq("_id", serie.id()), eq(CAMPO_USUARIO_ID, serie.usuarioId())),
                 doc,
                 new ReplaceOptions().upsert(false)
         ).getMatchedCount() > 0;
     }
 
     public Optional<SerieRecorrente> buscar(ObjectId usuarioId, ObjectId id) {
-        Document doc = collection.find(and(eq("_id", id), eq("usuarioId", usuarioId))).first();
+        Document doc = collection.find(and(eq("_id", id), eq(CAMPO_USUARIO_ID, usuarioId))).first();
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
 
@@ -59,36 +70,36 @@ public class SerieRecorrenteRepository {
             return Optional.empty();
         }
         Document doc = collection.find(and(
-                eq("usuarioId", usuarioId),
-                eq("origemOperacaoId", origemOperacaoId))).first();
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_ORIGEM_OPERACAO_ID, origemOperacaoId))).first();
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
 
     public List<SerieRecorrente> listarAtivas(ObjectId usuarioId) {
         List<SerieRecorrente> resultado = new ArrayList<>();
         collection.find(and(
-                eq("usuarioId", usuarioId),
-                eq("deletedAt", null),
-                eq("ativa", true)
-        )).sort(Sorts.descending("criadoEm"))
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_DELETED_AT, null),
+                eq(CAMPO_ATIVA, true)
+        )).sort(Sorts.descending(CAMPO_CRIADO_EM))
           .forEach(doc -> resultado.add(paraEntidade(doc)));
         return resultado;
     }
 
-    /** Séries ativas vinculadas a uma lista (impacto de exclusão, ). */
+    /** Séries ativas vinculadas a uma lista (impacto de exclusão). */
     public long contarAtivasPorLista(ObjectId usuarioId, ObjectId listaId) {
         return collection.countDocuments(and(
-                eq("usuarioId", usuarioId),
-                eq("listaId", listaId),
-                eq("deletedAt", null),
-                eq("ativa", true)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_LISTA_ID, listaId),
+                eq(CAMPO_DELETED_AT, null),
+                eq(CAMPO_ATIVA, true)
         ));
     }
 
     public List<SerieRecorrente> listarTodas(ObjectId usuarioId) {
         List<SerieRecorrente> resultado = new ArrayList<>();
-        collection.find(and(eq("usuarioId", usuarioId), eq("deletedAt", null)))
-                .sort(Sorts.descending("criadoEm"))
+        collection.find(and(eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_DELETED_AT, null)))
+                .sort(Sorts.descending(CAMPO_CRIADO_EM))
                 .forEach(doc -> resultado.add(paraEntidade(doc)));
         return resultado;
     }
@@ -96,148 +107,129 @@ public class SerieRecorrenteRepository {
     public List<SerieRecorrente> listarLixeira(ObjectId usuarioId, Instant agora) {
         List<SerieRecorrente> resultado = new ArrayList<>();
         collection.find(and(
-                eq("usuarioId", usuarioId),
-                ne("deletedAt", null),
-                gt("expiresAt", BsonDates.toBsonDate(agora))
-        )).sort(Sorts.descending("deletedAt"))
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                ne(CAMPO_DELETED_AT, null),
+                gt(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(agora))
+        )).sort(Sorts.descending(CAMPO_DELETED_AT))
           .forEach(doc -> resultado.add(paraEntidade(doc)));
         return resultado;
     }
 
     public boolean moverParaLixeira(ObjectId usuarioId, ObjectId id, String loteExclusaoId, Instant agora, Instant expiresAt) {
         return collection.updateOne(
-                and(eq("_id", id), eq("usuarioId", usuarioId)),
+                and(eq("_id", id), eq(CAMPO_USUARIO_ID, usuarioId)),
                 Updates.combine(
-                        Updates.set("ativa", false),
-                        Updates.set("deletedAt", BsonDates.toBsonDate(agora)),
-                        Updates.set("expiresAt", BsonDates.toBsonDate(expiresAt)),
-                        Updates.set("loteExclusaoId", loteExclusaoId),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(agora))
+                        Updates.set(CAMPO_ATIVA, false),
+                        Updates.set(CAMPO_DELETED_AT, BsonDates.toBsonDate(agora)),
+                        Updates.set(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(expiresAt)),
+                        Updates.set(CAMPO_LOTE_EXCLUSAO_ID, loteExclusaoId),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(agora))
                 )
         ).getModifiedCount() > 0;
     }
 
     public boolean restaurar(ObjectId usuarioId, ObjectId id) {
         return collection.updateOne(
-                and(eq("_id", id), eq("usuarioId", usuarioId)),
+                and(eq("_id", id), eq(CAMPO_USUARIO_ID, usuarioId)),
                 Updates.combine(
-                        Updates.unset("deletedAt"),
-                        Updates.unset("expiresAt"),
-                        Updates.unset("loteExclusaoId"),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(Instant.now()))
+                        Updates.unset(CAMPO_DELETED_AT),
+                        Updates.unset(CAMPO_EXPIRES_AT),
+                        Updates.unset(CAMPO_LOTE_EXCLUSAO_ID),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))
                 )
         ).getModifiedCount() > 0;
     }
 
     public long desvincularLista(ObjectId usuarioId, ObjectId listaId) {
         return collection.updateMany(
-                and(eq("usuarioId", usuarioId), eq("listaId", listaId)),
+                and(eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_LISTA_ID, listaId)),
                 Updates.combine(
-                        Updates.unset("listaId"),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(Instant.now()))
+                        Updates.unset(CAMPO_LISTA_ID),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))
                 )
         ).getModifiedCount();
     }
 
     public long esvaziarLixeira(ObjectId usuarioId) {
         return collection.deleteMany(and(
-                eq("usuarioId", usuarioId),
-                ne("deletedAt", null)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                ne(CAMPO_DELETED_AT, null)
         )).getDeletedCount();
     }
 
     public long purgarExpiradas(Instant agora) {
         return collection.deleteMany(and(
-                ne("deletedAt", null),
-                lte("expiresAt", BsonDates.toBsonDate(agora))
+                ne(CAMPO_DELETED_AT, null),
+                lte(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(agora))
         )).getDeletedCount();
     }
 
     public boolean removerDefinitivamente(ObjectId usuarioId, ObjectId id) {
-        return collection.deleteOne(and(eq("_id", id), eq("usuarioId", usuarioId))).getDeletedCount() > 0;
+        return collection.deleteOne(and(eq("_id", id), eq(CAMPO_USUARIO_ID, usuarioId))).getDeletedCount() > 0;
     }
 
     public Document paraDocumento(SerieRecorrente s) {
         Document doc = new Document();
-        if (s.id() != null) {
-            doc.put("_id", s.id());
-        }
-        doc.put("usuarioId", s.usuarioId());
-        if (s.listaId() != null) {
-            doc.put("listaId", s.listaId());
-        }
-        doc.put("titulo", s.titulo());
-        if (s.descricao() != null) {
-            doc.put("descricao", s.descricao());
-        }
+        colocarSePresente(doc, "_id", s.id());
+        doc.put(CAMPO_USUARIO_ID, s.usuarioId());
+        colocarSePresente(doc, CAMPO_LISTA_ID, s.listaId());
+        doc.put(CAMPO_TITULO, s.titulo());
+        colocarSePresente(doc, "descricao", s.descricao());
         doc.put("prioridade", s.prioridade().getValor());
-        if (s.horario() != null) {
-            doc.put("horario", s.horario());
-        }
+        colocarSePresente(doc, "horario", s.horario());
+        doc.put("subtarefasModelo", converterSubtarefasParaDoc(s.subtarefasModelo()));
+        preencherRegraRecorrenciaDoc(doc, s);
+        preencherLembreteELixeiraDoc(doc, s);
+        doc.put(CAMPO_CRIADO_EM, BsonDates.toBsonDate(s.criadoEm()));
+        doc.put(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(s.atualizadoEm()));
+        return doc;
+    }
 
+    private List<Document> converterSubtarefasParaDoc(List<Subtarefa> subtarefas) {
         List<Document> subtarefasDocs = new ArrayList<>();
-        if (s.subtarefasModelo() != null) {
-            for (Subtarefa sub : s.subtarefasModelo()) {
+        if (subtarefas != null) {
+            for (Subtarefa sub : subtarefas) {
                 subtarefasDocs.add(new Document()
                         .append("id", sub.id())
-                        .append("titulo", sub.titulo())
+                        .append(CAMPO_TITULO, sub.titulo())
                         .append("concluida", sub.concluida())
                         .append("ordem", sub.ordem()));
             }
         }
-        doc.put("subtarefasModelo", subtarefasDocs);
+        return subtarefasDocs;
+    }
 
+    private void preencherRegraRecorrenciaDoc(Document doc, SerieRecorrente s) {
         doc.put("frequencia", s.frequencia());
         doc.put("intervalo", s.intervalo());
         doc.put("diasDaSemana", s.diasDaSemana());
-        if (s.modoMensal() != null) {
-            doc.put("modoMensal", s.modoMensal());
-        }
-        if (s.diaDoMes() != null) {
-            doc.put("diaDoMes", s.diaDoMes());
-        }
-        if (s.ordinalSemana() != null) {
-            doc.put("ordinalSemana", s.ordinalSemana());
-        }
-        if (s.diaSemanaOrdinal() != null) {
-            doc.put("diaSemanaOrdinal", s.diaSemanaOrdinal());
-        }
+        colocarSePresente(doc, "modoMensal", s.modoMensal());
+        colocarSePresente(doc, "diaDoMes", s.diaDoMes());
+        colocarSePresente(doc, "ordinalSemana", s.ordinalSemana());
+        colocarSePresente(doc, "diaSemanaOrdinal", s.diaSemanaOrdinal());
         doc.put("tipoTermino", s.tipoTermino());
         doc.put("dataInicio", BsonDates.toIso(s.dataInicio()));
-        if (s.dataFim() != null) {
-            doc.put("dataFim", BsonDates.toIso(s.dataFim()));
-        }
-        if (s.maxOcorrencias() != null) {
-            doc.put("maxOcorrencias", s.maxOcorrencias());
-        }
-        if (s.geradoAte() != null) {
-            doc.put("geradoAte", BsonDates.toIso(s.geradoAte()));
-        }
+        colocarSePresente(doc, "dataFim", BsonDates.toIso(s.dataFim()));
+        colocarSePresente(doc, "maxOcorrencias", s.maxOcorrencias());
+        colocarSePresente(doc, "geradoAte", BsonDates.toIso(s.geradoAte()));
         doc.put("totalGeradas", s.totalGeradas());
-        doc.put("ativa", s.ativa());
+        doc.put(CAMPO_ATIVA, s.ativa());
+    }
 
+    private void preencherLembreteELixeiraDoc(Document doc, SerieRecorrente s) {
         doc.put("modoLembrete", s.modoLembrete().name());
-        if (s.lembreteMinutosAntes() != null) {
-            doc.put("lembreteMinutosAntes", s.lembreteMinutosAntes());
+        colocarSePresente(doc, "lembreteMinutosAntes", s.lembreteMinutosAntes());
+        colocarSePresente(doc, "fusoAgendamento", s.fusoAgendamento());
+        colocarSePresente(doc, CAMPO_ORIGEM_OPERACAO_ID, s.origemOperacaoId());
+        colocarSePresente(doc, CAMPO_DELETED_AT, BsonDates.toBsonDate(s.deletedAt()));
+        colocarSePresente(doc, CAMPO_EXPIRES_AT, BsonDates.toBsonDate(s.expiresAt()));
+        colocarSePresente(doc, CAMPO_LOTE_EXCLUSAO_ID, s.loteExclusaoId());
+    }
+
+    private static void colocarSePresente(Document doc, String chave, Object valor) {
+        if (valor != null) {
+            doc.put(chave, valor);
         }
-        if (s.fusoAgendamento() != null) {
-            doc.put("fusoAgendamento", s.fusoAgendamento());
-        }
-        if (s.origemOperacaoId() != null) {
-            doc.put("origemOperacaoId", s.origemOperacaoId());
-        }
-        if (s.deletedAt() != null) {
-            doc.put("deletedAt", BsonDates.toBsonDate(s.deletedAt()));
-        }
-        if (s.expiresAt() != null) {
-            doc.put("expiresAt", BsonDates.toBsonDate(s.expiresAt()));
-        }
-        if (s.loteExclusaoId() != null) {
-            doc.put("loteExclusaoId", s.loteExclusaoId());
-        }
-        doc.put("criadoEm", BsonDates.toBsonDate(s.criadoEm()));
-        doc.put("atualizadoEm", BsonDates.toBsonDate(s.atualizadoEm()));
-        return doc;
     }
 
     public SerieRecorrente paraEntidade(Document doc) {
@@ -247,7 +239,7 @@ public class SerieRecorrenteRepository {
             for (Document subDoc : subsDocs) {
                 subtarefas.add(new Subtarefa(
                         subDoc.getString("id"),
-                        subDoc.getString("titulo"),
+                        subDoc.getString(CAMPO_TITULO),
                         Boolean.TRUE.equals(subDoc.getBoolean("concluida")),
                         subDoc.getInteger("ordem", 0)
                 ));
@@ -258,9 +250,9 @@ public class SerieRecorrenteRepository {
 
         return new SerieRecorrente(
                 doc.getObjectId("_id"),
-                doc.getObjectId("usuarioId"),
-                doc.getObjectId("listaId"),
-                doc.getString("titulo"),
+                doc.getObjectId(CAMPO_USUARIO_ID),
+                doc.getObjectId(CAMPO_LISTA_ID),
+                doc.getString(CAMPO_TITULO),
                 doc.getString("descricao"),
                 PrioridadeTarefa.fromString(doc.getString("prioridade")),
                 doc.getString("horario"),
@@ -278,16 +270,16 @@ public class SerieRecorrenteRepository {
                 doc.getInteger("maxOcorrencias"),
                 BsonDates.lerLocalDate(doc, "geradoAte"),
                 doc.getInteger("totalGeradas", 0),
-                Boolean.TRUE.equals(doc.getBoolean("ativa", true)),
+                Boolean.TRUE.equals(doc.getBoolean(CAMPO_ATIVA, true)),
                 ModoLembrete.fromString(doc.getString("modoLembrete")),
                 doc.getInteger("lembreteMinutosAntes"),
                 doc.getString("fusoAgendamento"),
-                doc.getString("origemOperacaoId"),
-                BsonDates.lerInstant(doc, "deletedAt"),
-                BsonDates.lerInstant(doc, "expiresAt"),
-                doc.getString("loteExclusaoId"),
-                BsonDates.lerInstant(doc, "criadoEm"),
-                BsonDates.lerInstant(doc, "atualizadoEm")
+                doc.getString(CAMPO_ORIGEM_OPERACAO_ID),
+                BsonDates.lerInstant(doc, CAMPO_DELETED_AT),
+                BsonDates.lerInstant(doc, CAMPO_EXPIRES_AT),
+                doc.getString(CAMPO_LOTE_EXCLUSAO_ID),
+                BsonDates.lerInstant(doc, CAMPO_CRIADO_EM),
+                BsonDates.lerInstant(doc, CAMPO_ATUALIZADO_EM)
         );
     }
 }

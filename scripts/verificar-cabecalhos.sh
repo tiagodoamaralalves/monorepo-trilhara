@@ -4,7 +4,7 @@
 #
 # Sobe o Caddy com o Caddyfile do repositório em modo isolado (porta efêmera, sem
 # certificado) e faz `curl -I` em cada origem do frontend. Falha se qualquer header
-# exigido por estiver ausente ou se a CSP permitir `unsafe-eval`.
+# de segurança obrigatório estiver ausente ou se a CSP permitir `unsafe-eval`.
 #
 # Uso:
 #   bash scripts/verificar-cabecalhos.sh          # sobe, testa e derruba
@@ -28,7 +28,7 @@ ORIGENS=(
   "notas.trilhara.test"
 )
 
-# Headers exigidos por .
+# Headers de segurança obrigatórios.
 CSP="Content-Security-Policy"
 PERMISSIONS="Permissions-Policy"
 NOSNIFF="X-Content-Type-Options"

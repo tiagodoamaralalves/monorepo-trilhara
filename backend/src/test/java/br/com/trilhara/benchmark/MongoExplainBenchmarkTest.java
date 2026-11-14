@@ -1,7 +1,6 @@
 package br.com.trilhara.benchmark;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
@@ -51,7 +50,7 @@ public class MongoExplainBenchmarkTest {
     @Inject
     MongoClient mongoClient;
 
-    @ConfigProperty(name = "quarkus.mongodb.database")
+    @ConfigProperty(name = "quarkus.mongodb.database", defaultValue = "trilhara")
     String databaseName;
 
     private ObjectId benchmarkUserId;

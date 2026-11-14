@@ -22,7 +22,7 @@ public class PurgaLixeiraNotasJob {
         this.purgaService = purgaService;
     }
 
-    @Scheduled(cron = "{trilhara.jobs.purga-lixeira-notas.cron:0 30 3 * * ?}")
+    @Scheduled(cron = "${trilhara.jobs.purga-lixeira-notas.cron:0 30 3 * * ?}")
     public void executarAgendado() {
         executarPurga(Instant.now());
     }

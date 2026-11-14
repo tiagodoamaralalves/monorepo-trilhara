@@ -17,7 +17,7 @@ public class RateLimitService {
 
     /** exclusão de conta / verificação de senha — 5 tentativas por 15 minutos/usuário. */
     private static final int LIMITE_EXCLUSAO_CONTA = 5;
-    private static final long JANELA_EXCLUSAO_CONTA_SEGUNDOS = 15 * 60;
+    private static final long JANELA_EXCLUSAO_CONTA_SEGUNDOS = 15L * 60L;
 
     /** login/refresh/handoff — 10 por minuto por IP. */
     private static final int LIMITE_AUTH_POR_IP = 10;
@@ -82,7 +82,7 @@ public class RateLimitService {
                 JANELA_EXCLUSAO_CONTA_SEGUNDOS);
     }
 
-    public void limparTentativasLogin(String ip, String emailNormalizado) {
+    public void limparTentativasLogin(String emailNormalizado) {
         if (emailNormalizado != null && !emailNormalizado.isBlank()) {
             janelasPorChave.remove("login:email:" + emailNormalizado);
         }
@@ -170,7 +170,7 @@ public class RateLimitService {
             }
         }
 
-        Deque<Instant> fila = janelasPorChave.computeIfAbsent(chave, k -> new ArrayDeque<>());
+        Deque<Instant> fila = janelasPorChave.computeIfAbsent(chave, _ -> new ArrayDeque<>());
         synchronized (fila) {
             while (!fila.isEmpty() && fila.peekFirst().isBefore(corte)) {
                 fila.pollFirst();
@@ -190,6 +190,7 @@ public class RateLimitService {
     }
 
     public static class RateLimitExceededException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
         private final long retryAfterSeconds;
 
         public RateLimitExceededException(String message, long retryAfterSeconds) {

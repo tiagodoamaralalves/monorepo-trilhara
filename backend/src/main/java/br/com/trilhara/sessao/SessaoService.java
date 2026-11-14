@@ -41,7 +41,21 @@ import jakarta.ws.rs.core.Response;
 @ApplicationScoped
 public class SessaoService {
 
+    private static final String CAMPO_TRILHA_ID = "trilhaId";
+    private static final String PREFIXO_API_TRILHAS = "/api/trilhas/";
+    private static final String ERRO_TRILHA_NAO_ENCONTRADA = "Trilha não encontrada";
+    private static final String CAMPO_DISCIPLINA_ID = "disciplinaId";
+    private static final String CAMPO_DURACAO_SEGUNDOS = "duracaoSegundos";
+    private static final String CAMPO_QUESTOES = "questoes";
+    private static final String ERRO_QUESTOES_NAO_NEGATIVO = "O total de questões deve ser maior ou igual a zero.";
+    private static final String CAMPO_ACERTOS = "acertos";
+    private static final String CAMPO_DATA_SESSAO = "dataSessao";
+    private static final String CODIGO_INVALID_DATE = "INVALID_DATE";
+    private static final String CODIGO_INVALID_DATE_RANGE = "INVALID_DATE_RANGE";
+
     public record RegistroResultado(SessaoDTO sessao, boolean criada) {}
+
+    private record IntervaloDatas(LocalDate dataInicio, LocalDate dataFim) {}
 
     private final SessaoRepository repository;
     private final TrilhaRepository trilhaRepository;
@@ -67,110 +81,36 @@ public class SessaoService {
             String idempotencyKeyHeader,
             RegistrarSessaoRequest request) {
         ObjectId usuarioId = usuarioAtual.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
-        String path = "/api/trilhas/" + trilhaIdStr + "/sessoes";
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
+        String path = PREFIXO_API_TRILHAS + trilhaIdStr + "/sessoes";
 
-        // 1. Validação do cabeçalho de Idempotência
-        if (idempotencyKeyHeader == null || idempotencyKeyHeader.isBlank()) {
-            throw badRequest("MISSING_IDEMPOTENCY_KEY", "O cabeçalho Idempotency-Key é obrigatório.", path);
-        }
-        String chave = idempotencyKeyHeader.trim();
-        if (chave.length() > 128) {
-            throw badRequest("INVALID_IDEMPOTENCY_KEY", "A chave de idempotência não pode exceder 128 caracteres.", path);
-        }
-        if (request.chaveIdempotencia() != null && !request.chaveIdempotencia().isBlank()) {
-            if (!request.chaveIdempotencia().trim().equals(chave)) {
-                throw badRequest("IDEMPOTENCY_KEY_MISMATCH",
-                        "O valor de chaveIdempotencia no corpo diverge do cabeçalho Idempotency-Key.", path);
-            }
-        }
+        String chave = validarChaveIdempotencia(idempotencyKeyHeader, request.chaveIdempotencia(), path);
 
-        // 2. Validação da trilha e disciplina
         Document trilhaDoc = trilhaRepository.buscarEntidade(usuarioId, trilhaId)
-                .orElseThrow(() -> new NotFoundException("Trilha não encontrada"));
+                .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
 
-        ObjectId disciplinaId = BsonIds.parse(request.disciplinaId(), "disciplinaId");
-        // Referência de corpo: disciplina de outra trilha ou de outro usuário é
-        // 400 VALIDATION_ERROR em errors.disciplinaId, nunca 404 — o 404 revelaria existência.
+        ObjectId disciplinaId = BsonIds.parse(request.disciplinaId(), CAMPO_DISCIPLINA_ID);
         Disciplina disciplina = disciplinaRepository.buscarPorId(usuarioId, trilhaId, disciplinaId)
                 .orElseThrow(() -> badRequestCampo(
-                        "disciplinaId",
+                        CAMPO_DISCIPLINA_ID,
                         "A disciplina informada não pertence a esta trilha.",
                         "A disciplina informada não pertence a esta trilha.",
                         path));
 
-        // 3. Validação dos campos funcionais
-        if (request.duracaoSegundos() < 60 || request.duracaoSegundos() > 86400) {
-            throw badRequestCampo(
-                    "duracaoSegundos",
-                    "A duração deve estar entre 60 e 86400 segundos.",
-                    "A duração deve ser de no mínimo 60 segundos e no máximo 86400 segundos (24 horas).",
-                    path);
-        }
-
         int questoes = request.questoesEfetivas();
         int acertos = request.acertosEfetivos();
-        if (questoes < 0) {
-            throw badRequestCampo(
-                    "questoes",
-                    "O total de questões deve ser maior ou igual a zero.",
-                    "O total de questões deve ser maior ou igual a zero.",
-                    path);
-        }
-        if (acertos < 0 || acertos > questoes) {
-            throw badRequestCampo(
-                    "acertos",
-                    "O total de acertos deve estar entre 0 e o total de questões.",
-                    "O total de acertos deve ser entre 0 e o total de questões.",
-                    path);
-        }
+        validarMetricasSessao(request.duracaoSegundos(), questoes, acertos, path);
+        LocalDate dataSessao = validarDataSessao(request.dataSessao(), path);
 
-        LocalDate dataSessao;
-        try {
-            dataSessao = LocalDate.parse(request.dataSessao());
-        } catch (DateTimeParseException e) {
-            throw badRequestCampo(
-                    "dataSessao",
-                    "Use o formato ISO yyyy-MM-dd.",
-                    "Formato de data inválido. Use o padrão ISO yyyy-MM-dd.",
-                    path);
-        }
-
-        LocalDate hojeLocal = timezoneContext.hojeLocal();
-        if (dataSessao.isAfter(hojeLocal)) {
-            throw badRequestCampo(
-                    "dataSessao",
-                    "A data da sessão não pode ser futura.",
-                    "A data da sessão não pode ser futura em relação ao fuso horário local.",
-                    path);
-        }
-
-        // 4. Cálculo do hash dos parâmetros funcionais
         String requestHash = calcularRequestHash(trilhaId, disciplinaId, dataSessao.toString(),
                 request.duracaoSegundos(), questoes, acertos);
 
-        // 5. Verificação de idempotência no repositório
         Optional<Document> docExistenteOpt = repository.buscarDocumentoPorChaveIdempotencia(usuarioId, chave);
         if (docExistenteOpt.isPresent()) {
-            Document doc = docExistenteOpt.get();
-            if (doc.get("deletedAt") != null) {
-                throw new DomainConflictException(CodigoErro.IDEMPOTENCY_RESULT_REMOVED,
-                        "Esta sessão foi excluída e sua chave de idempotência não pode ser reutilizada.");
-            }
-            String existingHash = doc.getString("requestHash");
-            if (requestHash.equals(existingHash)) {
-                Sessao s = repository.paraSessao(doc);
-                ObjectId primeiraId = repository.buscarPrimeiraSessaoDaTrilha(usuarioId, trilhaId)
-                        .map(Sessao::id).orElse(null);
-                boolean editavel = s.id().equals(primeiraId);
-                return new RegistroResultado(paraDTO(s, disciplina.nome(), disciplina.cor(), false, editavel), false);
-            } else {
-                throw new DomainConflictException(CodigoErro.IDEMPOTENCY_KEY_CONFLICT,
-                        "Chave de idempotência já utilizada com dados diferentes.");
-            }
+            return resolverSessaoIdempotente(
+                    usuarioId, trilhaId, docExistenteOpt.get(), requestHash, disciplina.nome(), disciplina.cor());
         }
 
-        // 6. Inserção de nova sessão
         ObjectId sessaoId = new ObjectId();
         Instant agora = Instant.now();
         String trilhaNome = trilhaDoc.getString("nome");
@@ -200,24 +140,9 @@ public class SessaoService {
             repository.inserir(nova);
         } catch (MongoWriteException e) {
             if (e.getError().getCode() == 11000) {
-                // Concorrência detectada: reavalia idempotência
                 Document doc = repository.buscarDocumentoPorChaveIdempotencia(usuarioId, chave)
                         .orElseThrow(() -> e);
-                if (doc.get("deletedAt") != null) {
-                    throw new DomainConflictException(CodigoErro.IDEMPOTENCY_RESULT_REMOVED,
-                            "Esta sessão foi excluída e sua chave de idempotência não pode ser reutilizada.");
-                }
-                String existingHash = doc.getString("requestHash");
-                if (requestHash.equals(existingHash)) {
-                    Sessao s = repository.paraSessao(doc);
-                    ObjectId primeiraId = repository.buscarPrimeiraSessaoDaTrilha(usuarioId, trilhaId)
-                            .map(Sessao::id).orElse(null);
-                    boolean editavel = s.id().equals(primeiraId);
-                    return new RegistroResultado(paraDTO(s, discNome, discCor, false, editavel), false);
-                } else {
-                    throw new DomainConflictException(CodigoErro.IDEMPOTENCY_KEY_CONFLICT,
-                            "Chave de idempotência já utilizada com dados diferentes.");
-                }
+                return resolverSessaoIdempotente(usuarioId, trilhaId, doc, requestHash, discNome, discCor);
             }
             throw e;
         }
@@ -228,17 +153,102 @@ public class SessaoService {
         return new RegistroResultado(paraDTO(nova, discNome, discCor, false, editavel), true);
     }
 
+    private String validarChaveIdempotencia(String idempotencyKeyHeader, String chaveCorpo, String path) {
+        if (idempotencyKeyHeader == null || idempotencyKeyHeader.isBlank()) {
+            throw badRequest("MISSING_IDEMPOTENCY_KEY", "O cabeçalho Idempotency-Key é obrigatório.", path);
+        }
+        String chave = idempotencyKeyHeader.trim();
+        if (chave.length() > 128) {
+            throw badRequest("INVALID_IDEMPOTENCY_KEY", "A chave de idempotência não pode exceder 128 caracteres.", path);
+        }
+        if (chaveCorpo != null && !chaveCorpo.isBlank() && !chaveCorpo.trim().equals(chave)) {
+            throw badRequest("IDEMPOTENCY_KEY_MISMATCH",
+                    "O valor de chaveIdempotencia no corpo diverge do cabeçalho Idempotency-Key.", path);
+        }
+        return chave;
+    }
+
+    private void validarMetricasSessao(int duracaoSegundos, int questoes, int acertos, String path) {
+        if (duracaoSegundos < 60 || duracaoSegundos > 86400) {
+            throw badRequestCampo(
+                    CAMPO_DURACAO_SEGUNDOS,
+                    "A duração deve estar entre 60 e 86400 segundos.",
+                    "A duração deve ser de no mínimo 60 segundos e no máximo 86400 segundos (24 horas).",
+                    path);
+        }
+        if (questoes < 0) {
+            throw badRequestCampo(
+                    CAMPO_QUESTOES,
+                    ERRO_QUESTOES_NAO_NEGATIVO,
+                    ERRO_QUESTOES_NAO_NEGATIVO,
+                    path);
+        }
+        if (acertos < 0 || acertos > questoes) {
+            throw badRequestCampo(
+                    CAMPO_ACERTOS,
+                    "O total de acertos deve estar entre 0 e o total de questões.",
+                    "O total de acertos deve ser entre 0 e o total de questões.",
+                    path);
+        }
+    }
+
+    private LocalDate validarDataSessao(String dataSessaoStr, String path) {
+        LocalDate dataSessao;
+        try {
+            dataSessao = LocalDate.parse(dataSessaoStr);
+        } catch (DateTimeParseException _) {
+            throw badRequestCampo(
+                    CAMPO_DATA_SESSAO,
+                    "Use o formato ISO yyyy-MM-dd.",
+                    "Formato de data inválido. Use o padrão ISO yyyy-MM-dd.",
+                    path);
+        }
+
+        LocalDate hojeLocal = timezoneContext.hojeLocal();
+        if (dataSessao.isAfter(hojeLocal)) {
+            throw badRequestCampo(
+                    CAMPO_DATA_SESSAO,
+                    "A data da sessão não pode ser futura.",
+                    "A data da sessão não pode ser futura em relação ao fuso horário local.",
+                    path);
+        }
+        return dataSessao;
+    }
+
+    private RegistroResultado resolverSessaoIdempotente(
+            ObjectId usuarioId,
+            ObjectId trilhaId,
+            Document doc,
+            String requestHash,
+            String discNome,
+            String discCor) {
+        if (doc.get("deletedAt") != null) {
+            throw new DomainConflictException(CodigoErro.IDEMPOTENCY_RESULT_REMOVED,
+                    "Esta sessão foi excluída e sua chave de idempotência não pode ser reutilizada.");
+        }
+        String existingHash = doc.getString("requestHash");
+        if (!requestHash.equals(existingHash)) {
+            throw new DomainConflictException(CodigoErro.IDEMPOTENCY_KEY_CONFLICT,
+                    "Chave de idempotência já utilizada com dados diferentes.");
+        }
+        Sessao s = repository.paraSessao(doc);
+        ObjectId primeiraId = repository.buscarPrimeiraSessaoDaTrilha(usuarioId, trilhaId)
+                .map(Sessao::id).orElse(null);
+        boolean editavel = s.id().equals(primeiraId);
+        return new RegistroResultado(paraDTO(s, discNome, discCor, false, editavel), false);
+    }
+
     public SessaoDTO atualizar(
             String trilhaIdStr,
             String sessaoIdStr,
             AtualizarSessaoRequest request) {
         ObjectId usuarioId = usuarioAtual.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
         ObjectId sessaoId = BsonIds.parse(sessaoIdStr, "sessaoId");
-        String path = "/api/trilhas/" + trilhaIdStr + "/sessoes/" + sessaoIdStr;
+        String path = PREFIXO_API_TRILHAS + trilhaIdStr + "/sessoes/" + sessaoIdStr;
 
         trilhaRepository.buscarEntidade(usuarioId, trilhaId)
-                .orElseThrow(() -> new NotFoundException("Trilha não encontrada"));
+                .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
 
         // A sessão mais recente da trilha é estritamente a número 1 em (dataSessao DESC, criadoEm DESC, _id DESC)
         Optional<Sessao> primeiraOpt = repository.buscarPrimeiraSessaoDaTrilha(usuarioId, trilhaId);
@@ -254,30 +264,9 @@ public class SessaoService {
 
         Sessao sessaoAlvo = primeiraOpt.get();
 
-        if (request.duracaoSegundos() < 60 || request.duracaoSegundos() > 86400) {
-            throw badRequestCampo(
-                    "duracaoSegundos",
-                    "A duração deve estar entre 60 e 86400 segundos.",
-                    "A duração deve ser de no mínimo 60 segundos e no máximo 86400 segundos (24 horas).",
-                    path);
-        }
-
         int questoes = request.questoesEfetivas();
         int acertos = request.acertosEfetivos();
-        if (questoes < 0) {
-            throw badRequestCampo(
-                    "questoes",
-                    "O total de questões deve ser maior ou igual a zero.",
-                    "O total de questões deve ser maior ou igual a zero.",
-                    path);
-        }
-        if (acertos < 0 || acertos > questoes) {
-            throw badRequestCampo(
-                    "acertos",
-                    "O total de acertos deve estar entre 0 e o total de questões.",
-                    "O total de acertos deve ser entre 0 e o total de questões.",
-                    path);
-        }
+        validarMetricasSessao(request.duracaoSegundos(), questoes, acertos, path);
 
         Instant agora = Instant.now();
         repository.atualizar(usuarioId, trilhaId, sessaoId, request.duracaoSegundos(), questoes, acertos, agora);
@@ -313,11 +302,11 @@ public class SessaoService {
 
     public void excluirIndividual(String trilhaIdStr, String sessaoIdStr) {
         ObjectId usuarioId = usuarioAtual.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
         ObjectId sessaoId = BsonIds.parse(sessaoIdStr, "sessaoId");
 
         trilhaRepository.buscarEntidade(usuarioId, trilhaId)
-                .orElseThrow(() -> new NotFoundException("Trilha não encontrada"));
+                .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
 
         Optional<Sessao> sessaoOpt = repository.buscarPorId(usuarioId, trilhaId, sessaoId);
         if (sessaoOpt.isEmpty()) {
@@ -331,11 +320,11 @@ public class SessaoService {
             String trilhaIdStr,
             String disciplinaIdStr) {
         ObjectId usuarioId = usuarioAtual.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
-        ObjectId disciplinaId = BsonIds.parse(disciplinaIdStr, "disciplinaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
+        ObjectId disciplinaId = BsonIds.parse(disciplinaIdStr, CAMPO_DISCIPLINA_ID);
 
         trilhaRepository.buscarEntidade(usuarioId, trilhaId)
-                .orElseThrow(() -> new NotFoundException("Trilha não encontrada"));
+                .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
 
         return repository.excluirSessoesDaDisciplina(usuarioId, trilhaId, disciplinaId);
     }
@@ -348,11 +337,11 @@ public class SessaoService {
             Integer pagina,
             Integer tamanho) {
         ObjectId usuarioId = usuarioAtual.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
-        String path = "/api/trilhas/" + trilhaIdStr + "/sessoes";
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
+        String path = PREFIXO_API_TRILHAS + trilhaIdStr + "/sessoes";
 
         trilhaRepository.buscarEntidade(usuarioId, trilhaId)
-                .orElseThrow(() -> new NotFoundException("Trilha não encontrada"));
+                .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
 
         int p = (pagina != null) ? pagina : 1;
         int t = (tamanho != null) ? tamanho : 20;
@@ -361,31 +350,14 @@ public class SessaoService {
                     "Parâmetros de paginação inválidos. 'pagina' deve ser >= 1 e 'tamanho' deve estar entre 1 e 100.", path);
         }
 
-        ObjectId disciplinaId = null;
-        if (disciplinaIdStr != null && !disciplinaIdStr.isBlank()) {
-            disciplinaId = BsonIds.parse(disciplinaIdStr, "disciplinaId");
-        }
-
-        LocalDate dataInicio = null;
-        if (dataInicioStr != null && !dataInicioStr.isBlank()) {
-            try {
-                dataInicio = LocalDate.parse(dataInicioStr);
-            } catch (DateTimeParseException e) {
-                throw badRequest("INVALID_DATE", "Formato inválido de dataInicio. Use yyyy-MM-dd.", path);
-            }
-        }
-
-        LocalDate dataFim = null;
-        if (dataFimStr != null && !dataFimStr.isBlank()) {
-            try {
-                dataFim = LocalDate.parse(dataFimStr);
-            } catch (DateTimeParseException e) {
-                throw badRequest("INVALID_DATE", "Formato inválido de dataFim. Use yyyy-MM-dd.", path);
-            }
-        }
+        ObjectId disciplinaId = (disciplinaIdStr != null && !disciplinaIdStr.isBlank())
+                ? BsonIds.parse(disciplinaIdStr, CAMPO_DISCIPLINA_ID)
+                : null;
+        LocalDate dataInicio = parsearDataFiltroOpcional(dataInicioStr, "dataInicio", path);
+        LocalDate dataFim = parsearDataFiltroOpcional(dataFimStr, "dataFim", path);
 
         if (dataInicio != null && dataFim != null && dataInicio.isAfter(dataFim)) {
-            throw badRequest("INVALID_DATE_RANGE", "A data inicial não pode ser posterior à data final.", path);
+            throw badRequest(CODIGO_INVALID_DATE_RANGE, "A data inicial não pode ser posterior à data final.", path);
         }
 
         ObjectId primeiraSessaoId = repository.buscarPrimeiraSessaoDaTrilha(usuarioId, trilhaId)
@@ -401,66 +373,74 @@ public class SessaoService {
         );
     }
 
+    private LocalDate parsearDataFiltroOpcional(String dataStr, String nomeCampo, String path) {
+        if (dataStr == null || dataStr.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(dataStr);
+        } catch (DateTimeParseException _) {
+            throw badRequest(CODIGO_INVALID_DATE, "Formato inválido de " + nomeCampo + ". Use yyyy-MM-dd.", path);
+        }
+    }
+
     public EstatisticasTrilhaDTO obterEstatisticas(
             String trilhaIdStr,
             String periodo,
             String dataInicioStr,
             String dataFimStr) {
         ObjectId usuarioId = usuarioAtual.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
-        String path = "/api/trilhas/" + trilhaIdStr + "/estatisticas";
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
+        String path = PREFIXO_API_TRILHAS + trilhaIdStr + "/estatisticas";
 
         trilhaRepository.buscarEntidade(usuarioId, trilhaId)
-                .orElseThrow(() -> new NotFoundException("Trilha não encontrada"));
+                .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
 
-        LocalDate dataInicio = null;
-        LocalDate dataFim = null;
+        IntervaloDatas intervalo = resolverIntervaloEstatisticas(periodo, dataInicioStr, dataFimStr, path);
+        List<Disciplina> disciplinasTrilha = disciplinaRepository.listarPorTrilha(usuarioId, trilhaId);
+        return repository.obterEstatisticas(
+                usuarioId,
+                trilhaId,
+                intervalo.dataInicio(),
+                intervalo.dataFim(),
+                timezoneContext.hojeLocal(),
+                disciplinasTrilha);
+    }
 
-        if ((dataInicioStr != null && !dataInicioStr.isBlank()) || (dataFimStr != null && !dataFimStr.isBlank())) {
-            if (dataInicioStr == null || dataInicioStr.isBlank() || dataFimStr == null || dataFimStr.isBlank()) {
-                throw badRequest("INVALID_DATE_RANGE",
+    private IntervaloDatas resolverIntervaloEstatisticas(
+            String periodo, String dataInicioStr, String dataFimStr, String path) {
+        boolean temInicio = dataInicioStr != null && !dataInicioStr.isBlank();
+        boolean temFim = dataFimStr != null && !dataFimStr.isBlank();
+        if (temInicio || temFim) {
+            if (!temInicio || !temFim) {
+                throw badRequest(CODIGO_INVALID_DATE_RANGE,
                         "Ambas as datas 'dataInicio' e 'dataFim' devem ser fornecidas para intervalo personalizado.", path);
             }
+            LocalDate dataInicio;
+            LocalDate dataFim;
             try {
                 dataInicio = LocalDate.parse(dataInicioStr);
                 dataFim = LocalDate.parse(dataFimStr);
-            } catch (DateTimeParseException e) {
-                throw badRequest("INVALID_DATE", "Formato de data inválido. Use yyyy-MM-dd.", path);
+            } catch (DateTimeParseException _) {
+                throw badRequest(CODIGO_INVALID_DATE, "Formato de data inválido. Use yyyy-MM-dd.", path);
             }
             if (dataInicio.isAfter(dataFim)) {
-                throw badRequest("INVALID_DATE_RANGE", "A data inicial não pode ser posterior à data final.", path);
+                throw badRequest(CODIGO_INVALID_DATE_RANGE, "A data inicial não pode ser posterior à data final.", path);
             }
-        } else {
-            LocalDate hojeLocal = timezoneContext.hojeLocal();
-            String p = (periodo != null && !periodo.isBlank()) ? periodo.trim().toLowerCase() : "7d";
-            switch (p) {
-                case "7d" -> {
-                    dataInicio = hojeLocal.minusDays(6);
-                    dataFim = hojeLocal;
-                }
-                case "14d" -> {
-                    dataInicio = hojeLocal.minusDays(13);
-                    dataFim = hojeLocal;
-                }
-                case "30d" -> {
-                    dataInicio = hojeLocal.minusDays(29);
-                    dataFim = hojeLocal;
-                }
-                case "180d" -> {
-                    dataInicio = hojeLocal.minusDays(179);
-                    dataFim = hojeLocal;
-                }
-                case "tudo" -> {
-                    dataInicio = null;
-                    dataFim = null;
-                }
-                default -> throw badRequest("INVALID_PERIOD",
-                        "Período inválido. Valores aceitos: 7d, 14d, 30d, 180d, tudo.", path);
-            }
+            return new IntervaloDatas(dataInicio, dataFim);
         }
 
-        List<Disciplina> disciplinasTrilha = disciplinaRepository.listarPorTrilha(usuarioId, trilhaId);
-        return repository.obterEstatisticas(usuarioId, trilhaId, dataInicio, dataFim, timezoneContext.hojeLocal(), disciplinasTrilha);
+        LocalDate hojeLocal = timezoneContext.hojeLocal();
+        String p = (periodo != null && !periodo.isBlank()) ? periodo.trim().toLowerCase() : "7d";
+        return switch (p) {
+            case "7d" -> new IntervaloDatas(hojeLocal.minusDays(6), hojeLocal);
+            case "14d" -> new IntervaloDatas(hojeLocal.minusDays(13), hojeLocal);
+            case "30d" -> new IntervaloDatas(hojeLocal.minusDays(29), hojeLocal);
+            case "180d" -> new IntervaloDatas(hojeLocal.minusDays(179), hojeLocal);
+            case "tudo" -> new IntervaloDatas(null, null);
+            default -> throw badRequest("INVALID_PERIOD",
+                    "Período inválido. Valores aceitos: 7d, 14d, 30d, 180d, tudo.", path);
+        };
     }
 
     /**
@@ -480,12 +460,12 @@ public class SessaoService {
             int questoes,
             int acertos) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("trilhaId", trilhaId.toHexString());
-        payload.put("disciplinaId", disciplinaId.toHexString());
-        payload.put("dataSessao", dataSessao);
-        payload.put("duracaoSegundos", duracaoSegundos);
-        payload.put("questoes", questoes);
-        payload.put("acertos", acertos);
+        payload.put(CAMPO_TRILHA_ID, trilhaId.toHexString());
+        payload.put(CAMPO_DISCIPLINA_ID, disciplinaId.toHexString());
+        payload.put(CAMPO_DATA_SESSAO, dataSessao);
+        payload.put(CAMPO_DURACAO_SEGUNDOS, duracaoSegundos);
+        payload.put(CAMPO_QUESTOES, questoes);
+        payload.put(CAMPO_ACERTOS, acertos);
         String canonical = jsonCanonico(payload);
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -591,7 +571,7 @@ public class SessaoService {
     /**
  * Erro de payload com extensão {@code errors} preenchida.
  *
- * <p>Toda referência inválida vinda no corpo ou todo campo funcional fora de faixa responde
+ * <p>Toda referência inválida vinda no corpo ou cada campo funcional fora de faixa responde
  * {@code 400 VALIDATION_ERROR} com a chave do campo, para que o cliente destaque o input. A
  * referência cruzada ({@code disciplinaId} de outra trilha ou de outro usuário) segue a mesma
  * regra: não é recurso do path, então não vira {@code 404}.</p>
@@ -609,7 +589,7 @@ public class SessaoService {
 
     /**
  * Mapeia os códigos de validação de sessão para o catálogo fechado.
- * Todo erro de payload é {@code VALIDATION_ERROR}; apenas a paginação e o
+ * Qualquer erro de payload é {@code VALIDATION_ERROR}; apenas a paginação e o
  * descasamento de idempotência têm código próprio.
  */
     private static CodigoErro codigoDoErro(String code) {

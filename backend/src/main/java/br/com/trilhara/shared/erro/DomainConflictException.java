@@ -14,6 +14,8 @@ import java.util.Map;
  */
 public class DomainConflictException extends RuntimeException {
 
+    private static final long serialVersionUID = 1L;
+
     private final CodigoErro codigo;
     private final Map<String, List<String>> errors;
 

@@ -24,6 +24,7 @@ public class FaultInjectorExclusaoContaControlavel implements FaultInjectorExclu
 
     /** Falha deliberada usada para exercitar os caminhos de retomada. */
     public static class FalhaInjetada extends RuntimeException {
+        private static final long serialVersionUID = 1L;
         private final ColecaoTrilhara colecao;
 
         public FalhaInjetada(ColecaoTrilhara colecao) {

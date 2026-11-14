@@ -32,7 +32,7 @@ public class ReconciliadorCronogramasJob {
     }
 
     @Scheduled(
-            every = "{trilhara.jobs.reconciliador-cronogramas.every:5m}",
+            every = "${trilhara.jobs.reconciliador-cronogramas.every:5m}",
             concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     public void executarAgendado() {
         executarReconciliacao(Instant.now());

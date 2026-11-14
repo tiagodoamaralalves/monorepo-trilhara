@@ -11,6 +11,8 @@ import jakarta.ws.rs.core.Response;
  */
 public class InvalidLocalDatetimeException extends WebApplicationException {
 
+    private static final long serialVersionUID = 1L;
+
     public InvalidLocalDatetimeException(String message) {
         super(message, resposta(message));
     }

@@ -27,11 +27,11 @@ public class DefaultWebPushSender implements WebPushSender {
     /** TTL padrão quando o chamador não informa: igual à janela útil de entrega. */
     static final int TTL_PADRAO_SEGUNDOS = 900;
 
-    @ConfigProperty(name = "trilhara.push.vapid.public-key")
-    java.util.Optional<String> vapidPublicKey;
+    @ConfigProperty(name = "trilhara.push.vapid.public-key", defaultValue = "")
+    java.util.Optional<String> vapidPublicKey = java.util.Optional.empty();
 
-    @ConfigProperty(name = "trilhara.push.vapid.private-key")
-    java.util.Optional<String> vapidPrivateKey;
+    @ConfigProperty(name = "trilhara.push.vapid.private-key", defaultValue = "")
+    java.util.Optional<String> vapidPrivateKey = java.util.Optional.empty();
 
     @ConfigProperty(name = "trilhara.push.vapid.subject", defaultValue = "mailto:suporte@trilhara.com.br")
     String vapidSubject;
@@ -81,38 +81,45 @@ public class DefaultWebPushSender implements WebPushSender {
 
             // Injeta autenticação VAPID se chaves estiverem configuradas
             if (isVapidConfigured()) {
-                try {
-                    String origin = endpointUri.getScheme() + "://" + endpointUri.getAuthority();
-                    String vapidToken = gerarVapidToken(origin);
-                    builder.header("Authorization", "vapid t=" + vapidToken + ", k=" + vapidPublicKey.get().trim());
-                } catch (Exception e) {
-                    LOG.warnf("Falha ao assinar cabeçalho VAPID para %s: %s", endpointUri, e.getMessage());
-                }
+                aplicarCabecalhoVapid(builder, endpointUri);
             }
 
             HttpResponse<Void> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.discarding());
             int status = response.statusCode();
 
-            if (status == 200 || status == 201 || status == 202) {
-                return PushSendResult.sucesso(status);
-            } else if (status == 404 || status == 410) {
-                return PushSendResult.endpointInvalido(status, "Inscrição inválida ou expirada no provedor Push (HTTP " + status + ").");
-            } else {
-                return PushSendResult.falha(status, "Provedor Push retornou status HTTP " + status);
-            }
+            return switch (status) {
+                case 200, 201, 202 -> PushSendResult.sucesso(status);
+                case 404, 410 -> PushSendResult.endpointInvalido(
+                        status, "Inscrição inválida ou expirada no provedor Push (HTTP " + status + ").");
+                default -> PushSendResult.falha(status, "Provedor Push retornou status HTTP " + status);
+            };
 
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LOG.warnf("Envio Web Push interrompido para %s: %s", subscription.endpoint(), e.getMessage());
+            return PushSendResult.falha(0, "Falha de rede: " + e.getMessage());
         } catch (Exception e) {
             LOG.warnf("Erro de rede ao enviar notificação Web Push para %s: %s", subscription.endpoint(), e.getMessage());
             return PushSendResult.falha(0, "Falha de rede: " + e.getMessage());
         }
     }
 
-    public boolean isVapidConfigured() {
-        return vapidPublicKey != null && vapidPublicKey.isPresent() && !vapidPublicKey.get().isBlank()
-                && vapidPrivateKey != null && vapidPrivateKey.isPresent() && !vapidPrivateKey.get().isBlank();
+    private void aplicarCabecalhoVapid(HttpRequest.Builder builder, URI endpointUri) {
+        try {
+            String origin = endpointUri.getScheme() + "://" + endpointUri.getAuthority();
+            String vapidToken = gerarVapidToken(origin);
+            builder.header("Authorization", "vapid t=" + vapidToken + ", k=" + vapidPublicKey.orElse("").trim());
+        } catch (GeneralSecurityException | IllegalArgumentException e) {
+            LOG.warnf("Falha ao assinar cabeçalho VAPID para %s: %s", endpointUri, e.getMessage());
+        }
     }
 
-    private String gerarVapidToken(String audience) throws Exception {
+    public boolean isVapidConfigured() {
+        return vapidPublicKey.isPresent() && !vapidPublicKey.get().isBlank()
+                && vapidPrivateKey.isPresent() && !vapidPrivateKey.get().isBlank();
+    }
+
+    private String gerarVapidToken(String audience) throws GeneralSecurityException {
         long exp = Instant.now().plus(Duration.ofHours(12)).getEpochSecond();
         String header = Base64.getUrlEncoder().withoutPadding().encodeToString("{\"typ\":\"JWT\",\"alg\":\"ES256\"}".getBytes(StandardCharsets.UTF_8));
         String claims = String.format("{\"aud\":\"%s\",\"exp\":%d,\"sub\":\"%s\"}", audience, exp, vapidSubject);

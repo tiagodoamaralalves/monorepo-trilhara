@@ -12,7 +12,6 @@ import java.security.spec.ECGenParameterSpec;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -58,7 +57,7 @@ class PushDeliverySchedulerTest {
     @Inject
     MongoClient mongoClient;
 
-    @ConfigProperty(name = "quarkus.mongodb.database")
+    @ConfigProperty(name = "quarkus.mongodb.database", defaultValue = "trilhara")
     String databaseName;
 
     private ObjectId usuarioId;
@@ -178,7 +177,7 @@ class PushDeliverySchedulerTest {
         ObjectId tarefaId = tarefaComTitulo("Tarefa com falha transitória");
         Instant agora = Instant.now().truncatedTo(ChronoUnit.MILLIS);
         Instant entrega = agora.minusSeconds(5);
-        LembretePush lembrete = inserirLembrete(tarefaId, entrega, 1, 0);
+        inserirLembrete(tarefaId, entrega, 1, 0);
 
         WebPushSender senderFalha = (sub, payload, ttl) ->
                 WebPushSender.PushSendResult.falha(500, "Provedor indisponível");

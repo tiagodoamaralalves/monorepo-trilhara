@@ -8,7 +8,6 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -45,6 +44,12 @@ public class HandoffService {
 
     private static final Logger LOG = Logger.getLogger(HandoffService.class);
     private static final int TTL_SEGUNDOS = 60;
+    private static final String CAMPO_CONSUMIDO_EM = "consumidoEm";
+    private static final String CAMPO_USUARIO_ID = "usuarioId";
+    private static final String CAMPO_CODIGO_HASH = "codigoHash";
+    private static final String CAMPO_ORIGEM_DESTINO = "origemDestino";
+    private static final String CAMPO_EXPIRA_EM = "expiraEm";
+    private static final String ERRO_DESTINO_DIVERGENTE = "Destino divergente do autorizado no handoff.";
 
     private final SecureRandom secureRandom = new SecureRandom();
     private final MongoCollection<Document> collection;
@@ -84,12 +89,12 @@ public class HandoffService {
         Instant expiraEm = agora.plusSeconds(TTL_SEGUNDOS);
 
         Document doc = new Document("_id", new ObjectId())
-                .append("usuarioId", new ObjectId(usuarioId))
-                .append("codigoHash", codigoHash)
-                .append("origemDestino", destinoUrl.trim())
+                .append(CAMPO_USUARIO_ID, new ObjectId(usuarioId))
+                .append(CAMPO_CODIGO_HASH, codigoHash)
+                .append(CAMPO_ORIGEM_DESTINO, destinoUrl.trim())
                 .append("criadoEm", BsonDates.toBsonDate(agora))
-                .append("expiraEm", BsonDates.toBsonDate(expiraEm))
-                .append("consumidoEm", null);
+                .append(CAMPO_EXPIRA_EM, BsonDates.toBsonDate(expiraEm))
+                .append(CAMPO_CONSUMIDO_EM, null);
 
         collection.insertOne(doc);
         LOG.infof("Código de handoff emitido com TTL de %ds.", TTL_SEGUNDOS);
@@ -113,22 +118,22 @@ public class HandoffService {
 
         Document doc = collection.findOneAndUpdate(
                 Filters.and(
-                        Filters.eq("codigoHash", codigoHash),
-                        Filters.eq("consumidoEm", null),
-                        Filters.gt("expiraEm", BsonDates.toBsonDate(agora))),
-                Updates.set("consumidoEm", BsonDates.toBsonDate(agora)),
+                        Filters.eq(CAMPO_CODIGO_HASH, codigoHash),
+                        Filters.eq(CAMPO_CONSUMIDO_EM, null),
+                        Filters.gt(CAMPO_EXPIRA_EM, BsonDates.toBsonDate(agora))),
+                Updates.set(CAMPO_CONSUMIDO_EM, BsonDates.toBsonDate(agora)),
                 new FindOneAndUpdateOptions().returnDocument(ReturnDocument.BEFORE));
 
         if (doc == null) {
             throw new NotAuthorizedException("Código de handoff inválido, expirado ou já utilizado.");
         }
 
-        String origemDestino = doc.getString("origemDestino");
+        String origemDestino = doc.getString(CAMPO_ORIGEM_DESTINO);
         if (callerHost != null && origemDestino != null) {
             validarOrigemDestinoConsistente(origemDestino, callerHost);
         }
 
-        ObjectId usuarioId = doc.getObjectId("usuarioId");
+        ObjectId usuarioId = doc.getObjectId(CAMPO_USUARIO_ID);
         if (usuarioId == null) {
             throw new NotAuthorizedException("Código de handoff inválido.");
         }
@@ -167,14 +172,14 @@ public class HandoffService {
         URI uri;
         try {
             uri = URI.create(destino);
-        } catch (IllegalArgumentException e) {
-            throw new BadRequestException("Destino divergente do autorizado no handoff.");
+        } catch (IllegalArgumentException _) {
+            throw new BadRequestException(ERRO_DESTINO_DIVERGENTE);
         }
 
         String hostEsperado = uri.getHost();
         String callerHostLimpo = callerHost.split(":")[0].trim().toLowerCase();
         if (hostEsperado == null) {
-            throw new BadRequestException("Destino divergente do autorizado no handoff.");
+            throw new BadRequestException(ERRO_DESTINO_DIVERGENTE);
         }
 
         String hostEsperadoNormalizado = hostEsperado.toLowerCase();
@@ -182,7 +187,7 @@ public class HandoffService {
         boolean ambosLocais = ehHostLocal(hostEsperadoNormalizado) && ehHostLocal(callerHostLimpo);
         if (!mesmosHosts && !ambosLocais) {
             LOG.warnf("Tentativa de consumo de handoff com destino divergente: esperado=%s, caller=%s", hostEsperadoNormalizado, callerHostLimpo);
-            throw new BadRequestException("Destino divergente do autorizado no handoff.");
+            throw new BadRequestException(ERRO_DESTINO_DIVERGENTE);
         }
     }
 

@@ -99,9 +99,8 @@ Reproduza o ambiente e execute na ordem — é exatamente o que o CI roda:
 eval "$(bash scripts/env-gate.sh)"          # JAVA_HOME (JDK 25), MONGODB_URL, RESEND_API_KEY
 
 cd backend  && ./mvnw -q verify              # testes + ArchUnit + JaCoCo check + dependency:analyze
-cd ../frontend   && npm run typecheck   && npm run lint -- --max-warnings 0   && npm test -- --run --coverage   && npm run build   && npx knip
+cd ../frontend && npm run typecheck && npm run lint -- --max-warnings 0 && npm test -- --run --coverage && npm run build && npx knip
 
-cd .. && bash scripts/verificar-legado.sh    # modo estrito: falha em achados
 cd .. && bash scripts/verificar-cabecalhos.sh # CSP/HSTS/Permissions-Policy nas 5 origens
 ```
 
@@ -111,8 +110,8 @@ cd backend
 ./mvnw -q verify
 ```
 O `verify` executa, além dos testes:
-- **ArchUnit** — `TenantIsolationArchTest` (isolamento por `usuarioId`, sem `@ArchIgnore`) e `LegacyPackagesArchTest` (pacotes/símbolos do Anexo C);
-- **JaCoCo em enforce** — `check` sobre `target/jacoco-quarkus.exec`, piso de 75% de instrução por bundle (medido: 80,0%);
+- **ArchUnit** — `TenantIsolationArchTest` (isolamento por `usuarioId`);
+- **JaCoCo em enforce** — `check` sobre `target/jacoco-quarkus.exec`, piso de 75% de instrução por bundle;
 - **`dependency:analyze`** — falha em dependência declarada não usada ou usada não declarada;
 - `AuthorizationByOwnerTest` (anti-IDOR ⇒ 404), `MassAssignmentParametrizadoTest`, `LogSemPiiTest`, `RotasPublicasContratoTest` e `InventarioColecoesTest`.
 

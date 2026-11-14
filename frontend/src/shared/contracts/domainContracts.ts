@@ -1,6 +1,5 @@
 /**
  * Contratos de domínio compartilhados e congelados .
- * Conforme PLANO-IMPLEMENTACAO-REESTRUTURACAO.md e REQUISITOS-REESTRUTURACAO-DADOS.md.
  */
 
 /**

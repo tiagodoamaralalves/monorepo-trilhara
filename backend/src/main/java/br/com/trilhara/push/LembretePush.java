@@ -36,6 +36,6 @@ public record LembretePush(
     public static final String ESTADO_EXPIRADO_FORA_DA_JANELA = "EXPIRADO_FORA_DA_JANELA";
     public static final String ESTADO_FALHA_FINAL = "FALHA_FINAL";
 
-    /** Versão inicial de todo agendamento. */
+    /** Versão inicial de cada agendamento. */
     public static final long VERSAO_INICIAL = 1L;
 }

@@ -144,34 +144,7 @@ public class SecurityFilter implements ContainerRequestFilter, ContainerResponse
         try {
             ClaimsToken claims = tokenService.validarAccessToken(token);
             Usuario usuario = userRepository.buscarPorId(claims.usuarioId()).orElse(null);
-            if (usuario == null) {
-                abortarNaoAutorizado(requestContext, "Usuário inválido ou conta inexistente.");
-                return true;
-            }
-            if (!usuario.ativo()) {
-                String path = requestContext.getUriInfo() != null ? requestContext.getUriInfo().getPath() : "";
-                boolean isExclusaoConta = path.endsWith("/auth/conta") || path.endsWith("/conta");
-                if (!isExclusaoConta || !"DELETE".equalsIgnoreCase(requestContext.getMethod())) {
-                    abortarNaoAutorizado(requestContext, "Usuário inválido ou conta desativada.");
-                    return true;
-                }
-            }
-            // conta com exclusão em andamento é 401 em qualquer rota. A única exceção é o
-            // retry do próprio DELETE /api/auth/conta com Idempotency-Key, que devolve 202 com o
-            // mesmo operationId (o cliente não precisa repetir quando já não tem sessão).
-            if (userRepository.estaEmExclusao(usuario.id())) {
-                String path = requestContext.getUriInfo() != null ? requestContext.getUriInfo().getPath() : "";
-                boolean isRetryExclusao = (path.endsWith("/auth/conta") || path.endsWith("/conta"))
-                        && "DELETE".equalsIgnoreCase(requestContext.getMethod())
-                        && requestContext.getHeaderString("Idempotency-Key") != null
-                        && !requestContext.getHeaderString("Idempotency-Key").isBlank();
-                if (!isRetryExclusao) {
-                    abortarNaoAutorizado(requestContext, "Conta em processo de exclusão.");
-                    return true;
-                }
-            }
-            if (senhaAlteradaDepoisDaEmissao(claims, usuario)) {
-                abortarNaoAutorizado(requestContext, "Sessão expirada devido a alteração de credenciais.");
+            if (!validarEstadoUsuarioAutenticado(requestContext, claims, usuario)) {
                 return true;
             }
 
@@ -183,6 +156,41 @@ public class SecurityFilter implements ContainerRequestFilter, ContainerResponse
             abortarNaoAutorizado(requestContext, exception.getMessage());
             return true;
         }
+    }
+
+    private boolean validarEstadoUsuarioAutenticado(
+            ContainerRequestContext requestContext, ClaimsToken claims, Usuario usuario) {
+        if (usuario == null) {
+            abortarNaoAutorizado(requestContext, "Usuário inválido ou conta inexistente.");
+            return false;
+        }
+        if (!usuario.ativo() && !ehDeleteConta(requestContext)) {
+            abortarNaoAutorizado(requestContext, "Usuário inválido ou conta desativada.");
+            return false;
+        }
+        // conta com exclusão em andamento é 401 em qualquer rota. A única exceção é o
+        // retry do próprio DELETE /api/auth/conta com Idempotency-Key, que devolve 202 com o
+        // mesmo operationId (o cliente não precisa repetir quando já não tem sessão).
+        if (userRepository.estaEmExclusao(usuario.id()) && !ehRetryExclusaoConta(requestContext)) {
+            abortarNaoAutorizado(requestContext, "Conta em processo de exclusão.");
+            return false;
+        }
+        if (senhaAlteradaDepoisDaEmissao(claims, usuario)) {
+            abortarNaoAutorizado(requestContext, "Sessão expirada devido a alteração de credenciais.");
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean ehDeleteConta(ContainerRequestContext requestContext) {
+        String path = requestContext.getUriInfo() != null ? requestContext.getUriInfo().getPath() : "";
+        return (path.endsWith("/auth/conta") || path.endsWith("/conta"))
+                && "DELETE".equalsIgnoreCase(requestContext.getMethod());
+    }
+
+    private static boolean ehRetryExclusaoConta(ContainerRequestContext requestContext) {
+        String idempotencyKey = requestContext.getHeaderString("Idempotency-Key");
+        return ehDeleteConta(requestContext) && idempotencyKey != null && !idempotencyKey.isBlank();
     }
 
     private static boolean senhaAlteradaDepoisDaEmissao(ClaimsToken claims, Usuario usuario) {
@@ -203,34 +211,49 @@ public class SecurityFilter implements ContainerRequestFilter, ContainerResponse
 
     private void validarAutorizacao(ContainerRequestContext requestContext, String path) {
         Autenticado anotacaoAutenticado = obterAnotacaoAutenticado();
-        boolean rotaAuthProtegida = path.startsWith("/api/auth") && !ROTAS_AUTH_PUBLICAS.contains(path);
         boolean rotaAdmin = path.startsWith("/api/admin") || path.startsWith("/api/auth/admin");
-        boolean rotaNegocioProtegida = path.startsWith("/api/trilhas")
+
+        if (exigeAutenticacao(path, anotacaoAutenticado, rotaAdmin) && !authContext.estaAutenticado()) {
+            abortarNaoAutorizado(requestContext, "Autenticação necessária para acessar este recurso.");
+            return;
+        }
+
+        if (!authContext.estaAutenticado()) {
+            return;
+        }
+        if (!possuiRolesAnotadas(anotacaoAutenticado)) {
+            abortarProibido(requestContext, "Acesso negado: você não possui permissão para realizar esta operação.");
+            return;
+        }
+        if (rotaAdmin && !authContext.possuiRole(Role.ADMIN)) {
+            abortarProibido(requestContext, "Acesso negado: permissão de administrador (ADMIN) necessária.");
+        }
+    }
+
+    private boolean exigeAutenticacao(String path, Autenticado anotacaoAutenticado, boolean rotaAdmin) {
+        if (rotaAdmin || anotacaoAutenticado != null) {
+            return true;
+        }
+        if (path.startsWith("/api/auth") && !ROTAS_AUTH_PUBLICAS.contains(path)) {
+            return true;
+        }
+        return strictMode && ehRotaNegocioProtegida(path);
+    }
+
+    private static boolean ehRotaNegocioProtegida(String path) {
+        return path.startsWith("/api/trilhas")
                 || path.startsWith("/api/notas")
                 || path.startsWith("/api/blocos")
                 || path.startsWith("/api/tarefas")
                 || path.startsWith("/api/listas-tarefas")
                 || path.startsWith("/api/push");
+    }
 
-        if ((rotaAdmin || anotacaoAutenticado != null || rotaAuthProtegida || (rotaNegocioProtegida && strictMode))
-                && !authContext.estaAutenticado()) {
-            abortarNaoAutorizado(requestContext, "Autenticação necessária para acessar este recurso.");
-            return;
+    private boolean possuiRolesAnotadas(Autenticado anotacaoAutenticado) {
+        if (anotacaoAutenticado == null || anotacaoAutenticado.roles().length == 0) {
+            return true;
         }
-
-        if (authContext.estaAutenticado()) {
-            if (anotacaoAutenticado != null && anotacaoAutenticado.roles().length > 0) {
-                boolean autorizado = Arrays.stream(anotacaoAutenticado.roles())
-                        .anyMatch(authContext::possuiRole);
-                if (!autorizado) {
-                    abortarProibido(requestContext, "Acesso negado: você não possui permissão para realizar esta operação.");
-                    return;
-                }
-            }
-            if (rotaAdmin && !authContext.possuiRole(Role.ADMIN)) {
-                abortarProibido(requestContext, "Acesso negado: permissão de administrador (ADMIN) necessária.");
-            }
-        }
+        return Arrays.stream(anotacaoAutenticado.roles()).anyMatch(authContext::possuiRole);
     }
 
     @Override

@@ -9,7 +9,7 @@ export interface TrilhaItem {
   cor?: string;
 }
 
-/** Preferência local que dispensa a sugestão automática (REQUISITOS §10.1). */
+/** Preferência local que dispensa a sugestão automática. */
 export const CHAVE_OCULTAR_MODAL_IMPORTACAO = (usuarioId: string) =>
   `trilhara:u:${usuarioId}:notas_ocultar_modal_importacao`;
 

@@ -12,12 +12,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
-import java.util.EnumMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.function.BiConsumer;
 
 import org.bson.Document;
 import org.bson.types.ObjectId;
@@ -55,10 +51,6 @@ class AccountDeletionIntegrationTest {
     private static final String CONTA_ENDPOINT = "/api/auth/conta";
     private static final String SENHA = "Senh@Forte2026!";
 
-    /** Populadores por coleção filha; validados contra o enum em {@link #popularColecoesFilhas}. */
-    private static final Map<ColecaoTrilhara, BiConsumer<MongoDatabase, Document>> POPULADORES =
-            FixturesConta.populadores();
-
     @Inject
     AccountDeletionService accountDeletionService;
 
@@ -68,7 +60,7 @@ class AccountDeletionIntegrationTest {
     @Inject
     MongoClient mongoClient;
 
-    @ConfigProperty(name = "quarkus.mongodb.database")
+    @ConfigProperty(name = "quarkus.mongodb.database", defaultValue = "trilhara")
     String databaseName;
 
     @Inject

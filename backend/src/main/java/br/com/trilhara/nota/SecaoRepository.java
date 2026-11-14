@@ -29,13 +29,23 @@ import jakarta.inject.Inject;
 
 /**
  * Repositório direto BSON para a coleção normalizada 'secoes'.
- * Conforme REQUISITOS-REESTRUTURACAO-DADOS.md §10 e PLANO-IMPLEMENTACAO-REESTRUTURACAO.md §8.2.
  */
 @ApplicationScoped
 public class SecaoRepository {
 
     /** Teto normativo de seções por caderno (500 seções/caderno). */
     public static final int LIMITE_LISTAGEM = 500;
+
+    private static final String CAMPO_USUARIO_ID = "usuarioId";
+    private static final String CAMPO_DELETED_AT = "deletedAt";
+    private static final String CAMPO_CADERNO_ID = "cadernoId";
+    private static final String CAMPO_ORDEM = "ordem";
+    private static final String CAMPO_CRIADO_EM = "criadoEm";
+    private static final String CAMPO_ATUALIZADO_EM = "atualizadoEm";
+    private static final String CAMPO_ORIGEM_DISCIPLINA_ID = "origemDisciplinaId";
+    private static final String CAMPO_EXPIRES_AT = "expiresAt";
+    private static final String CAMPO_LOTE_EXCLUSAO_ID = "loteExclusaoId";
+    private static final String CAMPO_TITULO = "titulo";
 
     private final MongoCollection<Document> collection;
 
@@ -53,7 +63,7 @@ public class SecaoRepository {
     public boolean atualizar(Secao secao) {
         Document doc = paraDocumento(secao);
         return collection.replaceOne(
-                and(eq("_id", secao.id()), eq("usuarioId", secao.usuarioId())),
+                and(eq("_id", secao.id()), eq(CAMPO_USUARIO_ID, secao.usuarioId())),
                 doc,
                 new ReplaceOptions().upsert(false)
         ).getMatchedCount() > 0;
@@ -62,8 +72,8 @@ public class SecaoRepository {
     public Optional<Secao> buscarAtiva(ObjectId usuarioId, ObjectId secaoId) {
         Document doc = collection.find(and(
                 eq("_id", secaoId),
-                eq("usuarioId", usuarioId),
-                eq("deletedAt", null)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_DELETED_AT, null)
         )).first();
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
@@ -71,7 +81,7 @@ public class SecaoRepository {
     public Optional<Secao> buscarQualquerStatus(ObjectId usuarioId, ObjectId secaoId) {
         Document doc = collection.find(and(
                 eq("_id", secaoId),
-                eq("usuarioId", usuarioId)
+                eq(CAMPO_USUARIO_ID, usuarioId)
         )).first();
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
@@ -89,10 +99,10 @@ public class SecaoRepository {
     public List<Secao> listarPorCaderno(ObjectId usuarioId, ObjectId cadernoId, int limite) {
         List<Secao> lista = new ArrayList<>();
         collection.find(and(
-                eq("usuarioId", usuarioId),
-                eq("cadernoId", cadernoId),
-                eq("deletedAt", null)
-        )).sort(Sorts.orderBy(Sorts.ascending("ordem"), Sorts.ascending("criadoEm"), Sorts.ascending("_id")))
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_CADERNO_ID, cadernoId),
+                eq(CAMPO_DELETED_AT, null)
+        )).sort(Sorts.orderBy(Sorts.ascending(CAMPO_ORDEM), Sorts.ascending(CAMPO_CRIADO_EM), Sorts.ascending("_id")))
           .limit(limite)
           .forEach(doc -> lista.add(paraEntidade(doc)));
         return lista;
@@ -100,77 +110,77 @@ public class SecaoRepository {
 
     public long contarPorCaderno(ObjectId usuarioId, ObjectId cadernoId) {
         return collection.countDocuments(and(
-                eq("usuarioId", usuarioId),
-                eq("cadernoId", cadernoId),
-                eq("deletedAt", null)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_CADERNO_ID, cadernoId),
+                eq(CAMPO_DELETED_AT, null)
         ));
     }
 
     public int proximaOrdem(ObjectId usuarioId, ObjectId cadernoId) {
         Document doc = collection.find(and(
-                eq("usuarioId", usuarioId),
-                eq("cadernoId", cadernoId),
-                eq("deletedAt", null)
-        )).sort(Sorts.descending("ordem")).first();
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_CADERNO_ID, cadernoId),
+                eq(CAMPO_DELETED_AT, null)
+        )).sort(Sorts.descending(CAMPO_ORDEM)).first();
 
-        if (doc != null && doc.getInteger("ordem") != null) {
-            return doc.getInteger("ordem") + 1;
+        if (doc != null && doc.getInteger(CAMPO_ORDEM) != null) {
+            return doc.getInteger(CAMPO_ORDEM) + 1;
         }
         return 0;
     }
 
     public void desvincularOrigemDisciplinaPorCaderno(ObjectId usuarioId, ObjectId cadernoId) {
         collection.updateMany(
-                and(eq("usuarioId", usuarioId), eq("cadernoId", cadernoId)),
+                and(eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_CADERNO_ID, cadernoId)),
                 Updates.combine(
-                        Updates.unset("origemDisciplinaId"),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(Instant.now()))
+                        Updates.unset(CAMPO_ORIGEM_DISCIPLINA_ID),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))
                 )
         );
     }
 
     public void desvincularOrigemDisciplina(ObjectId usuarioId, ObjectId secaoId) {
         collection.updateOne(
-                and(eq("usuarioId", usuarioId), eq("_id", secaoId)),
+                and(eq(CAMPO_USUARIO_ID, usuarioId), eq("_id", secaoId)),
                 Updates.combine(
-                        Updates.unset("origemDisciplinaId"),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(Instant.now()))
+                        Updates.unset(CAMPO_ORIGEM_DISCIPLINA_ID),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))
                 )
         );
     }
 
     public boolean moverParaLixeira(ObjectId usuarioId, ObjectId secaoId, String loteExclusaoId, Instant agora, Instant expiresAt) {
         return collection.updateOne(
-                and(eq("_id", secaoId), eq("usuarioId", usuarioId), eq("deletedAt", null)),
+                and(eq("_id", secaoId), eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_DELETED_AT, null)),
                 Updates.combine(
-                        Updates.set("deletedAt", BsonDates.toBsonDate(agora)),
-                        Updates.set("expiresAt", BsonDates.toBsonDate(expiresAt)),
-                        Updates.set("loteExclusaoId", loteExclusaoId),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(agora))
+                        Updates.set(CAMPO_DELETED_AT, BsonDates.toBsonDate(agora)),
+                        Updates.set(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(expiresAt)),
+                        Updates.set(CAMPO_LOTE_EXCLUSAO_ID, loteExclusaoId),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(agora))
                 )
         ).getModifiedCount() > 0;
     }
 
     public long moverPorCadernoParaLixeira(ObjectId usuarioId, ObjectId cadernoId, String loteExclusaoId, Instant agora, Instant expiresAt) {
         return collection.updateMany(
-                and(eq("cadernoId", cadernoId), eq("usuarioId", usuarioId), eq("deletedAt", null)),
+                and(eq(CAMPO_CADERNO_ID, cadernoId), eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_DELETED_AT, null)),
                 Updates.combine(
-                        Updates.set("deletedAt", BsonDates.toBsonDate(agora)),
-                        Updates.set("expiresAt", BsonDates.toBsonDate(expiresAt)),
-                        Updates.set("loteExclusaoId", loteExclusaoId),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(agora))
+                        Updates.set(CAMPO_DELETED_AT, BsonDates.toBsonDate(agora)),
+                        Updates.set(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(expiresAt)),
+                        Updates.set(CAMPO_LOTE_EXCLUSAO_ID, loteExclusaoId),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(agora))
                 )
         ).getModifiedCount();
     }
 
     public boolean restaurar(ObjectId usuarioId, ObjectId secaoId) {
         return collection.updateOne(
-                and(eq("_id", secaoId), eq("usuarioId", usuarioId)),
+                and(eq("_id", secaoId), eq(CAMPO_USUARIO_ID, usuarioId)),
                 Updates.combine(
-                        Updates.unset("deletedAt"),
-                        Updates.unset("expiresAt"),
-                        Updates.unset("loteExclusaoId"),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(Instant.now()))
+                        Updates.unset(CAMPO_DELETED_AT),
+                        Updates.unset(CAMPO_EXPIRES_AT),
+                        Updates.unset(CAMPO_LOTE_EXCLUSAO_ID),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))
                 )
         ).getModifiedCount() > 0;
     }
@@ -179,15 +189,15 @@ public class SecaoRepository {
         if (loteExclusaoId == null) return 0;
         return collection.updateMany(
                 and(
-                        eq("cadernoId", cadernoId),
-                        eq("usuarioId", usuarioId),
-                        eq("loteExclusaoId", loteExclusaoId)
+                        eq(CAMPO_CADERNO_ID, cadernoId),
+                        eq(CAMPO_USUARIO_ID, usuarioId),
+                        eq(CAMPO_LOTE_EXCLUSAO_ID, loteExclusaoId)
                 ),
                 Updates.combine(
-                        Updates.unset("deletedAt"),
-                        Updates.unset("expiresAt"),
-                        Updates.unset("loteExclusaoId"),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(Instant.now()))
+                        Updates.unset(CAMPO_DELETED_AT),
+                        Updates.unset(CAMPO_EXPIRES_AT),
+                        Updates.unset(CAMPO_LOTE_EXCLUSAO_ID),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))
                 )
         ).getModifiedCount();
     }
@@ -195,29 +205,29 @@ public class SecaoRepository {
     public List<Secao> listarLixeira(ObjectId usuarioId, Instant agora) {
         List<Secao> lista = new ArrayList<>();
         collection.find(and(
-                eq("usuarioId", usuarioId),
-                ne("deletedAt", null),
-                gt("expiresAt", BsonDates.toBsonDate(agora))
-        )).sort(Sorts.orderBy(Sorts.descending("deletedAt"), Sorts.descending("_id")))
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                ne(CAMPO_DELETED_AT, null),
+                gt(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(agora))
+        )).sort(Sorts.orderBy(Sorts.descending(CAMPO_DELETED_AT), Sorts.descending("_id")))
           .forEach(doc -> lista.add(paraEntidade(doc)));
         return lista;
     }
 
     public long contarLixeira(ObjectId usuarioId, Instant agora) {
         return collection.countDocuments(and(
-                eq("usuarioId", usuarioId),
-                ne("deletedAt", null),
-                gt("expiresAt", BsonDates.toBsonDate(agora))
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                ne(CAMPO_DELETED_AT, null),
+                gt(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(agora))
         ));
     }
 
     public List<Secao> listarLixeira(ObjectId usuarioId, Instant agora, int pagina, int tamanho) {
         List<Secao> lista = new ArrayList<>();
         collection.find(and(
-                eq("usuarioId", usuarioId),
-                ne("deletedAt", null),
-                gt("expiresAt", BsonDates.toBsonDate(agora))
-        )).sort(Sorts.orderBy(Sorts.descending("deletedAt"), Sorts.descending("_id")))
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                ne(CAMPO_DELETED_AT, null),
+                gt(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(agora))
+        )).sort(Sorts.orderBy(Sorts.descending(CAMPO_DELETED_AT), Sorts.descending("_id")))
           .skip(Math.max(0, (pagina - 1) * tamanho))
           .limit(tamanho)
           .forEach(doc -> lista.add(paraEntidade(doc)));
@@ -227,9 +237,9 @@ public class SecaoRepository {
     /** Seções ativas do caderno — usado no teto de 500 seções. */
     public long contarAtivas(ObjectId usuarioId, ObjectId cadernoId) {
         return collection.countDocuments(and(
-                eq("usuarioId", usuarioId),
-                eq("cadernoId", cadernoId),
-                eq("deletedAt", null)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_CADERNO_ID, cadernoId),
+                eq(CAMPO_DELETED_AT, null)
         ));
     }
 
@@ -240,10 +250,10 @@ public class SecaoRepository {
             return contagens;
         }
         collection.aggregate(List.of(
-                new Document("$match", new Document("usuarioId", usuarioId)
-                        .append("cadernoId", new Document("$in", cadernoIds))
-                        .append("deletedAt", null)),
-                new Document("$group", new Document("_id", "$cadernoId")
+                new Document("$match", new Document(CAMPO_USUARIO_ID, usuarioId)
+                        .append(CAMPO_CADERNO_ID, new Document("$in", cadernoIds))
+                        .append(CAMPO_DELETED_AT, null)),
+                new Document("$group", new Document("_id", "$" + CAMPO_CADERNO_ID)
                         .append("total", new Document("$sum", 1)))
         )).forEach(doc -> contagens.put(doc.getObjectId("_id"), ((Number) doc.get("total")).longValue()));
         return contagens;
@@ -253,12 +263,12 @@ public class SecaoRepository {
     public List<String> titulosAtivosPorCaderno(ObjectId usuarioId, ObjectId cadernoId) {
         List<String> titulos = new ArrayList<>();
         collection.find(and(
-                eq("usuarioId", usuarioId),
-                eq("cadernoId", cadernoId),
-                eq("deletedAt", null)
-        )).projection(new Document("titulo", 1))
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_CADERNO_ID, cadernoId),
+                eq(CAMPO_DELETED_AT, null)
+        )).projection(new Document(CAMPO_TITULO, 1))
           .forEach(doc -> {
-              String titulo = doc.getString("titulo");
+              String titulo = doc.getString(CAMPO_TITULO);
               if (titulo != null) {
                   titulos.add(titulo);
               }
@@ -268,36 +278,36 @@ public class SecaoRepository {
 
     public long esvaziarLixeira(ObjectId usuarioId) {
         return collection.deleteMany(
-                and(eq("usuarioId", usuarioId), ne("deletedAt", null))
+                and(eq(CAMPO_USUARIO_ID, usuarioId), ne(CAMPO_DELETED_AT, null))
         ).getDeletedCount();
     }
 
     public long purgarExpirados(Instant agora) {
         return collection.deleteMany(
-                and(ne("deletedAt", null), lte("expiresAt", BsonDates.toBsonDate(agora)))
+                and(ne(CAMPO_DELETED_AT, null), lte(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(agora)))
         ).getDeletedCount();
     }
 
     public Document paraDocumento(Secao s) {
         Document doc = new Document("_id", s.id() != null ? s.id() : new ObjectId())
-                .append("usuarioId", s.usuarioId())
-                .append("cadernoId", s.cadernoId())
-                .append("titulo", s.titulo())
-                .append("ordem", s.ordem())
-                .append("criadoEm", BsonDates.toBsonDate(s.criadoEm()))
-                .append("atualizadoEm", BsonDates.toBsonDate(s.atualizadoEm()));
+                .append(CAMPO_USUARIO_ID, s.usuarioId())
+                .append(CAMPO_CADERNO_ID, s.cadernoId())
+                .append(CAMPO_TITULO, s.titulo())
+                .append(CAMPO_ORDEM, s.ordem())
+                .append(CAMPO_CRIADO_EM, BsonDates.toBsonDate(s.criadoEm()))
+                .append(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(s.atualizadoEm()));
 
         if (s.origemDisciplinaId() != null) {
-            doc.append("origemDisciplinaId", s.origemDisciplinaId());
+            doc.append(CAMPO_ORIGEM_DISCIPLINA_ID, s.origemDisciplinaId());
         }
         if (s.deletedAt() != null) {
-            doc.append("deletedAt", BsonDates.toBsonDate(s.deletedAt()));
+            doc.append(CAMPO_DELETED_AT, BsonDates.toBsonDate(s.deletedAt()));
         }
         if (s.expiresAt() != null) {
-            doc.append("expiresAt", BsonDates.toBsonDate(s.expiresAt()));
+            doc.append(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(s.expiresAt()));
         }
         if (s.loteExclusaoId() != null) {
-            doc.append("loteExclusaoId", s.loteExclusaoId());
+            doc.append(CAMPO_LOTE_EXCLUSAO_ID, s.loteExclusaoId());
         }
         return doc;
     }
@@ -306,16 +316,16 @@ public class SecaoRepository {
         if (doc == null) return null;
         return new Secao(
                 doc.getObjectId("_id"),
-                doc.getObjectId("usuarioId"),
-                doc.getObjectId("cadernoId"),
-                doc.getString("titulo"),
-                doc.getInteger("ordem", 0),
-                doc.getObjectId("origemDisciplinaId"),
-                BsonDates.lerInstant(doc, "deletedAt"),
-                BsonDates.lerInstant(doc, "expiresAt"),
-                doc.getString("loteExclusaoId"),
-                BsonDates.lerInstant(doc, "criadoEm"),
-                BsonDates.lerInstant(doc, "atualizadoEm")
+                doc.getObjectId(CAMPO_USUARIO_ID),
+                doc.getObjectId(CAMPO_CADERNO_ID),
+                doc.getString(CAMPO_TITULO),
+                doc.getInteger(CAMPO_ORDEM, 0),
+                doc.getObjectId(CAMPO_ORIGEM_DISCIPLINA_ID),
+                BsonDates.lerInstant(doc, CAMPO_DELETED_AT),
+                BsonDates.lerInstant(doc, CAMPO_EXPIRES_AT),
+                doc.getString(CAMPO_LOTE_EXCLUSAO_ID),
+                BsonDates.lerInstant(doc, CAMPO_CRIADO_EM),
+                BsonDates.lerInstant(doc, CAMPO_ATUALIZADO_EM)
         );
     }
 }

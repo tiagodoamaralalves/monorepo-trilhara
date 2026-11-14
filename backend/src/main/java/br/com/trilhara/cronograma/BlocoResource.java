@@ -23,8 +23,12 @@ import jakarta.ws.rs.core.MediaType;
 @Autenticado
 public class BlocoResource {
 
+    private final CronogramaService service;
+
     @Inject
-    CronogramaService service;
+    public BlocoResource(CronogramaService service) {
+        this.service = service;
+    }
 
     @GET
     @Path("/hoje")

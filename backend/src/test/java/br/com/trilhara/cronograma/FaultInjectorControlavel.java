@@ -21,6 +21,7 @@ public class FaultInjectorControlavel implements FaultInjector {
 
     /** Falha deliberada usada para exercitar os caminhos de recuperação. */
     public static class FalhaInjetada extends RuntimeException {
+        private static final long serialVersionUID = 1L;
         private final EtapaPublicacao etapa;
 
         public FalhaInjetada(EtapaPublicacao etapa) {

@@ -15,7 +15,6 @@ import jakarta.validation.constraints.Size;
 
 /**
  * Entidade normalizada da coleção 'disciplinas'.
- * Conforme REQUISITOS-REESTRUTURACAO-DADOS.md §4.1 e PLANO-IMPLEMENTACAO-REESTRUTURACAO.md §2.2.
  *
  * <p>O campo {@code cadernoLink} foi removido: vínculo entre disciplina e notas é
  * derivado de {@code cadernos.origemTrilhaId}, nunca de uma URL guardada na disciplina. O limite
@@ -37,7 +36,7 @@ public record Disciplina(
     public static final int MAX_TOPICOS = 500;
 
     public Disciplina {
-        peso = peso == null ? 1 : Math.max(1, Math.min(5, peso));
+        peso = peso == null ? 1 : Math.clamp(peso, 1, 5);
         ordem = ordem == null ? 0 : Math.max(0, ordem);
         topicos = topicos == null ? List.of() : List.copyOf(topicos);
     }

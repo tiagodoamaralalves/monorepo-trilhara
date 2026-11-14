@@ -33,6 +33,28 @@ import jakarta.enterprise.context.ApplicationScoped;
 @ApplicationScoped
 public class TarefaRepository {
 
+    private static final String CAMPO_USUARIO_ID = "usuarioId";
+    private static final String CAMPO_SERIE_ID = "serieId";
+    private static final String CAMPO_DATA_ORIGINAL_OCORRENCIA = "dataOriginalOcorrencia";
+    private static final String CAMPO_DELETED_AT = "deletedAt";
+    private static final String CAMPO_LISTA_ID = "listaId";
+    private static final String CAMPO_DATA_VENCIMENTO = "dataVencimento";
+    private static final String CAMPO_CONCLUIDA = "concluida";
+    private static final String CAMPO_ESTADO = "estado";
+    private static final String ESTADO_PENDENTE = "PENDENTE";
+    private static final String ESTADO_CONCLUIDA = "CONCLUIDA";
+    private static final String CAMPO_ORDEM = "ordem";
+    private static final String CAMPO_CRIADO_EM = "criadoEm";
+    private static final String CAMPO_EXPIRES_AT = "expiresAt";
+    private static final String CAMPO_MODO_LEMBRETE = "modoLembrete";
+    private static final String CAMPO_HORARIO = "horario";
+    private static final String CAMPO_CONCLUIDA_EM = "concluidaEm";
+    private static final String CAMPO_LOTE_EXCLUSAO_ID = "loteExclusaoId";
+    private static final String CAMPO_ATUALIZADO_EM = "atualizadoEm";
+    private static final String CAMPO_DESVINCULADA_DA_SERIE = "desvinculadaDaSerie";
+    private static final String CAMPO_TITULO = "titulo";
+    private static final String CAMPO_DESCRICAO = "descricao";
+
     private final MongoCollection<Document> collection;
 
     /** Página de entidades {@link Tarefa}; a conversão para DTO acontece no serviço. */
@@ -42,6 +64,18 @@ public class TarefaRepository {
             int tamanho,
             long totalItens,
             int totalPaginas) {
+    }
+
+    /** Filtro da listagem simples de tarefas ativas do usuário. */
+    public record FiltroListagemTarefas(
+            ObjectId listaId,
+            boolean apenasSemLista,
+            LocalDate dataVencimento,
+            LocalDate dataInicio,
+            LocalDate dataFim,
+            Boolean concluida,
+            String estado,
+            String filtro) {
     }
 
     /**
@@ -65,7 +99,7 @@ public class TarefaRepository {
 
     public TarefaRepository(
             MongoClient client,
-            @ConfigProperty(name = "quarkus.mongodb.database") String database) {
+            @ConfigProperty(name = "quarkus.mongodb.database", defaultValue = "trilhara") String database) {
         this.collection = client.getDatabase(database).getCollection("tarefas");
     }
 
@@ -77,88 +111,91 @@ public class TarefaRepository {
     public boolean atualizar(Tarefa tarefa) {
         Document doc = paraDocumento(tarefa);
         return collection.replaceOne(
-                and(eq("_id", tarefa.id()), eq("usuarioId", tarefa.usuarioId())),
+                and(eq("_id", tarefa.id()), eq(CAMPO_USUARIO_ID, tarefa.usuarioId())),
                 doc,
                 new ReplaceOptions().upsert(false)
         ).getMatchedCount() > 0;
     }
 
     public Optional<Tarefa> buscar(ObjectId usuarioId, ObjectId id) {
-        Document doc = collection.find(and(eq("_id", id), eq("usuarioId", usuarioId))).first();
+        Document doc = collection.find(and(eq("_id", id), eq(CAMPO_USUARIO_ID, usuarioId))).first();
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
 
     public Optional<Tarefa> buscarPorOcorrencia(ObjectId usuarioId, ObjectId serieId, LocalDate dataOriginalOcorrencia) {
         Document doc = collection.find(and(
-                eq("usuarioId", usuarioId),
-                eq("serieId", serieId),
-                eq("dataOriginalOcorrencia", BsonDates.toIso(dataOriginalOcorrencia))
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_SERIE_ID, serieId),
+                eq(CAMPO_DATA_ORIGINAL_OCORRENCIA, BsonDates.toIso(dataOriginalOcorrencia))
         )).first();
         return Optional.ofNullable(doc).map(this::paraEntidade);
     }
 
-    public List<Tarefa> listar(
-            ObjectId usuarioId,
-            ObjectId listaId,
-            boolean apenasSemLista,
-            LocalDate dataVencimento,
-            LocalDate dataInicio,
-            LocalDate dataFim,
-            Boolean concluida,
-            String estado,
-            String filtro) {
+    public List<Tarefa> listar(ObjectId usuarioId, FiltroListagemTarefas filtro) {
         List<Bson> filtros = new ArrayList<>();
-        filtros.add(eq("usuarioId", usuarioId));
-        filtros.add(eq("deletedAt", null));
+        filtros.add(eq(CAMPO_USUARIO_ID, usuarioId));
+        filtros.add(eq(CAMPO_DELETED_AT, null));
 
-        if (apenasSemLista) {
-            filtros.add(eq("listaId", null));
-        } else if (listaId != null) {
-            filtros.add(eq("listaId", listaId));
+        adicionarFiltroLista(filtros, filtro.apenasSemLista(), filtro.listaId());
+        adicionarFiltrosDataVencimento(filtros, filtro.dataVencimento(), filtro.dataInicio(), filtro.dataFim());
+
+        if (filtro.concluida() != null) {
+            filtros.add(eq(CAMPO_CONCLUIDA, filtro.concluida()));
         }
 
-        if (dataVencimento != null) {
-            filtros.add(eq("dataVencimento", BsonDates.toIso(dataVencimento)));
-        } else if (dataInicio != null && dataFim != null) {
-            filtros.add(gte("dataVencimento", BsonDates.toIso(dataInicio)));
-            filtros.add(lte("dataVencimento", BsonDates.toIso(dataFim)));
-        } else if (dataInicio != null) {
-            filtros.add(gte("dataVencimento", BsonDates.toIso(dataInicio)));
-        } else if (dataFim != null) {
-            filtros.add(lte("dataVencimento", BsonDates.toIso(dataFim)));
+        if (filtro.estado() != null && !filtro.estado().isBlank()) {
+            filtros.add(eq(CAMPO_ESTADO, filtro.estado()));
         }
 
-        if (concluida != null) {
-            filtros.add(eq("concluida", concluida));
-        }
-
-        if (estado != null && !estado.isBlank()) {
-            filtros.add(eq("estado", estado));
-        }
-
-        if (filtro != null) {
-            switch (filtro.trim().toLowerCase()) {
-                case "concluidas" -> filtros.add(eq("concluida", true));
-                case "pendentes" -> filtros.add(eq("estado", "PENDENTE"));
-                case "sem_data" -> filtros.add(eq("dataVencimento", null));
+        if (filtro.filtro() != null) {
+            switch (filtro.filtro().trim().toLowerCase()) {
+                case "concluidas" -> filtros.add(eq(CAMPO_CONCLUIDA, true));
+                case "pendentes" -> filtros.add(eq(CAMPO_ESTADO, ESTADO_PENDENTE));
+                case "sem_data" -> filtros.add(eq(CAMPO_DATA_VENCIMENTO, null));
+                default -> { /* outros filtros ignorados */ }
             }
         }
 
         List<Tarefa> resultado = new ArrayList<>();
         collection.find(and(filtros))
-                .sort(Sorts.ascending("ordem", "criadoEm"))
+                .sort(Sorts.ascending(CAMPO_ORDEM, CAMPO_CRIADO_EM))
                 .forEach(doc -> resultado.add(paraEntidade(doc)));
         return resultado;
+    }
+
+    private static void adicionarFiltroLista(List<Bson> filtros, boolean apenasSemLista, ObjectId listaId) {
+        if (apenasSemLista) {
+            filtros.add(eq(CAMPO_LISTA_ID, null));
+        } else if (listaId != null) {
+            filtros.add(eq(CAMPO_LISTA_ID, listaId));
+        }
+    }
+
+    private static void adicionarFiltrosDataVencimento(
+            List<Bson> filtros,
+            LocalDate dataVencimento,
+            LocalDate dataInicio,
+            LocalDate dataFim) {
+        if (dataVencimento != null) {
+            filtros.add(eq(CAMPO_DATA_VENCIMENTO, BsonDates.toIso(dataVencimento)));
+            return;
+        }
+        if (dataInicio != null) {
+            filtros.add(gte(CAMPO_DATA_VENCIMENTO, BsonDates.toIso(dataInicio)));
+        }
+        if (dataFim != null) {
+            filtros.add(lte(CAMPO_DATA_VENCIMENTO, BsonDates.toIso(dataFim)));
+        }
     }
 
     public List<Tarefa> listarAtrasadas(ObjectId usuarioId, LocalDate hojeLocal) {
         List<Tarefa> resultado = new ArrayList<>();
         collection.find(and(
-                eq("usuarioId", usuarioId),
-                eq("deletedAt", null),
-                eq("estado", "PENDENTE"),
-                ne("dataVencimento", null),
-                lt("dataVencimento", BsonDates.toIso(hojeLocal))
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_DELETED_AT, null),
+                eq(CAMPO_ESTADO, ESTADO_PENDENTE),
+                ne(CAMPO_DATA_VENCIMENTO, null),
+                lt(CAMPO_DATA_VENCIMENTO, BsonDates.toIso(hojeLocal))
         )).forEach(doc -> resultado.add(paraEntidade(doc)));
         return resultado;
     }
@@ -166,10 +203,10 @@ public class TarefaRepository {
     public List<Tarefa> listarHoje(ObjectId usuarioId, LocalDate hojeLocal) {
         List<Tarefa> resultado = new ArrayList<>();
         collection.find(and(
-                eq("usuarioId", usuarioId),
-                eq("deletedAt", null),
-                eq("estado", "PENDENTE"),
-                eq("dataVencimento", BsonDates.toIso(hojeLocal))
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_DELETED_AT, null),
+                eq(CAMPO_ESTADO, ESTADO_PENDENTE),
+                eq(CAMPO_DATA_VENCIMENTO, BsonDates.toIso(hojeLocal))
         )).forEach(doc -> resultado.add(paraEntidade(doc)));
         return resultado;
     }
@@ -177,10 +214,10 @@ public class TarefaRepository {
     public List<Tarefa> listarSemData(ObjectId usuarioId) {
         List<Tarefa> resultado = new ArrayList<>();
         collection.find(and(
-                eq("usuarioId", usuarioId),
-                eq("deletedAt", null),
-                eq("estado", "PENDENTE"),
-                eq("dataVencimento", null)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_DELETED_AT, null),
+                eq(CAMPO_ESTADO, ESTADO_PENDENTE),
+                eq(CAMPO_DATA_VENCIMENTO, null)
         )).forEach(doc -> resultado.add(paraEntidade(doc)));
         return resultado;
     }
@@ -188,10 +225,10 @@ public class TarefaRepository {
     public List<Tarefa> listarLixeira(ObjectId usuarioId, Instant agora) {
         List<Tarefa> resultado = new ArrayList<>();
         collection.find(and(
-                eq("usuarioId", usuarioId),
-                ne("deletedAt", null),
-                gt("expiresAt", BsonDates.toBsonDate(agora))
-        )).sort(Sorts.descending("deletedAt"))
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                ne(CAMPO_DELETED_AT, null),
+                gt(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(agora))
+        )).sort(Sorts.descending(CAMPO_DELETED_AT))
           .forEach(doc -> resultado.add(paraEntidade(doc)));
         return resultado;
     }
@@ -199,12 +236,12 @@ public class TarefaRepository {
     public List<Tarefa> listarAtivasComHorarioEPadraoLembrete(ObjectId usuarioId) {
         List<Tarefa> resultado = new ArrayList<>();
         var filtro = and(
-                eq("usuarioId", usuarioId),
-                eq("deletedAt", null),
-                eq("concluida", false),
-                eq("modoLembrete", ModoLembrete.HERDAR.name()),
-                ne("horario", null),
-                ne("dataVencimento", null)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_DELETED_AT, null),
+                eq(CAMPO_CONCLUIDA, false),
+                eq(CAMPO_MODO_LEMBRETE, ModoLembrete.HERDAR.name()),
+                ne(CAMPO_HORARIO, null),
+                ne(CAMPO_DATA_VENCIMENTO, null)
         );
         collection.find(filtro).forEach(doc -> resultado.add(paraEntidade(doc)));
         return resultado;
@@ -220,67 +257,28 @@ public class TarefaRepository {
  * documento, sem campo duplicado.</p>
  */
     public PaginaTarefas listarPaginado(FiltroPaginacaoTarefas filtro) {
-        List<Bson> filtros = new ArrayList<>();
-        filtros.add(eq("usuarioId", filtro.usuarioId()));
-        filtros.add(eq("deletedAt", null));
-
-        if (filtro.apenasSemLista()) {
-            filtros.add(eq("listaId", null));
-        } else if (filtro.listaId() != null) {
-            filtros.add(eq("listaId", filtro.listaId()));
-        }
-
-        if (filtro.dataVencimento() != null) {
-            filtros.add(eq("dataVencimento", BsonDates.toIso(filtro.dataVencimento())));
-        } else if (filtro.dataInicio() != null && filtro.dataFim() != null) {
-            filtros.add(gte("dataVencimento", BsonDates.toIso(filtro.dataInicio())));
-            filtros.add(lte("dataVencimento", BsonDates.toIso(filtro.dataFim())));
-        } else if (filtro.dataInicio() != null) {
-            filtros.add(gte("dataVencimento", BsonDates.toIso(filtro.dataInicio())));
-        } else if (filtro.dataFim() != null) {
-            filtros.add(lte("dataVencimento", BsonDates.toIso(filtro.dataFim())));
-        }
-
-        if (filtro.estado() != null) {
-            filtros.add(eq("estado", filtro.estado()));
-        }
-        if (filtro.concluida() != null) {
-            filtros.add(eq("concluida", filtro.concluida()));
-        }
-
-        if ("CONCLUIDAS".equalsIgnoreCase(filtro.filtro())) {
-            filtros.add(eq("estado", "CONCLUIDA"));
-        }
-        if ("TODAS".equalsIgnoreCase(filtro.filtro())) {
-            filtros.add(ne("estado", "CANCELADA"));
-        }
-        if ("FUTURO".equalsIgnoreCase(filtro.filtro())) {
-            filtros.add(eq("estado", "PENDENTE"));
-            filtros.add(gte("dataVencimento", BsonDates.toIso(filtro.hojeLocal())));
-        }
-
-        Bson predicado = and(filtros);
+        Bson predicado = construirPredicadoPaginacao(filtro);
         long totalItens = collection.countDocuments(predicado);
         int totalPaginas = totalItens > 0 ? (int) Math.ceil((double) totalItens / filtro.tamanho()) : 1;
 
         boolean somenteConcluidas = Boolean.TRUE.equals(filtro.concluida())
-                || "CONCLUIDA".equalsIgnoreCase(filtro.estado())
+                || ESTADO_CONCLUIDA.equalsIgnoreCase(filtro.estado())
                 || "CONCLUIDAS".equalsIgnoreCase(filtro.filtro());
 
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(predicado));
         if (somenteConcluidas) {
             pipeline.add(Aggregates.sort(Sorts.orderBy(
-                    Sorts.descending("concluidaEm"), Sorts.descending("_id"))));
+                    Sorts.descending(CAMPO_CONCLUIDA_EM), Sorts.descending("_id"))));
         } else {
             pipeline.add(Aggregates.addFields(
                     new Field<>("_prioridadePeso", pesoPrioridadeExpressao()),
                     new Field<>("_semData", semDataExpressao())));
             pipeline.add(Aggregates.sort(Sorts.orderBy(
                     Sorts.ascending("_semData"),
-                    Sorts.ascending("dataVencimento"),
+                    Sorts.ascending(CAMPO_DATA_VENCIMENTO),
                     Sorts.descending("_prioridadePeso"),
-                    Sorts.ascending("ordem"),
+                    Sorts.ascending(CAMPO_ORDEM),
                     Sorts.ascending("_id"))));
         }
         pipeline.add(Aggregates.skip((filtro.pagina() - 1) * filtro.tamanho()));
@@ -292,12 +290,39 @@ public class TarefaRepository {
         return new PaginaTarefas(itens, filtro.pagina(), filtro.tamanho(), totalItens, totalPaginas);
     }
 
+    private static Bson construirPredicadoPaginacao(FiltroPaginacaoTarefas filtro) {
+        List<Bson> filtros = new ArrayList<>();
+        filtros.add(eq(CAMPO_USUARIO_ID, filtro.usuarioId()));
+        filtros.add(eq(CAMPO_DELETED_AT, null));
+
+        adicionarFiltroLista(filtros, filtro.apenasSemLista(), filtro.listaId());
+        adicionarFiltrosDataVencimento(filtros, filtro.dataVencimento(), filtro.dataInicio(), filtro.dataFim());
+
+        if (filtro.estado() != null) {
+            filtros.add(eq(CAMPO_ESTADO, filtro.estado()));
+        }
+        if (filtro.concluida() != null) {
+            filtros.add(eq(CAMPO_CONCLUIDA, filtro.concluida()));
+        }
+
+        if ("CONCLUIDAS".equalsIgnoreCase(filtro.filtro())) {
+            filtros.add(eq(CAMPO_ESTADO, ESTADO_CONCLUIDA));
+        } else if ("TODAS".equalsIgnoreCase(filtro.filtro())) {
+            filtros.add(ne(CAMPO_ESTADO, "CANCELADA"));
+        } else if ("FUTURO".equalsIgnoreCase(filtro.filtro())) {
+            filtros.add(eq(CAMPO_ESTADO, ESTADO_PENDENTE));
+            filtros.add(gte(CAMPO_DATA_VENCIMENTO, BsonDates.toIso(filtro.hojeLocal())));
+        }
+
+        return and(filtros);
+    }
+
     /** Lixeira paginada de tarefas, com filtro {@code expiresAt > agora}. */
     public PaginaTarefas listarLixeiraPaginada(ObjectId usuarioId, Instant agora, int pagina, int tamanho) {
         Bson predicado = and(
-                eq("usuarioId", usuarioId),
-                ne("deletedAt", null),
-                gt("expiresAt", BsonDates.toBsonDate(agora))
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                ne(CAMPO_DELETED_AT, null),
+                gt(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(agora))
         );
 
         long totalItens = collection.countDocuments(predicado);
@@ -305,7 +330,7 @@ public class TarefaRepository {
 
         List<Tarefa> itens = new ArrayList<>();
         collection.find(predicado)
-                .sort(Sorts.orderBy(Sorts.descending("deletedAt"), Sorts.descending("_id")))
+                .sort(Sorts.orderBy(Sorts.descending(CAMPO_DELETED_AT), Sorts.descending("_id")))
                 .skip((pagina - 1) * tamanho)
                 .limit(tamanho)
                 .forEach(doc -> itens.add(paraEntidade(doc)));
@@ -334,65 +359,65 @@ public class TarefaRepository {
 
     public boolean moverParaLixeira(ObjectId usuarioId, ObjectId id, String loteExclusaoId, Instant agora, Instant expiresAt) {
         return collection.updateOne(
-                and(eq("_id", id), eq("usuarioId", usuarioId)),
+                and(eq("_id", id), eq(CAMPO_USUARIO_ID, usuarioId)),
                 Updates.combine(
-                        Updates.set("deletedAt", BsonDates.toBsonDate(agora)),
-                        Updates.set("expiresAt", BsonDates.toBsonDate(expiresAt)),
-                        Updates.set("loteExclusaoId", loteExclusaoId),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(agora))
+                        Updates.set(CAMPO_DELETED_AT, BsonDates.toBsonDate(agora)),
+                        Updates.set(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(expiresAt)),
+                        Updates.set(CAMPO_LOTE_EXCLUSAO_ID, loteExclusaoId),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(agora))
                 )
         ).getModifiedCount() > 0;
     }
 
     public long moverPorListaParaLixeira(ObjectId usuarioId, ObjectId listaId, String loteExclusaoId, Instant agora, Instant expiresAt) {
         return collection.updateMany(
-                and(eq("usuarioId", usuarioId), eq("listaId", listaId), eq("deletedAt", null)),
+                and(eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_LISTA_ID, listaId), eq(CAMPO_DELETED_AT, null)),
                 Updates.combine(
-                        Updates.set("deletedAt", BsonDates.toBsonDate(agora)),
-                        Updates.set("expiresAt", BsonDates.toBsonDate(expiresAt)),
-                        Updates.set("loteExclusaoId", loteExclusaoId),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(agora))
+                        Updates.set(CAMPO_DELETED_AT, BsonDates.toBsonDate(agora)),
+                        Updates.set(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(expiresAt)),
+                        Updates.set(CAMPO_LOTE_EXCLUSAO_ID, loteExclusaoId),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(agora))
                 )
         ).getModifiedCount();
     }
 
     public boolean restaurar(ObjectId usuarioId, ObjectId id, ObjectId novaListaId) {
         List<Bson> updates = new ArrayList<>();
-        updates.add(Updates.unset("deletedAt"));
-        updates.add(Updates.unset("expiresAt"));
-        updates.add(Updates.unset("loteExclusaoId"));
-        updates.add(Updates.set("atualizadoEm", BsonDates.toBsonDate(Instant.now())));
+        updates.add(Updates.unset(CAMPO_DELETED_AT));
+        updates.add(Updates.unset(CAMPO_EXPIRES_AT));
+        updates.add(Updates.unset(CAMPO_LOTE_EXCLUSAO_ID));
+        updates.add(Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now())));
         if (novaListaId != null) {
-            updates.add(Updates.set("listaId", novaListaId));
+            updates.add(Updates.set(CAMPO_LISTA_ID, novaListaId));
         } else {
-            updates.add(Updates.unset("listaId"));
+            updates.add(Updates.unset(CAMPO_LISTA_ID));
         }
 
         return collection.updateOne(
-                and(eq("_id", id), eq("usuarioId", usuarioId)),
+                and(eq("_id", id), eq(CAMPO_USUARIO_ID, usuarioId)),
                 Updates.combine(updates)
         ).getModifiedCount() > 0;
     }
 
     public long restaurarPorLote(ObjectId usuarioId, ObjectId listaId, String loteExclusaoId) {
         return collection.updateMany(
-                and(eq("usuarioId", usuarioId), eq("listaId", listaId), eq("loteExclusaoId", loteExclusaoId)),
+                and(eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_LISTA_ID, listaId), eq(CAMPO_LOTE_EXCLUSAO_ID, loteExclusaoId)),
                 Updates.combine(
-                        Updates.unset("deletedAt"),
-                        Updates.unset("expiresAt"),
-                        Updates.unset("loteExclusaoId"),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(Instant.now()))
+                        Updates.unset(CAMPO_DELETED_AT),
+                        Updates.unset(CAMPO_EXPIRES_AT),
+                        Updates.unset(CAMPO_LOTE_EXCLUSAO_ID),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))
                 )
         ).getModifiedCount();
     }
 
     public long removerPendentesFuturas(ObjectId usuarioId, ObjectId serieId, LocalDate aPartirDe) {
         return collection.deleteMany(and(
-                eq("usuarioId", usuarioId),
-                eq("serieId", serieId),
-                gte("dataOriginalOcorrencia", BsonDates.toIso(aPartirDe)),
-                ne("estado", "CONCLUIDA"),
-                ne("desvinculadaDaSerie", true)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_SERIE_ID, serieId),
+                gte(CAMPO_DATA_ORIGINAL_OCORRENCIA, BsonDates.toIso(aPartirDe)),
+                ne(CAMPO_ESTADO, ESTADO_CONCLUIDA),
+                ne(CAMPO_DESVINCULADA_DA_SERIE, true)
         )).getDeletedCount();
     }
 
@@ -402,7 +427,7 @@ public class TarefaRepository {
  */
     public List<ObjectId> listarIdsPorSerie(ObjectId usuarioId, ObjectId serieId) {
         List<ObjectId> ids = new ArrayList<>();
-        collection.find(and(eq("usuarioId", usuarioId), eq("serieId", serieId)))
+        collection.find(and(eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_SERIE_ID, serieId)))
                 .projection(new Document("_id", 1))
                 .forEach(doc -> ids.add(doc.getObjectId("_id")));
         return ids;
@@ -411,16 +436,16 @@ public class TarefaRepository {
     public long moverPendentesSerieParaLixeira(ObjectId usuarioId, ObjectId serieId, String loteExclusaoId, Instant agora, Instant expiresAt) {
         return collection.updateMany(
                 and(
-                        eq("usuarioId", usuarioId),
-                        eq("serieId", serieId),
-                        eq("estado", "PENDENTE"),
-                        eq("deletedAt", null)
+                        eq(CAMPO_USUARIO_ID, usuarioId),
+                        eq(CAMPO_SERIE_ID, serieId),
+                        eq(CAMPO_ESTADO, ESTADO_PENDENTE),
+                        eq(CAMPO_DELETED_AT, null)
                 ),
                 Updates.combine(
-                        Updates.set("deletedAt", BsonDates.toBsonDate(agora)),
-                        Updates.set("expiresAt", BsonDates.toBsonDate(expiresAt)),
-                        Updates.set("loteExclusaoId", loteExclusaoId),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(agora))
+                        Updates.set(CAMPO_DELETED_AT, BsonDates.toBsonDate(agora)),
+                        Updates.set(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(expiresAt)),
+                        Updates.set(CAMPO_LOTE_EXCLUSAO_ID, loteExclusaoId),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(agora))
                 )
         ).getModifiedCount();
     }
@@ -439,152 +464,134 @@ public class TarefaRepository {
             Instant expiresAt) {
         return collection.updateMany(
                 and(
-                        eq("usuarioId", usuarioId),
-                        eq("serieId", serieId),
-                        gte("dataOriginalOcorrencia", BsonDates.toIso(aPartirDe)),
-                        eq("estado", "PENDENTE"),
-                        eq("deletedAt", null)
+                        eq(CAMPO_USUARIO_ID, usuarioId),
+                        eq(CAMPO_SERIE_ID, serieId),
+                        gte(CAMPO_DATA_ORIGINAL_OCORRENCIA, BsonDates.toIso(aPartirDe)),
+                        eq(CAMPO_ESTADO, ESTADO_PENDENTE),
+                        eq(CAMPO_DELETED_AT, null)
                 ),
                 Updates.combine(
-                        Updates.set("deletedAt", BsonDates.toBsonDate(agora)),
-                        Updates.set("expiresAt", BsonDates.toBsonDate(expiresAt)),
-                        Updates.set("loteExclusaoId", loteExclusaoId),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(agora))
+                        Updates.set(CAMPO_DELETED_AT, BsonDates.toBsonDate(agora)),
+                        Updates.set(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(expiresAt)),
+                        Updates.set(CAMPO_LOTE_EXCLUSAO_ID, loteExclusaoId),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(agora))
                 )
         ).getModifiedCount();
     }
 
     public long desvincularLista(ObjectId usuarioId, ObjectId listaId) {
         return collection.updateMany(
-                and(eq("usuarioId", usuarioId), eq("listaId", listaId)),
+                and(eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_LISTA_ID, listaId)),
                 Updates.combine(
-                        Updates.unset("listaId"),
-                        Updates.set("atualizadoEm", BsonDates.toBsonDate(Instant.now()))
+                        Updates.unset(CAMPO_LISTA_ID),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))
                 )
         ).getModifiedCount();
     }
 
     public long esvaziarLixeira(ObjectId usuarioId) {
         return collection.deleteMany(and(
-                eq("usuarioId", usuarioId),
-                ne("deletedAt", null)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                ne(CAMPO_DELETED_AT, null)
         )).getDeletedCount();
     }
 
     public long purgarExpiradas(Instant agora) {
         return collection.deleteMany(and(
-                ne("deletedAt", null),
-                lte("expiresAt", BsonDates.toBsonDate(agora))
+                ne(CAMPO_DELETED_AT, null),
+                lte(CAMPO_EXPIRES_AT, BsonDates.toBsonDate(agora))
         )).getDeletedCount();
     }
 
     public boolean removerDefinitivamente(ObjectId usuarioId, ObjectId id) {
-        return collection.deleteOne(and(eq("_id", id), eq("usuarioId", usuarioId))).getDeletedCount() > 0;
+        return collection.deleteOne(and(eq("_id", id), eq(CAMPO_USUARIO_ID, usuarioId))).getDeletedCount() > 0;
     }
 
     public long contarPorLista(ObjectId usuarioId, ObjectId listaId) {
         return collection.countDocuments(and(
-                eq("usuarioId", usuarioId),
-                eq("listaId", listaId),
-                eq("deletedAt", null)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_LISTA_ID, listaId),
+                eq(CAMPO_DELETED_AT, null)
         ));
     }
 
     /** Total de ocorrências materializadas de uma série (inclui lixeira e concluídas). */
     public long contarPorSerie(ObjectId usuarioId, ObjectId serieId) {
         return collection.countDocuments(and(
-                eq("usuarioId", usuarioId),
-                eq("serieId", serieId)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_SERIE_ID, serieId)
         ));
     }
 
     /** Contagem por estado de conclusão para o impacto de exclusão da lista. */
     public long contarPorListaPorConclusao(ObjectId usuarioId, ObjectId listaId, boolean concluida) {
         return collection.countDocuments(and(
-                eq("usuarioId", usuarioId),
-                eq("listaId", listaId),
-                eq("concluida", concluida),
-                eq("deletedAt", null)
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_LISTA_ID, listaId),
+                eq(CAMPO_CONCLUIDA, concluida),
+                eq(CAMPO_DELETED_AT, null)
         ));
     }
 
     public int proximaOrdem(ObjectId usuarioId, ObjectId listaId) {
         Bson filtro = listaId != null
-                ? and(eq("usuarioId", usuarioId), eq("listaId", listaId), eq("deletedAt", null))
-                : and(eq("usuarioId", usuarioId), eq("listaId", null), eq("deletedAt", null));
-        Document doc = collection.find(filtro).sort(Sorts.descending("ordem")).first();
-        if (doc != null && doc.getInteger("ordem") != null) {
-            return doc.getInteger("ordem") + 1;
+                ? and(eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_LISTA_ID, listaId), eq(CAMPO_DELETED_AT, null))
+                : and(eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_LISTA_ID, null), eq(CAMPO_DELETED_AT, null));
+        Document doc = collection.find(filtro).sort(Sorts.descending(CAMPO_ORDEM)).first();
+        if (doc != null && doc.getInteger(CAMPO_ORDEM) != null) {
+            return doc.getInteger(CAMPO_ORDEM) + 1;
         }
         return 0;
     }
 
     public Document paraDocumento(Tarefa t) {
         Document doc = new Document();
-        if (t.id() != null) {
-            doc.put("_id", t.id());
-        }
-        doc.put("usuarioId", t.usuarioId());
-        if (t.listaId() != null) {
-            doc.put("listaId", t.listaId());
-        }
-        if (t.serieId() != null) {
-            doc.put("serieId", t.serieId());
-        }
-        if (t.dataOriginalOcorrencia() != null) {
-            doc.put("dataOriginalOcorrencia", BsonDates.toIso(t.dataOriginalOcorrencia()));
-        }
-        doc.put("desvinculadaDaSerie", t.desvinculadaDaSerie());
-        doc.put("titulo", t.titulo());
-        if (t.descricao() != null) {
-            doc.put("descricao", t.descricao());
-        }
+        colocarSePresente(doc, "_id", t.id());
+        doc.put(CAMPO_USUARIO_ID, t.usuarioId());
+        colocarSePresente(doc, CAMPO_LISTA_ID, t.listaId());
+        colocarSePresente(doc, CAMPO_SERIE_ID, t.serieId());
+        colocarSePresente(doc, CAMPO_DATA_ORIGINAL_OCORRENCIA, BsonDates.toIso(t.dataOriginalOcorrencia()));
+        doc.put(CAMPO_DESVINCULADA_DA_SERIE, t.desvinculadaDaSerie());
+        doc.put(CAMPO_TITULO, t.titulo());
+        colocarSePresente(doc, CAMPO_DESCRICAO, t.descricao());
         doc.put("prioridade", t.prioridade().getValor());
-        if (t.dataVencimento() != null) {
-            doc.put("dataVencimento", BsonDates.toIso(t.dataVencimento()));
-        }
-        if (t.horario() != null) {
-            doc.put("horario", t.horario());
-        }
-        doc.put("estado", t.estado());
-        doc.put("concluida", t.concluida());
+        colocarSePresente(doc, CAMPO_DATA_VENCIMENTO, BsonDates.toIso(t.dataVencimento()));
+        colocarSePresente(doc, CAMPO_HORARIO, t.horario());
+        doc.put(CAMPO_ESTADO, t.estado());
+        doc.put(CAMPO_CONCLUIDA, t.concluida());
         doc.put("concluido", t.concluida()); // index compatibility
-        if (t.concluidaEm() != null) {
-            doc.put("concluidaEm", BsonDates.toBsonDate(t.concluidaEm()));
-        }
-        doc.put("ordem", t.ordem());
+        colocarSePresente(doc, CAMPO_CONCLUIDA_EM, BsonDates.toBsonDate(t.concluidaEm()));
+        doc.put(CAMPO_ORDEM, t.ordem());
+        doc.put("subtarefas", converterSubtarefasParaDoc(t.subtarefas()));
+        doc.put(CAMPO_MODO_LEMBRETE, t.modoLembrete().name());
+        colocarSePresente(doc, "lembreteMinutosAntes", t.lembreteMinutosAntes());
+        colocarSePresente(doc, "fusoAgendamento", t.fusoAgendamento());
+        colocarSePresente(doc, CAMPO_DELETED_AT, BsonDates.toBsonDate(t.deletedAt()));
+        colocarSePresente(doc, CAMPO_EXPIRES_AT, BsonDates.toBsonDate(t.expiresAt()));
+        colocarSePresente(doc, CAMPO_LOTE_EXCLUSAO_ID, t.loteExclusaoId());
+        doc.put(CAMPO_CRIADO_EM, BsonDates.toBsonDate(t.criadoEm()));
+        doc.put(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(t.atualizadoEm()));
+        return doc;
+    }
 
+    private List<Document> converterSubtarefasParaDoc(List<Subtarefa> subtarefas) {
         List<Document> subsDocs = new ArrayList<>();
-        if (t.subtarefas() != null) {
-            for (Subtarefa sub : t.subtarefas()) {
+        if (subtarefas != null) {
+            for (Subtarefa sub : subtarefas) {
                 subsDocs.add(new Document()
                         .append("id", sub.id())
-                        .append("titulo", sub.titulo())
-                        .append("concluida", sub.concluida())
-                        .append("ordem", sub.ordem()));
+                        .append(CAMPO_TITULO, sub.titulo())
+                        .append(CAMPO_CONCLUIDA, sub.concluida())
+                        .append(CAMPO_ORDEM, sub.ordem()));
             }
         }
-        doc.put("subtarefas", subsDocs);
+        return subsDocs;
+    }
 
-        doc.put("modoLembrete", t.modoLembrete().name());
-        if (t.lembreteMinutosAntes() != null) {
-            doc.put("lembreteMinutosAntes", t.lembreteMinutosAntes());
+    private static void colocarSePresente(Document doc, String chave, Object valor) {
+        if (valor != null) {
+            doc.put(chave, valor);
         }
-        if (t.fusoAgendamento() != null) {
-            doc.put("fusoAgendamento", t.fusoAgendamento());
-        }
-        if (t.deletedAt() != null) {
-            doc.put("deletedAt", BsonDates.toBsonDate(t.deletedAt()));
-        }
-        if (t.expiresAt() != null) {
-            doc.put("expiresAt", BsonDates.toBsonDate(t.expiresAt()));
-        }
-        if (t.loteExclusaoId() != null) {
-            doc.put("loteExclusaoId", t.loteExclusaoId());
-        }
-        doc.put("criadoEm", BsonDates.toBsonDate(t.criadoEm()));
-        doc.put("atualizadoEm", BsonDates.toBsonDate(t.atualizadoEm()));
-        return doc;
     }
 
     public Tarefa paraEntidade(Document doc) {
@@ -594,46 +601,46 @@ public class TarefaRepository {
             for (Document subDoc : subsDocs) {
                 subtarefas.add(new Subtarefa(
                         subDoc.getString("id"),
-                        subDoc.getString("titulo"),
-                        Boolean.TRUE.equals(subDoc.getBoolean("concluida")),
-                        subDoc.getInteger("ordem", 0)
+                        subDoc.getString(CAMPO_TITULO),
+                        Boolean.TRUE.equals(subDoc.getBoolean(CAMPO_CONCLUIDA)),
+                        subDoc.getInteger(CAMPO_ORDEM, 0)
                 ));
             }
         }
 
-        String estado = doc.getString("estado");
-        boolean concluida = Boolean.TRUE.equals(doc.getBoolean("concluida"))
+        String estado = doc.getString(CAMPO_ESTADO);
+        boolean concluida = Boolean.TRUE.equals(doc.getBoolean(CAMPO_CONCLUIDA))
                 || Boolean.TRUE.equals(doc.getBoolean("concluido"))
-                || "CONCLUIDA".equalsIgnoreCase(estado);
+                || ESTADO_CONCLUIDA.equalsIgnoreCase(estado);
         if (estado == null) {
-            estado = concluida ? "CONCLUIDA" : "PENDENTE";
+            estado = concluida ? ESTADO_CONCLUIDA : ESTADO_PENDENTE;
         }
 
         return new Tarefa(
                 doc.getObjectId("_id"),
-                doc.getObjectId("usuarioId"),
-                doc.getObjectId("listaId"),
-                doc.getObjectId("serieId"),
-                BsonDates.lerLocalDate(doc, "dataOriginalOcorrencia"),
-                Boolean.TRUE.equals(doc.getBoolean("desvinculadaDaSerie", false)),
-                doc.getString("titulo"),
-                doc.getString("descricao") != null ? doc.getString("descricao") : doc.getString("observacoes"),
+                doc.getObjectId(CAMPO_USUARIO_ID),
+                doc.getObjectId(CAMPO_LISTA_ID),
+                doc.getObjectId(CAMPO_SERIE_ID),
+                BsonDates.lerLocalDate(doc, CAMPO_DATA_ORIGINAL_OCORRENCIA),
+                Boolean.TRUE.equals(doc.getBoolean(CAMPO_DESVINCULADA_DA_SERIE, false)),
+                doc.getString(CAMPO_TITULO),
+                doc.getString(doc.getString(CAMPO_DESCRICAO) != null ? CAMPO_DESCRICAO : "observacoes"),
                 PrioridadeTarefa.fromString(doc.getString("prioridade")),
-                BsonDates.lerLocalDate(doc, "dataVencimento"),
-                doc.getString("horario"),
+                BsonDates.lerLocalDate(doc, CAMPO_DATA_VENCIMENTO),
+                doc.getString(CAMPO_HORARIO),
                 estado,
                 concluida,
-                BsonDates.lerInstant(doc, "concluidaEm"),
-                doc.getInteger("ordem", 0),
+                BsonDates.lerInstant(doc, CAMPO_CONCLUIDA_EM),
+                doc.getInteger(CAMPO_ORDEM, 0),
                 subtarefas,
-                ModoLembrete.fromString(doc.getString("modoLembrete")),
+                ModoLembrete.fromString(doc.getString(CAMPO_MODO_LEMBRETE)),
                 doc.getInteger("lembreteMinutosAntes"),
                 doc.getString("fusoAgendamento"),
-                BsonDates.lerInstant(doc, "deletedAt"),
-                BsonDates.lerInstant(doc, "expiresAt"),
-                doc.getString("loteExclusaoId"),
-                BsonDates.lerInstant(doc, "criadoEm"),
-                BsonDates.lerInstant(doc, "atualizadoEm")
+                BsonDates.lerInstant(doc, CAMPO_DELETED_AT),
+                BsonDates.lerInstant(doc, CAMPO_EXPIRES_AT),
+                doc.getString(CAMPO_LOTE_EXCLUSAO_ID),
+                BsonDates.lerInstant(doc, CAMPO_CRIADO_EM),
+                BsonDates.lerInstant(doc, CAMPO_ATUALIZADO_EM)
         );
     }
 }

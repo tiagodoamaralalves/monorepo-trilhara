@@ -33,8 +33,12 @@ import jakarta.ws.rs.core.Response;
 @Autenticado
 public class CronogramaResource {
 
+    private final CronogramaService service;
+
     @Inject
-    CronogramaService service;
+    public CronogramaResource(CronogramaService service) {
+        this.service = service;
+    }
 
     @GET
     public List<CronogramaDTO> listar(@PathParam("trilhaId") String trilhaId) {
@@ -91,7 +95,9 @@ public class CronogramaResource {
         LocalDate dFim = dataFim != null && !dataFim.isBlank() ? LocalDate.parse(dataFim) : null;
 
         return service.listarBlocosPaginado(
-                trilhaId, cronogramaId, concluido, statusData, dInicio, dFim, pagina, tamanho);
+                trilhaId,
+                cronogramaId,
+                new CronogramaService.FiltroListagemBlocos(concluido, statusData, dInicio, dFim, pagina, tamanho));
     }
 
     @POST

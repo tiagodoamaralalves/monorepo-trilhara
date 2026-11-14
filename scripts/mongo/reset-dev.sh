@@ -72,4 +72,3 @@ if ! executar_mongosh 'db.dropDatabase()'; then
 fi
 
 echo "reset-dev: banco '$BANCO' removido. Reinicie a aplicação para recriar as 20 coleções e os índices canônicos."
-echo "reset-dev: gate sugerido: bash scripts/verificar-legado.sh"

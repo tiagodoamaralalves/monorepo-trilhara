@@ -1,6 +1,7 @@
 package br.com.trilhara.nota;
 
 import java.time.Instant;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import br.com.trilhara.shared.SystemScope;
@@ -21,17 +22,17 @@ public class NotaPurgaService {
 
     private static final Logger LOG = Logger.getLogger(NotaPurgaService.class.getName());
 
-    private final NotaService notaService;
+    private final NotaLixeiraService notaLixeiraService;
 
     @Inject
-    public NotaPurgaService(NotaService notaService) {
-        this.notaService = notaService;
+    public NotaPurgaService(NotaLixeiraService notaLixeiraService) {
+        this.notaLixeiraService = notaLixeiraService;
     }
 
     /** Remove definitivamente páginas, seções e cadernos com {@code expiresAt <= agora}. */
     public int purgarExpirados(Instant agora) {
-        int total = notaService.purgarExpiradasGlobal(agora);
-        LOG.fine("Purga da lixeira de Notas concluída. Itens removidos: " + total);
+        int total = notaLixeiraService.purgarExpiradasGlobal(agora);
+        LOG.log(Level.FINE, "Purga da lixeira de Notas concluída. Itens removidos: {0}", total);
         return total;
     }
 }

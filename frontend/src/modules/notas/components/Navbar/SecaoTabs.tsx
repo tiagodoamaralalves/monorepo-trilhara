@@ -16,7 +16,7 @@ export interface SecaoTabsProps {
  * Abas de seção do caderno ativo.
  *
  * A exclusão da última seção é permitida: o caderno pode ficar temporariamente com zero seções
- * ativas e exibe o estado vazio orientando criar uma seção ou abrir a lixeira (REQUISITOS §10.1).
+ * ativas e exibe o estado vazio orientando criar uma seção ou abrir a lixeira.
  * A trava legada que escondia o botão de excluir quando havia uma única seção foi removida.
  */
 export const SecaoTabs: React.FC<SecaoTabsProps> = ({

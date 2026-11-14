@@ -1,7 +1,6 @@
 package br.com.trilhara.push;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
@@ -20,7 +19,9 @@ import br.com.trilhara.auth.Role;
 import br.com.trilhara.auth.UserRepository;
 import br.com.trilhara.auth.Usuario;
 import br.com.trilhara.tarefa.ModoLembrete;
+import br.com.trilhara.tarefa.SerieRecorrenteService;
 import br.com.trilhara.tarefa.Tarefa;
+import br.com.trilhara.tarefa.TarefaLixeiraService;
 import br.com.trilhara.tarefa.TarefaRepository;
 import br.com.trilhara.tarefa.TarefaService;
 import br.com.trilhara.tarefa.dto.CriarSerieRecorrenteRequest;
@@ -34,7 +35,7 @@ import jakarta.inject.Inject;
  * ciclo de vida do agendamento.
  *
  * <p>Todas as datas são calculadas a partir de {@code Instant.now} porque a elegibilidade
- * exige {@code instanteEntregaUtc > agora}: data fixa no passado tornaria todo cenário inelegível.</p>
+ * exige {@code instanteEntregaUtc > agora}: data fixa no passado tornaria qualquer cenário inelegível.</p>
  */
 @QuarkusTest
 class LembretePushLifecycleTest {
@@ -43,6 +44,12 @@ class LembretePushLifecycleTest {
 
     @Inject
     TarefaService tarefaService;
+
+    @Inject
+    SerieRecorrenteService serieRecorrenteService;
+
+    @Inject
+    TarefaLixeiraService tarefaLixeiraService;
 
     @Inject
     TarefaRepository tarefaRepository;
@@ -221,7 +228,7 @@ class LembretePushLifecycleTest {
         tarefaService.excluirTarefa(criada.id(), null, usuarioIdStr);
         assertEquals(LembretePush.ESTADO_CANCELADO, versaoVigente(tarefaId).estado());
 
-        tarefaService.restaurarTarefaDaLixeira(criada.id(), usuarioIdStr);
+        tarefaLixeiraService.restaurarTarefaDaLixeira(criada.id(), usuarioIdStr);
 
         LembretePush vigente = versaoVigente(tarefaId);
         assertEquals(LembretePush.ESTADO_PENDENTE, vigente.estado(),
@@ -239,7 +246,7 @@ class LembretePushLifecycleTest {
                 ModoLembrete.PERSONALIZADO, 60, FUSO.getId(), null);
 
 
-        SerieRecorrenteResponse criada = tarefaService.criarSerie(serie, usuarioIdStr);
+        SerieRecorrenteResponse criada = serieRecorrenteService.criarSerie(serie, usuarioIdStr);
 
         List<TarefaResponse> ocorrencias = tarefaService
                 .listarTarefas(usuarioIdStr, null, 1, 100)

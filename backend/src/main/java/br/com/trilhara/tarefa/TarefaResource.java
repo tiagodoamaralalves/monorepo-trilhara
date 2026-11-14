@@ -1,7 +1,5 @@
 package br.com.trilhara.tarefa;
 
-import java.util.List;
-
 import br.com.trilhara.auth.AuthContext;
 import br.com.trilhara.auth.Autenticado;
 import br.com.trilhara.tarefa.dto.AtualizarConclusaoTarefaRequest;
@@ -36,10 +34,15 @@ import jakarta.ws.rs.core.Response;
 public class TarefaResource {
 
     private final TarefaService service;
+    private final TarefaLixeiraService lixeiraService;
     private final AuthContext authContext;
 
-    public TarefaResource(TarefaService service, AuthContext authContext) {
+    public TarefaResource(
+            TarefaService service,
+            TarefaLixeiraService lixeiraService,
+            AuthContext authContext) {
         this.service = service;
+        this.lixeiraService = lixeiraService;
         this.authContext = authContext;
     }
 
@@ -89,20 +92,20 @@ public class TarefaResource {
     public LixeiraTarefasResponse listarLixeira(
             @QueryParam("pagina") Integer pagina,
             @QueryParam("tamanho") Integer tamanho) {
-        return service.listarLixeira(authContext.usuarioId(), pagina, tamanho);
+        return lixeiraService.listarLixeira(authContext.usuarioId(), pagina, tamanho);
     }
 
     @POST
     @Path("lixeira/{tarefaId}/restaurar")
     @Consumes(MediaType.WILDCARD)
     public RestauracaoTarefaResponse restaurarDaLixeira(@PathParam("tarefaId") String tarefaId) {
-        return service.restaurarTarefaDaLixeira(tarefaId, authContext.usuarioId());
+        return lixeiraService.restaurarTarefaDaLixeira(tarefaId, authContext.usuarioId());
     }
 
     @DELETE
     @Path("lixeira/esvaziar")
     public Response esvaziarLixeira() {
-        service.esvaziarLixeira(authContext.usuarioId());
+        lixeiraService.esvaziarLixeira(authContext.usuarioId());
         return Response.noContent().build();
     }
 

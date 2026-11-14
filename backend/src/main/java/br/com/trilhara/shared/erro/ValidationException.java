@@ -9,6 +9,8 @@ package br.com.trilhara.shared.erro;
  */
 public class ValidationException extends RuntimeException {
 
+    private static final long serialVersionUID = 1L;
+
     private final String campo;
 
     public ValidationException(String campo, String mensagem) {

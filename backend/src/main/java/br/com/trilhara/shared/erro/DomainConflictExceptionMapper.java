@@ -35,7 +35,7 @@ public class DomainConflictExceptionMapper implements ExceptionMapper<DomainConf
         }
         try {
             return ProblemDetailsFactory.normalizarInstance(uriInfo.getPath());
-        } catch (Exception e) {
+        } catch (Exception _) {
             return "/";
         }
     }

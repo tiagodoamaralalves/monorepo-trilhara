@@ -136,7 +136,7 @@ public class PushPayloadFactory {
                 return null;
             }
             return (uri.getScheme() + "://" + uri.getAuthority()).toLowerCase();
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             LOG.warnf("Entrada inválida na allowlist de URL de tarefas: %s", url);
             return null;
         }

@@ -27,11 +27,14 @@ import jakarta.ws.rs.core.MediaType;
 @Autenticado
 public class SecaoResource {
 
-    @Inject
-    NotaService notaService;
+    private final NotaService notaService;
+    private final AuthContext authContext;
 
     @Inject
-    AuthContext authContext;
+    public SecaoResource(NotaService notaService, AuthContext authContext) {
+        this.notaService = notaService;
+        this.authContext = authContext;
+    }
 
     private ObjectId usuarioId() {
         return authContext.usuarioIdObjectId();

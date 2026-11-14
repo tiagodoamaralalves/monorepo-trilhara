@@ -10,7 +10,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.bson.types.ObjectId;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -27,6 +29,7 @@ public class RefreshTokenService {
     private static final int TAMANHO_TOKEN_BYTES = 32;
 
     private final SecureRandom secureRandom = new SecureRandom();
+    private final Map<String, Object> locksPorFamilia = new ConcurrentHashMap<>();
     private final RefreshTokenRepository repository;
     private final long expiracaoDias;
     private final long gracePeriodSeconds;
@@ -63,7 +66,8 @@ public class RefreshTokenService {
         RefreshToken atualInicial = repository.buscarPorHash(hash)
                 .orElseThrow(() -> new TokenInvalidoException("Refresh token inválido."));
 
-        synchronized (atualInicial.familiaId().intern()) {
+        Object lockFamilia = locksPorFamilia.computeIfAbsent(atualInicial.familiaId(), k -> new Object());
+        synchronized (lockFamilia) {
             RefreshToken atual = repository.buscarPorHash(hash)
                     .orElseThrow(() -> new TokenInvalidoException("Refresh token inválido."));
 

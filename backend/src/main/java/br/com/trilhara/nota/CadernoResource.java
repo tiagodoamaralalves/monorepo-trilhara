@@ -37,7 +37,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 /**
- * Cadernos, seções e páginas ( a ).
+ * Cadernos, seções e páginas.
  *
  * <p>A criação de página existe <strong>apenas</strong> na rota aninhada
  * {@code POST /api/cadernos/{id}/secoes/{secaoId}/notas}: a rota duplicada {@code POST /api/notas}
@@ -50,11 +50,16 @@ import jakarta.ws.rs.core.Response;
 @Autenticado
 public class CadernoResource {
 
-    @Inject
-    NotaService notaService;
+    private static final String PARAM_SECAO_ID = "secaoId";
+
+    private final NotaService notaService;
+    private final AuthContext authContext;
 
     @Inject
-    AuthContext authContext;
+    public CadernoResource(NotaService notaService, AuthContext authContext) {
+        this.notaService = notaService;
+        this.authContext = authContext;
+    }
 
     private ObjectId usuarioId() {
         return authContext.usuarioIdObjectId();
@@ -164,10 +169,10 @@ public class CadernoResource {
     @Consumes(MediaType.APPLICATION_JSON)
     public SecaoResponse atualizarSecaoNoCaderno(
             @PathParam("id") String id,
-            @PathParam("secaoId") String secaoId,
+            @PathParam(PARAM_SECAO_ID) String secaoId,
             @Valid AtualizarSecaoRequest request) {
         ObjectId cadernoId = BsonIds.parse(id, "id");
-        ObjectId secao = BsonIds.parse(secaoId, "secaoId");
+        ObjectId secao = BsonIds.parse(secaoId, PARAM_SECAO_ID);
         notaService.buscarCaderno(usuarioId(), cadernoId);
         return notaService.atualizarSecao(usuarioId(), secao, request);
     }
@@ -176,9 +181,9 @@ public class CadernoResource {
     @Path("/{id}/secoes/{secaoId}")
     public ExclusaoLixeiraResponse deletarSecaoNoCaderno(
             @PathParam("id") String id,
-            @PathParam("secaoId") String secaoId) {
+            @PathParam(PARAM_SECAO_ID) String secaoId) {
         ObjectId cadernoId = BsonIds.parse(id, "id");
-        ObjectId secao = BsonIds.parse(secaoId, "secaoId");
+        ObjectId secao = BsonIds.parse(secaoId, PARAM_SECAO_ID);
         notaService.buscarCaderno(usuarioId(), cadernoId);
         return notaService.deletarSecao(usuarioId(), secao);
     }
@@ -190,13 +195,13 @@ public class CadernoResource {
     @Path("/{id}/secoes/{secaoId}/notas")
     public PaginaNotasResponse listarNotas(
             @PathParam("id") String id,
-            @PathParam("secaoId") String secaoId,
+            @PathParam(PARAM_SECAO_ID) String secaoId,
             @QueryParam("pagina") @DefaultValue("1") int pagina,
             @QueryParam("tamanho") @DefaultValue("50") int tamanho) {
         return notaService.listarNotasMetadados(
                 usuarioId(),
                 BsonIds.parse(id, "id"),
-                BsonIds.parse(secaoId, "secaoId"),
+                BsonIds.parse(secaoId, PARAM_SECAO_ID),
                 pagina,
                 tamanho);
     }
@@ -206,12 +211,12 @@ public class CadernoResource {
     @Consumes(MediaType.APPLICATION_JSON)
     public Response criarNota(
             @PathParam("id") String id,
-            @PathParam("secaoId") String secaoId,
+            @PathParam(PARAM_SECAO_ID) String secaoId,
             @Valid CriarNotaRequest request) {
         NotaDetalheResponse nota = notaService.criarNota(
                 usuarioId(),
                 BsonIds.parse(id, "id"),
-                BsonIds.parse(secaoId, "secaoId"),
+                BsonIds.parse(secaoId, PARAM_SECAO_ID),
                 request);
         URI location = URI.create("/api/notas/" + nota.id());
         return Response.created(location).entity(nota).build();

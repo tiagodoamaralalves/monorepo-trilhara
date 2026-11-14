@@ -4,7 +4,6 @@ import org.bson.types.ObjectId;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import br.com.trilhara.auth.AuthContext;
-import br.com.trilhara.shared.mongo.BsonIds;
 import io.quarkus.runtime.LaunchMode;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;

@@ -5,7 +5,6 @@ import org.bson.types.ObjectId;
 
 /**
  * Entidade normalizada da coleção 'secoes'.
- * Conforme REQUISITOS-REESTRUTURACAO-DADOS.md §10 e PLANO-IMPLEMENTACAO-REESTRUTURACAO.md §8.2.
  */
 public record Secao(
     ObjectId id,

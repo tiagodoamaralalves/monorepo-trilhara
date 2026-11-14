@@ -30,7 +30,7 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 
 /**
- * Leitura canônica, atualização e exclusão de páginas, busca global e lixeira ( a ).
+ * Leitura canônica, atualização e exclusão de páginas, busca global e lixeira.
  *
  * <p>A criação acontece apenas na rota aninhada por seção, em {@link CadernoResource}; não há
  * {@code POST /api/notas} nem leitura aninhada de página.</p>
@@ -41,14 +41,22 @@ import jakarta.ws.rs.core.MediaType;
 @Autenticado
 public class NotaResource {
 
-    @Inject
-    NotaService notaService;
+    private final NotaService notaService;
+    private final NotaLixeiraService notaLixeiraService;
+    private final AuthContext authContext;
+    private final RateLimitService rateLimitService;
 
     @Inject
-    AuthContext authContext;
-
-    @Inject
-    RateLimitService rateLimitService;
+    public NotaResource(
+            NotaService notaService,
+            NotaLixeiraService notaLixeiraService,
+            AuthContext authContext,
+            RateLimitService rateLimitService) {
+        this.notaService = notaService;
+        this.notaLixeiraService = notaLixeiraService;
+        this.authContext = authContext;
+        this.rateLimitService = rateLimitService;
+    }
 
     private ObjectId usuarioId() {
         return authContext.usuarioIdObjectId();
@@ -62,7 +70,7 @@ public class NotaResource {
             @QueryParam("tamanho") @DefaultValue("20") int tamanho) {
         // busca em texto pleno limitada a 60/min por usuário (consulta $text é a mais cara).
         rateLimitService.verificarLimiteBuscaNotas(authContext.usuarioId());
-        return notaService.buscarGlobal(usuarioId(), q, pagina, tamanho);
+        return notaLixeiraService.buscarGlobal(usuarioId(), q, pagina, tamanho);
     }
 
     @GET
@@ -70,7 +78,7 @@ public class NotaResource {
     public LixeiraNotasResponse listarLixeira(
             @QueryParam("pagina") @DefaultValue("1") int pagina,
             @QueryParam("tamanho") @DefaultValue("50") int tamanho) {
-        return notaService.listarLixeira(usuarioId(), pagina, tamanho);
+        return notaLixeiraService.listarLixeira(usuarioId(), pagina, tamanho);
     }
 
     @POST
@@ -78,14 +86,14 @@ public class NotaResource {
     public RestauracaoLixeiraResponse restaurar(
             @PathParam("tipo") String tipo,
             @PathParam("id") String id) {
-        return notaService.restaurarItem(usuarioId(), tipo, BsonIds.parse(id, "id"));
+        return notaLixeiraService.restaurarItem(usuarioId(), tipo, BsonIds.parse(id, "id"));
     }
 
     /** Esvaziamento imediato da lixeira; a UI confirma com variante {@code danger}. */
     @DELETE
     @Path("/lixeira/esvaziar")
     public Map<String, Long> esvaziarLixeira() {
-        return notaService.esvaziarLixeira(usuarioId());
+        return notaLixeiraService.esvaziarLixeira(usuarioId());
     }
 
     /** Endpoint canônico de leitura completa. */

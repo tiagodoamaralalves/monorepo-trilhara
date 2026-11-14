@@ -98,14 +98,16 @@ public class RegraRecorrenciaValidator {
         String termino = tipoTermino.toUpperCase().trim();
 
         switch (termino) {
-            case "NUNCA" -> {
-                if (dataFim != null || maxOcorrencias != null) {
-                    throw new BadRequestException("Tipo de término NUNCA não deve conter dataFim nem maxOcorrencias.");
-                }
-            }
+            case "NUNCA" -> validarTerminoNunca(dataFim, maxOcorrencias);
             case "EM_DATA" -> validarTerminoEmData(dataInicio, dataFim, maxOcorrencias);
             case "APOS_OCORRENCIAS" -> validarTerminoAposOcorrencias(dataFim, maxOcorrencias);
             default -> throw new BadRequestException("Tipo de término inválido: " + tipoTermino);
+        }
+    }
+
+    private void validarTerminoNunca(LocalDate dataFim, Integer maxOcorrencias) {
+        if (dataFim != null || maxOcorrencias != null) {
+            throw new BadRequestException("Tipo de término NUNCA não deve conter dataFim nem maxOcorrencias.");
         }
     }
 

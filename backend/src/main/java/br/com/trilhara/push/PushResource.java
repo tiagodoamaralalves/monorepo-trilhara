@@ -56,11 +56,11 @@ public class PushResource {
     @ConfigProperty(name = "trilhara.push.habilitado", defaultValue = "true")
     boolean pushHabilitado;
 
-    @ConfigProperty(name = "trilhara.push.vapid.public-key")
-    java.util.Optional<String> vapidPublicKey;
+    @ConfigProperty(name = "trilhara.push.vapid.public-key", defaultValue = "")
+    java.util.Optional<String> vapidPublicKey = java.util.Optional.empty();
 
-    @ConfigProperty(name = "trilhara.push.vapid.private-key")
-    java.util.Optional<String> vapidPrivateKey;
+    @ConfigProperty(name = "trilhara.push.vapid.private-key", defaultValue = "")
+    java.util.Optional<String> vapidPrivateKey = java.util.Optional.empty();
 
     @Inject
     public PushResource(
@@ -158,7 +158,7 @@ public class PushResource {
         URI uri;
         try {
             uri = URI.create(endpoint);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             throw new ValidationException("endpoint", "Endpoint malformado.");
         }
         if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null) {
@@ -187,13 +187,13 @@ public class PushResource {
         }
         try {
             return Base64.getUrlDecoder().decode(valor.trim());
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             throw new ValidationException("keys", "Chaves devem estar em base64url.");
         }
     }
 
     private boolean temChavePrivada() {
-        return vapidPrivateKey != null && vapidPrivateKey.isPresent() && !vapidPrivateKey.get().isBlank();
+        return vapidPrivateKey.isPresent() && !vapidPrivateKey.get().isBlank();
     }
 
     private ObjectId extrairUsuarioId() {

@@ -61,10 +61,43 @@ public class CronogramaService {
     private static final String ERRO_CRONOGRAMA_NAO_ENCONTRADO = "Cronograma não encontrado";
     private static final String ERRO_TRILHA_NAO_ENCONTRADA = "Trilha não encontrada";
     private static final String ERRO_BLOCO_NAO_ENCONTRADO = "Bloco não encontrado";
+    private static final String CAMPO_TRILHA_ID = "trilhaId";
+    private static final String CAMPO_CRONOGRAMA_ID = "cronogramaId";
+    private static final String CAMPO_CRONOGRAMA_ATIVO_ID = "cronogramaAtivoId";
+    private static final String CAMPO_SEMANA_MODELO_MANUAL = "semanaModeloManual";
+    private static final String CAMPO_DISCIPLINAS_PARTICIPANTES_IDS = "disciplinasParticipantesIds";
     private static final int MAX_CRONOGRAMAS_POR_TRILHA = 3;
     private static final int MAX_DIAS_HORIZONTE = 366;
     private static final List<String> PERIODOS_SUPORTADOS =
             List.of("ATE_PROVA", "UMA_SEMANA", "UM_MES", "TRES_MESES");
+
+    public record FiltroListagemBlocos(
+            Boolean concluido,
+            String statusData,
+            LocalDate dataInicio,
+            LocalDate dataFim,
+            int pagina,
+            int tamanho) {
+    }
+
+    private record ContextoPublicacao(
+            ObjectId usuarioId,
+            ObjectId trilhaId,
+            ObjectId cronogramaId,
+            long versaoNova,
+            ModalidadeCronograma modalidade,
+            int duracaoBlocoMinutos,
+            String tipoPeriodo,
+            LocalDate dataInicio,
+            LocalDate dataFim,
+            List<Integer> diasAtivosSemana,
+            Integer blocosPorDia,
+            List<Disciplina> participantes,
+            Map<Integer, List<String>> semanaModeloManual,
+            Document configuracao,
+            Instant agora,
+            Instant criadoEm) {
+    }
 
     public record DadosConfiguracao(
             ModalidadeCronograma modalidade,
@@ -117,7 +150,7 @@ public class CronogramaService {
         // que uma rajada não chegue nem a disputar a trava da trilha.
         rateLimitService.verificarLimiteCriacaoCronograma(usuarioId.toHexString());
 
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
 
         String leaseToken = UUID.randomUUID().toString();
         adquirirLeaseOuFalhar(usuarioId, trilhaId, leaseToken);
@@ -164,11 +197,12 @@ public class CronogramaService {
                     request.semanaModeloManual(), null, configDoc, agora, agora);
             cronogramaRepository.inserir(novo);
 
-            return publicar(heartbeat, usuarioId, trilhaId, cronogramaId, versaoNova,
+            return publicar(heartbeat, new ContextoPublicacao(
+                    usuarioId, trilhaId, cronogramaId, versaoNova,
                     request.modalidade(), request.duracaoBlocoMinutos(), request.tipoPeriodo(),
                     dataInicio, dataFim, request.diasAtivosSemana(), request.blocosPorDia(),
                     participantes, request.semanaModeloManual(), configDoc,
-                    agora, novo.criadoEm());
+                    agora, novo.criadoEm()));
         } finally {
             trilhaRepository.liberarLease(usuarioId, trilhaId, leaseToken);
         }
@@ -176,8 +210,8 @@ public class CronogramaService {
 
     public CronogramaDTO atualizar(String trilhaIdStr, String cronogramaIdStr, AtualizarCronogramaRequest request) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
-        ObjectId cronogramaId = BsonIds.parse(cronogramaIdStr, "cronogramaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
+        ObjectId cronogramaId = BsonIds.parse(cronogramaIdStr, CAMPO_CRONOGRAMA_ID);
 
         String leaseToken = UUID.randomUUID().toString();
         adquirirLeaseOuFalhar(usuarioId, trilhaId, leaseToken);
@@ -221,11 +255,12 @@ public class CronogramaService {
                     existente.criadoEm(), Instant.now());
             cronogramaRepository.atualizar(preparando);
 
-            return publicar(heartbeat, usuarioId, trilhaId, cronogramaId, versaoNova,
+            return publicar(heartbeat, new ContextoPublicacao(
+                    usuarioId, trilhaId, cronogramaId, versaoNova,
                     request.modalidade(), request.duracaoBlocoMinutos(), request.tipoPeriodo(),
                     dataInicio, dataFim, request.diasAtivosSemana(), request.blocosPorDia(),
                     participantes, request.semanaModeloManual(), configPreparada,
-                    Instant.now(), existente.criadoEm());
+                    Instant.now(), existente.criadoEm()));
         } finally {
             trilhaRepository.liberarLease(usuarioId, trilhaId, leaseToken);
         }
@@ -233,8 +268,8 @@ public class CronogramaService {
 
     public CronogramaDTO ativar(String trilhaIdStr, String cronogramaIdStr) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
-        ObjectId cronogramaId = BsonIds.parse(cronogramaIdStr, "cronogramaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
+        ObjectId cronogramaId = BsonIds.parse(cronogramaIdStr, CAMPO_CRONOGRAMA_ID);
 
         String leaseToken = UUID.randomUUID().toString();
         adquirirLeaseOuFalhar(usuarioId, trilhaId, leaseToken);
@@ -275,8 +310,8 @@ public class CronogramaService {
 
     public void excluir(String trilhaIdStr, String cronogramaIdStr) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
-        ObjectId cronogramaId = BsonIds.parse(cronogramaIdStr, "cronogramaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
+        ObjectId cronogramaId = BsonIds.parse(cronogramaIdStr, CAMPO_CRONOGRAMA_ID);
 
         String leaseToken = UUID.randomUUID().toString();
         adquirirLeaseOuFalhar(usuarioId, trilhaId, leaseToken);
@@ -327,7 +362,7 @@ public class CronogramaService {
 
     public List<CronogramaDTO> listar(String trilhaIdStr) {
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
 
         trilhaRepository.buscarEntidade(usuarioId, trilhaId)
                 .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
@@ -346,23 +381,18 @@ public class CronogramaService {
     public PaginaBlocosDTO listarBlocosPaginado(
             String trilhaIdStr,
             String cronogramaIdStr,
-            Boolean concluido,
-            String statusData,
-            LocalDate dataInicio,
-            LocalDate dataFim,
-            int pagina,
-            int tamanho) {
+            FiltroListagemBlocos filtro) {
 
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
-        ObjectId cronogramaId = BsonIds.parse(cronogramaIdStr, "cronogramaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
+        ObjectId cronogramaId = BsonIds.parse(cronogramaIdStr, CAMPO_CRONOGRAMA_ID);
 
-        if (pagina < 1 || tamanho < 1 || tamanho > BlocoCronogramaRepository.TAMANHO_MAXIMO_PAGINA) {
+        if (filtro.pagina() < 1 || filtro.tamanho() < 1 || filtro.tamanho() > BlocoCronogramaRepository.TAMANHO_MAXIMO_PAGINA) {
             throw paginacaoInvalida("'pagina' deve ser >= 1 e 'tamanho' deve estar entre 1 e "
                     + BlocoCronogramaRepository.TAMANHO_MAXIMO_PAGINA + ".");
         }
 
-        String statusNormalizado = normalizarStatusData(statusData);
+        String statusNormalizado = normalizarStatusData(filtro.statusData());
 
         Cronograma cronograma = cronogramaRepository.buscarPorId(usuarioId, trilhaId, cronogramaId)
                 .orElseThrow(() -> new NotFoundException(ERRO_CRONOGRAMA_NAO_ENCONTRADO));
@@ -370,8 +400,18 @@ public class CronogramaService {
         LocalDate hojeLocal = timezoneContext.hojeLocal();
 
         var paginado = blocoCronogramaRepository.listarPaginado(
-                usuarioId, trilhaId, cronogramaId, cronograma.versaoAtiva(),
-                concluido, statusNormalizado, hojeLocal, dataInicio, dataFim, pagina, tamanho);
+                usuarioId,
+                new BlocoCronogramaRepository.FiltroPaginacaoBlocos(
+                        trilhaId,
+                        cronogramaId,
+                        cronograma.versaoAtiva(),
+                        filtro.concluido(),
+                        statusNormalizado,
+                        hojeLocal,
+                        filtro.dataInicio(),
+                        filtro.dataFim(),
+                        filtro.pagina(),
+                        filtro.tamanho()));
 
         List<BlocoCronogramaItemDTO> itens = paginado.itens().stream()
                 .map(b -> paraBlocoDTO(b, hojeLocal))
@@ -399,7 +439,7 @@ public class CronogramaService {
         Map<ObjectId, Long> versoesAtivasPorCronograma = new HashMap<>();
 
         for (Document td : trilhasDocs) {
-            ObjectId cronogramaAtivoId = td.getObjectId("cronogramaAtivoId");
+            ObjectId cronogramaAtivoId = td.getObjectId(CAMPO_CRONOGRAMA_ATIVO_ID);
             if (cronogramaAtivoId != null) {
                 Long versao = td.getLong("versaoAtivaCronograma");
                 versoesAtivasPorCronograma.put(cronogramaAtivoId, versao != null ? versao : 1L);
@@ -411,8 +451,7 @@ public class CronogramaService {
             return List.of();
         }
 
-        // a leitura usa o par cronogramaId + versaoAtivaCronograma do ponteiro da trilha;
-        // o flag `ativo` nunca é usado sozinho como fonte de leitura.
+        // Leitura sempre guiada pelo ponteiro publicado da trilha (id e versão ativa)
         List<BlocoCronograma> blocos = blocoCronogramaRepository.listarHoje(
                 usuarioId, hojeLocal, versoesAtivasPorCronograma);
 
@@ -482,8 +521,8 @@ public class CronogramaService {
             String trilhaIdStr, String cronogramaIdStr, UUID operationId) {
 
         ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, "trilhaId");
-        ObjectId cronogramaId = BsonIds.parse(cronogramaIdStr, "cronogramaId");
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
+        ObjectId cronogramaId = BsonIds.parse(cronogramaIdStr, CAMPO_CRONOGRAMA_ID);
 
         String leaseToken = UUID.randomUUID().toString();
         // Lease ocupado ⇒ 409 SCHEDULE_GENERATION_IN_PROGRESS
@@ -507,7 +546,7 @@ public class CronogramaService {
                             usuarioId, trilhaId, cronogramaId, b.id(), agora)) {
                         concluidos++;
                     }
-                } catch (RuntimeException ex) {
+                } catch (RuntimeException _) {
                     falhas.add(new FalhaBlocoDTO(b.idHex(), "FALHA_CONCLUSAO"));
                 }
             }
@@ -560,7 +599,7 @@ public class CronogramaService {
 
         List<Document> trilhas = trilhaRepository.listarEntidades(usuarioId);
         for (Document t : trilhas) {
-            ObjectId cronogramaAtivoId = t.getObjectId("cronogramaAtivoId");
+            ObjectId cronogramaAtivoId = t.getObjectId(CAMPO_CRONOGRAMA_ATIVO_ID);
             if (cronogramaAtivoId != null) {
                 cronogramaRepository.buscarPorId(usuarioId, cronogramaAtivoId).ifPresent(c -> {
                     if (c.ativo() && c.dataFim() != null && !c.dataFim().isBefore(hojeLocal)) {
@@ -642,25 +681,7 @@ public class CronogramaService {
  * o leitor pode ver a versão nova, mas flags e staging precisam ser reconciliados de forma
  * idempotente.</p>
  */
-    private CronogramaDTO publicar(
-            LeaseHeartbeat heartbeat,
-            ObjectId usuarioId,
-            ObjectId trilhaId,
-            ObjectId cronogramaId,
-            long versaoNova,
-            ModalidadeCronograma modalidade,
-            int duracaoBlocoMinutos,
-            String tipoPeriodo,
-            LocalDate dataInicio,
-            LocalDate dataFim,
-            List<Integer> diasAtivosSemana,
-            Integer blocosPorDia,
-            List<Disciplina> participantes,
-            Map<Integer, List<String>> semanaModeloManual,
-            Document configuracao,
-            Instant agora,
-            Instant criadoEm) {
-
+    private CronogramaDTO publicar(LeaseHeartbeat heartbeat, ContextoPublicacao ctx) {
         String leaseToken = heartbeat.token();
         boolean ponteiroTrocado = false;
         try {
@@ -669,16 +690,16 @@ public class CronogramaService {
             faultInjector.antesDe(EtapaPublicacao.GERACAO_BLOCOS);
             List<BlocoCronograma> blocos = GeradorBlocosCronograma.gerar(
                     new GeradorBlocosCronograma.ParametrosGeracao(
-                            usuarioId, trilhaId, cronogramaId, versaoNova,
-                            modalidade, duracaoBlocoMinutos, dataInicio, dataFim,
-                            diasAtivosSemana, blocosPorDia, participantes, semanaModeloManual));
+                            ctx.usuarioId(), ctx.trilhaId(), ctx.cronogramaId(), ctx.versaoNova(),
+                            ctx.modalidade(), ctx.duracaoBlocoMinutos(), ctx.dataInicio(), ctx.dataFim(),
+                            ctx.diasAtivosSemana(), ctx.blocosPorDia(), ctx.participantes(), ctx.semanaModeloManual()));
             blocoCronogramaRepository.inserirLote(blocos);
 
             // ETAPA 3 — contagem esperada antes de publicar
             heartbeat.verificarVivo();
             faultInjector.antesDe(EtapaPublicacao.VERIFICACAO_CONTAGEM);
             long contagem = blocoCronogramaRepository.contarPorVersao(
-                    usuarioId, trilhaId, cronogramaId, versaoNova);
+                    ctx.usuarioId(), ctx.trilhaId(), ctx.cronogramaId(), ctx.versaoNova());
             if (contagem != blocos.size()) {
                 throw new IllegalStateException(
                         "Falha na geração: contagem de blocos em staging diverge do esperado.");
@@ -688,7 +709,7 @@ public class CronogramaService {
             heartbeat.verificarVivo();
             faultInjector.antesDe(EtapaPublicacao.TROCA_PONTEIRO);
             if (!trilhaRepository.atualizarPonteiroCronogramaAtivo(
-                    usuarioId, trilhaId, cronogramaId, versaoNova, leaseToken)) {
+                    ctx.usuarioId(), ctx.trilhaId(), ctx.cronogramaId(), ctx.versaoNova(), leaseToken)) {
                 throw new DomainConflictException(
                         CodigoErro.SCHEDULE_GENERATION_IN_PROGRESS, LeaseTrilhaService.MSG_LEASE_PERDIDO);
             }
@@ -697,29 +718,28 @@ public class CronogramaService {
             // ETAPA 5 — reconciliação dos flags (no máximo um ativo por trilha)
             heartbeat.verificarVivo();
             faultInjector.antesDe(EtapaPublicacao.RECONCILIACAO_FLAGS);
-            cronogramaRepository.desativarOutros(usuarioId, trilhaId, cronogramaId);
+            cronogramaRepository.desativarOutros(ctx.usuarioId(), ctx.trilhaId(), ctx.cronogramaId());
 
             Cronograma publicado = new Cronograma(
-                    cronogramaId, usuarioId, trilhaId, modalidade,
-                    true, versaoNova, null, VALOR_ATIVO,
-                    duracaoBlocoMinutos, tipoPeriodo, dataInicio, dataFim, diasAtivosSemana,
-                    blocosPorDia, participantes.stream().map(Disciplina::id).toList(),
-                    semanaModeloManual, configuracao, null,
-                    criadoEm != null ? criadoEm : agora, Instant.now());
+                    ctx.cronogramaId(), ctx.usuarioId(), ctx.trilhaId(), ctx.modalidade(),
+                    true, ctx.versaoNova(), null, VALOR_ATIVO,
+                    ctx.duracaoBlocoMinutos(), ctx.tipoPeriodo(), ctx.dataInicio(), ctx.dataFim(), ctx.diasAtivosSemana(),
+                    ctx.blocosPorDia(), ctx.participantes().stream().map(Disciplina::id).toList(),
+                    ctx.semanaModeloManual(), ctx.configuracao(), null,
+                    ctx.criadoEm() != null ? ctx.criadoEm() : ctx.agora(), Instant.now());
             cronogramaRepository.atualizar(publicado);
 
             // ETAPA 6 — limpeza das versões anteriores deste cronograma
             heartbeat.verificarVivo();
             faultInjector.antesDe(EtapaPublicacao.LIMPEZA_VERSOES_ANTERIORES);
-            blocoCronogramaRepository.excluirVersoesDiferentes(usuarioId, trilhaId, cronogramaId, versaoNova);
+            blocoCronogramaRepository.excluirVersoesDiferentes(
+                    ctx.usuarioId(), ctx.trilhaId(), ctx.cronogramaId(), ctx.versaoNova());
 
             return paraDTO(publicado, blocos.size());
         } catch (RuntimeException ex) {
             if (ponteiroTrocado) {
-                marcarRecuperacaoNecessaria(usuarioId, trilhaId, cronogramaId);
+                marcarRecuperacaoNecessaria(ctx.usuarioId(), ctx.trilhaId(), ctx.cronogramaId());
             }
-            LOG.warning(() -> "Publicação de cronograma interrompida (cronogramaId="
-                    + cronogramaId.toHexString() + ", versao=" + versaoNova + "): " + ex.getMessage());
             throw ex;
         }
     }
@@ -757,7 +777,7 @@ public class CronogramaService {
     private void exigirBlocoPublicado(ObjectId usuarioId, BlocoCronograma bloco) {
         Document trilhaDoc = trilhaRepository.buscarEntidade(usuarioId, bloco.trilhaId())
                 .orElseThrow(() -> new NotFoundException(ERRO_BLOCO_NAO_ENCONTRADO));
-        ObjectId cronogramaAtivoId = trilhaDoc.getObjectId("cronogramaAtivoId");
+        ObjectId cronogramaAtivoId = trilhaDoc.getObjectId(CAMPO_CRONOGRAMA_ATIVO_ID);
         Long versaoAtiva = trilhaDoc.getLong("versaoAtivaCronograma");
         boolean publicado = cronogramaAtivoId != null
                 && cronogramaAtivoId.equals(bloco.cronogramaId())
@@ -799,6 +819,16 @@ public class CronogramaService {
             Map<Integer, List<String>> semanaModeloManual,
             List<Disciplina> participantes) {
 
+        validarPeriodoEDuracao(tipoPeriodo, duracaoBlocoMinutos);
+        validarDiasAtivosEBlocosPorDia(diasAtivosSemana, blocosPorDia);
+
+        Set<ObjectId> participantesIds = participantes.stream()
+                .map(Disciplina::id)
+                .collect(Collectors.toCollection(HashSet::new));
+        validarSemanaModeloManual(semanaModeloManual, participantesIds);
+    }
+
+    private static void validarPeriodoEDuracao(String tipoPeriodo, int duracaoBlocoMinutos) {
         if (tipoPeriodo != null && !tipoPeriodo.isBlank()
                 && PERIODOS_SUPORTADOS.stream().noneMatch(p -> p.equalsIgnoreCase(tipoPeriodo))) {
             throw new ValidationException("tipoPeriodo",
@@ -809,11 +839,9 @@ public class CronogramaService {
             throw new ValidationException("duracaoBlocoMinutos",
                     "A duração do bloco deve estar entre 30 e 240 minutos.");
         }
+    }
 
-        Set<ObjectId> participantesIds = participantes.stream()
-                .map(Disciplina::id)
-                .collect(Collectors.toCollection(HashSet::new));
-
+    private static void validarDiasAtivosEBlocosPorDia(List<Integer> diasAtivosSemana, Integer blocosPorDia) {
         if (diasAtivosSemana != null) {
             Set<Integer> vistos = new HashSet<>();
             for (Integer dia : diasAtivosSemana) {
@@ -831,25 +859,33 @@ public class CronogramaService {
             throw new ValidationException("blocosPorDia",
                     "A quantidade de blocos por dia deve estar entre 1 e 24.");
         }
-        if (semanaModeloManual != null) {
-            for (Map.Entry<Integer, List<String>> entrada : semanaModeloManual.entrySet()) {
-                Integer dia = entrada.getKey();
-                List<String> ids = entrada.getValue();
-                if (dia == null || dia < 1 || dia > 7) {
-                    throw new ValidationException("semanaModeloManual",
-                            "Os dias da semana-modelo devem estar entre 1 e 7.");
-                }
-                if (ids == null || ids.isEmpty()) {
-                    throw new ValidationException("semanaModeloManual",
-                            "Cada dia da semana-modelo precisa de ao menos uma disciplina.");
-                }
-                for (String id : ids) {
-                    ObjectId disciplinaId = BsonIds.parse(id, "semanaModeloManual");
-                    if (!participantesIds.contains(disciplinaId)) {
-                        throw new ValidationException("semanaModeloManual",
-                                "A semana-modelo só pode usar disciplinas participantes desta trilha.");
-                    }
-                }
+    }
+
+    private static void validarSemanaModeloManual(
+            Map<Integer, List<String>> semanaModeloManual, Set<ObjectId> participantesIds) {
+        if (semanaModeloManual == null) {
+            return;
+        }
+        for (Map.Entry<Integer, List<String>> entrada : semanaModeloManual.entrySet()) {
+            validarDiaSemanaModelo(entrada.getKey(), entrada.getValue(), participantesIds);
+        }
+    }
+
+    private static void validarDiaSemanaModelo(
+            Integer dia, List<String> ids, Set<ObjectId> participantesIds) {
+        if (dia == null || dia < 1 || dia > 7) {
+            throw new ValidationException(CAMPO_SEMANA_MODELO_MANUAL,
+                    "Os dias da semana-modelo devem estar entre 1 e 7.");
+        }
+        if (ids == null || ids.isEmpty()) {
+            throw new ValidationException(CAMPO_SEMANA_MODELO_MANUAL,
+                    "Cada dia da semana-modelo precisa de ao menos uma disciplina.");
+        }
+        for (String id : ids) {
+            ObjectId disciplinaId = BsonIds.parse(id, CAMPO_SEMANA_MODELO_MANUAL);
+            if (!participantesIds.contains(disciplinaId)) {
+                throw new ValidationException(CAMPO_SEMANA_MODELO_MANUAL,
+                        "A semana-modelo só pode usar disciplinas participantes desta trilha.");
             }
         }
     }
@@ -857,13 +893,13 @@ public class CronogramaService {
     private List<Disciplina> validarDisciplinasParticipantes(
             ObjectId usuarioId, ObjectId trilhaId, List<String> participantesIdsStr) {
         if (participantesIdsStr == null || participantesIdsStr.isEmpty()) {
-            throw new ValidationException("disciplinasParticipantesIds",
+            throw new ValidationException(CAMPO_DISCIPLINAS_PARTICIPANTES_IDS,
                     "Ao menos uma disciplina participante deve ser informada.");
         }
 
         Set<ObjectId> idsDesejados = new HashSet<>();
         for (String id : participantesIdsStr) {
-            idsDesejados.add(BsonIds.parse(id, "disciplinasParticipantesIds"));
+            idsDesejados.add(BsonIds.parse(id, CAMPO_DISCIPLINAS_PARTICIPANTES_IDS));
         }
 
         List<Disciplina> ativas = disciplinaRepository.listarPorTrilha(usuarioId, trilhaId);
@@ -871,7 +907,7 @@ public class CronogramaService {
 
         // Todas as disciplinas informadas precisam pertencer à trilha do usuário (§5.2).
         if (!idsDaTrilha.containsAll(idsDesejados)) {
-            throw new ValidationException("disciplinasParticipantesIds",
+            throw new ValidationException(CAMPO_DISCIPLINAS_PARTICIPANTES_IDS,
                     "Todas as disciplinas participantes devem pertencer a esta trilha.");
         }
 
@@ -887,11 +923,11 @@ public class CronogramaService {
         config.put("dataFim", dados.dataFim().toString());
         config.put("diasAtivosSemana", dados.diasAtivosSemana());
         config.put("blocosPorDia", dados.blocosPorDia());
-        config.put("disciplinasParticipantesIds", dados.disciplinasParticipantesIds());
+        config.put(CAMPO_DISCIPLINAS_PARTICIPANTES_IDS, dados.disciplinasParticipantesIds());
         if (dados.semanaModeloManual() != null) {
             Document mDoc = new Document();
             dados.semanaModeloManual().forEach((k, v) -> mDoc.put(String.valueOf(k), v));
-            config.put("semanaModeloManual", mDoc);
+            config.put(CAMPO_SEMANA_MODELO_MANUAL, mDoc);
         }
         return config;
     }
