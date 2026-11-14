@@ -35,5 +35,6 @@ export * from './ContaMenuButton/ContaMenuButton';
 export * from './AvisoContaExcluida/AvisoContaExcluida';
 export * from './CalendarView/CalendarView';
 export * from './CalendarView/dateUtils';
+export * from './ListDivider/ListDivider';
 
 

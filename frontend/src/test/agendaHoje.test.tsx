@@ -36,6 +36,7 @@ function agendaVazia(): AgendaHojeDerivado {
     blocosHoje: [],
     tarefasHoje: [],
     semData: [],
+    concluidasHoje: [],
     erroTarefas: null,
     erroBlocos: null,
     vazioTotal: true
@@ -267,15 +268,13 @@ describe('AgendaHoje', () => {
     });
   });
 
-  it('modoPomodoroExpoeDefinirComoFocoEExclusaoSemAcoesDeEdicaoOuPular', () => {
-    const onDefinirFoco = vi.fn();
+  it('modoPomodoroOmiteEdicaoEPularEMantemExclusaoEConclusao', () => {
     const onExcluirTarefa = vi.fn();
 
     render(
       <AgendaHoje
         {...propsBase({
           modo: 'pomodoro',
-          onDefinirFoco,
           onExcluirTarefa,
           dados: {
             ...agendaVazia(),
@@ -289,12 +288,8 @@ describe('AgendaHoje', () => {
 
     expect(screen.queryByRole('button', { name: /editar tarefa/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /pular esta ocorrência/i })).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Tarefa hoje-1' }));
-    expect(onDefinirFoco).toHaveBeenCalledWith({ tipo: 'TAREFA', id: 'hoje-1' });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Definir como foco' }));
-    expect(onDefinirFoco).toHaveBeenCalledWith({ tipo: 'BLOCO', id: 'bloco-1' });
+    expect(screen.queryByRole('button', { name: /definir como foco/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: /filtrar itens da agenda de hoje/i })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /excluir tarefa tarefa hoje-1/i }));
     expect(onExcluirTarefa).toHaveBeenCalledTimes(1);
@@ -322,6 +317,7 @@ describe('AgendaHoje', () => {
 
     expect(screen.queryByRole('button', { name: /editar tarefa/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /pular esta ocorrência/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: /filtrar itens da agenda de hoje/i })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Tarefa hoje-1' }));
     expect(onEditarTarefa).toHaveBeenCalledTimes(1);
@@ -329,5 +325,51 @@ describe('AgendaHoje', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /excluir tarefa tarefa hoje-1/i }));
     expect(onExcluirTarefa).toHaveBeenCalledTimes(1);
+  });
+
+  it('exibeConcluidasHojeAbaixoDoSeparadorMantendoPilulasDeDataPrioridadeELixeira', () => {
+    render(
+      <AgendaHoje
+        {...propsBase({
+          dados: {
+            ...agendaVazia(),
+            vazioTotal: false,
+            concluidasHoje: [
+              tarefa('done-1', {
+                concluida: true,
+                prioridade: 'ALTA',
+                dataVencimento: '2026-11-09'
+              })
+            ]
+          },
+          onExcluirTarefa: vi.fn()
+        })}
+      />
+    );
+
+    expect(screen.getByRole('separator', { name: 'Concluídas' })).toBeInTheDocument();
+    expect(screen.getByText('Tarefa done-1')).toBeInTheDocument();
+    expect(screen.getByText('Hoje')).toBeInTheDocument();
+    expect(screen.getByText('Alta')).toBeInTheDocument();
+    expect(screen.queryByText('Concluída')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /excluir tarefa tarefa done-1/i })
+    ).toBeInTheDocument();
+  });
+
+  it('exibeConcluidasExtrasQuandoConcluidasHojeEstaVazia', () => {
+    render(
+      <AgendaHoje
+        {...propsBase({
+          modo: 'pomodoro',
+          dados: agendaVazia(),
+          concluidasExtras: <div>Tarefa local concluída</div>
+        })}
+      />
+    );
+
+    expect(screen.getByRole('separator', { name: 'Concluídas' })).toBeInTheDocument();
+    expect(screen.getByText('Tarefa local concluída')).toBeInTheDocument();
+    expect(screen.queryByText('Tudo em dia por hoje')).not.toBeInTheDocument();
   });
 });

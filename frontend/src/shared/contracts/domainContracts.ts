@@ -427,6 +427,13 @@ export interface SerieRecorrenteDTO {
 /** Modelo explícito de lembrete: ausência de minutos nunca significa "herdar". */
 export type ModoLembrete = 'HERDAR' | 'SEM_ALERTA' | 'PERSONALIZADO';
 
+export type TipoConexaoFluxo = 'ANTECESSORA' | 'SUCESSORA' | 'PAR';
+
+export interface PosicaoFluxoDTO {
+  x: number;
+  y: number;
+}
+
 export interface TarefaDTO {
   id: string;
   usuarioId?: string;
@@ -450,6 +457,11 @@ export interface TarefaDTO {
   deletedAt?: string;
   expiresAt?: string;
   loteExclusaoId?: string;
+  noFluxo?: boolean;
+  sucessorasIds?: string[];
+  antecessorasIds?: string[];
+  paresIds?: string[];
+  posicaoFluxo?: PosicaoFluxoDTO | null;
   criadoEm?: string;
   atualizadoEm?: string;
 }
@@ -460,6 +472,7 @@ export interface TarefasHojeDTO {
   atrasadas: TarefaDTO[];
   hoje: TarefaDTO[];
   semData: TarefaDTO[];
+  concluidasHoje?: TarefaDTO[];
 }
 
 /** Resposta de GET /api/tarefas/lixeira: tarefas paginadas + metadados. */

@@ -12,9 +12,7 @@ export interface BlocoAgendaItemProps {
   trilhaNome?: string;
   data?: string;
   statusData?: StatusDataBloco;
-  selecionado?: boolean;
   onConcluir: () => void;
-  onDefinirFoco?: () => void;
 }
 
 const STATUS_BADGE: Record<
@@ -33,14 +31,12 @@ export const BlocoAgendaItem: React.FC<BlocoAgendaItemProps> = ({
   trilhaNome,
   data,
   statusData = 'HOJE',
-  selecionado = false,
-  onConcluir,
-  onDefinirFoco
+  onConcluir
 }) => {
   const badge = STATUS_BADGE[statusData] ?? STATUS_BADGE.HOJE;
 
   return (
-    <article className={`${styles.card} ${selecionado ? styles.cardSelected : ''}`}>
+    <article className={styles.card}>
       <div className={styles.cardRow}>
         <div className={styles.cardLead}>
           <CheckCircleButton
@@ -54,19 +50,7 @@ export const BlocoAgendaItem: React.FC<BlocoAgendaItemProps> = ({
           />
 
           <div className={styles.cardTitleWrap}>
-            {onDefinirFoco ? (
-              <button
-                type="button"
-                className={styles.cardTrigger}
-                onClick={onDefinirFoco}
-                title="Definir como foco"
-                aria-label="Definir como foco"
-              >
-                <DisciplineLabel name={disciplinaNome} color={disciplinaCor} />
-              </button>
-            ) : (
-              <DisciplineLabel name={disciplinaNome} color={disciplinaCor} />
-            )}
+            <DisciplineLabel name={disciplinaNome} color={disciplinaCor} />
           </div>
         </div>
 

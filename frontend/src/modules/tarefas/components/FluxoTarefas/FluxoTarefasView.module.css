@@ -1,0 +1,205 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 210px);
+  min-height: 540px;
+}
+
+.canvasShell {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 480px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-strong);
+  background:
+    radial-gradient(circle at 14% 16%, var(--bg-ambient-1) 0%, transparent 44%),
+    radial-gradient(circle at 86% 82%, var(--purple-bg-subtle) 0%, transparent 46%),
+    var(--bg-elevated);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.hudIsland {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 10px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-glass);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+.hudStatsPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-mid);
+  font-variant-numeric: tabular-nums;
+}
+
+.hudStatsDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  flex: 0 0 auto;
+}
+
+.hudZoomTag {
+  padding: 4px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.hudZoomDotMode {
+  color: var(--purple-text);
+  border-color: var(--purple-border);
+  background: var(--purple-bg-subtle);
+}
+
+.bottomLegendPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-glass);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 11.5px;
+  font-weight: 500;
+  box-shadow: var(--shadow-sm);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legendLineSeq {
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--primary);
+}
+
+.legendLineDone {
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--green);
+}
+
+.legendLinePar {
+  width: 18px;
+  height: 0;
+  border-top: 2px dashed var(--purple);
+}
+
+.legendDivider {
+  width: 1px;
+  height: 12px;
+  background: var(--border-strong);
+}
+
+.canvasShell :global(.react-flow__controls) {
+  background: var(--surface-glass);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.canvasShell :global(.react-flow__controls-button) {
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  fill: currentColor;
+}
+
+.canvasShell :global(.react-flow__controls-button:last-child) {
+  border-bottom: none;
+}
+
+.canvasShell :global(.react-flow__controls-button:hover) {
+  background: var(--surface-3);
+}
+
+.canvasShell :global(.react-flow__minimap) {
+  width: 184px !important;
+  height: 118px !important;
+  padding: 6px;
+  background: var(--surface-glass) !important;
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--border-strong) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-md), inset 0 1px 0 var(--surface-subtle-hover) !important;
+  overflow: hidden;
+}
+
+.canvasShell :global(.react-flow__minimap-svg) {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-sm);
+}
+
+.canvasShell :global(.react-flow__attribution) {
+  display: none;
+}
+
+.emptyWrap {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  gap: 16px;
+}
+
+.emptyLegendRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+@media (max-width: 760px) {
+  .wrapper {
+    height: calc(100vh - 185px);
+    min-height: 460px;
+  }
+
+  .hudStatsPill,
+  .hudZoomTag,
+  .bottomLegendPill {
+    display: none;
+  }
+
+  .canvasShell :global(.react-flow__minimap) {
+    display: none;
+  }
+}

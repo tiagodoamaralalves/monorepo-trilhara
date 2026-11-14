@@ -9,6 +9,8 @@ import {
 } from '../shared/timers/estudoTimer';
 import { AuthContext, AuthContextValue } from '../shared/auth/AuthContext';
 import { ConfirmProvider } from '../shared/design-system/ConfirmDialog/ConfirmDialog';
+import { ToastProvider, GlobalSessionModalProvider } from '../shared/design-system';
+import { EstudarView } from '../modules/estudos/views/EstudarView';
 import {
   definirUsuarioCorrente,
   __receberParaTeste,
@@ -230,5 +232,44 @@ describe('studyTimer — cronômetro de Estudos exige autenticação', () => {
 
     expect(localStorage.getItem('trilhara:u:user-reset:study_timer')).toBeNull();
     expect(screen.getByTestId('segundos')).toHaveTextContent('0');
+  });
+
+  it('EstudarView desabilita Pausa curta e Pausa longa quando parado e habilita quando iniciado ou pausado', async () => {
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <ConfirmProvider>
+          <AuthContext.Provider value={mockAuth('user-estudar')}>
+            <StudyTimerProvider>
+              <GlobalSessionModalProvider>
+                <EstudarView
+                  trilha={null}
+                  onTrilhaCriada={vi.fn()}
+                  onTrilhaAtualizada={vi.fn()}
+                  onSessaoRegistrada={vi.fn()}
+                />
+              </GlobalSessionModalProvider>
+            </StudyTimerProvider>
+          </AuthContext.Provider>
+        </ConfirmProvider>
+      </ToastProvider>
+    );
+
+    const btnCurta = screen.getByRole('button', { name: /pausa curta/i });
+    const btnLonga = screen.getByRole('button', { name: /pausa longa/i });
+    expect(btnCurta).toBeDisabled();
+    expect(btnLonga).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: /iniciar/i }));
+    expect(btnCurta).toBeEnabled();
+    expect(btnLonga).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: /pausar/i }));
+    expect(btnCurta).toBeEnabled();
+    expect(btnLonga).toBeEnabled();
+
+    await user.click(btnCurta);
+    expect(btnCurta).toBeDisabled();
+    expect(btnLonga).toBeDisabled();
   });
 });

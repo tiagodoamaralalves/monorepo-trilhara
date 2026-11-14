@@ -18,19 +18,18 @@
   outline-offset: 2px;
 }
 
-.cardSelected {
-  border-color: var(--primary);
-  background: var(--primary-bg);
-}
-
 .cardDone {
-  opacity: 0.7;
+  opacity: 0.55;
   background: var(--bg-elevated);
   border-color: var(--border-subtle);
 }
 
 .cardDone:hover {
-  opacity: 0.9;
+  opacity: 0.78;
+}
+
+.cardDone .cardMeta {
+  filter: saturate(0.4);
 }
 
 .cardRow {
@@ -157,6 +156,47 @@
   border-color: var(--green-border);
 }
 
+.flowPill {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.flowPill:hover {
+  color: var(--text);
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+}
+
+.flowPill:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.flowPillActive {
+  color: var(--purple);
+  background: var(--purple-bg);
+  border-color: color-mix(in srgb, var(--purple) 35%, transparent);
+}
+
+.flowPillActive:hover {
+  color: var(--purple);
+  background: color-mix(in srgb, var(--purple) 18%, transparent);
+  border-color: var(--purple);
+}
+
 .deleteBtn {
   position: relative;
   z-index: 1;
@@ -204,7 +244,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .card,
-  .subtaskPill {
+  .subtaskPill,
+  .flowPill {
     transition: none;
   }
 }

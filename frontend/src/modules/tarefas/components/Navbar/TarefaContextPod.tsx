@@ -1,63 +1,42 @@
 import React from 'react';
-import { Plus, CalendarCheck2 } from 'lucide-react';
+import { Clock, Plus, Route } from 'lucide-react';
 import { Button, useSidebar } from '@shared/design-system';
 import { FiltroVisualizacao } from '../../types/tarefa';
-import { NAV_ITEMS_TAREFAS } from './navigationConfig';
 import styles from './TarefaContextPod.module.css';
 
 export interface TarefaContextPodProps {
   onAbrirNovaTarefa: () => void;
   filtroAtivo: FiltroVisualizacao;
-  listaSelecionadaId?: string;
+  temListaOuTrilhaAtiva?: boolean;
   onNavegar: (filtro: FiltroVisualizacao) => void;
-  onSelecionarLista: (id?: string) => void;
   contadores: {
     hoje: number;
     concluidasHoje?: number;
     totalHoje?: number;
-    proximas: number;
-    concluidas: number;
-    total: number;
+    noFluxo?: number;
   };
 }
 
 export const TarefaContextPod: React.FC<TarefaContextPodProps> = ({
   onAbrirNovaTarefa,
   filtroAtivo,
-  listaSelecionadaId,
+  temListaOuTrilhaAtiva = false,
   onNavegar,
-  onSelecionarLista,
   contadores
 }) => {
   const { collapsed } = useSidebar();
 
-  const dataHoje = new Date();
-  const dataHojeFormatada = dataHoje.toLocaleDateString('pt-BR', {
+  const dataHojeFormatada = new Date().toLocaleDateString('pt-BR', {
     weekday: 'short',
     day: 'numeric',
     month: 'short'
   });
 
   const concluidasHoje = contadores.concluidasHoje ?? 0;
-  const totalHoje = contadores.totalHoje ?? (contadores.hoje + concluidasHoje);
+  const totalHoje = contadores.totalHoje ?? contadores.hoje + concluidasHoje;
   const percentualProgresso = totalHoje > 0 ? Math.round((concluidasHoje / totalHoje) * 100) : 0;
 
-  const isFiltroAtivo = (id: FiltroVisualizacao) => {
-    return filtroAtivo === id && !listaSelecionadaId;
-  };
-
-  const handleSelectFiltro = (id: FiltroVisualizacao) => {
-    onSelecionarLista(undefined);
-    onNavegar(id);
-  };
-
-  const getBadgeCount = (id: FiltroVisualizacao): number | undefined => {
-    if (id === 'hoje') return contadores.hoje > 0 ? contadores.hoje : undefined;
-    if (id === 'proximas') return contadores.proximas > 0 ? contadores.proximas : undefined;
-    if (id === 'concluidas') return contadores.concluidas > 0 ? contadores.concluidas : undefined;
-    if (id === 'todas') return contadores.total > 0 ? contadores.total : undefined;
-    return undefined;
-  };
+  const isFiltroAtivo = (id: FiltroVisualizacao) => filtroAtivo === id && !temListaOuTrilhaAtiva;
 
   if (collapsed) {
     return (
@@ -72,45 +51,33 @@ export const TarefaContextPod: React.FC<TarefaContextPodProps> = ({
           <Plus size={18} />
         </button>
 
-        {/* Card compacto de Tarefas do dia */}
         <button
           type="button"
-          className={`${styles.collapsedCardBtn} ${isFiltroAtivo('hoje') ? styles.collapsedFilterActive : ''}`}
-          onClick={() => handleSelectFiltro('hoje')}
-          title={`Tarefas do dia: ${contadores.hoje} pendentes`}
-          aria-label="Tarefas do dia"
+          className={`${styles.collapsedCardBtn} ${isFiltroAtivo('hoje') ? styles.collapsedCardActive : ''}`}
+          onClick={() => onNavegar('hoje')}
+          title={`Hoje: ${contadores.hoje} pendentes`}
+          aria-label="Hoje"
+          aria-current={isFiltroAtivo('hoje') ? 'page' : undefined}
         >
-          <CalendarCheck2 size={18} />
+          <Clock size={18} />
         </button>
 
-        {/* Ícones dos Filtros */}
-        <div className={styles.filtrosList}>
-          {NAV_ITEMS_TAREFAS.map((item) => {
-            const Icon = item.icon;
-            const ativo = isFiltroAtivo(item.id);
-            const badge = getBadgeCount(item.id);
-
-            return (
-              <button
-                key={item.id}
-                type="button"
-                className={`${styles.collapsedFilterItem} ${ativo ? styles.collapsedFilterActive : ''}`}
-                onClick={() => handleSelectFiltro(item.id)}
-                title={badge ? `${item.label} (${badge})` : item.label}
-                aria-label={item.label}
-              >
-                <Icon size={18} />
-              </button>
-            );
-          })}
-        </div>
+        <button
+          type="button"
+          className={`${styles.collapsedCardBtn} ${styles.collapsedFluxoBtn} ${isFiltroAtivo('fluxo') ? styles.collapsedCardActive : ''}`}
+          onClick={() => onNavegar('fluxo')}
+          title="Abrir Fluxo de Tarefas"
+          aria-label="Fluxo de Tarefas"
+          aria-current={isFiltroAtivo('fluxo') ? 'page' : undefined}
+        >
+          <Route size={18} />
+        </button>
       </div>
     );
   }
 
   return (
     <div className={styles.pod}>
-      {/* ── BOTÃO DE CRIAÇÃO PRINCIPAL ── */}
       <Button
         variant="primary"
         size="sm"
@@ -122,27 +89,28 @@ export const TarefaContextPod: React.FC<TarefaContextPodProps> = ({
         Nova Tarefa
       </Button>
 
-      {/* ── CARD "TAREFAS DO DIA" (cartão de tarefas do dia) ── */}
+      {/* Cartão "Hoje" */}
       <div
         role="button"
         tabIndex={0}
         className={`${styles.tarefasDoDiaCard} ${isFiltroAtivo('hoje') ? styles.tarefasDoDiaCardAtivo : ''}`}
-        onClick={() => handleSelectFiltro('hoje')}
+        onClick={() => onNavegar('hoje')}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            handleSelectFiltro('hoje');
+            onNavegar('hoje');
           }
         }}
         title="Visualizar tarefas de hoje"
-        aria-label="Visualizar tarefas de hoje"
+        aria-label="Hoje"
+        aria-current={isFiltroAtivo('hoje') ? 'page' : undefined}
       >
         <div className={styles.tarefasDoDiaTop}>
           <div className={styles.tarefasDoDiaHeader}>
             <div className={styles.tarefasDoDiaIconWrap}>
-              <CalendarCheck2 size={15} />
+              <Clock size={15} />
             </div>
-            <span className={styles.tarefasDoDiaTitle}>Tarefas do dia</span>
+            <span className={styles.tarefasDoDiaTitle}>Hoje</span>
           </div>
           <span className={styles.tarefasDoDiaDate}>{dataHojeFormatada}</span>
         </div>
@@ -176,37 +144,30 @@ export const TarefaContextPod: React.FC<TarefaContextPodProps> = ({
         </div>
       </div>
 
-      {/* ── SEÇÃO DE FILTROS (INVERTIDO CONFORME SOLICITAÇÃO) ── */}
-      <div className={styles.filtrosSection}>
-        <span className={styles.filtrosHeader}>Filtros</span>
-
-        <div className={styles.filtrosList}>
-          {NAV_ITEMS_TAREFAS.map((item) => {
-            const Icon = item.icon;
-            const ativo = isFiltroAtivo(item.id);
-            const badge = getBadgeCount(item.id);
-
-            return (
-              <button
-                key={item.id}
-                type="button"
-                className={`${styles.filterItem} ${ativo ? styles.filterItemActive : ''}`}
-                onClick={() => handleSelectFiltro(item.id)}
-                title={item.title}
-                aria-current={ativo ? 'page' : undefined}
-              >
-                <span className={styles.filterIconWrap}>
-                  <Icon size={17} />
-                </span>
-                <span className={styles.filterLabel}>{item.label}</span>
-                {badge !== undefined && (
-                  <span className={styles.filterBadge}>{badge}</span>
-                )}
-              </button>
-            );
-          })}
+      {/* Cartão "Fluxo de Tarefas" */}
+      <button
+        type="button"
+        className={`${styles.tarefasDoDiaCard} ${styles.fluxoCardSurface} ${isFiltroAtivo('fluxo') ? styles.fluxoCardAtivo : ''}`}
+        onClick={() => onNavegar('fluxo')}
+        title="Abrir tela infinita do fluxo de tarefas"
+        aria-label="Abrir Fluxo de Tarefas"
+        aria-current={isFiltroAtivo('fluxo') ? 'page' : undefined}
+      >
+        <div className={styles.tarefasDoDiaTop}>
+          <div className={styles.tarefasDoDiaHeader}>
+            <div className={`${styles.tarefasDoDiaIconWrap} ${styles.fluxoCardIconWrap}`}>
+              <Route size={15} />
+            </div>
+            <span className={styles.tarefasDoDiaTitle}>Fluxo de Tarefas</span>
+          </div>
+          <span className={styles.fluxoCardBadge}>
+            {(contadores.noFluxo ?? 0) > 0 ? `${contadores.noFluxo} no grafo` : 'Grafo'}
+          </span>
         </div>
-      </div>
+        <span className={styles.fluxoCardDesc}>
+          Grafo visual com antecessoras, pares e sucessoras
+        </span>
+      </button>
     </div>
   );
 };

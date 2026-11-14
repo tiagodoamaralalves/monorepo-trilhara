@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bell,
-  BellOff,
+  BookmarkPlus,
+  ChevronDown,
+  ChevronRight,
   Coffee,
   ExternalLink,
   HelpCircle,
@@ -12,16 +14,17 @@ import {
   Square,
   Timer,
   ListTodo,
-  X,
   LogIn
 } from 'lucide-react';
 import {
+  Badge,
   Button,
   Checkbox,
   ContaMenuButton,
   AvisoContaExcluida,
   FormModal,
   Input,
+  ListDivider,
   Modal,
   PageBanner,
   Switch,
@@ -33,11 +36,27 @@ import {
 import { formatarRelogio as formatarSegundos, hojeISO } from '@shared/format';
 import { registrarFalha } from '@shared/diagnostico';
 import { useAuth } from '@shared/auth';
-import { AgendaHoje, ExcluirRecorrenteModal, QuickAddTask, useAgendaHoje } from '@shared/agenda';
+import {
+  AgendaHoje,
+  ExcluirRecorrenteModal,
+  QuickAddTask,
+  TarefaAgendaItem,
+  useAgendaHoje
+} from '@shared/agenda';
 import { assinar, publicar } from '@shared/sync/barramento';
 import { alertarTitulo, preferenciaMovimentoReduzido } from '@shared/services/alertaTitulo';
 import { BlocoHojeDTO, EscopoRecorrencia, TarefaDTO } from '@shared/contracts/domainContracts';
 import { TarefaService } from '../tarefas/services/tarefaService';
+import {
+  POMODORO_LOCAL_TASKS_STORAGE_KEY,
+  TarefaLocalPomodoro,
+  gerarIdTarefaLocal,
+  lerAgendaExpandidaPomodoro,
+  lerTarefasLocaisPomodoro,
+  paraTarefaAgendaDTO,
+  salvarAgendaExpandidaPomodoro,
+  salvarTarefasLocaisPomodoro
+} from './tarefasLocaisStorage';
 import logoMark from '@shared/assets/logo-mark.svg';
 import styles from './App.module.css';
 
@@ -199,51 +218,6 @@ export function getPomodoroTimerStorageKey(usuarioId?: string | null): string {
   return usuarioId ? `trilhara:u:${usuarioId}:pomodoro_timer` : 'trilhara:anon:pomodoro_timer';
 }
 
-/** Foco atual do Pomodoro: apenas identificador e tipo, nunca o título (item pode sumir). */
-export interface FocoPomodoroPersistido {
-  tipo: 'TAREFA' | 'BLOCO';
-  id: string;
-}
-
-/** Chave do foco atual, escopada por conta. Visitante não persiste foco. */
-export function getPomodoroFocoStorageKey(usuarioId?: string | null): string | null {
-  return usuarioId ? `trilhara:u:${usuarioId}:pomodoro_foco` : null;
-}
-
-function lerFocoPomodoro(usuarioId?: string | null): FocoPomodoroPersistido | null {
-  if (typeof window === 'undefined') return null;
-  const chave = getPomodoroFocoStorageKey(usuarioId);
-  if (!chave) return null;
-  try {
-    const bruto = window.localStorage.getItem(chave);
-    if (!bruto) return null;
-    const valor = JSON.parse(bruto) as Partial<FocoPomodoroPersistido> | null;
-    if (!valor || typeof valor.id !== 'string' || !valor.id) return null;
-    if (valor.tipo !== 'TAREFA' && valor.tipo !== 'BLOCO') return null;
-    return { tipo: valor.tipo, id: valor.id };
-  } catch {
-    return null;
-  }
-}
-
-function salvarFocoPomodoro(
-  usuarioId: string | null | undefined,
-  foco: FocoPomodoroPersistido | null
-): void {
-  if (typeof window === 'undefined') return;
-  const chave = getPomodoroFocoStorageKey(usuarioId);
-  if (!chave) return;
-  try {
-    if (!foco) {
-      window.localStorage.removeItem(chave);
-      return;
-    }
-    window.localStorage.setItem(chave, JSON.stringify(foco));
-  } catch {
-    // Storage restrito: o foco permanece apenas em memória.
-  }
-}
-
 function obterAgoraMs(): number {
   return Date.now();
 }
@@ -267,88 +241,47 @@ export default function PomodoroApp() {
   const usuarioId = usuario?.id || null;
   const usuarioIdRef = useRef<string | null>(usuarioId);
 
-  /**
- * "Foco atual" é apenas contexto visual (§8): persistimos somente `{ tipo, id }` em
- * `trilhara:u:{id}:pomodoro_foco` e derivamos o título da agenda. Se o item sumir, o foco
- * é ignorado e a chave removida.
- */
-  const [focoPersistido, setFocoPersistido] = useState<FocoPomodoroPersistido | null>(() =>
-    lerFocoPomodoro(usuarioId)
+  const [tarefasLocais, setTarefasLocais] = useState<TarefaLocalPomodoro[]>(() =>
+    lerTarefasLocaisPomodoro()
+  );
+  const [salvandoLocais, setSalvandoLocais] = useState<Record<string, boolean>>({});
+  const [agendaExpandida, setAgendaExpandida] = useState<boolean>(() =>
+    lerAgendaExpandidaPomodoro(usuarioId)
   );
 
-  const definirFoco = (foco: { tipo: 'TAREFA' | 'BLOCO'; id: string }) => {
-    setFocoPersistido(foco);
-    salvarFocoPomodoro(usuarioId, foco);
-  };
+  // Sincroniza tarefas locais do navegador entre abas da mesma origem.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === POMODORO_LOCAL_TASKS_STORAGE_KEY) {
+        setTarefasLocais(lerTarefasLocaisPomodoro());
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
-  const limparFoco = () => {
-    setFocoPersistido(null);
-    salvarFocoPomodoro(usuarioId, null);
-  };
-
-  // Troca de conta/exclusão: nada do foco anterior é reaproveitado.
+  // Troca de conta/exclusão: relê preferência do card para a conta atual.
   const usuarioAnteriorRef = useRef<string | null>(usuarioId);
   useEffect(() => {
     if (usuarioAnteriorRef.current === usuarioId) return;
     usuarioAnteriorRef.current = usuarioId;
-    setFocoPersistido(lerFocoPomodoro(usuarioId));
+    setAgendaExpandida(lerAgendaExpandidaPomodoro(usuarioId));
   }, [usuarioId]);
 
-  useEffect(() => {
-    const aoEncerrar = () => {
-      setFocoPersistido(null);
-    };
-    window.addEventListener('trilhara:logout', aoEncerrar);
-    window.addEventListener('trilhara:conta-excluida', aoEncerrar);
-    return () => {
-      window.removeEventListener('trilhara:logout', aoEncerrar);
-      window.removeEventListener('trilhara:conta-excluida', aoEncerrar);
-    };
-  }, []);
-
-  const focoItem = useMemo((): { tipo: 'TAREFA' | 'BLOCO'; id: string; titulo: string } | null => {
-    const foco = focoPersistido;
-    if (!foco || !agendaHoje) return null;
-
-    if (foco.tipo === 'TAREFA') {
-      const tarefa = [
-        ...agendaHoje.tarefasHoje,
-        ...agendaHoje.atrasadas,
-        ...agendaHoje.semData
-      ].find((item) => item.id === foco.id);
-      return tarefa ? { tipo: 'TAREFA', id: foco.id, titulo: tarefa.titulo } : null;
-    }
-
-    const bloco = agendaHoje.blocosHoje.find(
-      (item) => (item.blocoId || item.id) === foco.id
-    );
-    return bloco
-      ? {
-          tipo: 'BLOCO',
-          id: foco.id,
-          titulo: `${bloco.disciplinaNome} (${bloco.trilhaNome || 'Estudos'})`
-        }
-      : null;
-  }, [agendaHoje, focoPersistido]);
-
-  // Item do foco sumiu (concluído, removido ou cronograma regenerado): ignora e limpa.
-  useEffect(() => {
-    if (!focoPersistido) return;
-    if (focoItem) return;
-    if (!agendaHoje) return;
-    if (focoPersistido.tipo === 'TAREFA' && agendaHoje.statusTarefas !== 'sucesso') return;
-    if (focoPersistido.tipo === 'BLOCO' && agendaHoje.statusBlocos !== 'sucesso') return;
-    setFocoPersistido(null);
-    salvarFocoPomodoro(usuarioId, null);
-  }, [agendaHoje, focoItem, focoPersistido, usuarioId]);
+  const alternarAgendaExpandida = () => {
+    setAgendaExpandida((anterior) => {
+      const proximo = !anterior;
+      salvarAgendaExpandidaPomodoro(usuarioId, proximo);
+      return proximo;
+    });
+  };
 
   /**
- * Concluir tarefa manual **não** pausa o timer nem abre o modal de sessão (§8).
- */
+   * Concluir tarefa manual **não** pausa o timer nem abre o modal de sessão (§8).
+   */
   const handleConcluirTarefa = async (tarefaId: string, concluida = true) => {
     try {
       await TarefaService.alternarConclusao(tarefaId, concluida);
-      if (focoPersistido?.tipo === 'TAREFA' && focoPersistido.id === tarefaId) limparFoco();
       notificarMudanca();
     } catch {
       toast.error('Não foi possível concluir a tarefa.');
@@ -386,6 +319,70 @@ export default function PomodoroApp() {
     }
   };
 
+  const handleCriarTarefaLocal = (titulo: string): boolean => {
+    const nova: TarefaLocalPomodoro = {
+      id: gerarIdTarefaLocal(),
+      titulo: titulo.trim(),
+      concluida: false,
+      criadaEm: new Date().toISOString()
+    };
+    setTarefasLocais((prev) => {
+      const proximas = [nova, ...prev];
+      salvarTarefasLocaisPomodoro(proximas);
+      return proximas;
+    });
+    toast.success('Tarefa salva no navegador!');
+    return true;
+  };
+
+  const handleAlternarTarefaLocal = (id: string, concluida: boolean) => {
+    setTarefasLocais((prev) => {
+      const proximas = prev.map((item) => (item.id === id ? { ...item, concluida } : item));
+      salvarTarefasLocaisPomodoro(proximas);
+      return proximas;
+    });
+  };
+
+  const handleExcluirTarefaLocal = (tarefa: TarefaDTO) => {
+    setTarefasLocais((prev) => {
+      const proximas = prev.filter((item) => item.id !== tarefa.id);
+      salvarTarefasLocaisPomodoro(proximas);
+      return proximas;
+    });
+  };
+
+  const handleSalvarTarefaLocalNaConta = async (local: TarefaLocalPomodoro) => {
+    if (salvandoLocais[local.id]) return;
+    setSalvandoLocais((prev) => ({ ...prev, [local.id]: true }));
+    try {
+      const hoje = hojeISO();
+      const criada = await TarefaService.criarTarefa({
+        titulo: local.titulo,
+        dataVencimento: hoje,
+        data: hoje,
+        prioridade: 'MEDIA'
+      });
+      if (local.concluida) {
+        await TarefaService.alternarConclusao(criada.id, true);
+      }
+      setTarefasLocais((prev) => {
+        const proximas = prev.filter((item) => item.id !== local.id);
+        salvarTarefasLocaisPomodoro(proximas);
+        return proximas;
+      });
+      notificarMudanca();
+      toast.success('Tarefa salva na sua conta!');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Não foi possível salvar a tarefa na conta.');
+    } finally {
+      setSalvandoLocais((prev) => {
+        const proximo = { ...prev };
+        delete proximo[local.id];
+        return proximo;
+      });
+    }
+  };
+
   const handleExcluirTarefa = async (tarefa: TarefaDTO) => {
     if (tarefa.serieId && !tarefa.desvinculadaDaSerie) {
       setTarefaParaExcluirRecorrente(tarefa);
@@ -403,7 +400,6 @@ export default function PomodoroApp() {
 
     try {
       await TarefaService.excluirTarefa(tarefa.id);
-      if (focoPersistido?.tipo === 'TAREFA' && focoPersistido.id === tarefa.id) limparFoco();
       notificarMudanca();
       toast.success('Tarefa movida para a lixeira.');
     } catch (err) {
@@ -418,7 +414,6 @@ export default function PomodoroApp() {
 
     try {
       await TarefaService.excluirTarefa(tarefa.id, escopoExclusao);
-      if (focoPersistido?.tipo === 'TAREFA' && focoPersistido.id === tarefa.id) limparFoco();
       notificarMudanca();
       toast.success('Exclusão de recorrência concluída com sucesso.');
     } catch (err) {
@@ -442,7 +437,6 @@ export default function PomodoroApp() {
         recarregarAgenda();
       },
       onSuccess: () => {
-        if (focoPersistido?.tipo === 'BLOCO' && focoPersistido.id === bloco.blocoId) limparFoco();
         notificarMudanca();
       }
     });
@@ -499,6 +493,8 @@ export default function PomodoroApp() {
   const [notificacaoAtiva, setNotificacaoAtiva] = useState<boolean>(
     () => estadoInicial.notificacaoAtiva ?? true
   );
+  const [configSomAtivo, setConfigSomAtivo] = useState<boolean>(somAtivo);
+  const [configNotificacaoAtiva, setConfigNotificacaoAtiva] = useState<boolean>(notificacaoAtiva);
 
   const timerSecondsRef = useRef(timerSeconds);
   const breakSecondsRef = useRef(breakSeconds);
@@ -857,6 +853,8 @@ export default function PomodoroApp() {
     ? timerSeconds === totalPomodoroSeconds
     : timerSeconds === 0;
 
+  const podeIniciarPausa = (isRunning || !isTimerAtStart) && !breakType;
+
   const status = useMemo(() => {
     if (breakType) {
       return `Pausa ${breakType === 'short' ? 'curta' : 'longa'} em andamento`;
@@ -918,7 +916,16 @@ export default function PomodoroApp() {
       stopwatchStartTimeRef.current = novoStopwatchStart;
       stopwatchBaseSecondsRef.current = tempoAtual;
     }
-    void solicitarPermissaoNotificacao();
+    if (
+      notificacaoAtiva &&
+      typeof window !== 'undefined' &&
+      'Notification' in window &&
+      Notification.permission === 'default'
+    ) {
+      void garantirPermissaoNotificacao().then((concedido) => {
+        if (!concedido) setNotificacaoAtiva(false);
+      });
+    }
     setIsRunning(true);
     setBreakType(null);
     breakEndTimeRef.current = null;
@@ -949,6 +956,7 @@ export default function PomodoroApp() {
   };
 
   const iniciarPausa = (tipo: BreakType) => {
+    if (!podeIniciarPausa) return;
     if (isEditingInline) {
       concluirEdicaoInline();
     }
@@ -1083,6 +1091,8 @@ export default function PomodoroApp() {
     const novaConfig = { short: curta, long: longa };
     setPausas(novaConfig);
     setConfigPausas(novaConfig);
+    setSomAtivo(configSomAtivo);
+    setNotificacaoAtiva(configNotificacaoAtiva);
 
     if (breakType) {
       const duracaoSegundos = novaConfig[breakType] * 60;
@@ -1090,34 +1100,72 @@ export default function PomodoroApp() {
       breakEndTimeRef.current = Date.now() + duracaoSegundos * 1000;
     }
 
+    salvarETransmitir({
+      pausas: novaConfig,
+      somAtivo: configSomAtivo,
+      notificacaoAtiva: configNotificacaoAtiva
+    });
+
     setConfigModalAberto(false);
   };
 
-  const solicitarPermissaoNotificacao = async (): Promise<boolean> => {
+  const garantirPermissaoNotificacao = async (): Promise<boolean> => {
     if (typeof window === 'undefined' || !('Notification' in window)) {
-      setNotificacaoAtiva(false);
       return false;
     }
 
     if (Notification.permission === 'granted') {
-      setNotificacaoAtiva(true);
       return true;
     }
 
     if (Notification.permission === 'denied') {
-      setNotificacaoAtiva(false);
       return false;
     }
 
     try {
       const resultado = await Notification.requestPermission();
-      const concedido = resultado === 'granted';
-      setNotificacaoAtiva(concedido);
-      return concedido;
+      return resultado === 'granted';
     } catch {
       return false;
     }
   };
+
+  const tarefasLocaisPendentes = tarefasLocais.filter((local) => !local.concluida);
+  const tarefasLocaisConcluidas = tarefasLocais.filter((local) => local.concluida);
+
+  const renderTarefaLocal = (local: TarefaLocalPomodoro) => (
+    <TarefaAgendaItem
+      key={local.id}
+      tarefa={paraTarefaAgendaDTO(local)}
+      ocultarPrioridade
+      statusBadge={
+        isAuthenticated ? null : (
+          <Badge variant="neutral" size="md">
+            No navegador
+          </Badge>
+        )
+      }
+      acaoExtra={
+        isAuthenticated ? (
+          <button
+            type="button"
+            className={styles.saveAccountPill}
+            disabled={Boolean(salvandoLocais[local.id])}
+            onClick={(e) => {
+              e.stopPropagation();
+              void handleSalvarTarefaLocalNaConta(local);
+            }}
+            title="Salvar esta tarefa na sua conta"
+          >
+            <BookmarkPlus size={12} aria-hidden="true" />
+            <span>{salvandoLocais[local.id] ? 'Salvando...' : 'Salvar em tarefas'}</span>
+          </button>
+        ) : undefined
+      }
+      onAlternar={handleAlternarTarefaLocal}
+      onExcluir={handleExcluirTarefaLocal}
+    />
+  );
 
   return (
     <div className={styles.pomodoroPage}>
@@ -1157,30 +1205,20 @@ export default function PomodoroApp() {
         }
         icon={pomodoroMode ? <TomatoIcon size={24} /> : <Timer size={22} />}
         actions={
-          <div className={styles.headerActions}>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              leftIcon={somAtivo ? <Bell size={15} /> : <BellOff size={15} />}
-              onClick={() => setSomAtivo((ativo) => !ativo)}
-              title={somAtivo ? 'Silenciar alarmes sonoros' : 'Ativar alarmes sonoros'}
-            >
-              {somAtivo ? 'Alarmes ativos' : 'Alarmes mudos'}
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              leftIcon={<Settings size={20} />}
-              onClick={() => {
-                setConfigPausas(pausas);
-                setConfigModalAberto(true);
-              }}
-              aria-label="Configurar pausas e alarmes"
-              title="Configurar pausas e alarmes"
-            />
-          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            leftIcon={<Settings size={20} />}
+            onClick={() => {
+              setConfigPausas(pausas);
+              setConfigSomAtivo(somAtivo);
+              setConfigNotificacaoAtiva(notificacaoAtiva);
+              setConfigModalAberto(true);
+            }}
+            aria-label="Configurar pausas e alarmes"
+            title="Configurar pausas e alarmes"
+          />
         }
       />
 
@@ -1381,6 +1419,8 @@ export default function PomodoroApp() {
               variant="outline"
               size="sm"
               leftIcon={<Coffee size={14} />}
+              disabled={!podeIniciarPausa}
+              title={podeIniciarPausa ? undefined : 'Inicie o cronômetro para usar as pausas'}
               onClick={() => iniciarPausa('short')}
             >
               Pausa curta ({pausas.short} min)
@@ -1390,6 +1430,8 @@ export default function PomodoroApp() {
               variant="outline"
               size="sm"
               leftIcon={<Coffee size={14} />}
+              disabled={!podeIniciarPausa}
+              title={podeIniciarPausa ? undefined : 'Inicie o cronômetro para usar as pausas'}
               onClick={() => iniciarPausa('long')}
             >
               Pausa longa ({pausas.long} min)
@@ -1399,74 +1441,105 @@ export default function PomodoroApp() {
 
         {/* Coluna 2: Espelho da Visão Hoje */}
         <aside className={styles.agendaColumn} aria-label="Agenda do dia">
-          {!isAuthenticated ? (
-            <div className={styles.visitorCard}>
-              <AvisoContaExcluida />
-              <div className={styles.visitorIconWrapper}>
-                <ListTodo size={28} />
-              </div>
-              <h3 className={styles.visitorTitle}>Entre para ver suas tarefas de hoje</h3>
-              <p className={styles.visitorDescription}>
-                Acompanhe tarefas diárias, blocos de cronograma e sincronize suas sessões de foco.
-              </p>
-              <Button type="button" variant="primary" size="md" onClick={abrirAuthModal}>
-                Entrar na conta
-              </Button>
-            </div>
-          ) : (
-            <>
-              <div className={styles.agendaHeader}>
-                <h3 className={styles.agendaTitle}>Agenda de Hoje</h3>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  onClick={recarregarAgenda}
-                  loading={carregandoAgenda}
-                  title="Atualizar agenda"
-                  aria-label="Atualizar agenda"
-                >
-                  <RotateCcw size={14} />
-                </Button>
-              </div>
+          <div
+            className={`${styles.agendaHeader} ${!agendaExpandida ? styles.agendaHeaderCollapsed : ''}`}
+          >
+            <h3 className={styles.agendaTitle}>
+              <button
+                type="button"
+                className={styles.agendaToggleBtn}
+                aria-expanded={agendaExpandida}
+                aria-controls="pomodoro-agenda-conteudo"
+                onClick={alternarAgendaExpandida}
+              >
+                {agendaExpandida ? (
+                  <ChevronDown size={16} aria-hidden="true" />
+                ) : (
+                  <ChevronRight size={16} aria-hidden="true" />
+                )}
+                <span>Agenda de Hoje</span>
+              </button>
+            </h3>
 
-              {focoItem && (
-                <div className={styles.focoItemCard}>
-                  <div className={styles.focoItemInfo}>
-                    <span className={styles.focoItemTag}>Foco Selecionado</span>
-                    <span className={styles.focoItemTitulo}>{focoItem.titulo}</span>
+            {isAuthenticated && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                iconOnly
+                onClick={recarregarAgenda}
+                loading={carregandoAgenda}
+                title="Atualizar agenda"
+                aria-label="Atualizar agenda"
+              >
+                <RotateCcw size={14} />
+              </Button>
+            )}
+          </div>
+
+          {agendaExpandida && (
+            <div id="pomodoro-agenda-conteudo" className={styles.agendaBody}>
+              {!isAuthenticated && <AvisoContaExcluida />}
+
+              {!isAuthenticated && (
+                <div className={styles.visitorBanner}>
+                  <div className={styles.visitorBannerInfo}>
+                    <ListTodo size={16} className={styles.visitorBannerIcon} aria-hidden="true" />
+                    <span>
+                      Tarefas salvas apenas neste navegador. Entre para sincronizar com sua conta.
+                    </span>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    iconOnly
-                    onClick={limparFoco}
-                    title="Desmarcar foco"
-                    aria-label="Desmarcar foco"
-                  >
-                    <X size={15} />
+                  <Button type="button" variant="secondary" size="sm" onClick={abrirAuthModal}>
+                    Entrar na conta
                   </Button>
                 </div>
               )}
 
-              <QuickAddTask onAdicionar={handleCriarTarefaRapida} />
-
-              <AgendaHoje
-                modo="pomodoro"
-                dados={agendaHoje}
-                onAlternarTarefa={handleConcluirTarefa}
-                onConcluirBloco={handleConcluirBloco}
-                onExcluirTarefa={handleExcluirTarefa}
-                onRetryTarefas={recarregarAgendaTarefas}
-                onRetryBlocos={recarregarAgendaBlocos}
-                recarregando={carregandoAgenda}
-                onAlternarSubtarefa={handleAlternarSubtarefa}
-                foco={focoItem ? { tipo: focoItem.tipo, id: focoItem.id } : null}
-                onDefinirFoco={(foco) => definirFoco(foco)}
+              <QuickAddTask
+                onAdicionar={isAuthenticated ? handleCriarTarefaRapida : handleCriarTarefaLocal}
               />
-            </>
+
+              {tarefasLocaisPendentes.length > 0 && (
+                <div className={styles.localTasksList} aria-label="Tarefas salvas no navegador">
+                  {tarefasLocaisPendentes.map(renderTarefaLocal)}
+                </div>
+              )}
+
+              {!isAuthenticated && tarefasLocaisConcluidas.length > 0 && (
+                <div
+                  className={styles.localTasksList}
+                  aria-label="Tarefas concluídas salvas no navegador"
+                >
+                  <ListDivider label="Concluídas" />
+                  {tarefasLocaisConcluidas.map(renderTarefaLocal)}
+                </div>
+              )}
+
+              {!isAuthenticated && tarefasLocais.length === 0 && (
+                <p className={styles.localTasksEmpty}>
+                  Adicione tarefas rápidas acima para acompanhar seu foco neste navegador.
+                </p>
+              )}
+
+              {isAuthenticated && (
+                <AgendaHoje
+                  modo="pomodoro"
+                  dados={agendaHoje}
+                  onAlternarTarefa={handleConcluirTarefa}
+                  onConcluirBloco={handleConcluirBloco}
+                  onExcluirTarefa={handleExcluirTarefa}
+                  onRetryTarefas={recarregarAgendaTarefas}
+                  onRetryBlocos={recarregarAgendaBlocos}
+                  recarregando={carregandoAgenda}
+                  onAlternarSubtarefa={handleAlternarSubtarefa}
+                  concluidasExtras={
+                    tarefasLocaisConcluidas.length > 0
+                      ? tarefasLocaisConcluidas.map(renderTarefaLocal)
+                      : undefined
+                  }
+                />
+              )}
+            </div>
           )}
         </aside>
         </div>
@@ -1578,23 +1651,23 @@ export default function PomodoroApp() {
             <Checkbox
               label="Alarme sonoro"
               description="Toca sinal sonoro harmonioso ao fim das pausas e do foco"
-              checked={somAtivo}
-              onChange={(e) => setSomAtivo(e.target.checked)}
+              checked={configSomAtivo}
+              onChange={(e) => setConfigSomAtivo(e.target.checked)}
             />
             <Checkbox
               label="Notificações na área de trabalho"
               description="Exibe notificação do navegador quando o tempo esgotar"
-              checked={notificacaoAtiva}
+              checked={configNotificacaoAtiva}
               onChange={async (e) => {
                 const checked = e.target.checked;
                 if (checked) {
-                  const concedido = await solicitarPermissaoNotificacao();
+                  const concedido = await garantirPermissaoNotificacao();
                   if (!concedido) {
-                    setNotificacaoAtiva(false);
+                    setConfigNotificacaoAtiva(false);
                     return;
                   }
                 }
-                setNotificacaoAtiva(checked);
+                setConfigNotificacaoAtiva(checked);
               }}
             />
           </div>
@@ -1605,8 +1678,8 @@ export default function PomodoroApp() {
               <span>Alarmes automáticos configurados:</span>
             </div>
             <ul className={styles.alarmInfoItems}>
-              <li>Ao fim da pausa curta ({pausas.short} min)</li>
-              <li>Ao fim da pausa longa ({pausas.long} min)</li>
+              <li>Ao fim da pausa curta ({configPausas.short} min)</li>
+              <li>Ao fim da pausa longa ({configPausas.long} min)</li>
               <li>Ao fim do tempo de foco ({pomodoroMinutes} min)</li>
             </ul>
             <Button

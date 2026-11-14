@@ -438,13 +438,6 @@
   border-top: 1px solid var(--border);
 }
 
-.headerActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 .configModalContent {
   display: flex;
   flex-direction: column;
@@ -621,85 +614,123 @@
   border-bottom: 1px solid var(--border);
 }
 
+.agendaHeaderCollapsed {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
 .agendaTitle {
   font-family: var(--font-display, var(--font-sans));
   font-size: 16px;
   font-weight: 750;
   color: var(--text);
   margin: 0;
-}
-
-.visitorCard {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 12px;
-  padding: 32px 16px;
-}
-
-.visitorIconWrapper {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--primary-light);
-  margin-bottom: 4px;
-}
-
-.visitorTitle {
-  font-family: var(--font-display, var(--font-sans));
-  font-size: 16px;
-  font-weight: 750;
-  color: var(--text);
-  margin: 0;
-}
-
-.visitorDescription {
-  font-size: 13px;
-  color: var(--text-mid);
-  line-height: 1.5;
-  max-width: 32ch;
-  margin: 0 0 8px;
-}
-
-.focoItemCard {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 14px;
-  background: var(--primary-bg);
-  border: 1px solid var(--primary-border-subtle);
-  border-radius: var(--radius-md);
-}
-
-.focoItemInfo {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
   min-width: 0;
 }
 
-.focoItemTag {
-  font-size: 10.5px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.agendaToggleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--transition-fast, 150ms ease);
+}
+
+.agendaToggleBtn:hover {
+  background: var(--surface-2);
+}
+
+.agendaToggleBtn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.agendaBody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.visitorBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.visitorBannerInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 220px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-mid);
+  line-height: 1.4;
+}
+
+.visitorBannerIcon {
+  flex: 0 0 auto;
   color: var(--primary-light);
 }
 
-.focoItemTitulo {
+.localTasksList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.localTasksEmpty {
+  margin: 0;
   font-size: 13px;
-  font-weight: 650;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--text-soft);
+}
+
+.saveAccountPill {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: var(--status-pill-height);
+  padding: var(--status-pill-padding);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--primary-border-subtle);
+  background: var(--primary-bg);
+  color: var(--primary-light);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
   white-space: nowrap;
+  transition: background var(--transition-fast, 150ms ease), border-color var(--transition-fast, 150ms ease);
+}
+
+.saveAccountPill:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+  border-color: var(--primary);
+}
+
+.saveAccountPill:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+.saveAccountPill:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
 }
 
 .clockEditButton {

@@ -1,24 +1,19 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  Calendar,
   CalendarDays,
   CheckCircle2,
   Clock,
-  ListTodo,
   Filter,
-  ChevronDown,
-  ChevronRight,
   Folder,
   ArrowUpDown,
   Trash2,
   RotateCcw,
-  BookOpen
+  BookOpen,
+  Route
 } from 'lucide-react';
 
 import {
   PageBanner,
-  Tabs,
-  TabItem,
   Button,
   EmptyState,
   DisciplineLabel,
@@ -28,7 +23,8 @@ import {
   SectionErrorCard,
   Skeleton,
   useGlobalSessionModal,
-  AvisoContaExcluida
+  AvisoContaExcluida,
+  ListDivider
 } from '@shared/design-system';
 import { useAuth, AuthView, AuthMode } from '@shared/auth';
 import { request, ApiError } from '@shared/auth/api';
@@ -46,6 +42,7 @@ import {
   BlocoCronogramaItemDTO,
   BlocoHojeDTO,
   ConcluirAtrasadosResponse,
+  TarefaDTO,
   TrilhaResumoDTO
 } from '@shared/contracts/domainContracts';
 import type { Pagina } from '@shared/contracts';
@@ -56,6 +53,9 @@ import { TaskModal, SalvarTarefaPayload } from './components/TaskModal/TaskModal
 import { ListaModal } from './components/ListaModal/ListaModal';
 import { ConfiguracaoLembreteModal } from './components/ConfiguracaoLembreteModal/ConfiguracaoLembreteModal';
 import { CalendarView } from './components/CalendarView/CalendarView';
+import { FluxoTarefasView } from './components/FluxoTarefas/FluxoTarefasView';
+import { FluxoTarefasModal } from './components/FluxoTarefas/FluxoTarefasModal';
+import { tarefaPertenceAoFluxo } from './components/FluxoTarefas/fluxoLayout';
 import { LandingView } from './views/LandingView';
 
 import {
@@ -63,7 +63,9 @@ import {
   ListaTarefas,
   FiltroVisualizacao,
   EscopoRecorrencia,
-  LixeiraTarefasDTO
+  LixeiraTarefasDTO,
+  PosicaoFluxoDTO,
+  TipoConexaoFluxo
 } from './types/tarefa';
 import { TarefaService } from './services/tarefaService';
 import styles from './App.module.css';
@@ -119,7 +121,6 @@ function TarefasApp() {
   const [listaAtivaId, setListaAtivaId] = useState<string | undefined>(undefined);
   const [filtro, setFiltro] = useState<FiltroVisualizacao>('hoje');
   const [ordenacao, setOrdenacao] = useState<Ordenacao>('vencimento');
-  const [mostrarConcluidas, setMostrarConcluidas] = useState(true);
 
   // Trilhas de Estudo com cronograma ativo e Listas Virtuais
   const [trilhasComCronograma, setTrilhasComCronograma] = useState<TrilhaComCronogramaInfo[]>([]);
@@ -145,6 +146,11 @@ function TarefasApp() {
   const [modalListaAberto, setModalListaAberto] = useState(false);
   const [listaEditando, setListaEditando] = useState<ListaTarefas | null>(null);
   const [modalPushAberto, setModalPushAberto] = useState(false);
+
+  // Fluxo visual de tarefas
+  const [tarefasFluxoExtra, setTarefasFluxoExtra] = useState<Tarefa[]>([]);
+  const [tarefaConectandoFluxo, setTarefaConectandoFluxo] = useState<Tarefa | null>(null);
+  const [tarefaFluxoFocadaId, setTarefaFluxoFocadaId] = useState<string | null>(null);
 
   // Modal de exclusão com escopo de recorrência
   const [tarefaParaExcluirRecorrente, setTarefaParaExcluirRecorrente] = useState<Tarefa | null>(null);
@@ -496,6 +502,7 @@ function TarefasApp() {
 
     // Atualização otimista
     setTarefasManuais((prev) => atualizarCampoConclusao(prev, concluida));
+    setTarefasFluxoExtra((prev) => atualizarCampoConclusao(prev, concluida));
     setTarefaEditando((prev) =>
       prev && prev.id === id
         ? {
@@ -510,10 +517,12 @@ function TarefasApp() {
     try {
       const atualizada = await TarefaService.alternarConclusao(id, concluida);
       setTarefasManuais((prev) => prev.map((t) => (t.id === atualizada.id ? atualizada : t)));
+      setTarefasFluxoExtra((prev) => prev.map((t) => (t.id === atualizada.id ? atualizada : t)));
       setTarefaEditando((prev) => (prev && prev.id === id ? atualizada : prev));
       notificarMudanca();
     } catch (err) {
       setTarefasManuais((prev) => atualizarCampoConclusao(prev, !concluida));
+      setTarefasFluxoExtra((prev) => atualizarCampoConclusao(prev, !concluida));
       setTarefaEditando((prev) =>
         prev && prev.id === id
           ? {
@@ -782,6 +791,207 @@ function TarefasApp() {
     [tarefasManuais]
   );
 
+  const todasTarefasComFluxo = useMemo(() => {
+    const mapa = new Map<string, Tarefa>();
+    for (const t of tarefasManuais) {
+      mapa.set(t.id, t);
+    }
+    for (const t of tarefasFluxoExtra) {
+      mapa.set(t.id, t);
+    }
+    return [...mapa.values()];
+  }, [tarefasManuais, tarefasFluxoExtra]);
+
+  const countFluxo = useMemo(
+    () => todasTarefasComFluxo.filter((t) => tarefaPertenceAoFluxo(t)).length,
+    [todasTarefasComFluxo]
+  );
+
+  const tarefaModalFluxo = useMemo(() => {
+    if (!tarefaConectandoFluxo) return null;
+    return (
+      todasTarefasComFluxo.find((t) => t.id === tarefaConectandoFluxo.id) ??
+      tarefaConectandoFluxo
+    );
+  }, [tarefaConectandoFluxo, todasTarefasComFluxo]);
+
+  const sincronizarFluxo = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      const doFluxo = await TarefaService.listarFluxo();
+      const mapaFluxo = new Map(doFluxo.map((t) => [t.id, t]));
+      setTarefasFluxoExtra(doFluxo);
+      setTarefasManuais((prev) =>
+        prev.map((t) =>
+          mapaFluxo.get(t.id) ??
+          (tarefaPertenceAoFluxo(t)
+            ? {
+                ...t,
+                noFluxo: false,
+                antecessorasIds: [],
+                sucessorasIds: [],
+                paresIds: []
+              }
+            : t)
+        )
+      );
+      notificarMudanca();
+    } catch {
+      // Silencia erro secundário se não estiver na tela de fluxo
+    }
+  }, [isAuthenticated, notificarMudanca]);
+
+  useEffect(() => {
+    if (isAuthenticated && filtro === 'fluxo') {
+      void sincronizarFluxo();
+    }
+  }, [isAuthenticated, filtro, sincronizarFluxo]);
+
+  const handleAbrirFluxoTarefa = useCallback(
+    (tarefaDTO: TarefaDTO) => {
+      const completa =
+        todasTarefasComFluxo.find((t) => t.id === tarefaDTO.id) ?? (tarefaDTO as Tarefa);
+      if (tarefaPertenceAoFluxo(completa)) {
+        setListaAtivaId(undefined);
+        setTrilhaAtivaId(undefined);
+        setTarefaFluxoFocadaId(completa.id);
+        setFiltro('fluxo');
+      } else {
+        setTarefaConectandoFluxo(completa);
+      }
+    },
+    [todasTarefasComFluxo]
+  );
+
+  const handleAbrirTelaFluxoComFoco = useCallback((tarefaId: string) => {
+    setListaAtivaId(undefined);
+    setTrilhaAtivaId(undefined);
+    setTarefaFluxoFocadaId(tarefaId);
+    setFiltro('fluxo');
+  }, []);
+
+  const handleAdicionarVariasAoFluxo = useCallback(
+    async (tarefaIds: string[]) => {
+      if (tarefaIds.length === 0) return;
+      try {
+        const existentesNoFluxo = todasTarefasComFluxo.filter((t) =>
+          tarefaPertenceAoFluxo(t)
+        ).length;
+
+        const posicoes = await Promise.all(
+          tarefaIds.map(async (tarefaId, idx) => {
+            await TarefaService.adicionarAoFluxo(tarefaId);
+            const posIndex = existentesNoFluxo + idx;
+            return {
+              tarefaId,
+              x: 80 + (posIndex % 4) * 310,
+              y: 80 + Math.floor(posIndex / 4) * 168
+            };
+          })
+        );
+        await TarefaService.atualizarPosicoesFluxoEmLote(posicoes);
+        await sincronizarFluxo();
+      } catch (err) {
+        toast.error(err instanceof Error ? err : 'Não foi possível adicionar as tarefas ao fluxo.');
+      }
+    },
+    [todasTarefasComFluxo, sincronizarFluxo, toast]
+  );
+
+  const handleConectarVariasFluxo = useCallback(
+    async (origemId: string, alvosIds: string[], tipo: TipoConexaoFluxo) => {
+      if (alvosIds.length === 0) return;
+      try {
+        for (const alvoId of alvosIds) {
+          await TarefaService.conectarNoFluxo(origemId, alvoId, tipo);
+        }
+        await sincronizarFluxo();
+      } catch (err) {
+        await sincronizarFluxo();
+        toast.error(err instanceof Error ? err : 'Não foi possível conectar as tarefas selecionadas.');
+        throw err;
+      }
+    },
+    [sincronizarFluxo, toast]
+  );
+
+  const handleRemoverDoFluxo = useCallback(
+    async (tarefaId: string) => {
+      try {
+        await TarefaService.removerDoFluxo(tarefaId);
+        await sincronizarFluxo();
+      } catch (err) {
+        toast.error(err instanceof Error ? err : 'Não foi possível remover a tarefa do fluxo.');
+      }
+    },
+    [sincronizarFluxo, toast]
+  );
+
+  const handleConectarFluxo = useCallback(
+    async (origemId: string, alvoId: string, tipo: TipoConexaoFluxo) => {
+      try {
+        await TarefaService.conectarNoFluxo(origemId, alvoId, tipo);
+        await sincronizarFluxo();
+      } catch (err) {
+        toast.error(err instanceof Error ? err : 'Não foi possível conectar as tarefas.');
+        throw err;
+      }
+    },
+    [sincronizarFluxo, toast]
+  );
+
+  const handleDesconectarFluxo = useCallback(
+    async (origemId: string, alvoId: string) => {
+      try {
+        await TarefaService.desconectarNoFluxo(origemId, alvoId);
+        await sincronizarFluxo();
+      } catch (err) {
+        toast.error(err instanceof Error ? err : 'Não foi possível desconectar as tarefas.');
+      }
+    },
+    [sincronizarFluxo, toast]
+  );
+
+  const handleAtualizarPosicaoFluxo = useCallback(
+    async (tarefaId: string, x: number, y: number) => {
+      const novaPosicao: PosicaoFluxoDTO = { x, y };
+      setTarefasManuais((prev) =>
+        prev.map((t) => (t.id === tarefaId ? { ...t, posicaoFluxo: novaPosicao } : t))
+      );
+      setTarefasFluxoExtra((prev) =>
+        prev.map((t) => (t.id === tarefaId ? { ...t, posicaoFluxo: novaPosicao } : t))
+      );
+      try {
+        await TarefaService.atualizarPosicaoFluxo(tarefaId, x, y);
+      } catch (err) {
+        toast.error(err instanceof Error ? err : 'Não foi possível salvar a posição no fluxo.');
+      }
+    },
+    [toast]
+  );
+
+  const handleAtualizarPosicoesFluxoEmLote = useCallback(
+    async (posicoes: Array<{ tarefaId: string; x: number; y: number }>) => {
+      const mapaPos = new Map(posicoes.map((p) => [p.tarefaId, { x: p.x, y: p.y }]));
+      setTarefasManuais((prev) =>
+        prev.map((t) =>
+          mapaPos.has(t.id) ? { ...t, posicaoFluxo: mapaPos.get(t.id) } : t
+        )
+      );
+      setTarefasFluxoExtra((prev) =>
+        prev.map((t) =>
+          mapaPos.has(t.id) ? { ...t, posicaoFluxo: mapaPos.get(t.id) } : t
+        )
+      );
+      try {
+        await TarefaService.atualizarPosicoesFluxoEmLote(posicoes);
+      } catch (err) {
+        toast.error(err instanceof Error ? err : 'Não foi possível organizar as posições do fluxo.');
+      }
+    },
+    [toast]
+  );
+
   const listaAtiva = useMemo(() => {
     if (!listaAtivaId) return null;
     return listas.find((l) => l.id === listaAtivaId) || null;
@@ -824,15 +1034,6 @@ function TarefasApp() {
       alternarTelaAuth('none');
     }
   }, [isAuthenticated, telaAuth, alternarTelaAuth]);
-
-  const tabs: TabItem[] = [
-    { id: 'hoje', label: 'Hoje', count: countHoje, icon: <Clock size={15} /> },
-    { id: 'proximas', label: 'Próximos Dias', count: countProximas, icon: <Calendar size={15} /> },
-    { id: 'concluidas', label: 'Concluídas', count: countConcluidas, icon: <CheckCircle2 size={15} /> },
-    { id: 'calendario', label: 'Calendário', icon: <CalendarDays size={15} /> },
-    { id: 'todas', label: 'Todas as Tarefas', count: countTotal, icon: <ListTodo size={15} /> },
-    { id: 'lixeira', label: 'Lixeira (30d)', icon: <Trash2 size={15} /> }
-  ];
 
   if (carregando) {
     return (
@@ -900,7 +1101,8 @@ function TarefasApp() {
           totalHoje: countHoje + countConcluidas,
           proximas: countProximas,
           concluidas: countConcluidas,
-          total: countTotal
+          total: countTotal,
+          noFluxo: countFluxo
         }}
         contadoresPorLista={contadoresPorLista}
         onNavegar={(f) => {
@@ -938,6 +1140,8 @@ function TarefasApp() {
               ? 'Tarefas Concluídas'
               : filtro === 'calendario'
               ? 'Visão em Calendário'
+              : filtro === 'fluxo'
+              ? 'Fluxo de Tarefas'
               : filtro === 'lixeira'
               ? 'Lixeira (30 dias)'
               : 'Minhas Tarefas'
@@ -947,6 +1151,8 @@ function TarefasApp() {
               ? 'Lista Virtual da Trilha — blocos de estudo do cronograma ativo.'
               : listaAtiva
               ? 'Tarefas organizadas dentro desta lista personalizada.'
+              : filtro === 'fluxo'
+              ? 'Visualize e conecte antecessoras, pares paralelos e sucessoras em uma tela infinita.'
               : filtro === 'lixeira'
               ? 'Itens excluídos permanecem aqui por 30 dias antes de serem purgados definitivamente.'
               : 'Organize suas metas diárias, séries recorrentes e tarefas manuais.'
@@ -960,6 +1166,8 @@ function TarefasApp() {
               <CheckCircle2 size={26} />
             ) : filtro === 'calendario' ? (
               <CalendarDays size={26} />
+            ) : filtro === 'fluxo' ? (
+              <Route size={26} />
             ) : (
               <Clock size={26} />
             )
@@ -975,17 +1183,6 @@ function TarefasApp() {
               >
                 Esvaziar Lixeira
               </Button>
-            ) : undefined
-          }
-          toolbar={
-            !listaAtiva ? (
-              <div className={styles.toolbar}>
-                <Tabs
-                  items={tabs}
-                  activeId={filtro}
-                  onChange={(id) => setFiltro(id as FiltroVisualizacao)}
-                />
-              </div>
             ) : undefined
           }
         />
@@ -1096,6 +1293,25 @@ function TarefasApp() {
                 setModalAberto(true);
               }}
             />
+          ) : filtro === 'fluxo' ? (
+            /* ── TELA INFINITA DE FLUXO DE TAREFAS ── */
+            <FluxoTarefasView
+              todasTarefas={todasTarefasComFluxo}
+              listas={listas}
+              tarefaFocadaId={tarefaFluxoFocadaId}
+              onAlternarConclusao={handleAlternarTarefa}
+              onEditarTarefa={(t) => {
+                setTarefaEditando(t);
+                setModalAberto(true);
+              }}
+              onAbrirConexoes={(t) => setTarefaConectandoFluxo(t)}
+              onAdicionarVariasAoFluxo={handleAdicionarVariasAoFluxo}
+              onRemoverDoFluxo={handleRemoverDoFluxo}
+              onConectar={handleConectarFluxo}
+              onDesconectar={handleDesconectarFluxo}
+              onAtualizarPosicao={handleAtualizarPosicaoFluxo}
+              onAtualizarPosicoesEmLote={handleAtualizarPosicoesFluxoEmLote}
+            />
           ) : trilhaAtiva ? (
             /* ── LISTA VIRTUAL POR TRILHA ── */
             <div>
@@ -1185,6 +1401,7 @@ function TarefasApp() {
                 }}
                 onExcluirTarefa={(t) => handleExcluirTarefa(t as Tarefa)}
                 onAlternarSubtarefa={handleAlternarSubtarefa}
+                onAbrirFluxoTarefa={handleAbrirFluxoTarefa}
               />
 
             </div>
@@ -1239,6 +1456,7 @@ function TarefasApp() {
                           }}
                           onExcluir={(t) => handleExcluirTarefa(t as Tarefa)}
                           onAlternarSubtarefa={handleAlternarSubtarefa}
+                          onAbrirFluxo={handleAbrirFluxoTarefa}
                         />
                       ))}
                     </div>
@@ -1273,36 +1491,26 @@ function TarefasApp() {
                 </div>
               )}
 
-              {/* Concluídas colapsáveis */}
+              {/* Concluídas abaixo de linha discreta */}
               {tarefasConcluidas.length > 0 && filtro !== 'concluidas' && (
                 <div className={styles.completedSection}>
-                  <button
-                    type="button"
-                    className={styles.completedHeader}
-                    onClick={() => setMostrarConcluidas((prev) => !prev)}
-                  >
-                    {mostrarConcluidas ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                    <span>Concluídas</span>
-                    <span className={styles.completedBadge}>{tarefasConcluidas.length}</span>
-                  </button>
-
-                  {mostrarConcluidas && (
-                    <div className={styles.taskList}>
-                      {tarefasConcluidas.map((tarefa) => (
-                        <TarefaAgendaItem
-                          key={tarefa.id}
-                          tarefa={tarefa}
-                          onAlternar={handleAlternarTarefa}
-                          onEditar={(t) => {
-                            setTarefaEditando(t as Tarefa);
-                            setModalAberto(true);
-                          }}
-                          onExcluir={(t) => handleExcluirTarefa(t as Tarefa)}
-                          onAlternarSubtarefa={handleAlternarSubtarefa}
-                        />
-                      ))}
-                    </div>
-                  )}
+                  <ListDivider label="Concluídas" />
+                  <div className={styles.taskList}>
+                    {tarefasConcluidas.map((tarefa) => (
+                      <TarefaAgendaItem
+                        key={tarefa.id}
+                        tarefa={tarefa}
+                        onAlternar={handleAlternarTarefa}
+                        onEditar={(t) => {
+                          setTarefaEditando(t as Tarefa);
+                          setModalAberto(true);
+                        }}
+                        onExcluir={(t) => handleExcluirTarefa(t as Tarefa)}
+                        onAlternarSubtarefa={handleAlternarSubtarefa}
+                        onAbrirFluxo={handleAbrirFluxoTarefa}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -1348,6 +1556,18 @@ function TarefasApp() {
         onChangeEscopo={setEscopoExclusao}
         onCancel={() => setTarefaParaExcluirRecorrente(null)}
         onConfirm={handleConfirmarExclusaoRecorrente}
+      />
+
+      <FluxoTarefasModal
+        isOpen={Boolean(tarefaModalFluxo)}
+        modo="conectar"
+        tarefa={tarefaModalFluxo}
+        todasTarefas={todasTarefasComFluxo}
+        listas={listas}
+        onClose={() => setTarefaConectandoFluxo(null)}
+        onConectarMultiplas={handleConectarVariasFluxo}
+        onDesconectar={handleDesconectarFluxo}
+        onAbrirTelaFluxo={handleAbrirTelaFluxoComFoco}
       />
     </div>
   );

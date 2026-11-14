@@ -196,7 +196,11 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
   };
 
 
+  const podeIniciarPausa =
+    timer.ativo && (timer.running || timer.startedAt !== null) && !timer.breakType;
+
   const iniciarPausa = (tipo: 'short' | 'long') => {
+    if (!podeIniciarPausa) return;
     timer.startBreak(tipo, pausas[tipo]);
   };
 
@@ -349,7 +353,14 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
               variant="outline"
               size="sm"
               leftIcon={<Coffee size={14} />}
-              disabled={!timer.ativo}
+              disabled={!podeIniciarPausa}
+              title={
+                podeIniciarPausa
+                  ? undefined
+                  : timer.ativo
+                    ? 'Inicie o cronômetro para usar as pausas'
+                    : 'Entre para usar o cronômetro'
+              }
               onClick={() => iniciarPausa('short')}
             >
               Pausa curta ({pausas.short} min)
@@ -359,7 +370,14 @@ export const EstudarView: React.FC<EstudarViewProps> = ({
               variant="outline"
               size="sm"
               leftIcon={<Coffee size={14} />}
-              disabled={!timer.ativo}
+              disabled={!podeIniciarPausa}
+              title={
+                podeIniciarPausa
+                  ? undefined
+                  : timer.ativo
+                    ? 'Inicie o cronômetro para usar as pausas'
+                    : 'Entre para usar o cronômetro'
+              }
               onClick={() => iniciarPausa('long')}
             >
               Pausa longa ({pausas.long} min)

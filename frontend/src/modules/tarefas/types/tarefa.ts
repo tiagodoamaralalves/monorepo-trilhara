@@ -6,6 +6,8 @@ import {
   ModoMensal,
   TipoTermino,
   ModoLembrete,
+  TipoConexaoFluxo,
+  PosicaoFluxoDTO,
   ListaTarefasDTO,
   SerieRecorrenteDTO,
   TarefaDTO,
@@ -23,6 +25,8 @@ export type {
   ModoMensal,
   TipoTermino,
   ModoLembrete,
+  TipoConexaoFluxo,
+  PosicaoFluxoDTO,
   ListaTarefasDTO,
   SerieRecorrenteDTO,
   TarefaDTO,
@@ -87,6 +91,11 @@ export interface Tarefa {
   deletedAt?: string;
   expiresAt?: string;
   loteExclusaoId?: string;
+  noFluxo?: boolean;
+  sucessorasIds?: string[];
+  antecessorasIds?: string[];
+  paresIds?: string[];
+  posicaoFluxo?: PosicaoFluxoDTO | null;
   criadoEm?: string;
   atualizadoEm?: string;
 
@@ -97,4 +106,11 @@ export interface Tarefa {
   origem?: string;
 }
 
-export type FiltroVisualizacao = 'hoje' | 'proximas' | 'concluidas' | 'todas' | 'calendario' | 'lixeira';
+export type FiltroVisualizacao =
+  | 'hoje'
+  | 'proximas'
+  | 'concluidas'
+  | 'todas'
+  | 'calendario'
+  | 'fluxo'
+  | 'lixeira';

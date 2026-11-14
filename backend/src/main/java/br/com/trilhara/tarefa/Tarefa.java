@@ -35,6 +35,10 @@ public record Tarefa(
         Instant deletedAt,
         Instant expiresAt,
         String loteExclusaoId,
+        boolean noFluxo,
+        List<ObjectId> sucessorasIds,
+        List<ObjectId> paresIds,
+        PosicaoFluxo posicaoFluxo,
         @NotNull Instant criadoEm,
         @NotNull Instant atualizadoEm) {
 
@@ -42,6 +46,12 @@ public record Tarefa(
         subtarefas = subtarefas == null
                 ? List.of()
                 : Collections.unmodifiableList(new ArrayList<>(subtarefas));
+        sucessorasIds = sucessorasIds == null
+                ? List.of()
+                : Collections.unmodifiableList(new ArrayList<>(sucessorasIds));
+        paresIds = paresIds == null
+                ? List.of()
+                : Collections.unmodifiableList(new ArrayList<>(paresIds));
         // ausência nunca significa "herdar"; o default do modelo é HERDAR explícito.
         modoLembrete = modoLembrete == null ? ModoLembrete.HERDAR : modoLembrete;
     }

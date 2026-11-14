@@ -5,6 +5,7 @@ import { FiltroVisualizacao, ListaTarefas } from '../../types/tarefa';
 import { TarefaContextPod } from './TarefaContextPod';
 import { MinhasListasNav, TrilhaComCronogramaInfo } from './MinhasListasNav';
 import { MobileTarefaControls } from './MobileTarefaControls';
+import { NAV_ITEMS_TAREFAS, NAV_ITEMS_TAREFAS_SIDEBAR } from './navigationConfig';
 
 export interface NavbarProps {
   filtroAtivo: FiltroVisualizacao;
@@ -25,6 +26,7 @@ export interface NavbarProps {
     proximas: number;
     concluidas: number;
     total: number;
+    noFluxo?: number;
   };
   contadoresPorLista?: Record<string, number>;
   onNavegar: (filtro: FiltroVisualizacao) => void;
@@ -52,13 +54,26 @@ export const Navbar: React.FC<NavbarProps> = ({
   onAbrirLogin,
   onSettings
 }) => {
+  const handleNavegarFiltro = (filtro: FiltroVisualizacao) => {
+    onSelecionarTrilha?.(undefined);
+    onSelecionarLista(undefined);
+    onNavegar(filtro);
+  };
+
+  const getBadgeForItem = (id: FiltroVisualizacao): number | undefined => {
+    if (id === 'proximas') return contadores.proximas > 0 ? contadores.proximas : undefined;
+    if (id === 'concluidas') return contadores.concluidas > 0 ? contadores.concluidas : undefined;
+    if (id === 'todas') return contadores.total > 0 ? contadores.total : undefined;
+    return undefined;
+  };
+
   return (
     <AppSidebar<FiltroVisualizacao>
       brand={{
         title: 'Trilhara',
         subtitle: 'Tarefas & Agenda',
         logoSrc: '/favicon.svg',
-        onClick: () => onNavegar('hoje'),
+        onClick: () => handleNavegarFiltro('hoje'),
         titleAttr: 'Ir para tarefas de hoje'
       }}
       user={
@@ -76,12 +91,17 @@ export const Navbar: React.FC<NavbarProps> = ({
         <TarefaContextPod
           onAbrirNovaTarefa={onAbrirNovaTarefa}
           filtroAtivo={filtroAtivo}
-          listaSelecionadaId={listaSelecionadaId}
-          onNavegar={onNavegar}
-          onSelecionarLista={onSelecionarLista}
+          temListaOuTrilhaAtiva={Boolean(listaSelecionadaId || trilhaSelecionadaId)}
+          onNavegar={handleNavegarFiltro}
           contadores={contadores}
         />
       }
+      navLabel="Filtros"
+      items={NAV_ITEMS_TAREFAS_SIDEBAR}
+      mobileItems={NAV_ITEMS_TAREFAS}
+      activeId={listaSelecionadaId || trilhaSelecionadaId ? null : filtroAtivo}
+      onNavigate={handleNavegarFiltro}
+      getBadge={getBadgeForItem}
       mobileControlsSlot={
         <MobileTarefaControls
           onAbrirNovaTarefa={onAbrirNovaTarefa}

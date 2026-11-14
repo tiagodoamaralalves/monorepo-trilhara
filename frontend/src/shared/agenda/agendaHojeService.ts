@@ -49,6 +49,7 @@ export interface AgendaHojeDerivado {
   blocosHoje: BlocoHojeDTO[];
   tarefasHoje: TarefaDTO[];
   semData: TarefaDTO[];
+  concluidasHoje: TarefaDTO[];
   erroTarefas: Error | null;
   erroBlocos: Error | null;
   /** `true` apenas quando as duas fontes responderam 2xx e não há nenhum item. */
@@ -422,6 +423,10 @@ export function derivarAgenda(estado: EstadoAgendaUsuario | null): AgendaHojeDer
     compararSemData
   );
 
+  const concluidasHoje = (estado.tarefas.dados?.concluidasHoje ?? []).filter(
+    (tarefa) => tarefa.concluida
+  );
+
   const erroTarefas =
     estado.tarefas.status === 'erro'
       ? estado.tarefas.erro ?? new Error('Falha ao carregar tarefas')
@@ -437,7 +442,8 @@ export function derivarAgenda(estado: EstadoAgendaUsuario | null): AgendaHojeDer
     atrasadas.length === 0 &&
     blocosHoje.length === 0 &&
     tarefasHoje.length === 0 &&
-    semData.length === 0;
+    semData.length === 0 &&
+    concluidasHoje.length === 0;
 
   return {
     hojeLocal,
@@ -449,6 +455,7 @@ export function derivarAgenda(estado: EstadoAgendaUsuario | null): AgendaHojeDer
     blocosHoje,
     tarefasHoje,
     semData,
+    concluidasHoje,
     erroTarefas,
     erroBlocos,
     vazioTotal

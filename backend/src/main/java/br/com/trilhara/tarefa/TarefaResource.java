@@ -1,10 +1,15 @@
 package br.com.trilhara.tarefa;
 
+import java.util.List;
+
 import br.com.trilhara.auth.AuthContext;
 import br.com.trilhara.auth.Autenticado;
 import br.com.trilhara.tarefa.dto.AtualizarConclusaoTarefaRequest;
+import br.com.trilhara.tarefa.dto.AtualizarPosicaoFluxoRequest;
+import br.com.trilhara.tarefa.dto.AtualizarPosicoesFluxoRequest;
 import br.com.trilhara.tarefa.dto.AtualizarSubtarefaRequest;
 import br.com.trilhara.tarefa.dto.AtualizarTarefaRequest;
+import br.com.trilhara.tarefa.dto.CriarConexaoFluxoRequest;
 import br.com.trilhara.tarefa.dto.CriarTarefaRequest;
 import br.com.trilhara.tarefa.dto.LixeiraTarefasResponse;
 import br.com.trilhara.tarefa.dto.PaginaTarefasDTO;
@@ -35,14 +40,17 @@ public class TarefaResource {
 
     private final TarefaService service;
     private final TarefaLixeiraService lixeiraService;
+    private final TarefaFluxoService fluxoService;
     private final AuthContext authContext;
 
     public TarefaResource(
             TarefaService service,
             TarefaLixeiraService lixeiraService,
+            TarefaFluxoService fluxoService,
             AuthContext authContext) {
         this.service = service;
         this.lixeiraService = lixeiraService;
+        this.fluxoService = fluxoService;
         this.authContext = authContext;
     }
 
@@ -156,5 +164,55 @@ public class TarefaResource {
     @Consumes(MediaType.WILDCARD)
     public TarefaResponse pular(@PathParam("tarefaId") String tarefaId) {
         return service.pularTarefa(tarefaId, authContext.usuarioId());
+    }
+
+    @GET
+    @Path("fluxo")
+    public List<TarefaResponse> listarFluxo() {
+        return fluxoService.listarFluxo(authContext.usuarioId());
+    }
+
+    @PATCH
+    @Path("fluxo/posicoes")
+    public List<TarefaResponse> atualizarPosicoesFluxo(@NotNull @Valid AtualizarPosicoesFluxoRequest request) {
+        return fluxoService.atualizarPosicoesEmLote(request, authContext.usuarioId());
+    }
+
+    @POST
+    @Path("{tarefaId}/fluxo")
+    @Consumes(MediaType.WILDCARD)
+    public TarefaResponse adicionarAoFluxo(@PathParam("tarefaId") String tarefaId) {
+        return fluxoService.adicionarAoFluxo(tarefaId, null, authContext.usuarioId());
+    }
+
+    @DELETE
+    @Path("{tarefaId}/fluxo")
+    public Response removerDoFluxo(@PathParam("tarefaId") String tarefaId) {
+        fluxoService.removerDoFluxo(tarefaId, authContext.usuarioId());
+        return Response.noContent().build();
+    }
+
+    @POST
+    @Path("{tarefaId}/fluxo/conexoes")
+    public List<TarefaResponse> criarConexaoFluxo(
+            @PathParam("tarefaId") String tarefaId,
+            @NotNull @Valid CriarConexaoFluxoRequest request) {
+        return fluxoService.criarConexao(tarefaId, request, authContext.usuarioId());
+    }
+
+    @DELETE
+    @Path("{tarefaId}/fluxo/conexoes/{alvoId}")
+    public List<TarefaResponse> removerConexaoFluxo(
+            @PathParam("tarefaId") String tarefaId,
+            @PathParam("alvoId") String alvoId) {
+        return fluxoService.removerConexao(tarefaId, alvoId, authContext.usuarioId());
+    }
+
+    @PATCH
+    @Path("{tarefaId}/fluxo/posicao")
+    public TarefaResponse atualizarPosicaoFluxo(
+            @PathParam("tarefaId") String tarefaId,
+            @NotNull @Valid AtualizarPosicaoFluxoRequest request) {
+        return fluxoService.atualizarPosicao(tarefaId, request, authContext.usuarioId());
     }
 }

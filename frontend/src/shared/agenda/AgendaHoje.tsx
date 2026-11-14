@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Check, ChevronDown, ChevronRight } from 'lucide-react';
-import { EmptyState, SectionErrorCard, Skeleton, ToggleGroup } from '../design-system';
+import { EmptyState, ListDivider, SectionErrorCard, Skeleton, ToggleGroup } from '../design-system';
 import { BlocoHojeDTO, TarefaDTO } from '../contracts/domainContracts';
 import { AgendaHojeDerivado } from './agendaHojeService';
 import { BlocoAgendaItem } from './BlocoAgendaItem';
@@ -10,13 +10,8 @@ import styles from './AgendaHoje.module.css';
 type ModoAgendaHoje = 'tarefas' | 'pomodoro';
 type FiltroAgendaHoje = 'todos' | 'atrasadas' | 'hoje' | 'blocos' | 'sem-data';
 
-interface FocoAgenda {
-  tipo: 'TAREFA' | 'BLOCO';
-  id: string;
-}
-
 export interface AgendaHojeProps {
-  /** `tarefas` (clique abre edição) ou `pomodoro` (clique define foco, sem edição). */
+  /** `tarefas` (clique abre edição) ou `pomodoro` (exibição sem edição). */
   modo: ModoAgendaHoje;
   /** Saída de `useAgendaHoje.dados`; `null` para visitante (nunca renderizado). */
   dados: AgendaHojeDerivado | null;
@@ -30,9 +25,10 @@ export interface AgendaHojeProps {
   onEditarTarefa?: (tarefa: TarefaDTO) => void;
   onExcluirTarefa?: (tarefa: TarefaDTO) => void;
   onAlternarSubtarefa?: (tarefaId: string, subtarefaId: string, concluida: boolean) => void;
-  /** Somente em `modo="pomodoro"`: contexto visual de foco atual. */
-  foco?: FocoAgenda | null;
-  onDefinirFoco?: (foco: FocoAgenda) => void;
+  /** Somente em `modo="tarefas"`: abre fluxo/conexões da tarefa. */
+  onAbrirFluxoTarefa?: (tarefa: TarefaDTO) => void;
+  /** Itens concluídos adicionais (ex.: tarefas locais do navegador no Pomodoro). */
+  concluidasExtras?: React.ReactNode;
 }
 
 const TEXTO_ERRO_REDE = 'Verifique sua conexão e tente novamente.';
@@ -70,8 +66,8 @@ export const AgendaHoje: React.FC<AgendaHojeProps> = ({
   onEditarTarefa,
   onExcluirTarefa,
   onAlternarSubtarefa,
-  foco = null,
-  onDefinirFoco
+  onAbrirFluxoTarefa,
+  concluidasExtras
 }) => {
   const [filtro, setFiltro] = useState<FiltroAgendaHoje>('todos');
   const [expansores, setExpansores] = useState<Record<string, boolean>>({});
@@ -79,7 +75,6 @@ export const AgendaHoje: React.FC<AgendaHojeProps> = ({
   if (!dados) return null;
 
   const isPomodoro = modo === 'pomodoro';
-  const permiteFoco = isPomodoro && Boolean(onDefinirFoco);
 
   const carregandoTarefas = dados.statusTarefas === 'carregando';
   const carregandoBlocos = dados.statusBlocos === 'carregando';
@@ -100,18 +95,12 @@ export const AgendaHoje: React.FC<AgendaHojeProps> = ({
       onEditar={isPomodoro ? undefined : onEditarTarefa}
       onExcluir={onExcluirTarefa}
       onAlternarSubtarefa={onAlternarSubtarefa}
-      onSelecionar={
-        permiteFoco
-          ? (selecionada) => onDefinirFoco?.({ tipo: 'TAREFA', id: selecionada.id })
-          : undefined
-      }
-      selecionado={foco?.tipo === 'TAREFA' && foco.id === tarefa.id}
+      onAbrirFluxo={isPomodoro ? undefined : onAbrirFluxoTarefa}
     />
   );
 
   const renderBloco = (bloco: BlocoHojeDTO) => {
     const blocoId = bloco.blocoId || bloco.id || '';
-    const selecionado = foco?.tipo === 'BLOCO' && foco.id === blocoId;
 
     return (
       <BlocoAgendaItem
@@ -121,11 +110,7 @@ export const AgendaHoje: React.FC<AgendaHojeProps> = ({
         duracaoMinutos={bloco.duracaoMinutos}
         trilhaNome={bloco.trilhaNome}
         statusData="HOJE"
-        selecionado={selecionado}
         onConcluir={() => onConcluirBloco(bloco)}
-        onDefinirFoco={
-          permiteFoco ? () => onDefinirFoco?.({ tipo: 'BLOCO', id: blocoId }) : undefined
-        }
       />
     );
   };
@@ -154,10 +139,30 @@ export const AgendaHoje: React.FC<AgendaHojeProps> = ({
   const exibirSemData =
     (filtro === 'todos' || filtro === 'sem-data') && !erroTarefas && dados.semData.length > 0;
 
+  const concluidasVisiveis = !erroTarefas
+    ? (dados.concluidasHoje ?? []).filter((tarefa) => {
+        switch (filtro) {
+          case 'todos':
+            return true;
+          case 'atrasadas':
+            return Boolean(tarefa.dataVencimento) && tarefa.dataVencimento! < dados.hojeLocal;
+          case 'hoje':
+            return tarefa.dataVencimento === dados.hojeLocal;
+          case 'sem-data':
+            return !tarefa.dataVencimento;
+          case 'blocos':
+            return false;
+        }
+      })
+    : [];
+
+  const exibirConcluidas =
+    incluiTarefas && !erroTarefas && (concluidasVisiveis.length > 0 || (filtro === 'todos' && Boolean(concluidasExtras)));
+
   const temItensVisiveis = exibirAtrasadas || exibirBlocos || exibirHoje || exibirSemData;
 
   const renderVazioFiltro = () => {
-    if (filtro === 'todos' && dados.vazioTotal) {
+    if (filtro === 'todos' && dados.vazioTotal && !concluidasExtras) {
       return (
         <EmptyState
           icone={<Check size={isPomodoro ? 20 : 24} />}
@@ -170,6 +175,7 @@ export const AgendaHoje: React.FC<AgendaHojeProps> = ({
     if (
       !carregandoFiltroAtual &&
       !temItensVisiveis &&
+      !exibirConcluidas &&
       !(incluiTarefas && erroTarefas) &&
       !(incluiBlocos && erroBlocos)
     ) {
@@ -193,15 +199,17 @@ export const AgendaHoje: React.FC<AgendaHojeProps> = ({
 
   return (
     <div className={styles.container}>
-      <div className={styles.toolbarRow}>
-        <ToggleGroup<FiltroAgendaHoje>
-          className={styles.filterGroup}
-          ariaLabel="Filtrar itens da agenda de hoje"
-          value={filtro}
-          onChange={setFiltro}
-          options={OPCOES_FILTRO}
-        />
-      </div>
+      {!isPomodoro && (
+        <div className={styles.toolbarRow}>
+          <ToggleGroup<FiltroAgendaHoje>
+            className={styles.filterGroup}
+            ariaLabel="Filtrar itens da agenda de hoje"
+            value={filtro}
+            onChange={setFiltro}
+            options={OPCOES_FILTRO}
+          />
+        </div>
+      )}
 
       {carregandoFiltroAtual ? (
         <Skeleton variant="row" linhas={3} className={styles.carregando} />
@@ -256,6 +264,25 @@ export const AgendaHoje: React.FC<AgendaHojeProps> = ({
 
               {exibirSemData && dados.semData.map((t) => renderTarefa(t, 'sem-data'))}
             </div>
+          )}
+
+          {exibirConcluidas && (
+            <>
+              <ListDivider label="Concluídas" />
+              <div className={styles.lista}>
+                {concluidasVisiveis.map((t) =>
+                  renderTarefa(
+                    t,
+                    t.dataVencimento === dados.hojeLocal
+                      ? 'hoje'
+                      : t.dataVencimento && t.dataVencimento < dados.hojeLocal
+                        ? 'atrasada'
+                        : 'sem-data'
+                  )
+                )}
+                {filtro === 'todos' && concluidasExtras}
+              </div>
+            </>
           )}
 
           {renderVazioFiltro()}

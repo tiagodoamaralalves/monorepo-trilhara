@@ -805,6 +805,12 @@ public class AuthorizationByOwnerTest {
         if (caminho.contains("/series-recorrentes")) {
             return "{\"titulo\":\"Série Invasora\",\"frequencia\":\"MENSAL\",\"intervalo\":1}";
         }
+        if (caminho.contains("/fluxo/conexoes")) {
+            return "{\"tarefaAlvoId\":\"" + tarefaAId.toHexString() + "\",\"tipo\":\"SUCESSORA\"}";
+        }
+        if (caminho.contains("/fluxo/posicao")) {
+            return "{\"x\":100,\"y\":200}";
+        }
         if (caminho.contains("/subtarefas")) {
             return "{\"concluida\":true}";
         }

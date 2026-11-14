@@ -28,6 +28,11 @@ public record TarefaResponse(
         Instant deletedAt,
         Instant expiresAt,
         String loteExclusaoId,
+        boolean noFluxo,
+        List<String> sucessorasIds,
+        List<String> antecessorasIds,
+        List<String> paresIds,
+        PosicaoFluxoDTO posicaoFluxo,
         Instant criadoEm,
         Instant atualizadoEm) {
 }

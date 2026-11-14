@@ -29,7 +29,9 @@ export interface AppSidebarProps<TId extends string = string> {
   contextSlot?: React.ReactNode;
   navLabel?: string;
   items?: readonly SidebarNavItemConfig<TId>[];
-  activeId?: TId;
+  /** Opcional: itens exibidos na barra inferior mobile (por padrão reutiliza `items`). */
+  mobileItems?: readonly SidebarNavItemConfig<TId>[];
+  activeId?: TId | null;
   onNavigate?: (id: TId) => void;
   getBadge?: (id: TId) => string | number | undefined;
   getLiveText?: (id: TId) => string | null;
@@ -53,6 +55,7 @@ export const AppSidebar = <TId extends string = string>({
   contextSlot,
   navLabel,
   items,
+  mobileItems,
   activeId,
   onNavigate,
   getBadge,
@@ -171,27 +174,31 @@ export const AppSidebar = <TId extends string = string>({
 
         {/* Navegação Principal */}
         <nav className={styles.sidebarNav} aria-label="Navegação principal">
-          {!collapsed && navLabel && <span className={styles.navSectionLabel}>{navLabel}</span>}
+          {items && onNavigate && activeId !== undefined && (
+            <>
+              {!collapsed && navLabel && <span className={styles.navSectionLabel}>{navLabel}</span>}
+              <div className={styles.navList}>
+                {items.map((item) => (
+                  <SidebarNavItem
+                    key={item.id}
+                    item={item}
+                    active={activeId === item.id}
+                    variant="sidebar"
+                    collapsed={collapsed}
+                    badge={getBadge ? getBadge(item.id) : undefined}
+                    liveText={getLiveText ? getLiveText(item.id) : null}
+                    isRunning={getIsRunning ? getIsRunning(item.id) : false}
+                    onSelect={onNavigate}
+                  />
+                ))}
+              </div>
+            </>
+          )}
 
-          {children ? (
-            children
-          ) : items && onNavigate && activeId !== undefined ? (
-            <div className={styles.navList}>
-              {items.map((item) => (
-                <SidebarNavItem
-                  key={item.id}
-                  item={item}
-                  active={activeId === item.id}
-                  variant="sidebar"
-                  collapsed={collapsed}
-                  badge={getBadge ? getBadge(item.id) : undefined}
-                  liveText={getLiveText ? getLiveText(item.id) : null}
-                  isRunning={getIsRunning ? getIsRunning(item.id) : false}
-                  onSelect={onNavigate}
-                />
-              ))}
-            </div>
-          ) : null}
+          {!items && !collapsed && navLabel && (
+            <span className={styles.navSectionLabel}>{navLabel}</span>
+          )}
+          {children}
         </nav>
 
         {/* Rodapé: Tema e Usuário */}
@@ -308,24 +315,27 @@ export const AppSidebar = <TId extends string = string>({
       <nav className={styles.mobileBottomNav} aria-label="Navegação principal mobile">
         {mobileBottomNavSlot ? (
           mobileBottomNavSlot
-        ) : items && onNavigate && activeId !== undefined ? (
-          <div
-            className={styles.mobileBottomTrack}
-            style={{ '--mobile-nav-columns': items.length } as React.CSSProperties}
-          >
-            {items.map((item) => (
-              <SidebarNavItem
-                key={item.id}
-                item={item}
-                active={activeId === item.id}
-                variant="bottom"
-                liveText={getLiveText ? getLiveText(item.id) : null}
-                isRunning={getIsRunning ? getIsRunning(item.id) : false}
-                onSelect={onNavigate}
-              />
-            ))}
-          </div>
-        ) : null}
+        ) : (() => {
+          const bottomItems = mobileItems ?? items;
+          return bottomItems && bottomItems.length > 0 && onNavigate && activeId !== undefined ? (
+            <div
+              className={styles.mobileBottomTrack}
+              style={{ '--mobile-nav-columns': bottomItems.length } as React.CSSProperties}
+            >
+              {bottomItems.map((item) => (
+                <SidebarNavItem
+                  key={item.id}
+                  item={item}
+                  active={activeId === item.id}
+                  variant="bottom"
+                  liveText={getLiveText ? getLiveText(item.id) : null}
+                  isRunning={getIsRunning ? getIsRunning(item.id) : false}
+                  onSelect={onNavigate}
+                />
+              ))}
+            </div>
+          ) : null;
+        })()}
       </nav>
     </SidebarContext.Provider>
   );

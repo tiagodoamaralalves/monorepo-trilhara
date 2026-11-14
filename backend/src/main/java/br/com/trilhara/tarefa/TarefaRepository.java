@@ -2,16 +2,22 @@ package br.com.trilhara.tarefa;
 
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Filters.exists;
 import static com.mongodb.client.model.Filters.gt;
 import static com.mongodb.client.model.Filters.gte;
+import static com.mongodb.client.model.Filters.in;
 import static com.mongodb.client.model.Filters.lt;
 import static com.mongodb.client.model.Filters.lte;
 import static com.mongodb.client.model.Filters.ne;
+import static com.mongodb.client.model.Filters.or;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.bson.Document;
@@ -54,6 +60,14 @@ public class TarefaRepository {
     private static final String CAMPO_DESVINCULADA_DA_SERIE = "desvinculadaDaSerie";
     private static final String CAMPO_TITULO = "titulo";
     private static final String CAMPO_DESCRICAO = "descricao";
+    private static final String CAMPO_NO_FLUXO = "noFluxo";
+    private static final String CAMPO_SUCESSORAS_IDS = "sucessorasIds";
+    private static final String CAMPO_PARES_IDS = "paresIds";
+    private static final String CAMPO_POSICAO_FLUXO = "posicaoFluxo";
+    private static final String CAMPO_POSICAO_X = "x";
+    private static final String CAMPO_POSICAO_Y = "y";
+    private static final String CAMPO_ID = "_id";
+    private static final String EXPR_PRIORIDADE = "$prioridade";
 
     private final MongoCollection<Document> collection;
 
@@ -222,6 +236,29 @@ public class TarefaRepository {
         return resultado;
     }
 
+    /** Tarefas concluídas cujo vencimento é hoje ou que foram concluídas no dia local informado. */
+    public List<Tarefa> listarConcluidasHoje(
+            ObjectId usuarioId,
+            LocalDate hojeLocal,
+            Instant inicioDia,
+            Instant fimDia) {
+        List<Tarefa> resultado = new ArrayList<>();
+        collection.find(and(
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_DELETED_AT, null),
+                eq(CAMPO_ESTADO, ESTADO_CONCLUIDA),
+                or(
+                        eq(CAMPO_DATA_VENCIMENTO, BsonDates.toIso(hojeLocal)),
+                        and(
+                                gte(CAMPO_CONCLUIDA_EM, BsonDates.toBsonDate(inicioDia)),
+                                lt(CAMPO_CONCLUIDA_EM, BsonDates.toBsonDate(fimDia))
+                        )
+                )
+        )).sort(Sorts.orderBy(Sorts.descending(CAMPO_CONCLUIDA_EM), Sorts.descending(CAMPO_ID)))
+          .forEach(doc -> resultado.add(paraEntidade(doc)));
+        return resultado;
+    }
+
     public List<Tarefa> listarLixeira(ObjectId usuarioId, Instant agora) {
         List<Tarefa> resultado = new ArrayList<>();
         collection.find(and(
@@ -341,10 +378,15 @@ public class TarefaRepository {
     /** {@code ALTA -> 3, MEDIA -> 2, BAIXA -> 1} sem duplicar o dado no documento. */
     private static Document pesoPrioridadeExpressao() {
         List<Document> branches = List.of(
-                new Document("case", new Document("$eq", List.of("$prioridade", "ALTA"))).append("then", 3),
-                new Document("case", new Document("$eq", List.of("$prioridade", "MEDIA"))).append("then", 2),
-                new Document("case", new Document("$eq", List.of("$prioridade", "BAIXA"))).append("then", 1));
+                branchPrioridade("ALTA", 3),
+                branchPrioridade("MEDIA", 2),
+                branchPrioridade("BAIXA", 1));
         return new Document("$switch", new Document("branches", branches).append("default", 0));
+    }
+
+    private static Document branchPrioridade(String prioridade, int peso) {
+        return new Document("case", new Document("$eq", List.of(EXPR_PRIORIDADE, prioridade)))
+                .append("then", peso);
     }
 
     /** {@code 0} quando há data (ordena antes), {@code 1} quando ausente ({@code NULLS LAST}). */
@@ -544,6 +586,142 @@ public class TarefaRepository {
         return 0;
     }
 
+    public List<Tarefa> listarNoFluxo(ObjectId usuarioId) {
+        Bson filtro = and(
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_DELETED_AT, null),
+                or(
+                        eq(CAMPO_NO_FLUXO, true),
+                        exists(CAMPO_SUCESSORAS_IDS + ".0", true),
+                        exists(CAMPO_PARES_IDS + ".0", true)
+                )
+        );
+        List<Tarefa> resultado = new ArrayList<>();
+        collection.find(filtro)
+                .sort(Sorts.ascending(CAMPO_CRIADO_EM, CAMPO_ID))
+                .forEach(doc -> resultado.add(paraEntidade(doc)));
+        return resultado;
+    }
+
+    public Map<ObjectId, List<ObjectId>> mapearAntecessoras(
+            ObjectId usuarioId, Collection<ObjectId> tarefaIds) {
+        Map<ObjectId, List<ObjectId>> mapa = new HashMap<>();
+        if (tarefaIds == null || tarefaIds.isEmpty()) {
+            return mapa;
+        }
+        Bson filtro = and(
+                eq(CAMPO_USUARIO_ID, usuarioId),
+                eq(CAMPO_DELETED_AT, null),
+                in(CAMPO_SUCESSORAS_IDS, tarefaIds)
+        );
+        collection.find(filtro)
+                .projection(new Document(CAMPO_ID, 1).append(CAMPO_SUCESSORAS_IDS, 1))
+                .forEach(doc -> {
+                    ObjectId origemId = doc.getObjectId(CAMPO_ID);
+                    List<ObjectId> sucessoras = doc.getList(CAMPO_SUCESSORAS_IDS, ObjectId.class);
+                    if (origemId == null || sucessoras == null) {
+                        return;
+                    }
+                    for (ObjectId succId : sucessoras) {
+                        if (succId != null && tarefaIds.contains(succId)) {
+                            mapa.computeIfAbsent(succId, k -> new ArrayList<>()).add(origemId);
+                        }
+                    }
+                });
+        return mapa;
+    }
+
+    public boolean atualizarConexoesFluxo(
+            ObjectId usuarioId,
+            ObjectId tarefaId,
+            boolean noFluxo,
+            List<ObjectId> sucessorasIds,
+            List<ObjectId> paresIds,
+            Instant atualizadoEm) {
+        return collection.updateOne(
+                and(eq(CAMPO_ID, tarefaId), eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_DELETED_AT, null)),
+                Updates.combine(
+                        Updates.set(CAMPO_NO_FLUXO, noFluxo),
+                        Updates.set(CAMPO_SUCESSORAS_IDS, sucessorasIds),
+                        Updates.set(CAMPO_PARES_IDS, paresIds),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(atualizadoEm))
+                )
+        ).getMatchedCount() > 0;
+    }
+
+    public boolean atualizarParticipacaoFluxo(
+            ObjectId usuarioId,
+            ObjectId tarefaId,
+            boolean noFluxo,
+            PosicaoFluxo posicaoFluxo,
+            Instant atualizadoEm) {
+        List<Bson> updates = new ArrayList<>();
+        updates.add(Updates.set(CAMPO_NO_FLUXO, noFluxo));
+        updates.add(Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(atualizadoEm)));
+        if (posicaoFluxo != null) {
+            updates.add(Updates.set(CAMPO_POSICAO_FLUXO, new Document()
+                    .append(CAMPO_POSICAO_X, posicaoFluxo.x())
+                    .append(CAMPO_POSICAO_Y, posicaoFluxo.y())));
+        }
+        return collection.updateOne(
+                and(eq(CAMPO_ID, tarefaId), eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_DELETED_AT, null)),
+                Updates.combine(updates)
+        ).getMatchedCount() > 0;
+    }
+
+    public boolean atualizarPosicaoFluxo(
+            ObjectId usuarioId,
+            ObjectId tarefaId,
+            PosicaoFluxo posicaoFluxo,
+            Instant atualizadoEm) {
+        return collection.updateOne(
+                and(eq(CAMPO_ID, tarefaId), eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_DELETED_AT, null)),
+                Updates.combine(
+                        Updates.set(CAMPO_NO_FLUXO, true),
+                        Updates.set(CAMPO_POSICAO_FLUXO, new Document()
+                                .append(CAMPO_POSICAO_X, posicaoFluxo.x())
+                                .append(CAMPO_POSICAO_Y, posicaoFluxo.y())),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(atualizadoEm))
+                )
+        ).getMatchedCount() > 0;
+    }
+
+    public boolean removerDoFluxoLimpo(
+            ObjectId usuarioId,
+            ObjectId tarefaId,
+            Instant atualizadoEm) {
+        return collection.updateOne(
+                and(eq(CAMPO_ID, tarefaId), eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_DELETED_AT, null)),
+                Updates.combine(
+                        Updates.set(CAMPO_NO_FLUXO, false),
+                        Updates.set(CAMPO_SUCESSORAS_IDS, List.of()),
+                        Updates.set(CAMPO_PARES_IDS, List.of()),
+                        Updates.unset(CAMPO_POSICAO_FLUXO),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(atualizadoEm))
+                )
+        ).getMatchedCount() > 0;
+    }
+
+    public long removerReferenciasDeFluxo(
+            ObjectId usuarioId,
+            ObjectId alvoId,
+            Instant atualizadoEm) {
+        return collection.updateMany(
+                and(
+                        eq(CAMPO_USUARIO_ID, usuarioId),
+                        or(
+                                eq(CAMPO_SUCESSORAS_IDS, alvoId),
+                                eq(CAMPO_PARES_IDS, alvoId)
+                        )
+                ),
+                Updates.combine(
+                        Updates.pull(CAMPO_SUCESSORAS_IDS, alvoId),
+                        Updates.pull(CAMPO_PARES_IDS, alvoId),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(atualizadoEm))
+                )
+        ).getModifiedCount();
+    }
+
     public Document paraDocumento(Tarefa t) {
         Document doc = new Document();
         colocarSePresente(doc, "_id", t.id());
@@ -569,6 +747,14 @@ public class TarefaRepository {
         colocarSePresente(doc, CAMPO_DELETED_AT, BsonDates.toBsonDate(t.deletedAt()));
         colocarSePresente(doc, CAMPO_EXPIRES_AT, BsonDates.toBsonDate(t.expiresAt()));
         colocarSePresente(doc, CAMPO_LOTE_EXCLUSAO_ID, t.loteExclusaoId());
+        doc.put(CAMPO_NO_FLUXO, t.noFluxo());
+        doc.put(CAMPO_SUCESSORAS_IDS, t.sucessorasIds());
+        doc.put(CAMPO_PARES_IDS, t.paresIds());
+        if (t.posicaoFluxo() != null) {
+            doc.put(CAMPO_POSICAO_FLUXO, new Document()
+                    .append(CAMPO_POSICAO_X, t.posicaoFluxo().x())
+                    .append(CAMPO_POSICAO_Y, t.posicaoFluxo().y()));
+        }
         doc.put(CAMPO_CRIADO_EM, BsonDates.toBsonDate(t.criadoEm()));
         doc.put(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(t.atualizadoEm()));
         return doc;
@@ -616,8 +802,18 @@ public class TarefaRepository {
             estado = concluida ? ESTADO_CONCLUIDA : ESTADO_PENDENTE;
         }
 
+        Document posDoc = doc.get(CAMPO_POSICAO_FLUXO, Document.class);
+        PosicaoFluxo posicaoFluxo = null;
+        if (posDoc != null
+                && posDoc.get(CAMPO_POSICAO_X) instanceof Number xNum
+                && posDoc.get(CAMPO_POSICAO_Y) instanceof Number yNum) {
+            posicaoFluxo = new PosicaoFluxo(xNum.doubleValue(), yNum.doubleValue());
+        }
+        List<ObjectId> sucessorasIds = doc.getList(CAMPO_SUCESSORAS_IDS, ObjectId.class);
+        List<ObjectId> paresIds = doc.getList(CAMPO_PARES_IDS, ObjectId.class);
+
         return new Tarefa(
-                doc.getObjectId("_id"),
+                doc.getObjectId(CAMPO_ID),
                 doc.getObjectId(CAMPO_USUARIO_ID),
                 doc.getObjectId(CAMPO_LISTA_ID),
                 doc.getObjectId(CAMPO_SERIE_ID),
@@ -639,6 +835,10 @@ public class TarefaRepository {
                 BsonDates.lerInstant(doc, CAMPO_DELETED_AT),
                 BsonDates.lerInstant(doc, CAMPO_EXPIRES_AT),
                 doc.getString(CAMPO_LOTE_EXCLUSAO_ID),
+                Boolean.TRUE.equals(doc.getBoolean(CAMPO_NO_FLUXO, false)),
+                sucessorasIds,
+                paresIds,
+                posicaoFluxo,
                 BsonDates.lerInstant(doc, CAMPO_CRIADO_EM),
                 BsonDates.lerInstant(doc, CAMPO_ATUALIZADO_EM)
         );

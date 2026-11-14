@@ -43,7 +43,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
+  width: 42px;
   height: 40px;
   border-radius: var(--radius-sm);
   background: var(--surface-2);
@@ -56,6 +56,15 @@
 .collapsedCardBtn:hover {
   background: var(--surface-3);
   border-color: var(--border-focus);
+}
+
+.collapsedFluxoBtn {
+  color: var(--purple-icon);
+}
+
+.collapsedCardActive {
+  background: var(--primary-bg);
+  border-color: var(--primary-light);
 }
 
 /* ── CARD TAREFAS DO DIA ("bem bonitin") ── */
@@ -84,6 +93,48 @@
   background: var(--primary-bg);
   border-color: var(--primary-light);
   box-shadow: 0 0 0 1px var(--primary-glow);
+}
+
+.fluxoCardSurface {
+  background:
+    radial-gradient(110% 90% at 100% 0%, var(--purple-bg-subtle) 0%, transparent 65%),
+    var(--surface-2);
+  border-color: color-mix(in srgb, var(--purple) 26%, var(--border));
+}
+
+.fluxoCardSurface:hover {
+  border-color: var(--purple-border-strong);
+  box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--purple) 28%, transparent);
+}
+
+.fluxoCardIconWrap {
+  background: var(--purple-bg);
+  color: var(--purple-icon);
+  border: 1px solid var(--purple-border);
+}
+
+.fluxoCardAtivo {
+  background:
+    radial-gradient(110% 90% at 100% 0%, var(--purple-bg) 0%, transparent 65%),
+    var(--purple-bg-subtle);
+  border-color: var(--purple);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--purple) 32%, transparent);
+}
+
+.fluxoCardBadge {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--purple-text);
+  background: var(--purple-bg);
+  border: 1px solid var(--purple-border);
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+}
+
+.fluxoCardDesc {
+  font-size: 11.5px;
+  color: var(--text-mid);
+  line-height: 1.35;
 }
 
 .tarefasDoDiaTop {
@@ -162,135 +213,4 @@
   background: var(--primary);
   border-radius: var(--radius-pill);
   transition: width var(--transition-normal);
-}
-
-/* ── SEÇÃO DE FILTROS ── */
-.filtrosSection {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  width: 100%;
-}
-
-.filtrosHeader {
-  padding: 4px 10px 2px;
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-soft);
-}
-
-.filtrosList {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: 100%;
-}
-
-.filterItem {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  height: 38px;
-  padding: 0 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-mid);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-  user-select: none;
-  transition: all var(--transition-fast);
-}
-
-.filterItem:hover:not(.filterItemActive) {
-  background: var(--surface-2);
-  color: var(--text);
-}
-
-.filterItemActive {
-  background: var(--nav-active-bg, var(--primary-bg));
-  border-color: var(--nav-active-border, var(--primary-border-subtle));
-  color: var(--text);
-  font-weight: 700;
-  box-shadow: var(--nav-active-shadow, 0 1px 3px rgba(0, 0, 0, 0.1));
-}
-
-.filterItemActive::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 6px;
-  bottom: 6px;
-  width: 3px;
-  border-radius: var(--radius-pill);
-  background: var(--primary-light);
-}
-
-.filterIconWrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: inherit;
-  flex-shrink: 0;
-}
-
-.filterLabel {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.filterBadge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-3);
-  color: var(--text-soft);
-  font-size: 11px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-.filterItemActive .filterBadge {
-  background: var(--primary-glow);
-  color: var(--primary-light);
-}
-
-/* ── MODO RECOLHIDO (COLLAPSED) ── */
-.collapsedFilterItem {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 40px;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--text-mid);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.collapsedFilterItem:hover:not(.collapsedFilterActive) {
-  background: var(--surface-2);
-  color: var(--text);
-}
-
-.collapsedFilterActive {
-  background: var(--primary-bg);
-  border-color: var(--primary-light);
-  color: var(--primary-light);
 }

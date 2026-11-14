@@ -66,6 +66,43 @@ describe('tarefasHoje', () => {
     expect(dados.tarefasHoje).toHaveLength(0);
   });
 
+  it('deriva concluidasHoje e atualiza vazioTotal quando há tarefas concluídas', async () => {
+    vi.mocked(request).mockImplementation(async (caminho: string) => {
+      if (caminho === '/tarefas/hoje') {
+        return {
+          hojeLocal: '2026-11-09',
+          atrasadas: [],
+          hoje: [],
+          semData: [],
+          concluidasHoje: [
+            {
+              id: 'c-1',
+              titulo: 'Feita hoje',
+              concluida: true,
+              estado: 'CONCLUIDA',
+              prioridade: 'MEDIA',
+              dataVencimento: '2026-11-09'
+            },
+            {
+              id: 'p-ignorar',
+              titulo: 'Pendente espúria',
+              concluida: false,
+              estado: 'PENDENTE',
+              prioridade: 'MEDIA'
+            }
+          ]
+        };
+      }
+      return [];
+    });
+
+    const dados = await carregarAgenda();
+
+    expect(dados.concluidasHoje).toHaveLength(1);
+    expect(dados.concluidasHoje[0].id).toBe('c-1');
+    expect(dados.vazioTotal).toBe(false);
+  });
+
   it('atrasadas mantêm agrupamento único sob a ocorrência mais recente', async () => {
     vi.mocked(request).mockImplementation(async (caminho: string) => {
       if (caminho === '/tarefas/hoje') {

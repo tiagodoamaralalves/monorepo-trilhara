@@ -5,7 +5,8 @@ import {
   ListChecks,
   Repeat,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Route
 } from 'lucide-react';
 import { Checkbox, Badge, Button } from '../design-system';
 import { descreverDataRelativa, hojeISO } from '../format';
@@ -24,9 +25,14 @@ export interface TarefaAgendaItemProps {
   onAlternarSubtarefa?: (tarefaId: string, subtarefaId: string, concluida: boolean) => void;
   /** Conclusão é sempre obrigatória em Tarefas e Pomodoro. */
   onAlternar: (id: string, concluida: boolean) => void;
-  /** Em Pomodoro, clicar no card define a tarefa como foco visual. */
-  onSelecionar?: (tarefa: TarefaDTO) => void;
-  selecionado?: boolean;
+  /** Em Tarefas, abre o fluxo ou modal rápido de conexões da tarefa. */
+  onAbrirFluxo?: (tarefa: TarefaDTO) => void;
+  /** Substitui a pílula padrão de data/status (ex.: tarefas locais no navegador). */
+  statusBadge?: React.ReactNode;
+  /** Oculta a pílula de prioridade (útil para tarefas rápidas locais sem prioridade configurada). */
+  ocultarPrioridade?: boolean;
+  /** Ação adicional exibida na lateral direita antes do botão excluir (ex.: "Salvar em tarefas"). */
+  acaoExtra?: React.ReactNode;
 }
 
 /**
@@ -42,8 +48,10 @@ export const TarefaAgendaItem: React.FC<TarefaAgendaItemProps> = ({
   onExcluir,
   onAlternarSubtarefa,
   onAlternar,
-  onSelecionar,
-  selecionado = false
+  onAbrirFluxo,
+  statusBadge,
+  ocultarPrioridade = false,
+  acaoExtra
 }) => {
   const [expandirSubtarefas, setExpandirSubtarefas] = useState(false);
 
@@ -56,15 +64,13 @@ export const TarefaAgendaItem: React.FC<TarefaAgendaItemProps> = ({
   const totalSubtarefas = subtarefas.length;
   const concluidasSubtarefas = subtarefas.filter((s) => s.concluida).length;
 
-  const pilulaStatus = (): React.ReactNode => {
-    if (tarefa.concluida) {
-      return (
-        <Badge variant="success" size="md">
-          Concluída
-        </Badge>
-      );
-    }
+  const totalConexoesFluxo =
+    (tarefa.antecessorasIds?.length ?? 0) +
+    (tarefa.sucessorasIds?.length ?? 0) +
+    (tarefa.paresIds?.length ?? 0);
+  const emFluxo = Boolean(tarefa.noFluxo) || totalConexoesFluxo > 0;
 
+  const pilulaStatus = (): React.ReactNode => {
     if (statusAgenda === 'atrasada' || (dataVencimento && dataVencimento < hoje)) {
       return (
         <Badge variant="danger" size="md">
@@ -124,14 +130,8 @@ export const TarefaAgendaItem: React.FC<TarefaAgendaItemProps> = ({
     }
   };
 
-  const clickable = Boolean(onSelecionar || onEditar);
-  const classes = [
-    styles.card,
-    selecionado ? styles.cardSelected : '',
-    tarefa.concluida ? styles.cardDone : ''
-  ]
-    .filter(Boolean)
-    .join(' ');
+  const clickable = Boolean(onEditar);
+  const classes = [styles.card, tarefa.concluida ? styles.cardDone : ''].filter(Boolean).join(' ');
 
   return (
     <article className={classes}>
@@ -152,8 +152,8 @@ export const TarefaAgendaItem: React.FC<TarefaAgendaItemProps> = ({
                 className={`${styles.cardTrigger} ${styles.cardTitle} ${
                   tarefa.concluida ? styles.cardTitleDone : ''
                 }`}
-                onClick={() => (onSelecionar ? onSelecionar(tarefa) : onEditar?.(tarefa))}
-                title={onSelecionar ? 'Definir como foco' : 'Editar tarefa'}
+                onClick={() => onEditar?.(tarefa)}
+                title="Editar tarefa"
               >
                 {tarefa.titulo}
               </button>
@@ -168,7 +168,7 @@ export const TarefaAgendaItem: React.FC<TarefaAgendaItemProps> = ({
         </div>
 
         <div className={styles.cardMeta}>
-          {pilulaStatus()}
+          {statusBadge !== undefined ? statusBadge : pilulaStatus()}
 
           {isRecorrente && (
             <Badge variant="purple" size="md" title="Tarefa recorrente gerada automaticamente">
@@ -209,7 +209,35 @@ export const TarefaAgendaItem: React.FC<TarefaAgendaItemProps> = ({
             </Badge>
           )}
 
-          {pilulaPrioridade()}
+          {!ocultarPrioridade && pilulaPrioridade()}
+
+          {onAbrirFluxo && (
+            <button
+              type="button"
+              className={`${styles.flowPill} ${emFluxo ? styles.flowPillActive : ''}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAbrirFluxo(tarefa);
+              }}
+              title={
+                totalConexoesFluxo > 0
+                  ? `Abrir tarefa no fluxo (${totalConexoesFluxo} ${totalConexoesFluxo === 1 ? 'conexão' : 'conexões'})`
+                  : emFluxo
+                    ? 'Abrir tarefa no fluxo'
+                    : 'Conectar ao fluxo de tarefas'
+              }
+              aria-label={
+                totalConexoesFluxo > 0
+                  ? `Fluxo da tarefa ${tarefa.titulo}: ${totalConexoesFluxo} ${totalConexoesFluxo === 1 ? 'conexão' : 'conexões'}`
+                  : `Conectar tarefa ${tarefa.titulo} ao fluxo`
+              }
+            >
+              <Route size={13} aria-hidden="true" />
+              {totalConexoesFluxo > 0 && <span>{totalConexoesFluxo}</span>}
+            </button>
+          )}
+
+          {acaoExtra}
 
           {onExcluir && (
             <Button

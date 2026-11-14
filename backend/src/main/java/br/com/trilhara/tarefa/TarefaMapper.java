@@ -14,6 +14,7 @@ import br.com.trilhara.shared.mongo.BsonDates;
 import br.com.trilhara.tarefa.dto.AtualizarTarefaRequest;
 import br.com.trilhara.tarefa.dto.CriarTarefaRequest;
 import br.com.trilhara.tarefa.dto.ListaTarefasResponse;
+import br.com.trilhara.tarefa.dto.PosicaoFluxoDTO;
 import br.com.trilhara.tarefa.dto.SerieRecorrenteResponse;
 import br.com.trilhara.tarefa.dto.SubtarefaDTO;
 import br.com.trilhara.tarefa.dto.TarefaResponse;
@@ -69,6 +70,10 @@ final class TarefaMapper {
                 fusoAgendamento,
                 null,
                 null,
+                null,
+                false,
+                List.of(),
+                List.of(),
                 null,
                 agora,
                 agora
@@ -166,7 +171,8 @@ final class TarefaMapper {
             LocalDate hojeLocal,
             List<Tarefa> atrasadas,
             List<Tarefa> hoje,
-            List<Tarefa> semData) {
+            List<Tarefa> semData,
+            List<Tarefa> concluidasHoje) {
         List<Tarefa> atrasadasList = new ArrayList<>(atrasadas);
         List<Tarefa> hojeList = new ArrayList<>(hoje);
         List<Tarefa> semDataList = new ArrayList<>(semData);
@@ -189,7 +195,8 @@ final class TarefaMapper {
                 hojeLocal.toString(),
                 atrasadasList.stream().map(TarefaMapper::paraTarefaResponse).toList(),
                 hojeList.stream().map(TarefaMapper::paraTarefaResponse).toList(),
-                semDataList.stream().map(TarefaMapper::paraTarefaResponse).toList()
+                semDataList.stream().map(TarefaMapper::paraTarefaResponse).toList(),
+                concluidasHoje.stream().map(TarefaMapper::paraTarefaResponse).toList()
         );
     }
 
@@ -207,9 +214,23 @@ final class TarefaMapper {
     }
 
     static TarefaResponse paraTarefaResponse(Tarefa t) {
+        return paraTarefaResponse(t, List.of());
+    }
+
+    static TarefaResponse paraTarefaResponse(Tarefa t, List<String> antecessorasIds) {
         List<SubtarefaDTO> subs = t.subtarefas().stream()
                 .map(s -> new SubtarefaDTO(s.id(), s.titulo(), s.concluida(), s.ordem()))
                 .toList();
+
+        List<String> sucessoras = t.sucessorasIds().stream()
+                .map(ObjectId::toHexString)
+                .toList();
+        List<String> pares = t.paresIds().stream()
+                .map(ObjectId::toHexString)
+                .toList();
+        PosicaoFluxoDTO posicaoDto = t.posicaoFluxo() != null
+                ? new PosicaoFluxoDTO(t.posicaoFluxo().x(), t.posicaoFluxo().y())
+                : null;
 
         return new TarefaResponse(
                 t.id().toHexString(),
@@ -234,6 +255,11 @@ final class TarefaMapper {
                 t.deletedAt(),
                 t.expiresAt(),
                 t.loteExclusaoId(),
+                t.noFluxo(),
+                sucessoras,
+                antecessorasIds != null ? antecessorasIds : List.of(),
+                pares,
+                posicaoDto,
                 t.criadoEm(),
                 t.atualizadoEm()
         );

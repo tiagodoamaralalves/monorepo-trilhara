@@ -118,6 +118,7 @@ function agendaVazia(): AgendaHojeDerivado {
     blocosHoje: [],
     tarefasHoje: [],
     semData: [],
+    concluidasHoje: [],
     erroTarefas: null,
     erroBlocos: null,
     vazioTotal: true
@@ -173,8 +174,8 @@ describe('listaVirtual', () => {
 
     montar(<TarefasApp />);
 
-    // Aba "Todas as Tarefas" não inclui blocos do cronograma.
-    fireEvent.click(await screen.findByRole('tab', { name: /todas as tarefas/i }));
+    // Filtro "Todas as Tarefas" no menu lateral não inclui blocos do cronograma.
+    fireEvent.click(await screen.findByRole('button', { name: /todas as tarefas/i }));
 
     await waitFor(() => {
       expect(screen.queryByText('Direito Penal')).not.toBeInTheDocument();
@@ -362,5 +363,39 @@ describe('listaVirtual', () => {
     expect(screen.getByRole('button', { name: /tentar novamente/i })).toBeInTheDocument();
     expect(payloads).toHaveLength(1);
     expect(JSON.parse(payloads[0])).toHaveProperty('operationId');
+  });
+
+  it('sidebarSemRedundanciaEBarraInferiorMobileComTodosOsFiltros', async () => {
+    vi.mocked(apiModule.request).mockImplementation(async (caminho: string) => {
+      if (caminho === '/tarefas/hoje') {
+        return { hojeLocal: '2026-11-09', atrasadas: [], hoje: [], semData: [], concluidasHoje: [] };
+      }
+      return [];
+    });
+
+    montar(<TarefasApp />);
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: /^Tarefas de Hoje$/i })).toBeInTheDocument()
+    );
+
+    // Sem barra superior de tabs redundante
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+
+    const sidebar = screen.getByLabelText('Painel lateral de navegação');
+    const bottomNav = screen.getByRole('navigation', { name: 'Navegação principal mobile' });
+
+    // Cartões no topo da sidebar ("Hoje" e "Fluxo de Tarefas") sem repetição na seção "Filtros"
+    expect(within(sidebar).getByRole('button', { name: 'Hoje' })).toBeInTheDocument();
+    expect(within(sidebar).queryByText('Tarefas do dia')).not.toBeInTheDocument();
+    expect(within(sidebar).getAllByRole('button', { name: /fluxo de tarefas/i })).toHaveLength(1);
+    expect(within(sidebar).getAllByRole('button', { name: /próximos dias/i })).toHaveLength(1);
+
+    // Barra inferior mobile reutilizando AppSidebar com todos os filtros
+    expect(within(bottomNav).getByRole('button', { name: 'Hoje' })).toBeInTheDocument();
+    expect(within(bottomNav).getByRole('button', { name: 'Próximos' })).toBeInTheDocument();
+    expect(within(bottomNav).getByRole('button', { name: 'Fluxo' })).toBeInTheDocument();
+    expect(within(bottomNav).getByRole('button', { name: 'Todas' })).toBeInTheDocument();
+    expect(within(bottomNav).getByRole('button', { name: 'Lixeira' })).toBeInTheDocument();
   });
 });

@@ -625,14 +625,21 @@
     border-top: 1px solid var(--border-strong);
     padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
     box-shadow: var(--bottom-nav-shadow);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .mobileBottomNav::-webkit-scrollbar {
+    display: none;
   }
 
   .mobileBottomTrack {
     display: grid;
-    grid-template-columns: repeat(var(--mobile-nav-columns, 5), minmax(0, 1fr));
+    grid-template-columns: repeat(var(--mobile-nav-columns, 5), minmax(56px, 1fr));
     align-items: center;
     gap: 4px;
-    max-width: 560px;
+    max-width: 640px;
+    min-width: min-content;
     margin: 0 auto;
   }
 

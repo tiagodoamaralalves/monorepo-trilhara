@@ -12,7 +12,8 @@ import {
   ExclusaoListaDTO,
   ListaTarefasDTO,
   TarefaDTO,
-  PrioridadeTarefa
+  PrioridadeTarefa,
+  TipoConexaoFluxo
 } from '../types/tarefa';
 
 function normalizarPrioridade(p?: unknown): PrioridadeTarefa {
@@ -34,7 +35,12 @@ function normalizarTarefa(t: TarefaDTO | Tarefa): Tarefa {
     observacoes: desc,
     subtarefas: t.subtarefas || [],
     prioridade: normalizarPrioridade(t.prioridade),
-    desvinculadaDaSerie: Boolean(t.desvinculadaDaSerie)
+    desvinculadaDaSerie: Boolean(t.desvinculadaDaSerie),
+    noFluxo: Boolean(t.noFluxo),
+    sucessorasIds: t.sucessorasIds || [],
+    antecessorasIds: t.antecessorasIds || [],
+    paresIds: t.paresIds || [],
+    posicaoFluxo: t.posicaoFluxo ?? null
   };
 }
 
@@ -310,6 +316,72 @@ export const TarefaService = {
       method: 'DELETE'
     });
   },
+
+  // ── FLUXO DE TAREFAS (VISUALIZAÇÃO EM GRAFO) ──
+
+  async listarFluxo(): Promise<Tarefa[]> {
+    const res = await request<TarefaDTO[]>('/tarefas/fluxo');
+    return (res || []).map(normalizarTarefa);
+  },
+
+  async adicionarAoFluxo(tarefaId: string): Promise<Tarefa> {
+    const res = await request<TarefaDTO>(`/tarefas/${encodeURIComponent(tarefaId)}/fluxo`, {
+      method: 'POST'
+    });
+    return normalizarTarefa(res);
+  },
+
+  async removerDoFluxo(tarefaId: string): Promise<void> {
+    await request(`/tarefas/${encodeURIComponent(tarefaId)}/fluxo`, {
+      method: 'DELETE'
+    });
+  },
+
+  async conectarNoFluxo(
+    tarefaId: string,
+    tarefaAlvoId: string,
+    tipo: TipoConexaoFluxo
+  ): Promise<Tarefa[]> {
+    const res = await request<TarefaDTO[]>(
+      `/tarefas/${encodeURIComponent(tarefaId)}/fluxo/conexoes`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ tarefaAlvoId, tipo })
+      }
+    );
+    return (res || []).map(normalizarTarefa);
+  },
+
+  async desconectarNoFluxo(tarefaId: string, alvoId: string): Promise<Tarefa[]> {
+    const res = await request<TarefaDTO[]>(
+      `/tarefas/${encodeURIComponent(tarefaId)}/fluxo/conexoes/${encodeURIComponent(alvoId)}`,
+      {
+        method: 'DELETE'
+      }
+    );
+    return (res || []).map(normalizarTarefa);
+  },
+
+  async atualizarPosicaoFluxo(tarefaId: string, x: number, y: number): Promise<Tarefa> {
+    const res = await request<TarefaDTO>(
+      `/tarefas/${encodeURIComponent(tarefaId)}/fluxo/posicao`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ x, y })
+      }
+    );
+    return normalizarTarefa(res);
+  },
+
+  async atualizarPosicoesFluxoEmLote(
+    posicoes: Array<{ tarefaId: string; x: number; y: number }>
+  ): Promise<Tarefa[]> {
+    const res = await request<TarefaDTO[]>('/tarefas/fluxo/posicoes', {
+      method: 'PATCH',
+      body: JSON.stringify({ posicoes })
+    });
+    return (res || []).map(normalizarTarefa);
+  }
 
   // Os blocos de cronograma não são tarefas: a lista virtual usa
   // `GET /api/trilhas/{trilhaId}/cronogramas/{cronogramaId}/blocos` (Estudos).

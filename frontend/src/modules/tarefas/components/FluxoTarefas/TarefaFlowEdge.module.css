@@ -1,0 +1,108 @@
+@keyframes flowDash {
+  to {
+    stroke-dashoffset: -18;
+  }
+}
+
+.edgePath {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 2.25;
+  stroke-dasharray: 6 3;
+  animation: flowDash 1.4s linear infinite;
+  transition: stroke var(--transition-fast), stroke-width var(--transition-fast), filter var(--transition-fast);
+}
+
+.edgeDone {
+  stroke: var(--green);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--green) 35%, transparent));
+}
+
+.edgePar {
+  stroke: var(--purple);
+  stroke-dasharray: 4 4;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--purple) 28%, transparent));
+}
+
+.edgeSelected {
+  stroke-width: 3.25;
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--primary) 55%, transparent));
+}
+
+.edgeDoneSelected {
+  stroke-width: 3.25;
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--green) 55%, transparent));
+}
+
+.edgeParSelected {
+  stroke-width: 3.25;
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--purple) 55%, transparent));
+}
+
+.edgeLabelWrap {
+  position: absolute;
+  pointer-events: all;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tipoTag {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background: var(--surface-glass);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--purple-border);
+  color: var(--purple-text);
+  box-shadow: var(--shadow-sm);
+}
+
+.disconnectBtn {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-glass);
+  backdrop-filter: blur(8px);
+  color: var(--text-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  opacity: 0.65;
+  transition: opacity var(--transition-fast), background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.disconnectBtn:hover,
+.disconnectBtnSelected {
+  opacity: 1;
+  background: var(--red-bg);
+  color: var(--red-text);
+  border-color: var(--red-border);
+  transform: scale(1.1);
+}
+
+.disconnectBtn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .disconnectBtn {
+    opacity: 0.92;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edgePath,
+  .disconnectBtn {
+    animation: none;
+    transition: none;
+  }
+}

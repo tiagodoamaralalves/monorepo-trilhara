@@ -155,7 +155,8 @@ class LembretePushLifecycleTest {
                 existente.estado(), existente.concluida(), existente.concluidaEm(), existente.ordem(),
                 existente.subtarefas(), existente.modoLembrete(), existente.lembreteMinutosAntes(),
                 existente.fusoAgendamento(), existente.deletedAt(), existente.expiresAt(),
-                existente.loteExclusaoId(), existente.criadoEm(), Instant.now());
+                existente.loteExclusaoId(), existente.noFluxo(), existente.sucessorasIds(),
+                existente.paresIds(), existente.posicaoFluxo(), existente.criadoEm(), Instant.now());
         tarefaRepository.atualizar(semHorario);
 
         lembretePushService.agendarOuAtualizarLembrete(semHorario, null, null, null);
@@ -183,7 +184,8 @@ class LembretePushLifecycleTest {
                 existente.estado(), existente.concluida(), existente.concluidaEm(), existente.ordem(),
                 existente.subtarefas(), existente.modoLembrete(), existente.lembreteMinutosAntes(),
                 existente.fusoAgendamento(), existente.deletedAt(), existente.expiresAt(),
-                existente.loteExclusaoId(), existente.criadoEm(), Instant.now());
+                existente.loteExclusaoId(), existente.noFluxo(), existente.sucessorasIds(),
+                existente.paresIds(), existente.posicaoFluxo(), existente.criadoEm(), Instant.now());
         tarefaRepository.atualizar(comNovoHorario);
 
         lembretePushService.agendarOuAtualizarLembrete(comNovoHorario, null, null, null);

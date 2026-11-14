@@ -103,7 +103,10 @@ class TarefaIntegrationTest {
                 .body("hoje", hasSize(1))
                 .body("hoje[0].id", equalTo(outraId))
                 .body("hoje[0].estado", equalTo("PENDENTE"))
-                .body("atrasadas", hasSize(0));
+                .body("atrasadas", hasSize(0))
+                .body("concluidasHoje", hasSize(1))
+                .body("concluidasHoje[0].id", equalTo(tarefaId))
+                .body("concluidasHoje[0].estado", equalTo("CONCLUIDA"));
     }
 
     // ── TODA_A_SERIE preserva serieId das concluídas ─────────────────

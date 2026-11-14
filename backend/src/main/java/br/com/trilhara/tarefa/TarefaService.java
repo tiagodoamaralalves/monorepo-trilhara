@@ -2,7 +2,11 @@ package br.com.trilhara.tarefa;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -123,8 +127,13 @@ public class TarefaService {
                 paginacao.pagina(),
                 paginacao.tamanho()));
 
+        List<ObjectId> ids = resultado.itens().stream().map(Tarefa::id).toList();
+        Map<ObjectId, List<ObjectId>> mapaAntecessoras = tarefaRepository.mapearAntecessoras(usuarioId, ids);
+
         return new PaginaTarefasDTO(
-                resultado.itens().stream().map(TarefaMapper::paraTarefaResponse).toList(),
+                resultado.itens().stream()
+                        .map(t -> mapearComAntecessoras(t, mapaAntecessoras))
+                        .toList(),
                 resultado.pagina(),
                 resultado.tamanho(),
                 resultado.totalItens(),
@@ -134,7 +143,10 @@ public class TarefaService {
     public TarefaResponse buscarTarefa(String tarefaIdStr, String usuarioIdStr) {
         ObjectId usuarioId = TarefaSupport.validarObjectId(usuarioIdStr, TarefaSupport.CAMPO_USUARIO_ID);
         ObjectId tarefaId = TarefaSupport.validarObjectId(tarefaIdStr, TarefaSupport.CAMPO_TAREFA_ID);
-        return TarefaMapper.paraTarefaResponse(buscarTarefaAtiva(usuarioId, tarefaId));
+        Tarefa tarefa = buscarTarefaAtiva(usuarioId, tarefaId);
+        Map<ObjectId, List<ObjectId>> mapaAntecessoras =
+                tarefaRepository.mapearAntecessoras(usuarioId, List.of(tarefa.id()));
+        return mapearComAntecessoras(tarefa, mapaAntecessoras);
     }
 
     public TarefaResponse atualizarTarefa(
@@ -326,6 +338,10 @@ public class TarefaService {
                 existente.deletedAt(),
                 existente.expiresAt(),
                 existente.loteExclusaoId(),
+                existente.noFluxo(),
+                existente.sucessorasIds(),
+                existente.paresIds(),
+                existente.posicaoFluxo(),
                 existente.criadoEm(),
                 Instant.now()
         );
@@ -337,7 +353,7 @@ public class TarefaService {
                 atualizada.lembreteMinutosAntes(),
                 atualizada.fusoAgendamento()
         );
-        return TarefaMapper.paraTarefaResponse(atualizada);
+        return buscarComAntecessoras(usuarioId, atualizada);
     }
 
     private TarefaResponse atualizarTarefaManual(
@@ -365,6 +381,10 @@ public class TarefaService {
                 existente.deletedAt(),
                 existente.expiresAt(),
                 existente.loteExclusaoId(),
+                existente.noFluxo(),
+                existente.sucessorasIds(),
+                existente.paresIds(),
+                existente.posicaoFluxo(),
                 existente.criadoEm(),
                 Instant.now()
         );
@@ -376,7 +396,7 @@ public class TarefaService {
                 atualizada.lembreteMinutosAntes(),
                 atualizada.fusoAgendamento()
         );
-        return TarefaMapper.paraTarefaResponse(atualizada);
+        return buscarComAntecessoras(usuarioId, atualizada);
     }
 
     public void excluirTarefa(String tarefaIdStr, String escopoParam, String usuarioIdStr) {
@@ -471,6 +491,10 @@ public class TarefaService {
                 existente.deletedAt(),
                 existente.expiresAt(),
                 existente.loteExclusaoId(),
+                existente.noFluxo(),
+                existente.sucessorasIds(),
+                existente.paresIds(),
+                existente.posicaoFluxo(),
                 existente.criadoEm(),
                 agora
         );
@@ -486,7 +510,7 @@ public class TarefaService {
                     atualizada.fusoAgendamento()
             );
         }
-        return TarefaMapper.paraTarefaResponse(atualizada);
+        return buscarComAntecessoras(usuarioId, atualizada);
     }
 
     public TarefaResponse atualizarSubtarefa(
@@ -524,12 +548,16 @@ public class TarefaService {
                 existente.deletedAt(),
                 existente.expiresAt(),
                 existente.loteExclusaoId(),
+                existente.noFluxo(),
+                existente.sucessorasIds(),
+                existente.paresIds(),
+                existente.posicaoFluxo(),
                 existente.criadoEm(),
                 Instant.now()
         );
 
         tarefaRepository.atualizar(atualizada);
-        return TarefaMapper.paraTarefaResponse(atualizada);
+        return buscarComAntecessoras(usuarioId, atualizada);
     }
 
     public TarefaResponse pularTarefa(String tarefaIdStr, String usuarioIdStr) {
@@ -561,26 +589,77 @@ public class TarefaService {
                 existente.deletedAt(),
                 existente.expiresAt(),
                 existente.loteExclusaoId(),
+                existente.noFluxo(),
+                existente.sucessorasIds(),
+                existente.paresIds(),
+                existente.posicaoFluxo(),
                 existente.criadoEm(),
                 Instant.now()
         );
 
         tarefaRepository.atualizar(atualizada);
         lembretePushService.cancelarLembrete(usuarioId, tarefaId);
-        return TarefaMapper.paraTarefaResponse(atualizada);
+        return buscarComAntecessoras(usuarioId, atualizada);
     }
 
     public TarefasHojeResponse obterTarefasHoje(String usuarioIdStr) {
         ObjectId usuarioId = TarefaSupport.validarObjectId(usuarioIdStr, TarefaSupport.CAMPO_USUARIO_ID);
         LocalDate hojeLocal = timezoneContext.hojeLocal();
+        ZoneId zoneId = timezoneContext.zoneId();
+        Instant inicioDia = hojeLocal.atStartOfDay(zoneId).toInstant();
+        Instant fimDia = hojeLocal.plusDays(1).atStartOfDay(zoneId).toInstant();
 
         recorrenciaEngine.expandirSeriesDoUsuario(usuarioId, hojeLocal, null);
 
-        return TarefaMapper.montarTarefasHojeResponse(
-                hojeLocal,
-                tarefaRepository.listarAtrasadas(usuarioId, hojeLocal),
-                tarefaRepository.listarHoje(usuarioId, hojeLocal),
-                tarefaRepository.listarSemData(usuarioId));
+        List<Tarefa> atrasadas = tarefaRepository.listarAtrasadas(usuarioId, hojeLocal);
+        List<Tarefa> hoje = tarefaRepository.listarHoje(usuarioId, hojeLocal);
+        List<Tarefa> semData = tarefaRepository.listarSemData(usuarioId);
+        List<Tarefa> concluidasHoje = tarefaRepository.listarConcluidasHoje(usuarioId, hojeLocal, inicioDia, fimDia);
+
+        List<ObjectId> todosIds = new ArrayList<>();
+        atrasadas.forEach(t -> todosIds.add(t.id()));
+        hoje.forEach(t -> todosIds.add(t.id()));
+        semData.forEach(t -> todosIds.add(t.id()));
+        concluidasHoje.forEach(t -> todosIds.add(t.id()));
+        Map<ObjectId, List<ObjectId>> mapaAntecessoras = tarefaRepository.mapearAntecessoras(usuarioId, todosIds);
+
+        TarefasHojeResponse bruto = TarefaMapper.montarTarefasHojeResponse(
+                hojeLocal, atrasadas, hoje, semData, concluidasHoje);
+        return new TarefasHojeResponse(
+                bruto.hojeLocal(),
+                enriquecerAntecessoras(atrasadas, bruto.atrasadas(), mapaAntecessoras),
+                enriquecerAntecessoras(hoje, bruto.hoje(), mapaAntecessoras),
+                enriquecerAntecessoras(semData, bruto.semData(), mapaAntecessoras),
+                enriquecerAntecessoras(concluidasHoje, bruto.concluidasHoje(), mapaAntecessoras)
+        );
+    }
+
+    private List<TarefaResponse> enriquecerAntecessoras(
+            List<Tarefa> entidades,
+            List<TarefaResponse> ordenadas,
+            Map<ObjectId, List<ObjectId>> mapaAntecessoras) {
+        Map<String, Tarefa> porId = new java.util.HashMap<>();
+        for (Tarefa t : entidades) {
+            porId.put(t.id().toHexString(), t);
+        }
+        return ordenadas.stream()
+                .map(r -> {
+                    Tarefa t = porId.get(r.id());
+                    return t != null ? mapearComAntecessoras(t, mapaAntecessoras) : r;
+                })
+                .toList();
+    }
+
+    private TarefaResponse buscarComAntecessoras(ObjectId usuarioId, Tarefa tarefa) {
+        Map<ObjectId, List<ObjectId>> mapa = tarefaRepository.mapearAntecessoras(usuarioId, List.of(tarefa.id()));
+        return mapearComAntecessoras(tarefa, mapa);
+    }
+
+    private TarefaResponse mapearComAntecessoras(Tarefa t, Map<ObjectId, List<ObjectId>> mapaAntecessoras) {
+        List<String> antecessoras = mapaAntecessoras.getOrDefault(t.id(), List.of()).stream()
+                .map(ObjectId::toHexString)
+                .toList();
+        return TarefaMapper.paraTarefaResponse(t, antecessoras);
     }
 
     private Tarefa buscarTarefaAtiva(ObjectId usuarioId, ObjectId tarefaId) {

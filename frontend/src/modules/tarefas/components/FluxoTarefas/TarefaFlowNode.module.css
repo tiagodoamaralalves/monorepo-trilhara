@@ -1,0 +1,541 @@
+.card {
+  position: relative;
+  width: 264px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 var(--surface-subtle-hover);
+  overflow: hidden;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+  color: var(--text);
+  cursor: grab;
+}
+
+.card:active {
+  cursor: grabbing;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border-strong));
+  box-shadow: var(--shadow-md), 0 8px 24px -8px var(--primary-glow);
+}
+
+.cardSelected {
+  border-color: var(--primary);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--primary) 34%, transparent),
+    0 10px 28px -8px var(--primary-glow),
+    var(--shadow-md);
+}
+
+.cardFocused {
+  border-color: var(--purple);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--purple) 36%, transparent),
+    0 10px 28px -8px color-mix(in srgb, var(--purple) 38%, transparent),
+    var(--shadow-md);
+}
+
+.cardDone {
+  border-color: color-mix(in srgb, var(--green) 42%, var(--border));
+  background:
+    radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--green-bg) 55%, transparent) 0%, transparent 65%),
+    var(--surface-1);
+}
+
+.cardAlta {
+  background:
+    radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--red-bg) 45%, transparent) 0%, transparent 65%),
+    var(--surface-1);
+}
+
+.cardMedia {
+  background:
+    radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--yellow-bg) 42%, transparent) 0%, transparent 65%),
+    var(--surface-1);
+}
+
+.cardPadrao {
+  background:
+    radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--primary-bg) 48%, transparent) 0%, transparent 65%),
+    var(--surface-1);
+}
+
+.accentBar {
+  height: 3px;
+  width: 100%;
+  background: linear-gradient(90deg, var(--primary) 0%, var(--purple) 100%);
+}
+
+.accentDone {
+  background: linear-gradient(90deg, var(--green) 0%, var(--primary) 100%);
+}
+
+.accentAlta {
+  background: linear-gradient(90deg, var(--red) 0%, var(--yellow) 100%);
+}
+
+.accentMedia {
+  background: linear-gradient(90deg, var(--yellow) 0%, var(--primary) 100%);
+}
+
+.cardBody {
+  padding: 10px 13px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.topStatusRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-mid);
+}
+
+.statusPillDone {
+  color: var(--green-text);
+  background: var(--green-bg);
+  border-color: var(--green-border);
+}
+
+.statusPillAlta {
+  color: var(--red-text);
+  background: var(--red-bg);
+  border-color: var(--red-border);
+}
+
+.statusPillMedia {
+  color: var(--yellow);
+  background: var(--yellow-bg);
+  border-color: var(--yellow-border);
+}
+
+.statusPillPar {
+  color: var(--purple-text);
+  background: var(--purple-bg);
+  border-color: var(--purple-border);
+}
+
+.statusPillBase {
+  color: var(--primary-light);
+  background: var(--primary-bg);
+  border-color: var(--primary-border-subtle);
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: 0 0 auto;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.checkTitleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.title {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.38;
+  color: var(--text);
+  margin: 0;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.titleDone {
+  text-decoration: line-through;
+  color: var(--text-soft);
+}
+
+.quickActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  opacity: 0.58;
+  transition: opacity var(--transition-fast);
+}
+
+.card:hover .quickActions,
+.card:focus-within .quickActions {
+  opacity: 1;
+}
+
+.actionBtn {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.actionBtn:hover {
+  background: var(--surface-3);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.actionBtnDanger:hover {
+  background: var(--red-bg);
+  color: var(--red-text);
+  border-color: var(--red-border);
+}
+
+.actionBtn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 1px;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.badgesGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.listaTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-mid);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+  max-width: 145px;
+}
+
+.listaDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.listaNome {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subProgressWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.subProgressTrack {
+  flex: 1 1 auto;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.subProgressFill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--primary) 0%, var(--green) 100%);
+  transition: width var(--transition-normal);
+}
+
+.subProgressFillDone {
+  background: var(--green);
+}
+
+.subProgressText {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+.dragHintRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-soft);
+}
+
+.connectPillBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-mid);
+  border-radius: var(--radius-pill);
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.connectPillBtn:hover {
+  color: var(--primary-light);
+  border-color: var(--primary-border-subtle);
+  background: var(--primary-bg);
+}
+
+.connectPillBtn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.direcaoBadges {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dirChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.dirChipPar {
+  color: var(--purple-text);
+  border-color: var(--purple-border);
+  background: var(--purple-bg-subtle);
+}
+
+.conexoesResumo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Handles nos 4 lados: Antecessora (esq), Sucessora (dir), Par (topo/base) */
+.handle {
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 999px !important;
+  background: var(--surface-1) !important;
+  border: 2px solid var(--primary-light) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--bg) 85%, transparent);
+  transition: transform var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.handlePar {
+  border-color: var(--purple-icon) !important;
+}
+
+.handle:hover {
+  transform: scale(1.32);
+  background: var(--primary-light) !important;
+  box-shadow: 0 0 0 4px var(--primary-glow);
+}
+
+.handlePar:hover {
+  transform: scale(1.32);
+  background: var(--purple-icon) !important;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--purple) 32%, transparent);
+}
+
+/* Modo Obsidian (zoom reduzido -> bolinhas de check conectadas) */
+.dotNode {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  min-width: 72px;
+  cursor: grab;
+}
+
+.dotNode:active {
+  cursor: grabbing;
+}
+
+.dotOrbWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dotButton {
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  border: 2px solid var(--primary-light);
+  background: radial-gradient(circle at 30% 28%, var(--surface-3) 0%, var(--surface-1) 78%);
+  color: var(--primary-light);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--primary) 16%, transparent),
+    0 0 18px color-mix(in srgb, var(--primary) 24%, transparent),
+    var(--shadow-sm);
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+}
+
+.dotButton:hover {
+  transform: scale(1.1);
+}
+
+.dotButton:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 3px;
+}
+
+.dotButtonDone {
+  background: radial-gradient(circle at 30% 28%, var(--green-text) 0%, var(--green) 75%);
+  border-color: var(--green);
+  color: var(--on-primary-solid);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--green) 24%, transparent),
+    0 0 22px color-mix(in srgb, var(--green) 36%, transparent),
+    var(--shadow-sm);
+}
+
+.dotButtonFocused {
+  box-shadow:
+    0 0 0 5px color-mix(in srgb, var(--purple) 36%, transparent),
+    0 0 24px color-mix(in srgb, var(--purple) 45%, transparent),
+    var(--shadow-md);
+}
+
+.dotButtonAlta {
+  border-color: var(--red);
+  color: var(--red-text);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--red) 18%, transparent),
+    0 0 18px color-mix(in srgb, var(--red) 28%, transparent),
+    var(--shadow-sm);
+}
+
+.dotButtonMedia {
+  border-color: var(--yellow);
+  color: var(--yellow);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--yellow) 18%, transparent),
+    0 0 18px color-mix(in srgb, var(--yellow) 26%, transparent),
+    var(--shadow-sm);
+}
+
+.dotCountCorner {
+  position: absolute;
+  top: -3px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.dotLabel {
+  max-width: 156px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-glass);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.dotLabelDone {
+  color: var(--text-soft);
+  text-decoration: line-through;
+}
+
+@media (hover: none) {
+  .quickActions {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .quickActions,
+  .actionBtn,
+  .subProgressFill,
+  .connectPillBtn,
+  .handle,
+  .dotButton {
+    transition: none;
+  }
+}

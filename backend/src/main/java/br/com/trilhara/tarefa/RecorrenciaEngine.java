@@ -204,6 +204,10 @@ public class RecorrenciaEngine {
                 null,
                 null,
                 null,
+                false,
+                List.of(),
+                List.of(),
+                null,
                 agora,
                 agora
         );

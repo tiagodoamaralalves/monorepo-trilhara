@@ -1,4 +1,4 @@
-import { Calendar, CalendarDays, CheckCircle2, Clock, ListTodo, Trash2 } from 'lucide-react';
+import { Calendar, CalendarDays, CheckCircle2, Clock, ListTodo, Route, Trash2 } from 'lucide-react';
 import { SidebarNavItemConfig } from '@shared/design-system';
 import { FiltroVisualizacao } from '../../types/tarefa';
 
@@ -34,6 +34,13 @@ export const NAV_ITEMS_TAREFAS: readonly NavItemConfigTarefas[] = [
     icon: CalendarDays
   },
   {
+    id: 'fluxo',
+    label: 'Fluxo de Tarefas',
+    mobileLabel: 'Fluxo',
+    title: 'Mapa visual de conexões entre tarefas',
+    icon: Route
+  },
+  {
     id: 'todas',
     label: 'Todas as Tarefas',
     mobileLabel: 'Todas',
@@ -48,4 +55,11 @@ export const NAV_ITEMS_TAREFAS: readonly NavItemConfigTarefas[] = [
     icon: Trash2
   }
 ];
+
+/**
+ * Itens exibidos na lista "Filtros" da sidebar desktop (exclui `hoje` e `fluxo`,
+ * já destacados nos cartões no topo do pod para evitar redundância).
+ */
+export const NAV_ITEMS_TAREFAS_SIDEBAR: readonly NavItemConfigTarefas[] =
+  NAV_ITEMS_TAREFAS.filter((item) => item.id !== 'hoje' && item.id !== 'fluxo');
 

@@ -90,3 +90,4 @@ describe('progressoTrilha — cálculo ponderado pelo peso da disciplina', () =>
     expect(formatarPercentualEdital(100)).toBe('100%');
   });
 });
+
