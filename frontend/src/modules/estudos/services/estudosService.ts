@@ -135,6 +135,20 @@ export const EstudosService = {
     );
   },
 
+  async atualizarConclusaoDisciplina(
+    trilhaId: string,
+    disciplinaId: string,
+    concluida: boolean
+  ): Promise<DisciplinaDTO> {
+    return await request<DisciplinaDTO>(
+      `/trilhas/${encodeURIComponent(trilhaId)}/disciplinas/${encodeURIComponent(disciplinaId)}/conclusao`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ concluida })
+      }
+    );
+  },
+
   // ── CATÁLOGO DE EDITAIS ──
   async listarEditais(filtro?: {
     q?: string;
@@ -166,20 +180,6 @@ export const EstudosService = {
 
   // ── DISCIPLINAS DO DIA ──
   // ── SESSÕES & HISTÓRICO ──
-  async atualizarSessao(
-    trilhaId: string,
-    sessaoId: string,
-    payload: { duracaoSegundos: number; questoes?: number; acertos?: number }
-  ): Promise<SessaoRegistradaDTO> {
-    return await request<SessaoRegistradaDTO>(
-      `/trilhas/${encodeURIComponent(trilhaId)}/sessoes/${encodeURIComponent(sessaoId)}`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify(payload)
-      }
-    );
-  },
-
   async excluirSessao(
     trilhaId: string,
     sessaoId: string
@@ -243,7 +243,6 @@ export const EstudosService = {
         acertos: dto.acertos ?? 0,
         erros: dto.erros ?? Math.max(0, (dto.questoes ?? 0) - (dto.acertos ?? 0)),
         percentualAcerto: dto.percentualAcerto,
-        editavel: dto.editavel,
         chaveIdempotencia: dto.chaveIdempotencia,
         criadoEm: dto.criadoEm,
         atualizadoEm: dto.atualizadoEm

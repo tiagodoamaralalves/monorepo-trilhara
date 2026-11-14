@@ -63,16 +63,43 @@ describe('AgendaHoje', () => {
     vi.useRealTimers();
   });
 
-  it('exibe os cabeçalhos h2 das três seções e os subgrupos de Hoje', () => {
-    render(<AgendaHoje {...propsBase()} />);
+  it('exibe barra de filtros no topo e lista unificada com pílulas horizontais sem títulos de seção', () => {
+    render(
+      <AgendaHoje
+        {...propsBase({
+          dados: {
+            ...agendaVazia(),
+            vazioTotal: false,
+            atrasadas: [tarefa('atr-1', { dataVencimento: '2026-11-01' })],
+            atrasadasAgrupadas: [{ principal: tarefa('atr-1', { dataVencimento: '2026-11-01' }), anteriores: [] }],
+            tarefasHoje: [tarefa('hoje-1', { dataVencimento: '2026-11-09' })],
+            semData: [tarefa('sd-1', { dataVencimento: undefined })],
+            blocosHoje: [bloco('bloco-1')]
+          }
+        })}
+      />
+    );
 
-    expect(screen.getByRole('heading', { level: 2, name: /atrasadas/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: /^hoje/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: /sem data/i })).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { level: 3, name: /blocos de estudo/i })
-    ).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 3, name: /^tarefas/i })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument();
+
+    expect(screen.getByRole('button', { name: 'Todos' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Atrasadas' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hoje' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Blocos' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sem data' })).toBeInTheDocument();
+
+    expect(screen.getByText('Tarefa atr-1')).toBeInTheDocument();
+    expect(screen.getByText('Tarefa hoje-1')).toBeInTheDocument();
+    expect(screen.getByText('Tarefa sd-1')).toBeInTheDocument();
+    expect(screen.getByText('Direito Penal')).toBeInTheDocument();
+    expect(screen.getAllByText('Atrasada').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Bloco de estudo')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Atrasadas' }));
+    expect(screen.getByText('Tarefa atr-1')).toBeInTheDocument();
+    expect(screen.queryByText('Tarefa hoje-1')).not.toBeInTheDocument();
+    expect(screen.queryByText('Direito Penal')).not.toBeInTheDocument();
   });
 
   it('tudoVazioExibeEmptyStateTudoEmDiaPorHoje', () => {
@@ -127,7 +154,7 @@ describe('AgendaHoje', () => {
     expect(screen.getByText('Tarefa hoje-1')).toBeInTheDocument();
   });
 
-  it('erroDeTarefasRenderizaInlineEmAtrasadasTarefasDeHojeESemData', () => {
+  it('erroDeTarefasRenderizaSectionErrorCardInlineEMantemBlocos', () => {
     render(
       <AgendaHoje
         {...propsBase({
@@ -142,7 +169,9 @@ describe('AgendaHoje', () => {
       />
     );
 
-    expect(screen.getAllByTestId('section-error-card')).toHaveLength(3);
+    const cartoes = screen.getAllByTestId('section-error-card');
+    expect(cartoes).toHaveLength(1);
+    expect(cartoes[0]).toHaveAttribute('data-variant', 'inline');
     expect(screen.getByText('Direito Penal')).toBeInTheDocument();
   });
 
@@ -238,14 +267,16 @@ describe('AgendaHoje', () => {
     });
   });
 
-  it('modoPomodoroExpoeDefinirComoFocoSemAcoesDeEdicao', () => {
+  it('modoPomodoroExpoeDefinirComoFocoEExclusaoSemAcoesDeEdicaoOuPular', () => {
     const onDefinirFoco = vi.fn();
+    const onExcluirTarefa = vi.fn();
 
     render(
       <AgendaHoje
         {...propsBase({
           modo: 'pomodoro',
           onDefinirFoco,
+          onExcluirTarefa,
           dados: {
             ...agendaVazia(),
             vazioTotal: false,
@@ -256,13 +287,47 @@ describe('AgendaHoje', () => {
       />
     );
 
-    // Densidade compacta não expõe ações de editar/excluir/pular.
     expect(screen.queryByRole('button', { name: /editar tarefa/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /pular esta ocorrência/i })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Tarefa hoje-1' }));
     expect(onDefinirFoco).toHaveBeenCalledWith({ tipo: 'TAREFA', id: 'hoje-1' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Definir como foco' }));
     expect(onDefinirFoco).toHaveBeenCalledWith({ tipo: 'BLOCO', id: 'bloco-1' });
+
+    fireEvent.click(screen.getByRole('button', { name: /excluir tarefa tarefa hoje-1/i }));
+    expect(onExcluirTarefa).toHaveBeenCalledTimes(1);
+    expect(onExcluirTarefa.mock.calls[0][0].id).toBe('hoje-1');
+  });
+
+  it('modoTarefasAbreEdicaoAoClicarNoCartaoSemBotoesLapisOuPular', () => {
+    const onEditarTarefa = vi.fn();
+    const onExcluirTarefa = vi.fn();
+
+    render(
+      <AgendaHoje
+        {...propsBase({
+          modo: 'tarefas',
+          onEditarTarefa,
+          onExcluirTarefa,
+          dados: {
+            ...agendaVazia(),
+            vazioTotal: false,
+            tarefasHoje: [tarefa('hoje-1', { dataVencimento: '2026-11-09', serieId: 's-1' })]
+          }
+        })}
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: /editar tarefa/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /pular esta ocorrência/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tarefa hoje-1' }));
+    expect(onEditarTarefa).toHaveBeenCalledTimes(1);
+    expect(onEditarTarefa.mock.calls[0][0].id).toBe('hoje-1');
+
+    fireEvent.click(screen.getByRole('button', { name: /excluir tarefa tarefa hoje-1/i }));
+    expect(onExcluirTarefa).toHaveBeenCalledTimes(1);
   });
 });

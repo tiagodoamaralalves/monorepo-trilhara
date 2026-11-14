@@ -880,11 +880,125 @@ class TrilhaNormalizadaIntegrationTest {
                 .contentType(ContentType.JSON).body("{\"disciplinaIds\": [\"%s\"]}".formatted(disciplinaId))
                 .when().put(API_TRILHAS + "/{trilhaId}/disciplinas/reordenar", trilhaId)
                 .then().statusCode(404);
+        given().header("Authorization", "Bearer " + tokenB)
+                .contentType(ContentType.JSON).body("{\"concluida\": true}")
+                .when().patch(API_TRILHAS + "/{trilhaId}/disciplinas/{disciplinaId}/conclusao", trilhaId, disciplinaId)
+                .then().statusCode(404);
 
         // A trilha de A continua intacta
         given().header("Authorization", "Bearer " + tokenA)
                 .when().get(API_TRILHA, trilhaId)
                 .then().statusCode(200)
                 .body("disciplinas", hasSize(1));
+    }
+
+    @Test
+    @DisplayName("Deve concluir e reabrir disciplina sem tópicos e sincronizar conclusão com tópicos")
+    void deveConcluirEReabrirDisciplinaComESemTopicos() {
+        ObjectId usuarioId = new ObjectId();
+        String token = gerarTokenParaUsuario(usuarioId);
+
+        var criada = given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                          "nome": "Trilha Conclusao Disciplina",
+                          "disciplinasIniciais": [
+                            {"nome": "Sem Assuntos"},
+                            {"nome": "Com Assuntos", "topicos": [{"nome": "T1"}, {"nome": "T2"}]}
+                          ]
+                        }
+                        """)
+                .when().post(API_TRILHAS)
+                .then().statusCode(201)
+                .extract().response();
+
+        String trilhaId = criada.path("id");
+        String discSemId = criada.path("disciplinas[0].id");
+        String discComId = criada.path("disciplinas[1].id");
+        String t1Id = criada.path("disciplinas[1].topicos[0].id");
+        String t2Id = criada.path("disciplinas[1].topicos[1].id");
+
+        // 1. Concluir disciplina sem assuntos
+        given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body("{\"concluida\": true}")
+                .when().patch(API_TRILHAS + "/{trilhaId}/disciplinas/{disciplinaId}/conclusao", trilhaId, discSemId)
+                .then().statusCode(200)
+                .body("concluida", equalTo(true));
+
+        given().header("Authorization", "Bearer " + token)
+                .when().get(API_TRILHA, trilhaId)
+                .then().statusCode(200)
+                .body("disciplinas[0].concluida", equalTo(true))
+                .body("disciplinasConcluidas", equalTo(1))
+                .body("temDisciplinaSemTopico", equalTo(true))
+                .body("percentualProgresso", equalTo(50.0f));
+
+        // 2. Adicionar um assunto à disciplina sem assuntos reabre a disciplina
+        given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body("{\"nome\": \"Sem Assuntos\", \"peso\": 1, \"topicos\": [{\"nome\": \"Novo Tópico\", \"ordem\": 1}]}")
+                .when().put(API_TRILHAS + "/{trilhaId}/disciplinas/{disciplinaId}", trilhaId, discSemId)
+                .then().statusCode(200)
+                .body("concluida", equalTo(false));
+
+        // 3. Concluir disciplina com assuntos marca todos os tópicos
+        given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body("{\"concluida\": true}")
+                .when().patch(API_TRILHAS + "/{trilhaId}/disciplinas/{disciplinaId}/conclusao", trilhaId, discComId)
+                .then().statusCode(200)
+                .body("concluida", equalTo(true))
+                .body("topicosConcluidos", equalTo(2))
+                .body("topicos[0].concluido", equalTo(true))
+                .body("topicos[1].concluido", equalTo(true));
+
+        // 4. Desmarcar um tópico reabre a disciplina para pendente
+        given()
+                .header("Authorization", "Bearer " + token)
+                .when().delete(API_TRILHAS + "/{trilhaId}/topicos/{topicoId}/progresso", trilhaId, t1Id)
+                .then().statusCode(204);
+
+        given().header("Authorization", "Bearer " + token)
+                .when().get(API_TRILHA, trilhaId)
+                .then().statusCode(200)
+                .body("disciplinas[1].concluida", equalTo(false))
+                .body("disciplinas[1].topicosConcluidos", equalTo(1));
+
+        // 5. Remarcar o tópico restante conclui a disciplina automaticamente
+        given()
+                .header("Authorization", "Bearer " + token)
+                .when().put(API_TRILHAS + "/{trilhaId}/topicos/{topicoId}/progresso", trilhaId, t1Id)
+                .then().statusCode(200);
+
+        given().header("Authorization", "Bearer " + token)
+                .when().get(API_TRILHA, trilhaId)
+                .then().statusCode(200)
+                .body("disciplinas[1].concluida", equalTo(true))
+                .body("disciplinas[1].topicosConcluidos", equalTo(2))
+                .body("temDisciplinaSemTopico", equalTo(false))
+                .body("percentualProgresso", equalTo(50.0f));
+
+        // 6. Reabrir disciplina com assuntos desmarca todos os tópicos
+        given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body("{\"concluida\": false}")
+                .when().patch(API_TRILHAS + "/{trilhaId}/disciplinas/{disciplinaId}/conclusao", trilhaId, discComId)
+                .then().statusCode(200)
+                .body("concluida", equalTo(false))
+                .body("topicosConcluidos", equalTo(0))
+                .body("topicos[0].concluido", equalTo(false))
+                .body("topicos[1].concluido", equalTo(false));
+
+        given().header("Authorization", "Bearer " + token)
+                .when().get(API_TRILHA, trilhaId)
+                .then().statusCode(200)
+                .body("topicosConcluidosIds", not(hasItem(t2Id)));
     }
 }

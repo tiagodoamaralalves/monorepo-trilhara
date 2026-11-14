@@ -3,11 +3,18 @@
   width: 100%;
   min-width: 0;
   align-items: center;
-  gap: 9px;
   padding: 8px 10px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
+}
+
+.disciplineRowContent {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
 }
 
 .disciplineItemClickable {
@@ -66,6 +73,8 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .topicItem {
@@ -73,13 +82,20 @@
   width: 100%;
   min-width: 0;
   align-items: center;
-  gap: 7px;
   padding: 7px 8px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
   color: var(--text);
   font-size: 13px;
+}
+
+.topicRowContent {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
 }
 
 .topicItemClickable {
@@ -94,7 +110,7 @@
 }
 
 .topicNumber {
-  flex: 0 0 20px;
+  flex: 0 0 24px;
   color: var(--text-soft);
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -106,5 +122,6 @@
   color: var(--text);
   font-size: 13px;
   line-height: 1.4;
+  overflow-wrap: anywhere;
   word-break: break-word;
 }

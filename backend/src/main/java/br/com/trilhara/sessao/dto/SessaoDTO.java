@@ -15,7 +15,6 @@ public record SessaoDTO(
         int acertos,
         int erros,
         double percentualAcerto,
-        boolean editavel,
         String chaveIdempotencia,
         Instant criadoEm,
         Instant atualizadoEm

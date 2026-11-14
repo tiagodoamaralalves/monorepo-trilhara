@@ -34,6 +34,7 @@ public final class GeradorBlocosCronograma {
             LocalDate dataFim,
             List<Integer> diasAtivosSemana,
             Integer blocosPorDia,
+            Map<Integer, Integer> blocosPorDiaSemana,
             List<Disciplina> disciplinasParticipantes,
             Map<Integer, List<String>> semanaModeloManual) {
     }
@@ -78,6 +79,7 @@ public final class GeradorBlocosCronograma {
                 dataFimEfetiva,
                 params.diasAtivosSemana(),
                 params.blocosPorDia(),
+                params.blocosPorDiaSemana(),
                 params.disciplinasParticipantes(),
                 params.semanaModeloManual()
         );
@@ -97,7 +99,7 @@ public final class GeradorBlocosCronograma {
     }
 
     private static List<BlocoCronograma> gerarSequencial(ParametrosGeracao params, Instant agora) {
-        validarDiasEBlocos(params.diasAtivosSemana(), params.blocosPorDia());
+        validarDiasEBlocos(params.diasAtivosSemana(), params.blocosPorDia(), params.blocosPorDiaSemana());
 
         List<Disciplina> ordenadas = new ArrayList<>(params.disciplinasParticipantes());
         ordenadas.sort(Comparator.comparingInt(Disciplina::ordem));
@@ -107,25 +109,23 @@ public final class GeradorBlocosCronograma {
 
         for (LocalDate data = params.dataInicio(); !data.isAfter(params.dataFim()); data = data.plusDays(1)) {
             int diaSemana = data.getDayOfWeek().getValue();
-            if (params.diasAtivosSemana().contains(diaSemana)) {
-                for (int ordem = 1; ordem <= params.blocosPorDia(); ordem++) {
-                    Disciplina disc = ordenadas.get(indiceFila % ordenadas.size());
-                    indiceFila++;
-                    resultado.add(criarBloco(params, data, ordem, disc, agora));
-                }
+            int quantidadeBlocos = blocosNoDia(params, diaSemana);
+            for (int ordem = 1; ordem <= quantidadeBlocos; ordem++) {
+                Disciplina disc = ordenadas.get(indiceFila % ordenadas.size());
+                indiceFila++;
+                resultado.add(criarBloco(params, data, ordem, disc, agora));
             }
         }
         return resultado;
     }
 
     private static List<BlocoCronograma> gerarPonderado(ParametrosGeracao params, Instant agora) {
-        validarDiasEBlocos(params.diasAtivosSemana(), params.blocosPorDia());
+        validarDiasEBlocos(params.diasAtivosSemana(), params.blocosPorDia(), params.blocosPorDiaSemana());
 
         List<Disciplina> ordenadas = new ArrayList<>(params.disciplinasParticipantes());
         ordenadas.sort(Comparator.comparingInt(Disciplina::ordem));
 
-        int totalDiasAtivos = contarDiasAtivos(params.dataInicio(), params.dataFim(), params.diasAtivosSemana());
-        int totalBlocos = totalDiasAtivos * params.blocosPorDia();
+        int totalBlocos = contarTotalBlocosPonderado(params);
         if (totalBlocos == 0) {
             return List.of();
         }
@@ -136,24 +136,32 @@ public final class GeradorBlocosCronograma {
         int indiceEscala = 0;
 
         for (LocalDate data = params.dataInicio(); !data.isAfter(params.dataFim()); data = data.plusDays(1)) {
-            if (params.diasAtivosSemana().contains(data.getDayOfWeek().getValue())) {
-                for (int ordem = 1; ordem <= params.blocosPorDia(); ordem++) {
-                    Disciplina disc = escalaGlobal.get(indiceEscala++);
-                    resultado.add(criarBloco(params, data, ordem, disc, agora));
-                }
+            int quantidadeBlocos = blocosNoDia(params, data.getDayOfWeek().getValue());
+            for (int ordem = 1; ordem <= quantidadeBlocos; ordem++) {
+                Disciplina disc = escalaGlobal.get(indiceEscala++);
+                resultado.add(criarBloco(params, data, ordem, disc, agora));
             }
         }
         return resultado;
     }
 
-    private static int contarDiasAtivos(LocalDate dataInicio, LocalDate dataFim, List<Integer> diasAtivosSemana) {
-        int totalDiasAtivos = 0;
-        for (LocalDate data = dataInicio; !data.isAfter(dataFim); data = data.plusDays(1)) {
-            if (diasAtivosSemana.contains(data.getDayOfWeek().getValue())) {
-                totalDiasAtivos++;
-            }
+    private static int contarTotalBlocosPonderado(ParametrosGeracao params) {
+        int totalBlocos = 0;
+        for (LocalDate data = params.dataInicio(); !data.isAfter(params.dataFim()); data = data.plusDays(1)) {
+            totalBlocos += blocosNoDia(params, data.getDayOfWeek().getValue());
         }
-        return totalDiasAtivos;
+        return totalBlocos;
+    }
+
+    private static int blocosNoDia(ParametrosGeracao params, int diaSemana) {
+        if (params.diasAtivosSemana() == null || !params.diasAtivosSemana().contains(diaSemana)) {
+            return 0;
+        }
+        if (params.blocosPorDiaSemana() != null && params.blocosPorDiaSemana().containsKey(diaSemana)) {
+            Integer qtd = params.blocosPorDiaSemana().get(diaSemana);
+            return qtd != null ? qtd : 0;
+        }
+        return params.blocosPorDia() != null ? params.blocosPorDia() : 0;
     }
 
     private static List<Disciplina> construirEscalaGlobalPonderada(List<Disciplina> ordenadas, int totalBlocos) {
@@ -278,7 +286,8 @@ public final class GeradorBlocosCronograma {
                 agora);
     }
 
-    private static void validarDiasEBlocos(List<Integer> diasAtivosSemana, Integer blocosPorDia) {
+    private static void validarDiasEBlocos(
+            List<Integer> diasAtivosSemana, Integer blocosPorDia, Map<Integer, Integer> blocosPorDiaSemana) {
         if (diasAtivosSemana == null || diasAtivosSemana.isEmpty()) {
             throw new BadRequestException("diasAtivosSemana é obrigatório para modalidade sequencial/ponderada.");
         }
@@ -286,9 +295,12 @@ public final class GeradorBlocosCronograma {
             if (dia == null || dia < 1 || dia > 7) {
                 throw new BadRequestException("Dia da semana inválido: " + dia + ". Deve ser entre 1 (Seg) e 7 (Dom).");
             }
-        }
-        if (blocosPorDia == null || blocosPorDia < 1 || blocosPorDia > MAX_BLOCOS_POR_DIA) {
-            throw new BadRequestException("blocosPorDia deve estar entre 1 e " + MAX_BLOCOS_POR_DIA + ".");
+            Integer blocosDia = (blocosPorDiaSemana != null && blocosPorDiaSemana.containsKey(dia))
+                    ? blocosPorDiaSemana.get(dia)
+                    : blocosPorDia;
+            if (blocosDia == null || blocosDia < 1 || blocosDia > MAX_BLOCOS_POR_DIA) {
+                throw new BadRequestException("blocosPorDia deve estar entre 1 e " + MAX_BLOCOS_POR_DIA + ".");
+            }
         }
     }
 }

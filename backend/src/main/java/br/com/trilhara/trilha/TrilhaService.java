@@ -134,9 +134,8 @@ public class TrilhaService {
         for (Document doc : documentos) {
             ObjectId trilhaId = doc.getObjectId("_id");
             List<Disciplina> disciplinas = disciplinaRepository.listarPorTrilha(usuarioId, trilhaId);
-            int totalTopicos = disciplinas.stream().mapToInt(d -> d.topicos().size()).sum();
-            int topicosConcluidos = (int) progressoRepository.contarConcluidosPorTrilha(usuarioId, trilhaId);
-            double pct = totalTopicos > 0 ? ((double) topicosConcluidos / totalTopicos) * 100.0 : 0.0;
+            Set<String> concluidosTrilha = progressoRepository.listarTopicosConcluidosIds(usuarioId, trilhaId);
+            ResumoProgresso resumo = calcularResumoProgresso(trilhaId.toHexString(), disciplinas, concluidosTrilha);
 
             resumos.add(new TrilhaResumoDTO(
                     trilhaId.toHexString(),
@@ -147,9 +146,11 @@ public class TrilhaService {
                     doc.getString("cor"),
                     hexOuNulo(doc.getObjectId("origemEditalId")),
                     disciplinas.size(),
-                    totalTopicos,
-                    topicosConcluidos,
-                    pct,
+                    resumo.disciplinasConcluidas(),
+                    resumo.temDisciplinaSemTopico(),
+                    resumo.totalTopicos(),
+                    resumo.topicosConcluidos(),
+                    resumo.percentualGeral(),
                     obterCronogramaAtivoResumo(doc, usuarioId),
                     BsonDates.lerInstant(doc, "criadoEm"),
                     BsonDates.lerInstant(doc, "atualizadoEm")));
@@ -174,15 +175,56 @@ public class TrilhaService {
     private TrilhaDetalheDTO montarDetalhe(Document doc, ObjectId usuarioId, ObjectId trilhaId) {
         List<Disciplina> disciplinas = disciplinaRepository.listarPorTrilha(usuarioId, trilhaId);
         Set<String> concluidosTrilha = progressoRepository.listarTopicosConcluidosIds(usuarioId, trilhaId);
+        String trilhaIdHex = trilhaId.toHexString();
+        ResumoProgresso resumo = calcularResumoProgresso(trilhaIdHex, disciplinas, concluidosTrilha);
 
+        return new TrilhaDetalheDTO(
+                trilhaIdHex,
+                doc.getString("nome"),
+                cargoDoDocumento(doc),
+                doc.getString("banca"),
+                doc.getString("dataProva"),
+                doc.getString("cor"),
+                hexOuNulo(doc.getObjectId("origemEditalId")),
+                resumo.disciplinasDTO().size(),
+                resumo.disciplinasConcluidas(),
+                resumo.temDisciplinaSemTopico(),
+                resumo.totalTopicos(),
+                resumo.topicosConcluidos(),
+                resumo.percentualGeral(),
+                obterCronogramaAtivoResumo(doc, usuarioId),
+                resumo.disciplinasDTO(),
+                concluidosTrilha,
+                BsonDates.lerInstant(doc, "criadoEm"),
+                BsonDates.lerInstant(doc, "atualizadoEm"));
+    }
+
+    record ResumoProgresso(
+            List<DisciplinaDTO> disciplinasDTO,
+            int disciplinasConcluidas,
+            boolean temDisciplinaSemTopico,
+            int totalTopicos,
+            int topicosConcluidos,
+            double percentualGeral) {
+    }
+
+    static ResumoProgresso calcularResumoProgresso(
+            String trilhaIdHex,
+            List<Disciplina> disciplinas,
+            Set<String> concluidosTrilha) {
         int totalTopicos = 0;
-        List<DisciplinaDTO> disciplinasDTO = new ArrayList<>();
+        int topicosConcluidos = 0;
+        int disciplinasConcluidas = 0;
+        boolean temDisciplinaSemTopico = false;
+        int somaPesos = 0;
+        double somaProgressoPonderado = 0.0;
+        List<DisciplinaDTO> disciplinasDTO = new ArrayList<>(disciplinas.size());
 
         for (Disciplina d : disciplinas) {
             int dTotal = d.topicos().size();
             totalTopicos += dTotal;
             int dConcluidos = 0;
-            List<TopicoDTO> topicosDTO = new ArrayList<>();
+            List<TopicoDTO> topicosDTO = new ArrayList<>(dTotal);
 
             for (TopicoEmbutido t : d.topicos()) {
                 boolean concluido = concluidosTrilha.contains(t.id());
@@ -192,10 +234,26 @@ public class TrilhaService {
                 topicosDTO.add(new TopicoDTO(t.id(), t.nome(), t.ordem(), concluido));
             }
 
+            topicosConcluidos += dConcluidos;
             double dPct = dTotal > 0 ? ((double) dConcluidos / dTotal) * 100.0 : 0.0;
+            boolean concluida = d.concluida() || (dTotal > 0 && dConcluidos == dTotal);
+            if (dTotal == 0) {
+                temDisciplinaSemTopico = true;
+            }
+            if (concluida) {
+                disciplinasConcluidas++;
+            }
+
+            int peso = d.peso() != null ? Math.clamp(d.peso(), 1, 5) : 1;
+            double progressoDisciplina = dTotal > 0
+                    ? (double) dConcluidos / dTotal
+                    : (concluida ? 1.0 : 0.0);
+            somaPesos += peso;
+            somaProgressoPonderado += peso * progressoDisciplina;
+
             disciplinasDTO.add(new DisciplinaDTO(
                     d.id().toHexString(),
-                    trilhaId.toHexString(),
+                    trilhaIdHex,
                     d.nome(),
                     d.cor(),
                     d.peso(),
@@ -203,29 +261,18 @@ public class TrilhaService {
                     topicosDTO,
                     dTotal,
                     dConcluidos,
-                    dPct));
+                    dPct,
+                    concluida));
         }
 
-        int topicosConcluidos = concluidosTrilha.size();
-        double percentualGeral = totalTopicos > 0 ? ((double) topicosConcluidos / totalTopicos) * 100.0 : 0.0;
-
-        return new TrilhaDetalheDTO(
-                trilhaId.toHexString(),
-                doc.getString("nome"),
-                cargoDoDocumento(doc),
-                doc.getString("banca"),
-                doc.getString("dataProva"),
-                doc.getString("cor"),
-                hexOuNulo(doc.getObjectId("origemEditalId")),
-                disciplinasDTO.size(),
+        double percentualGeral = somaPesos > 0 ? (somaProgressoPonderado / somaPesos) * 100.0 : 0.0;
+        return new ResumoProgresso(
+                disciplinasDTO,
+                disciplinasConcluidas,
+                temDisciplinaSemTopico,
                 totalTopicos,
                 topicosConcluidos,
-                percentualGeral,
-                obterCronogramaAtivoResumo(doc, usuarioId),
-                disciplinasDTO,
-                concluidosTrilha,
-                BsonDates.lerInstant(doc, "criadoEm"),
-                BsonDates.lerInstant(doc, "atualizadoEm"));
+                percentualGeral);
     }
 
     private String cargoDoDocumento(Document doc) {
@@ -534,7 +581,8 @@ public class TrilhaService {
                 topicosDTO,
                 topicosDTO.size(),
                 0,
-                0.0);
+                0.0,
+                false);
     }
 
     public DisciplinaDTO atualizarDisciplina(String trilhaIdStr, String disciplinaIdStr, AtualizarDisciplinaRequest request) {
@@ -546,6 +594,19 @@ public class TrilhaService {
                 .orElseThrow(() -> new NotFoundException(ERRO_DISCIPLINA_NAO_ENCONTRADA));
 
         List<TopicoEmbutido> novosTopicos = processarNovosTopicos(usuarioId, trilhaId, existente, request.topicos());
+        Set<String> concluidosTrilha = progressoRepository.listarTopicosConcluidosIds(usuarioId, trilhaId);
+        int dConcluidos = 0;
+        List<TopicoDTO> topicosDTO = new ArrayList<>();
+        for (TopicoEmbutido t : novosTopicos) {
+            boolean concluido = concluidosTrilha.contains(t.id());
+            if (concluido) {
+                dConcluidos++;
+            }
+            topicosDTO.add(new TopicoDTO(t.id(), t.nome(), t.ordem(), concluido));
+        }
+        boolean concluida = novosTopicos.isEmpty()
+                ? existente.concluida()
+                : dConcluidos == novosTopicos.size();
 
         Disciplina atualizada = new Disciplina(
                 disciplinaId,
@@ -556,6 +617,7 @@ public class TrilhaService {
                 request.peso() != null ? request.peso() : existente.peso(),
                 existente.ordem(),
                 novosTopicos,
+                concluida,
                 existente.criadoEm(),
                 Instant.now());
 
@@ -570,16 +632,6 @@ public class TrilhaService {
         blocoCronogramaRepository.atualizarSnapshotsDisciplina(
                 usuarioId, trilhaId, disciplinaId, atualizada.nome(), atualizada.cor(), cronogramasAtivosIds);
 
-        Set<String> concluidosTrilha = progressoRepository.listarTopicosConcluidosIds(usuarioId, trilhaId);
-        int dConcluidos = 0;
-        List<TopicoDTO> topicosDTO = new ArrayList<>();
-        for (TopicoEmbutido t : novosTopicos) {
-            boolean concluido = concluidosTrilha.contains(t.id());
-            if (concluido) {
-                dConcluidos++;
-            }
-            topicosDTO.add(new TopicoDTO(t.id(), t.nome(), t.ordem(), concluido));
-        }
         double pct = novosTopicos.isEmpty() ? 0.0 : ((double) dConcluidos / novosTopicos.size()) * 100.0;
 
         return new DisciplinaDTO(
@@ -592,7 +644,8 @@ public class TrilhaService {
                 topicosDTO,
                 novosTopicos.size(),
                 dConcluidos,
-                pct);
+                pct,
+                concluida);
     }
 
     /**
@@ -714,6 +767,13 @@ public class TrilhaService {
                 .orElseThrow(() -> new NotFoundException(ERRO_TOPICO_NAO_ENCONTRADO));
 
         progressoRepository.marcarConcluido(usuarioId, trilhaId, disciplina.id(), topicoIdValidado);
+        if (!disciplina.topicos().isEmpty() && !disciplina.concluida()) {
+            Set<String> concluidosTrilha = progressoRepository.listarTopicosConcluidosIds(usuarioId, trilhaId);
+            boolean todosConcluidos = disciplina.topicos().stream().allMatch(t -> concluidosTrilha.contains(t.id()));
+            if (todosConcluidos) {
+                disciplinaRepository.atualizarConclusao(usuarioId, trilhaId, disciplina.id(), true);
+            }
+        }
         return ProgressoTopicoDTO.concluido(topicoIdValidado, Instant.now());
     }
 
@@ -734,6 +794,51 @@ public class TrilhaService {
                 .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
 
         progressoRepository.desmarcarConcluido(usuarioId, trilhaId, topicoIdValidado);
+        disciplinaRepository.buscarPorTopicoId(usuarioId, trilhaId, topicoIdValidado)
+                .ifPresent(disciplina -> {
+                    if (disciplina.concluida()) {
+                        disciplinaRepository.atualizarConclusao(usuarioId, trilhaId, disciplina.id(), false);
+                    }
+                });
+    }
+
+    public DisciplinaDTO atualizarConclusaoDisciplina(String trilhaIdStr, String disciplinaIdStr, boolean concluida) {
+        ObjectId usuarioId = timezoneContext.usuarioIdObjectId();
+        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
+        ObjectId disciplinaId = BsonIds.parse(disciplinaIdStr, CAMPO_DISCIPLINA_ID);
+
+        Disciplina disciplina = disciplinaRepository.buscarPorId(usuarioId, trilhaId, disciplinaId)
+                .orElseThrow(() -> new NotFoundException(ERRO_DISCIPLINA_NAO_ENCONTRADA));
+
+        disciplinaRepository.atualizarConclusao(usuarioId, trilhaId, disciplinaId, concluida);
+        if (!disciplina.topicos().isEmpty()) {
+            if (concluida) {
+                List<String> ids = disciplina.topicos().stream().map(TopicoEmbutido::id).toList();
+                progressoRepository.marcarVariosConcluidos(usuarioId, trilhaId, disciplinaId, ids);
+            } else {
+                progressoRepository.excluirPorDisciplina(usuarioId, trilhaId, disciplinaId);
+            }
+        }
+
+        List<TopicoDTO> topicosDTO = disciplina.topicos().stream()
+                .map(t -> new TopicoDTO(t.id(), t.nome(), t.ordem(), concluida))
+                .toList();
+        int total = topicosDTO.size();
+        int concluidos = concluida ? total : 0;
+        double pct = total > 0 && concluida ? 100.0 : 0.0;
+
+        return new DisciplinaDTO(
+                disciplinaId.toHexString(),
+                trilhaId.toHexString(),
+                disciplina.nome(),
+                disciplina.cor(),
+                disciplina.peso(),
+                disciplina.ordem(),
+                topicosDTO,
+                total,
+                concluidos,
+                pct,
+                concluida);
     }
 
     /** IDs HTTP são hexadecimais de 24 caracteres; malformado é {@code 400 INVALID_IDENTIFIER}. */

@@ -4,6 +4,7 @@ import java.net.URI;
 import java.util.List;
 
 import br.com.trilhara.auth.Autenticado;
+import br.com.trilhara.trilha.dto.AtualizarConclusaoDisciplinaRequest;
 import br.com.trilhara.trilha.dto.AtualizarDisciplinaRequest;
 import br.com.trilhara.trilha.dto.AtualizarMetadadosTrilhaRequest;
 import br.com.trilhara.trilha.dto.CriarDisciplinaRequest;
@@ -19,6 +20,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.PATCH;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
@@ -118,6 +120,15 @@ public class TrilhaResource {
             @PathParam("disciplinaId") String disciplinaId,
             @Valid @NotNull AtualizarDisciplinaRequest request) {
         return service.atualizarDisciplina(trilhaId, disciplinaId, request);
+    }
+
+    @PATCH
+    @Path("{trilhaId}/disciplinas/{disciplinaId}/conclusao")
+    public DisciplinaDTO atualizarConclusaoDisciplina(
+            @PathParam("trilhaId") String trilhaId,
+            @PathParam("disciplinaId") String disciplinaId,
+            @Valid @NotNull AtualizarConclusaoDisciplinaRequest request) {
+        return service.atualizarConclusaoDisciplina(trilhaId, disciplinaId, request.concluida());
     }
 
     @DELETE

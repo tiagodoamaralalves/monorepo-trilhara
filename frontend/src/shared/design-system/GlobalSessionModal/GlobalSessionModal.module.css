@@ -23,7 +23,7 @@
   border-radius: var(--radius-lg, 12px);
   box-shadow: var(--shadow-lg, 0 20px 25px -5px rgba(0, 0, 0, 0.5));
   width: 100%;
-  max-width: 520px;
+  max-width: 580px;
   max-height: calc(100vh - 32px);
   display: flex;
   flex-direction: column;
@@ -82,9 +82,18 @@
   cursor: not-allowed;
 }
 
+.form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .body {
   padding: 20px 24px;
   overflow-y: auto;
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -207,12 +216,38 @@
   border-top: 1px solid var(--border, #2c2e33);
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 10px;
   background: var(--surface-1, #1a1b1e);
   flex-wrap: wrap;
 }
 
 .footerLeft {
-  margin-right: auto;
+  display: flex;
+  align-items: center;
+}
+
+.footerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+@media (max-width: 540px) {
+  .footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .footerLeft,
+  .footerActions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .footerLeft > button,
+  .footerActions > button {
+    flex: 1;
+  }
 }

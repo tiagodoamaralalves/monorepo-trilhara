@@ -53,6 +53,36 @@ describe('Hub — estados de carregamento, vazio e erro', () => {
     expect(screen.queryByTestId('empty-state')).not.toBeInTheDocument();
   });
 
+  it('exibe progresso por disciplinas quando a trilha não possui tópicos ou é mista', () => {
+    const semTopicos: TrilhaResumoDTO = {
+      ...trilha,
+      id: 't-sem',
+      nome: 'Trilha Sem Tópicos',
+      totalDisciplinas: 10,
+      disciplinasConcluidas: 9,
+      temDisciplinaSemTopico: true,
+      totalTopicos: 0,
+      topicosConcluidos: 0,
+      percentualProgresso: 90
+    };
+    const mista: TrilhaResumoDTO = {
+      ...trilha,
+      id: 't-mista',
+      nome: 'Trilha Mista',
+      totalDisciplinas: 11,
+      disciplinasConcluidas: 1,
+      temDisciplinaSemTopico: true,
+      totalTopicos: 20,
+      topicosConcluidos: 20,
+      percentualProgresso: 33.3
+    };
+
+    render(<HubView {...montarProps({ trilhas: [semTopicos, mista] })} />);
+
+    expect(screen.getByText('90% (9/10 disc.)')).toBeInTheDocument();
+    expect(screen.getByText('33% (1/11 disc. · 20/20 ass.)')).toBeInTheDocument();
+  });
+
   it('exibe EmptyState "Crie sua primeira trilha" com ação primária quando a resposta é vazia', () => {
     const props = montarProps({ trilhas: [] });
     render(<HubView {...props} />);

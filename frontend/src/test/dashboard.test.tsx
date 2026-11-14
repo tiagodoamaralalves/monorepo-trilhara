@@ -66,8 +66,7 @@ function paginaSessoes(overrides: Record<string, unknown> = {}) {
         questoes: 5,
         acertos: 4,
         erros: 1,
-        percentualAcerto: 80,
-        editavel: true
+        percentualAcerto: 80
       }
     ],
     pagina: 1,
@@ -201,5 +200,43 @@ describe('Dashboard de Estudos: estados, grupo removido e', () => {
     const dialogo = await screen.findByRole('dialog');
     expect(dialogo.textContent).toContain('Esta ação não pode ser desfeita.');
     expect(excluirSpy).not.toHaveBeenCalled();
+  });
+
+  it('histórico de sessões permite apenas excluir e não exibe pílula "Mais recente" nem botão Editar', async () => {
+    vi.spyOn(EstudosService, 'obterEstatisticas').mockResolvedValue(estatisticas() as never);
+    vi.spyOn(EstudosService, 'listarSessoesPaginado').mockResolvedValue(paginaSessoes() as never);
+
+    renderizar();
+
+    expect(await screen.findByRole('button', { name: /Excluir/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Editar/i })).not.toBeInTheDocument();
+    expect(screen.queryByText('Mais recente')).not.toBeInTheDocument();
+  });
+
+  it('diagnóstico de questões exibe pílula "Disciplina removida" igual ao tempo por disciplina', async () => {
+    vi.spyOn(EstudosService, 'obterEstatisticas').mockResolvedValue(estatisticas({
+      porDisciplina: [
+        {
+          disciplinaId: 'd-removida',
+          nome: 'Português',
+          cor: '#7C3AED',
+          disciplinaRemovida: true,
+          totalSegundos: 1800,
+          totalSessoes: 1,
+          totalQuestoes: 30,
+          totalAcertos: 15,
+          totalErros: 15,
+          percentualAcerto: 50
+        }
+      ]
+    }) as never);
+    vi.spyOn(EstudosService, 'listarSessoesPaginado').mockResolvedValue(paginaSessoes() as never);
+
+    renderizar();
+
+    const badges = await screen.findAllByText('Disciplina removida');
+    // 1 em Tempo por disciplina + 1 no banner de disciplina removida + 1 em Diagnóstico de questões
+    expect(badges).toHaveLength(3);
+    expect(screen.queryByText('Removida')).not.toBeInTheDocument();
   });
 });

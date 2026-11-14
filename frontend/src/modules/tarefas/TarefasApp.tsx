@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   Clock,
   ListTodo,
-  Plus,
   Filter,
   ChevronDown,
   ChevronRight,
@@ -13,10 +12,7 @@ import {
   ArrowUpDown,
   Trash2,
   RotateCcw,
-  Repeat,
-  Check,
-  BookOpen,
-  Bell
+  BookOpen
 } from 'lucide-react';
 
 import {
@@ -29,7 +25,6 @@ import {
   Select,
   useConfirm,
   useToast,
-  Badge,
   SectionErrorCard,
   Skeleton,
   useGlobalSessionModal,
@@ -38,7 +33,14 @@ import {
 import { useAuth, AuthView, AuthMode } from '@shared/auth';
 import { request, ApiError } from '@shared/auth/api';
 import { pushService, isPushSupported } from '@shared/services/pushService';
-import { AgendaHoje, TarefaAgendaItem, useAgendaHoje } from '@shared/agenda';
+import {
+  AgendaHoje,
+  BlocoAgendaItem,
+  ExcluirRecorrenteModal,
+  QuickAddTask,
+  TarefaAgendaItem,
+  useAgendaHoje
+} from '@shared/agenda';
 import { hojeISO } from '@shared/format';
 import {
   BlocoCronogramaItemDTO,
@@ -53,17 +55,14 @@ import { TrilhaComCronogramaInfo } from './components/Navbar/MinhasListasNav';
 import { TaskModal, SalvarTarefaPayload } from './components/TaskModal/TaskModal';
 import { ListaModal } from './components/ListaModal/ListaModal';
 import { ConfiguracaoLembreteModal } from './components/ConfiguracaoLembreteModal/ConfiguracaoLembreteModal';
-import { QuickAddTask } from './components/QuickAddTask/QuickAddTask';
 import { CalendarView } from './components/CalendarView/CalendarView';
 import { LandingView } from './views/LandingView';
 
 import {
   Tarefa,
-  TarefaDTO,
   ListaTarefas,
   FiltroVisualizacao,
   EscopoRecorrencia,
-  TarefasHojeDTO,
   LixeiraTarefasDTO
 } from './types/tarefa';
 import { TarefaService } from './services/tarefaService';
@@ -104,7 +103,7 @@ const OPCOES_ORDENACAO = [
 function TarefasApp() {
   const toast = useToast();
   const { confirm } = useConfirm();
-  const { usuario, isAuthenticated, carregando, logout } = useAuth();
+  const { usuario, isAuthenticated, carregando } = useAuth();
   const [telaAuth, setTelaAuth] = useState<AuthScreen>(obterTelaAuthInicial);
   const { abrirModal: abrirModalSessao } = useGlobalSessionModal();
   const {
@@ -121,9 +120,6 @@ function TarefasApp() {
   const [filtro, setFiltro] = useState<FiltroVisualizacao>('hoje');
   const [ordenacao, setOrdenacao] = useState<Ordenacao>('vencimento');
   const [mostrarConcluidas, setMostrarConcluidas] = useState(true);
-
-  // Visão Hoje
-  const [, setDadosHoje] = useState<TarefasHojeDTO | null>(null);
 
   // Trilhas de Estudo com cronograma ativo e Listas Virtuais
   const [trilhasComCronograma, setTrilhasComCronograma] = useState<TrilhaComCronogramaInfo[]>([]);
@@ -194,10 +190,7 @@ function TarefasApp() {
         // Trilhas mantidas como estavam se falhar
       }
 
-      if (filtro === 'hoje') {
-        const hojeRes = await TarefaService.obterTarefasHoje();
-        setDadosHoje(hojeRes);
-      } else if (filtro === 'lixeira') {
+      if (filtro === 'lixeira') {
         const lixeiraRes = await TarefaService.listarLixeira();
         setDadosLixeira(lixeiraRes);
       }
@@ -435,9 +428,7 @@ function TarefasApp() {
         prioridade: 'MEDIA'
       });
       setTarefasManuais((prev) => [criada, ...prev]);
-      if (filtro === 'hoje') {
-        setDadosHoje((prev) => prev ? { ...prev, hoje: [criada, ...prev.hoje] } : null);
-      }
+      notificarMudanca();
       toast.success('Tarefa adicionada!');
       return true;
     } catch (err) {
@@ -482,10 +473,7 @@ function TarefasApp() {
         toast.success('Tarefa criada com sucesso.');
       }
       setTarefaEditando(null);
-      if (filtro === 'hoje') {
-        const hojeRes = await TarefaService.obterTarefasHoje();
-        setDadosHoje(hojeRes);
-      }
+      notificarMudanca();
       return true;
     } catch (err) {
       toast.error(err instanceof Error ? err : 'Não foi possível salvar a tarefa.');
@@ -511,10 +499,7 @@ function TarefasApp() {
     try {
       const atualizada = await TarefaService.alternarConclusao(id, concluida);
       setTarefasManuais((prev) => prev.map((t) => (t.id === atualizada.id ? atualizada : t)));
-      if (filtro === 'hoje') {
-        const hojeRes = await TarefaService.obterTarefasHoje();
-        setDadosHoje(hojeRes);
-      }
+      notificarMudanca();
     } catch (err) {
       setTarefasManuais((prev) =>
         prev.map((t) => (t.id === id ? { ...t, concluida: !concluida } : t))
@@ -523,37 +508,11 @@ function TarefasApp() {
     }
   };
 
-  const handlePularTarefa = async (id: string) => {
-    try {
-      await TarefaService.pularTarefa(id);
-      setTarefasManuais((prev) => prev.filter((t) => t.id !== id));
-      if (filtro === 'hoje') {
-        const hojeRes = await TarefaService.obterTarefasHoje();
-        setDadosHoje(hojeRes);
-      }
-      toast.info('Ocorrência pulada.');
-    } catch (err) {
-      toast.error(err instanceof Error ? err : 'Não foi possível pular a ocorrência.');
-    }
-  };
-
   const handleAlternarSubtarefa = async (tarefaId: string, subtarefaId: string, concluida: boolean) => {
     try {
       const atualizada = await TarefaService.alternarSubtarefa(tarefaId, subtarefaId, concluida);
       setTarefasManuais((prev) => prev.map((t) => (t.id === atualizada.id ? atualizada : t)));
-      if (filtro === 'hoje') {
-        setDadosHoje((prev) => {
-          if (!prev) return prev;
-          const atualizarLista = (lista: TarefaDTO[]) =>
-            lista.map((t) => (t.id === atualizada.id ? atualizada : t));
-          return {
-            ...prev,
-            atrasadas: atualizarLista(prev.atrasadas),
-            hoje: atualizarLista(prev.hoje),
-            semData: atualizarLista(prev.semData)
-          };
-        });
-      }
+      notificarMudanca();
     } catch (err) {
       toast.error(err instanceof Error ? err : 'Não foi possível atualizar a subtarefa.');
     }
@@ -578,10 +537,7 @@ function TarefasApp() {
     try {
       await TarefaService.excluirTarefa(tarefa.id);
       setTarefasManuais((prev) => prev.filter((t) => t.id !== tarefa.id));
-      if (filtro === 'hoje') {
-        const hojeRes = await TarefaService.obterTarefasHoje();
-        setDadosHoje(hojeRes);
-      }
+      notificarMudanca();
       toast.success('Tarefa movida para a lixeira.');
     } catch (err) {
       toast.error(err instanceof Error ? err : 'Não foi possível excluir a tarefa.');
@@ -596,6 +552,7 @@ function TarefasApp() {
     try {
       await TarefaService.excluirTarefa(tarefa.id, escopoExclusao);
       await carregarDados();
+      notificarMudanca();
       toast.success('Exclusão de recorrência concluída com sucesso.');
     } catch (err) {
       toast.error(err instanceof Error ? err : 'Não foi possível excluir a tarefa recorrente.');
@@ -663,6 +620,7 @@ function TarefasApp() {
         );
       }
       await carregarDados();
+      notificarMudanca();
       toast.success(`Lista "${restaurada.nome}" restaurada com sucesso!`);
     } catch (err) {
       toast.error(err instanceof Error ? err : 'Não foi possível restaurar a lista.');
@@ -678,6 +636,7 @@ function TarefasApp() {
         );
       }
       await carregarDados();
+      notificarMudanca();
       if (resultado.realocadaParaListaGeral) {
         // a lista original foi purgada definitivamente.
         toast.info('Tarefa restaurada na Lista Geral (a lista original foi excluída definitivamente).');
@@ -934,10 +893,7 @@ function TarefasApp() {
           setModalAberto(true);
         }}
         onAbrirLogin={() => alternarTelaAuth('login')}
-        onLogout={async () => {
-          await logout();
-          toast.info('Você saiu da sua conta.');
-        }}
+        onSettings={() => setModalPushAberto(true)}
       />
 
       {/* ── ÁREA PRINCIPAL DE CONTEÚDO ── */}
@@ -999,31 +955,7 @@ function TarefasApp() {
               >
                 Esvaziar Lixeira
               </Button>
-            ) : (
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <Button
-                  variant="outline"
-                  size="md"
-                  leftIcon={<Bell size={16} />}
-                  onClick={() => setModalPushAberto(true)}
-                  title="Configurar Lembretes Push"
-                  data-testid="btn-config-push"
-                >
-                  Lembretes
-                </Button>
-                <Button
-                  variant="primary"
-                  size="md"
-                  leftIcon={<Plus size={16} />}
-                  onClick={() => {
-                    setTarefaEditando(null);
-                    setModalAberto(true);
-                  }}
-                >
-                  Adicionar Tarefa
-                </Button>
-              </div>
-            )
+            ) : undefined
           }
           toolbar={
             !listaAtiva ? (
@@ -1042,28 +974,17 @@ function TarefasApp() {
           {/* ── VISÃO LIXEIRA (30 DIAS) ── */}
           {filtro === 'lixeira' ? (
             <div>
-              <div style={{ marginBottom: '24px' }}>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '12px' }}>
+              <div className={styles.lixeiraSection}>
+                <h3 className={styles.lixeiraTitle}>
                   Listas na Lixeira ({dadosLixeira?.listas.length || 0})
                 </h3>
                 {dadosLixeira?.listas && dadosLixeira.listas.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div className={styles.taskList}>
                     {dadosLixeira.listas.map((l) => (
-                      <div
-                        key={l.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '12px 16px',
-                          background: 'var(--surface-1)',
-                          borderRadius: '8px',
-                          border: '1px solid var(--border-subtle)'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <Folder size={18} style={{ color: l.cor || 'var(--primary)' }} />
-                          <span style={{ fontWeight: 600 }}>{l.nome}</span>
+                      <div key={l.id} className={styles.lixeiraCard}>
+                        <div className={styles.lixeiraCardInfo}>
+                          <Folder size={18} style={{ color: l.cor || 'var(--primary)', flexShrink: 0 }} />
+                          <span className={styles.lixeiraCardTitle}>{l.nome}</span>
                         </div>
                         <Button
                           type="button"
@@ -1078,35 +999,24 @@ function TarefasApp() {
                     ))}
                   </div>
                 ) : (
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                  <p className={styles.lixeiraEmpty}>
                     Nenhuma lista na lixeira.
                   </p>
                 )}
               </div>
 
               <div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '12px' }}>
+                <h3 className={styles.lixeiraTitle}>
                   Tarefas na Lixeira ({dadosLixeira?.tarefas.length || 0})
                 </h3>
                 {dadosLixeira?.tarefas && dadosLixeira.tarefas.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div className={styles.taskList}>
                     {dadosLixeira.tarefas.map((t) => (
-                      <div
-                        key={t.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '12px 16px',
-                          background: 'var(--surface-1)',
-                          borderRadius: '8px',
-                          border: '1px solid var(--border-subtle)'
-                        }}
-                      >
-                        <div>
-                          <div style={{ fontWeight: 600 }}>{t.titulo}</div>
+                      <div key={t.id} className={styles.lixeiraCard}>
+                        <div className={styles.lixeiraCardText}>
+                          <div className={styles.lixeiraCardTitle}>{t.titulo}</div>
                           {t.descricao && (
-                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                            <div className={styles.lixeiraCardDesc}>
                               {t.descricao}
                             </div>
                           )}
@@ -1202,48 +1112,17 @@ function TarefasApp() {
               ) : blocosTrilha.length > 0 ? (
                 <>
                   <div className={styles.taskList}>
-                    {blocosTrilha.map((bloco) => {
-                      const badgeVariant =
-                        bloco.statusData === 'ATRASADO'
-                          ? 'danger'
-                          : bloco.statusData === 'HOJE'
-                          ? 'warning'
-                          : 'secondary';
-                      const badgeLabel =
-                        bloco.statusData === 'ATRASADO'
-                          ? 'Atrasado'
-                          : bloco.statusData === 'HOJE'
-                          ? 'Hoje'
-                          : 'Futuro';
-
-                      return (
-                        <div key={bloco.id} className={styles.blocoItemRow}>
-                          <div className={styles.blocoItemContent}>
-                            <button
-                              type="button"
-                              className={styles.blocoCheckBtn}
-                              onClick={() => handleConcluirBloco(bloco)}
-                              title="Concluir bloco e registrar sessão"
-                              aria-label={`Concluir bloco de ${bloco.disciplinaNome}`}
-                            >
-                              <Check size={14} />
-                            </button>
-                            <div className={styles.blocoDetails}>
-                              <DisciplineLabel
-                                name={bloco.disciplinaNome}
-                                color={bloco.disciplinaCor}
-                              />
-                              <span className={styles.blocoMeta}>
-                                <span>{bloco.data}</span>
-                                <span>•</span>
-                                <span>{bloco.duracaoMinutos} min</span>
-                              </span>
-                            </div>
-                          </div>
-                          <Badge variant={badgeVariant}>{badgeLabel}</Badge>
-                        </div>
-                      );
-                    })}
+                    {blocosTrilha.map((bloco) => (
+                      <BlocoAgendaItem
+                        key={bloco.id}
+                        disciplinaNome={bloco.disciplinaNome}
+                        disciplinaCor={bloco.disciplinaCor}
+                        duracaoMinutos={bloco.duracaoMinutos}
+                        data={bloco.data}
+                        statusData={bloco.statusData}
+                        onConcluir={() => handleConcluirBloco(bloco)}
+                      />
+                    ))}
                   </div>
 
                   {paginaBlocos < totalPaginasBlocos && (
@@ -1285,7 +1164,6 @@ function TarefasApp() {
                   setModalAberto(true);
                 }}
                 onExcluirTarefa={(t) => handleExcluirTarefa(t as Tarefa)}
-                onPularTarefa={handlePularTarefa}
                 onAlternarSubtarefa={handleAlternarSubtarefa}
               />
 
@@ -1340,7 +1218,6 @@ function TarefasApp() {
                             setModalAberto(true);
                           }}
                           onExcluir={(t) => handleExcluirTarefa(t as Tarefa)}
-                          onPular={handlePularTarefa}
                           onAlternarSubtarefa={handleAlternarSubtarefa}
                         />
                       ))}
@@ -1361,20 +1238,6 @@ function TarefasApp() {
                           : filtro === 'hoje'
                             ? 'Nenhuma tarefa pendente para hoje.'
                             : 'Adicione novas tarefas acima ou crie suas próprias listas personalizadas.'
-                      }
-                      acaoPrimaria={
-                        filtro === 'concluidas' ? undefined : (
-                          <Button
-                            variant="primary"
-                            leftIcon={<Plus size={16} />}
-                            onClick={() => {
-                              setTarefaEditando(null);
-                              setModalAberto(true);
-                            }}
-                          >
-                            {filtro === 'hoje' ? 'Nova tarefa' : 'Criar Primeira Tarefa'}
-                          </Button>
-                        )
                       }
                     />
                   ) : null}
@@ -1415,7 +1278,6 @@ function TarefasApp() {
                             setModalAberto(true);
                           }}
                           onExcluir={(t) => handleExcluirTarefa(t as Tarefa)}
-                          onPular={handlePularTarefa}
                           onAlternarSubtarefa={handleAlternarSubtarefa}
                         />
                       ))}
@@ -1458,103 +1320,13 @@ function TarefasApp() {
         onSalvo={() => toast.success('Preferência global de lembretes atualizada com sucesso!')}
       />
 
-      {/* ── DIÁLOGO DE ESCOPO DE EXCLUSÃO DE SÉRIE RECORRENTE ── */}
-      {tarefaParaExcluirRecorrente && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999
-          }}
-        >
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: '12px',
-              padding: '24px',
-              maxWidth: '480px',
-              width: '90%',
-              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <Repeat size={20} style={{ color: 'var(--primary-600, #4f46e5)' }} />
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>Excluir Tarefa Recorrente</h3>
-            </div>
-            <p style={{ color: 'var(--text-muted, #4b5563)', fontSize: '0.9rem', marginBottom: '16px' }}>
-              Esta tarefa faz parte de uma série recorrente. Como deseja proceder com a exclusão?
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="escopoExclusao"
-                  value="ESTA"
-                  aria-label="Apenas esta ocorrência"
-                  checked={escopoExclusao === 'ESTA'}
-                  onChange={() => setEscopoExclusao('ESTA')}
-                />
-                <div>
-                  <strong>Apenas esta ocorrência</strong>
-                  <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
-                    Move somente a tarefa selecionada para a lixeira. A série continua ativa.
-                  </div>
-                </div>
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="escopoExclusao"
-                  value="ESTA_E_FUTURAS"
-                  aria-label="Esta e todas as futuras"
-                  checked={escopoExclusao === 'ESTA_E_FUTURAS'}
-                  onChange={() => setEscopoExclusao('ESTA_E_FUTURAS')}
-                />
-                <div>
-                  <strong>Esta e todas as futuras</strong>
-                  <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
-                    Encerra a série nesta data e remove ocorrências futuras não concluídas.
-                  </div>
-                </div>
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="escopoExclusao"
-                  value="TODA_A_SERIE"
-                  aria-label="Toda a série de tarefas"
-                  checked={escopoExclusao === 'TODA_A_SERIE'}
-                  onChange={() => setEscopoExclusao('TODA_A_SERIE')}
-                />
-                <div>
-                  <strong>Toda a série de tarefas</strong>
-                  <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
-                    Envia a regra e todas as ocorrências pendentes para a lixeira. Ocorrências já concluídas são preservadas.
-                  </div>
-                </div>
-              </label>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <Button variant="ghost" onClick={() => setTarefaParaExcluirRecorrente(null)}>
-                Cancelar
-              </Button>
-              <Button variant="danger" onClick={handleConfirmarExclusaoRecorrente}>
-                Confirmar Exclusão
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ExcluirRecorrenteModal
+        isOpen={Boolean(tarefaParaExcluirRecorrente)}
+        escopo={escopoExclusao}
+        onChangeEscopo={setEscopoExclusao}
+        onCancel={() => setTarefaParaExcluirRecorrente(null)}
+        onConfirm={handleConfirmarExclusaoRecorrente}
+      />
     </div>
   );
 }

@@ -32,6 +32,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+.sessionActions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--space-3, 12px);
+  margin-top: var(--space-1, 4px);
+  border-top: 1px solid var(--color-border-subtle, #333);
+}
+
 .dangerZone {
   display: flex;
   flex-direction: column;

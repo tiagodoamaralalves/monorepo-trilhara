@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   ToastProvider,
   ConfirmProvider,
@@ -11,6 +12,8 @@ import { StudyTimerProvider } from '../shared/timers/estudoTimer';
 import * as apiModule from '../shared/auth/api';
 import PomodoroApp, { getPomodoroFocoStorageKey } from '../modules/pomodoro/PomodoroApp';
 import { TarefaService } from '../modules/tarefas/services/tarefaService';
+import { agendaHojeService } from '../shared/agenda/agendaHojeService';
+import { hojeISO } from '../shared/format';
 
 vi.mock('../shared/auth/api', async (importOriginal) => {
   const actual = await importOriginal<typeof apiModule>();
@@ -84,6 +87,7 @@ describe('pomodoroAgenda', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    agendaHojeService.resetarParaTestes();
   });
 
   afterEach(() => {
@@ -199,5 +203,81 @@ describe('pomodoroAgenda', () => {
       expect(screen.queryByText('Foco Selecionado')).not.toBeInTheDocument();
     });
     expect(localStorage.getItem(getPomodoroFocoStorageKey(USUARIO)!)).toBeNull();
+  });
+
+  it('criaTarefaRapidaParaHojeEmPomodoro', async () => {
+    const user = userEvent.setup();
+    const hoje = hojeISO();
+    const spyCriar = vi.spyOn(TarefaService, 'criarTarefa').mockResolvedValue({
+      ...tarefaHoje,
+      id: 'nova-1',
+      titulo: 'Revisar Direito Constitucional',
+      dataVencimento: hoje,
+      criadoEm: '',
+      atualizadoEm: ''
+    });
+
+    vi.mocked(apiModule.request).mockImplementation(async (caminho: string) => {
+      if (caminho === '/tarefas/hoje') {
+        return { hojeLocal: hoje, atrasadas: [], hoje: [], semData: [] };
+      }
+      if (caminho === '/blocos/hoje') return [];
+      return [];
+    });
+
+    montar(USUARIO);
+
+    const input = await screen.findByPlaceholderText(
+      /Adicionar uma tarefa\.\.\. \(Pressione Enter para salvar\)/i
+    );
+    await user.type(input, 'Revisar Direito Constitucional{Enter}');
+
+    await waitFor(() => {
+      expect(spyCriar).toHaveBeenCalledWith({
+        titulo: 'Revisar Direito Constitucional',
+        dataVencimento: hoje,
+        data: hoje,
+        prioridade: 'MEDIA'
+      });
+    });
+  });
+
+  it('excluiTarefaEmPomodoroELimpaFocoSelecionado', async () => {
+    const user = userEvent.setup();
+    const spyExcluir = vi.spyOn(TarefaService, 'excluirTarefa').mockResolvedValue(undefined);
+    let incluirTarefa = true;
+
+    vi.mocked(apiModule.request).mockImplementation(async (caminho: string) => {
+      if (caminho === '/tarefas/hoje') {
+        return {
+          hojeLocal: '2026-11-09',
+          atrasadas: [],
+          hoje: incluirTarefa ? [tarefaHoje] : [],
+          semData: []
+        };
+      }
+      if (caminho === '/blocos/hoje') return [];
+      return [];
+    });
+
+    montar(USUARIO);
+
+    await waitFor(() => {
+      expect(screen.getByText('Resolver 20 questões de RLM')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resolver 20 questões de RLM' }));
+    await waitFor(() => expect(screen.getByText('Foco Selecionado')).toBeInTheDocument());
+
+    incluirTarefa = false;
+    await user.click(
+      screen.getByRole('button', { name: /excluir tarefa resolver 20 questões de rlm/i })
+    );
+    await user.click(await screen.findByRole('button', { name: /Mover para Lixeira/i }));
+
+    await waitFor(() => {
+      expect(spyExcluir).toHaveBeenCalledWith('tar-manual-1');
+    });
+    expect(screen.queryByText('Foco Selecionado')).not.toBeInTheDocument();
   });
 });

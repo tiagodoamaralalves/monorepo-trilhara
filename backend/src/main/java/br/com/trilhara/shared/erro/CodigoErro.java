@@ -43,8 +43,6 @@ public enum CodigoErro {
 
     SCHEDULE_GENERATION_IN_PROGRESS(Response.Status.CONFLICT, "Operação concorrente em andamento"),
 
-    LATEST_SESSION_ONLY(Response.Status.CONFLICT, "Somente a sessão mais recente pode ser editada"),
-
     IDEMPOTENCY_KEY_CONFLICT(Response.Status.CONFLICT, "Conflito de chave de idempotência"),
 
     IDEMPOTENCY_RESULT_REMOVED(Response.Status.CONFLICT, "Resultado da idempotência removido"),

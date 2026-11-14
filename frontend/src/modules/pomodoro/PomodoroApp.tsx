@@ -26,16 +26,17 @@ import {
   PageBanner,
   Switch,
   ThemeToggle,
+  useConfirm,
   useGlobalSessionModal,
   useToast
 } from '@shared/design-system';
-import { formatarRelogio as formatarSegundos } from '@shared/format';
+import { formatarRelogio as formatarSegundos, hojeISO } from '@shared/format';
 import { registrarFalha } from '@shared/diagnostico';
 import { useAuth } from '@shared/auth';
-import { AgendaHoje, useAgendaHoje } from '@shared/agenda';
+import { AgendaHoje, ExcluirRecorrenteModal, QuickAddTask, useAgendaHoje } from '@shared/agenda';
 import { assinar, publicar } from '@shared/sync/barramento';
 import { alertarTitulo, preferenciaMovimentoReduzido } from '@shared/services/alertaTitulo';
-import { BlocoHojeDTO } from '@shared/contracts/domainContracts';
+import { BlocoHojeDTO, EscopoRecorrencia, TarefaDTO } from '@shared/contracts/domainContracts';
 import { TarefaService } from '../tarefas/services/tarefaService';
 import logoMark from '@shared/assets/logo-mark.svg';
 import styles from './App.module.css';
@@ -249,7 +250,10 @@ function obterAgoraMs(): number {
 
 export default function PomodoroApp() {
   const toast = useToast();
+  const { confirm } = useConfirm();
   const { usuario, isAuthenticated, abrirAuthModal } = useAuth();
+  const [tarefaParaExcluirRecorrente, setTarefaParaExcluirRecorrente] = useState<TarefaDTO | null>(null);
+  const [escopoExclusao, setEscopoExclusao] = useState<EscopoRecorrencia>('ESTA');
   const { abrirModal: abrirModalSessao } = useGlobalSessionModal();
   const {
     dados: agendaHoje,
@@ -361,6 +365,64 @@ export default function PomodoroApp() {
       notificarMudanca();
     } catch {
       toast.error('Não foi possível atualizar a subtarefa.');
+    }
+  };
+
+  const handleCriarTarefaRapida = async (titulo: string): Promise<boolean> => {
+    try {
+      const hoje = hojeISO();
+      await TarefaService.criarTarefa({
+        titulo,
+        dataVencimento: hoje,
+        data: hoje,
+        prioridade: 'MEDIA'
+      });
+      notificarMudanca();
+      toast.success('Tarefa adicionada!');
+      return true;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Não foi possível criar a tarefa.');
+      return false;
+    }
+  };
+
+  const handleExcluirTarefa = async (tarefa: TarefaDTO) => {
+    if (tarefa.serieId && !tarefa.desvinculadaDaSerie) {
+      setTarefaParaExcluirRecorrente(tarefa);
+      setEscopoExclusao('ESTA');
+      return;
+    }
+
+    const confirmou = await confirm({
+      title: 'Excluir tarefa?',
+      description: 'A tarefa será movida para a lixeira e mantida por 30 dias antes de ser excluída definitivamente.',
+      confirmText: 'Mover para Lixeira',
+      variant: 'danger'
+    });
+    if (!confirmou) return;
+
+    try {
+      await TarefaService.excluirTarefa(tarefa.id);
+      if (focoPersistido?.tipo === 'TAREFA' && focoPersistido.id === tarefa.id) limparFoco();
+      notificarMudanca();
+      toast.success('Tarefa movida para a lixeira.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Não foi possível excluir a tarefa.');
+    }
+  };
+
+  const handleConfirmarExclusaoRecorrente = async () => {
+    if (!tarefaParaExcluirRecorrente) return;
+    const tarefa = tarefaParaExcluirRecorrente;
+    setTarefaParaExcluirRecorrente(null);
+
+    try {
+      await TarefaService.excluirTarefa(tarefa.id, escopoExclusao);
+      if (focoPersistido?.tipo === 'TAREFA' && focoPersistido.id === tarefa.id) limparFoco();
+      notificarMudanca();
+      toast.success('Exclusão de recorrência concluída com sucesso.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Não foi possível excluir a tarefa recorrente.');
     }
   };
 
@@ -1387,11 +1449,14 @@ export default function PomodoroApp() {
                 </div>
               )}
 
+              <QuickAddTask onAdicionar={handleCriarTarefaRapida} />
+
               <AgendaHoje
                 modo="pomodoro"
                 dados={agendaHoje}
                 onAlternarTarefa={handleConcluirTarefa}
                 onConcluirBloco={handleConcluirBloco}
+                onExcluirTarefa={handleExcluirTarefa}
                 onRetryTarefas={recarregarAgendaTarefas}
                 onRetryBlocos={recarregarAgendaBlocos}
                 recarregando={carregandoAgenda}
@@ -1555,6 +1620,14 @@ export default function PomodoroApp() {
           </div>
         </div>
       </FormModal>
+
+      <ExcluirRecorrenteModal
+        isOpen={Boolean(tarefaParaExcluirRecorrente)}
+        escopo={escopoExclusao}
+        onChangeEscopo={setEscopoExclusao}
+        onCancel={() => setTarefaParaExcluirRecorrente(null)}
+        onConfirm={handleConfirmarExclusaoRecorrente}
+      />
     </div>
   );
 }

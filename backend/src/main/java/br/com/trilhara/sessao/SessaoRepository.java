@@ -88,15 +88,6 @@ public class SessaoRepository {
         return Optional.ofNullable(doc);
     }
 
-    public Optional<Sessao> buscarPrimeiraSessaoDaTrilha(ObjectId usuarioId, ObjectId trilhaId) {
-        Document doc = sessoes.find(and(
-                eq(CAMPO_USUARIO_ID, usuarioId),
-                eq(CAMPO_TRILHA_ID, trilhaId),
-                eq(CAMPO_DELETED_AT, null)
-        )).sort(Sorts.descending(CAMPO_DATA_SESSAO, CAMPO_CRIADO_EM, "_id")).first();
-        return Optional.ofNullable(doc).map(this::paraSessao);
-    }
-
     public Optional<Sessao> buscarPorId(ObjectId usuarioId, ObjectId trilhaId, ObjectId sessaoId) {
         Document doc = sessoes.find(and(
                 eq("_id", sessaoId),
@@ -105,29 +96,6 @@ public class SessaoRepository {
                 eq(CAMPO_DELETED_AT, null)
         )).first();
         return Optional.ofNullable(doc).map(this::paraSessao);
-    }
-
-    public boolean atualizar(
-            ObjectId usuarioId,
-            ObjectId trilhaId,
-            ObjectId sessaoId,
-            int duracaoSegundos,
-            int questoes,
-            int acertos,
-            Instant atualizadoEm) {
-        Bson filtro = and(
-                eq("_id", sessaoId),
-                eq(CAMPO_USUARIO_ID, usuarioId),
-                eq(CAMPO_TRILHA_ID, trilhaId),
-                eq(CAMPO_DELETED_AT, null)
-        );
-        Bson updates = Updates.combine(
-                Updates.set(CAMPO_DURACAO_SEGUNDOS, duracaoSegundos),
-                Updates.set(CAMPO_QUESTOES, questoes),
-                Updates.set(CAMPO_ACERTOS, acertos),
-                Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(atualizadoEm))
-        );
-        return sessoes.updateOne(filtro, updates).getModifiedCount() > 0;
     }
 
     /**
@@ -243,7 +211,6 @@ public class SessaoRepository {
 
     public PaginaSessoesDTO listarPaginado(
             FiltroPaginacao filtro,
-            ObjectId primeiraSessaoId,
             Map<ObjectId, Disciplina> disciplinasAtivas) {
         List<Bson> filtros = new ArrayList<>();
         filtros.add(eq(CAMPO_USUARIO_ID, filtro.usuarioId()));
@@ -285,7 +252,6 @@ public class SessaoRepository {
                     int acertos = doc.getInteger(CAMPO_ACERTOS, 0);
                     int erros = Math.max(0, questoes - acertos);
                     double percentual = questoes > 0 ? (acertos * 100.0 / questoes) : 0.0;
-                    boolean editavel = (primeiraSessaoId != null && primeiraSessaoId.equals(id));
 
                     itens.add(new SessaoDTO(
                             BsonIds.toHex(id),
@@ -300,7 +266,6 @@ public class SessaoRepository {
                             acertos,
                             erros,
                             percentual,
-                            editavel,
                             doc.getString(CAMPO_CHAVE_IDEMPOTENCIA),
                             BsonDates.lerInstant(doc, CAMPO_CRIADO_EM),
                             BsonDates.lerInstant(doc, CAMPO_ATUALIZADO_EM)

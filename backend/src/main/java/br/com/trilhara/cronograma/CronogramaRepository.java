@@ -209,6 +209,11 @@ public class CronogramaRepository {
         if (c.blocosPorDia() != null) {
             doc.put("blocosPorDia", c.blocosPorDia());
         }
+        if (c.blocosPorDiaSemana() != null && !c.blocosPorDiaSemana().isEmpty()) {
+            Document blocosDiaDoc = new Document();
+            c.blocosPorDiaSemana().forEach((dia, qtd) -> blocosDiaDoc.put(String.valueOf(dia), qtd));
+            doc.put("blocosPorDiaSemana", blocosDiaDoc);
+        }
         doc.put("disciplinasParticipantesIds", c.disciplinasParticipantesIds());
 
         if (c.semanaModeloManual() != null && !c.semanaModeloManual().isEmpty()) {
@@ -244,6 +249,21 @@ public class CronogramaRepository {
         LocalDate dataFim = BsonDates.toLocalDate(doc.getString("dataFim"));
         List<Integer> diasAtivosSemana = doc.getList("diasAtivosSemana", Integer.class);
         Integer blocosPorDia = doc.getInteger("blocosPorDia");
+        Map<Integer, Integer> blocosPorDiaSemana = new HashMap<>();
+        Document blocosDiaDoc = doc.get("blocosPorDiaSemana", Document.class);
+        if (blocosDiaDoc != null) {
+            for (String key : blocosDiaDoc.keySet()) {
+                try {
+                    int dia = Integer.parseInt(key);
+                    Integer qtd = blocosDiaDoc.getInteger(key);
+                    if (qtd != null) {
+                        blocosPorDiaSemana.put(dia, qtd);
+                    }
+                } catch (NumberFormatException _) {
+                    // Ignora chaves não numéricas
+                }
+            }
+        }
         List<ObjectId> disciplinasParticipantesIds = doc.getList("disciplinasParticipantesIds", ObjectId.class);
 
         Map<Integer, List<String>> semanaModeloManual = new HashMap<>();
@@ -282,6 +302,7 @@ public class CronogramaRepository {
                 dataFim,
                 diasAtivosSemana,
                 blocosPorDia,
+                blocosPorDiaSemana,
                 disciplinasParticipantesIds,
                 semanaModeloManual,
                 configuracaoAtiva,

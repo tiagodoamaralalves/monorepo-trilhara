@@ -60,6 +60,15 @@ public class ProgressoTopicoRepository {
         return result.getUpsertedId() != null || result.getMatchedCount() > 0;
     }
 
+    public void marcarVariosConcluidos(ObjectId usuarioId, ObjectId trilhaId, ObjectId disciplinaId, Collection<String> topicoIds) {
+        if (topicoIds == null || topicoIds.isEmpty()) {
+            return;
+        }
+        for (String topicoId : topicoIds) {
+            marcarConcluido(usuarioId, trilhaId, disciplinaId, topicoId);
+        }
+    }
+
     public boolean desmarcarConcluido(ObjectId usuarioId, ObjectId trilhaId, String topicoId) {
         return collection.deleteOne(and(
                 eq(CAMPO_USUARIO_ID, usuarioId),

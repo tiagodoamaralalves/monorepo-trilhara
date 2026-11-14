@@ -3,6 +3,7 @@ import { Pencil, Plus, Route } from 'lucide-react';
 import { Button, Select, useSidebar } from '@shared/design-system';
 import { TrilhaResumoDTO, TrilhaDetalheDTO } from '../../types/trilhara';
 import { diasAte } from '../../utils/format';
+import { calcularProgressoTrilha, formatarPercentualEdital } from '../../utils/progressoTrilha';
 import styles from './TrilhaPod.module.css';
 
 export interface TrilhaPodProps {
@@ -34,9 +35,17 @@ export const TrilhaPod: React.FC<TrilhaPodProps> = ({
 
   const progressoTrilha = useMemo(() => {
     if (!trilhaAtiva) return null;
-    const total = trilhaAtiva.disciplinas.flatMap((d) => d.topicos).length;
-    const concluidos = trilhaAtiva.topicosConcluidosIds.length;
-    return { total, concluidos, pct: Math.round(trilhaAtiva.percentualProgresso ?? 0) };
+    const resumo = calcularProgressoTrilha(
+      trilhaAtiva.disciplinas,
+      new Set(trilhaAtiva.topicosConcluidosIds ?? [])
+    );
+    const pct = Math.min(100, Math.max(0, resumo.percentualProgresso));
+    const pctTexto = formatarPercentualEdital(pct);
+    const rotuloContagem =
+      resumo.totalTopicos === 0 || resumo.temDisciplinaSemTopico
+        ? `${resumo.disciplinasConcluidas}/${resumo.totalDisciplinas} disc.`
+        : `${resumo.topicosConcluidos}/${resumo.totalTopicos}`;
+    return { pct, rotulo: `${rotuloContagem} (${pctTexto})` };
   }, [trilhaAtiva]);
 
   if (trilhas.length === 0) {
@@ -128,9 +137,7 @@ export const TrilhaPod: React.FC<TrilhaPodProps> = ({
             <div className={styles.trilhaProgressBlock}>
               <div className={styles.trilhaProgressMeta}>
                 <span>Progresso do edital</span>
-                <strong>
-                  {progressoTrilha.concluidos}/{progressoTrilha.total} ({progressoTrilha.pct}%)
-                </strong>
+                <strong>{progressoTrilha.rotulo}</strong>
               </div>
               <div className={styles.trilhaProgressBar} aria-hidden="true">
                 <span

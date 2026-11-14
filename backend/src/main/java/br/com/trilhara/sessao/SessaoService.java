@@ -17,7 +17,6 @@ import org.bson.types.ObjectId;
 
 import com.mongodb.MongoWriteException;
 
-import br.com.trilhara.sessao.dto.AtualizarSessaoRequest;
 import br.com.trilhara.sessao.dto.EstatisticasTrilhaDTO;
 import br.com.trilhara.sessao.dto.PaginaSessoesDTO;
 import br.com.trilhara.sessao.dto.RegistrarSessaoRequest;
@@ -108,7 +107,7 @@ public class SessaoService {
         Optional<Document> docExistenteOpt = repository.buscarDocumentoPorChaveIdempotencia(usuarioId, chave);
         if (docExistenteOpt.isPresent()) {
             return resolverSessaoIdempotente(
-                    usuarioId, trilhaId, docExistenteOpt.get(), requestHash, disciplina.nome(), disciplina.cor());
+                    docExistenteOpt.get(), requestHash, disciplina.nome(), disciplina.cor());
         }
 
         ObjectId sessaoId = new ObjectId();
@@ -142,15 +141,12 @@ public class SessaoService {
             if (e.getError().getCode() == 11000) {
                 Document doc = repository.buscarDocumentoPorChaveIdempotencia(usuarioId, chave)
                         .orElseThrow(() -> e);
-                return resolverSessaoIdempotente(usuarioId, trilhaId, doc, requestHash, discNome, discCor);
+                return resolverSessaoIdempotente(doc, requestHash, discNome, discCor);
             }
             throw e;
         }
 
-        ObjectId primeiraId = repository.buscarPrimeiraSessaoDaTrilha(usuarioId, trilhaId)
-                .map(Sessao::id).orElse(null);
-        boolean editavel = sessaoId.equals(primeiraId);
-        return new RegistroResultado(paraDTO(nova, discNome, discCor, false, editavel), true);
+        return new RegistroResultado(paraDTO(nova, discNome, discCor, false), true);
     }
 
     private String validarChaveIdempotencia(String idempotencyKeyHeader, String chaveCorpo, String path) {
@@ -216,8 +212,6 @@ public class SessaoService {
     }
 
     private RegistroResultado resolverSessaoIdempotente(
-            ObjectId usuarioId,
-            ObjectId trilhaId,
             Document doc,
             String requestHash,
             String discNome,
@@ -232,72 +226,7 @@ public class SessaoService {
                     "Chave de idempotência já utilizada com dados diferentes.");
         }
         Sessao s = repository.paraSessao(doc);
-        ObjectId primeiraId = repository.buscarPrimeiraSessaoDaTrilha(usuarioId, trilhaId)
-                .map(Sessao::id).orElse(null);
-        boolean editavel = s.id().equals(primeiraId);
-        return new RegistroResultado(paraDTO(s, discNome, discCor, false, editavel), false);
-    }
-
-    public SessaoDTO atualizar(
-            String trilhaIdStr,
-            String sessaoIdStr,
-            AtualizarSessaoRequest request) {
-        ObjectId usuarioId = usuarioAtual.usuarioIdObjectId();
-        ObjectId trilhaId = BsonIds.parse(trilhaIdStr, CAMPO_TRILHA_ID);
-        ObjectId sessaoId = BsonIds.parse(sessaoIdStr, "sessaoId");
-        String path = PREFIXO_API_TRILHAS + trilhaIdStr + "/sessoes/" + sessaoIdStr;
-
-        trilhaRepository.buscarEntidade(usuarioId, trilhaId)
-                .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
-
-        // A sessão mais recente da trilha é estritamente a número 1 em (dataSessao DESC, criadoEm DESC, _id DESC)
-        Optional<Sessao> primeiraOpt = repository.buscarPrimeiraSessaoDaTrilha(usuarioId, trilhaId);
-        if (primeiraOpt.isEmpty() || !primeiraOpt.get().id().equals(sessaoId)) {
-            // Verifica se a sessão existe na trilha
-            Optional<Sessao> sessaoExistente = repository.buscarPorId(usuarioId, trilhaId, sessaoId);
-            if (sessaoExistente.isEmpty()) {
-                throw new NotFoundException("Sessão não encontrada.");
-            }
-            throw new DomainConflictException(CodigoErro.LATEST_SESSION_ONLY,
-                    "Apenas a sessão mais recente da trilha pode ser editada.");
-        }
-
-        Sessao sessaoAlvo = primeiraOpt.get();
-
-        int questoes = request.questoesEfetivas();
-        int acertos = request.acertosEfetivos();
-        validarMetricasSessao(request.duracaoSegundos(), questoes, acertos, path);
-
-        Instant agora = Instant.now();
-        repository.atualizar(usuarioId, trilhaId, sessaoId, request.duracaoSegundos(), questoes, acertos, agora);
-
-        // Resolve estado da disciplina (ativa vs removida)
-        Optional<Disciplina> discOpt = disciplinaRepository.buscarPorId(usuarioId, trilhaId, sessaoAlvo.disciplinaId());
-        boolean disciplinaRemovida = discOpt.isEmpty();
-        String discNome = discOpt.map(Disciplina::nome).orElse(sessaoAlvo.disciplinaNomeSnapshot());
-        String discCor = discOpt.map(Disciplina::cor).orElse(sessaoAlvo.disciplinaCorSnapshot());
-
-        int erros = Math.max(0, questoes - acertos);
-        double percentual = questoes > 0 ? (acertos * 100.0 / questoes) : 0.0;
-
-        return new SessaoDTO(
-                BsonIds.toHex(sessaoId),
-                BsonIds.toHex(trilhaId),
-                BsonIds.toHex(sessaoAlvo.disciplinaId()),
-                discNome,
-                discCor,
-                disciplinaRemovida,
-                sessaoAlvo.dataSessao().toString(),
-                request.duracaoSegundos(),
-                questoes,
-                acertos,
-                erros,
-                percentual,
-                true,
-                sessaoAlvo.chaveIdempotencia(),
-                sessaoAlvo.criadoEm(),
-                agora
-        );
+        return new RegistroResultado(paraDTO(s, discNome, discCor, false), false);
     }
 
     public void excluirIndividual(String trilhaIdStr, String sessaoIdStr) {
@@ -360,15 +289,11 @@ public class SessaoService {
             throw badRequest(CODIGO_INVALID_DATE_RANGE, "A data inicial não pode ser posterior à data final.", path);
         }
 
-        ObjectId primeiraSessaoId = repository.buscarPrimeiraSessaoDaTrilha(usuarioId, trilhaId)
-                .map(Sessao::id).orElse(null);
-
         Map<ObjectId, Disciplina> disciplinasAtivas = disciplinaRepository.listarPorTrilha(usuarioId, trilhaId)
                 .stream().collect(Collectors.toMap(Disciplina::id, d -> d));
 
         return repository.listarPaginado(
                 new SessaoRepository.FiltroPaginacao(usuarioId, trilhaId, disciplinaId, dataInicio, dataFim, p, t),
-                primeiraSessaoId,
                 disciplinasAtivas
         );
     }
@@ -536,8 +461,7 @@ public class SessaoService {
             Sessao s,
             String discNome,
             String discCor,
-            boolean disciplinaRemovida,
-            boolean editavel) {
+            boolean disciplinaRemovida) {
         return new SessaoDTO(
                 BsonIds.toHex(s.id()),
                 BsonIds.toHex(s.trilhaId()),
@@ -551,7 +475,6 @@ public class SessaoService {
                 s.acertos(),
                 s.erros(),
                 s.percentualAcerto(),
-                editavel,
                 s.chaveIdempotencia(),
                 s.criadoEm(),
                 s.atualizadoEm()

@@ -19,7 +19,8 @@ public record DisciplinaDTO(
         List<TopicoDTO> topicos,
         int totalTopicos,
         int topicosConcluidos,
-        double percentualProgresso) {
+        double percentualProgresso,
+        boolean concluida) {
 
     public DisciplinaDTO {
         topicos = topicos == null ? List.of() : List.copyOf(topicos);

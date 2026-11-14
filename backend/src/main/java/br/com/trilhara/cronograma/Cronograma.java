@@ -25,6 +25,7 @@ public record Cronograma(
         LocalDate dataFim,
         List<Integer> diasAtivosSemana,
         Integer blocosPorDia,
+        Map<Integer, Integer> blocosPorDiaSemana,
         List<ObjectId> disciplinasParticipantesIds,
         Map<Integer, List<String>> semanaModeloManual,
         Document configuracaoAtiva,
@@ -35,6 +36,7 @@ public record Cronograma(
     public Cronograma {
         Objects.requireNonNull(modalidade, "Modalidade é obrigatória.");
         diasAtivosSemana = diasAtivosSemana == null ? List.of() : List.copyOf(diasAtivosSemana);
+        blocosPorDiaSemana = blocosPorDiaSemana == null ? Map.of() : Collections.unmodifiableMap(blocosPorDiaSemana);
         disciplinasParticipantesIds = disciplinasParticipantesIds == null ? List.of() : List.copyOf(disciplinasParticipantesIds);
         semanaModeloManual = semanaModeloManual == null ? Map.of() : Collections.unmodifiableMap(semanaModeloManual);
         if (estadoPublicacao == null) {

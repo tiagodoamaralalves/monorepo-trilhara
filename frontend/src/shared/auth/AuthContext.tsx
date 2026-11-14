@@ -157,6 +157,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await AuthService.logout();
     } finally {
       setUsuario(null);
+      setIsContaModalOpen(false);
     }
   }, []);
 
@@ -235,6 +236,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           isOpen={isContaModalOpen}
           onClose={fecharContaModal}
           usuario={usuario}
+          onLogout={logout}
           onExcluirConta={excluirConta}
         />
       )}

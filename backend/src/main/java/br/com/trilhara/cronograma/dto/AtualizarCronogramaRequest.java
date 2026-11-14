@@ -19,6 +19,7 @@ public record AtualizarCronogramaRequest(
         LocalDate dataFim,
         List<Integer> diasAtivosSemana,
         @Min(1) @Max(24) Integer blocosPorDia,
+        Map<Integer, Integer> blocosPorDiaSemana,
         @NotEmpty(message = "Ao menos uma disciplina participante é obrigatória.") List<String> disciplinasParticipantesIds,
         Map<Integer, List<String>> semanaModeloManual) {
 }

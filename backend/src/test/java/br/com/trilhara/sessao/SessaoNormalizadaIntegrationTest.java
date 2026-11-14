@@ -27,7 +27,7 @@ import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 
 @QuarkusTest
-@DisplayName("Domínio Estudos (Parte 2): Sessões em Segundos, Edição/Exclusão e Estatísticas Agregadas")
+@DisplayName("Domínio Estudos (Parte 2): Sessões em Segundos, Exclusão e Estatísticas Agregadas")
 class SessaoNormalizadaIntegrationTest {
 
     private static final String API_TRILHAS = "/api/trilhas";
@@ -149,7 +149,6 @@ class SessaoNormalizadaIntegrationTest {
                 .body("disciplinaNome", equalTo("Português"))
                 .body("disciplinaCor", equalTo("#4A6B82"))
                 .body("disciplinaRemovida", equalTo(false))
-                .body("editavel", equalTo(true))
                 .extract().path("id");
 
         // Verifica agregação refletindo exatamente 95 segundos
@@ -312,106 +311,6 @@ class SessaoNormalizadaIntegrationTest {
                 .then()
                 .statusCode(400)
                 .body("code", equalTo("VALIDATION_ERROR"));
-    }
-
-    @Test
-    @DisplayName("3.5 Deve permitir editar apenas a sessão mais recente da trilha (ordem canônica) e rejeitar as demais")
-    void devePermitirEditarApenasSessaoMaisRecente() {
-        ObjectId usuarioId = new ObjectId();
-        String token = gerarTokenParaUsuario(usuarioId);
-        TrilhaEDisciplinas setup = criarTrilhaComDisciplinas(token);
-
-        LocalDate hoje = LocalDate.now(FUSO_TESTES);
-
-        // Sessão 1: hoje - 2 dias (mais antiga)
-        String s1Id = given()
-                .header("Authorization", "Bearer " + token)
-                .header("Idempotency-Key", UUID.randomUUID().toString())
-                .contentType(ContentType.JSON)
-                .body("""
-                        {"disciplinaId":"%s","dataSessao":"%s","duracaoSegundos":100,"questoes":5,"acertos":3}
-                        """.formatted(setup.disciplina1Id(), hoje.minusDays(2)))
-                .when().post(API_TRILHAS + "/" + setup.trilhaId() + "/sessoes")
-                .then().statusCode(201).extract().path("id");
-
-        // Sessão 2: hoje - 1 dia (intermediária)
-        String s2Id = given()
-                .header("Authorization", "Bearer " + token)
-                .header("Idempotency-Key", UUID.randomUUID().toString())
-                .contentType(ContentType.JSON)
-                .body("""
-                        {"disciplinaId":"%s","dataSessao":"%s","duracaoSegundos":200,"questoes":10,"acertos":8}
-                        """.formatted(setup.disciplina2Id(), hoje.minusDays(1)))
-                .when().post(API_TRILHAS + "/" + setup.trilhaId() + "/sessoes")
-                .then().statusCode(201).extract().path("id");
-
-        // Sessão 3: hoje (mais recente global)
-        String s3Id = given()
-                .header("Authorization", "Bearer " + token)
-                .header("Idempotency-Key", UUID.randomUUID().toString())
-                .contentType(ContentType.JSON)
-                .body("""
-                        {"disciplinaId":"%s","dataSessao":"%s","duracaoSegundos":300,"questoes":20,"acertos":15}
-                        """.formatted(setup.disciplina1Id(), hoje))
-                .when().post(API_TRILHAS + "/" + setup.trilhaId() + "/sessoes")
-                .then().statusCode(201).extract().path("id");
-
-        // Listagem: verifica que s3 possui editavel: true e s1, s2 possuem editavel: false
-        given()
-                .header("Authorization", "Bearer " + token)
-                .when()
-                .get(API_TRILHAS + "/" + setup.trilhaId() + "/sessoes?pagina=1&tamanho=10")
-                .then()
-                .statusCode(200)
-                .body("itens[0].id", equalTo(s3Id))
-                .body("itens[0].editavel", equalTo(true))
-                .body("itens[1].id", equalTo(s2Id))
-                .body("itens[1].editavel", equalTo(false))
-                .body("itens[2].id", equalTo(s1Id))
-                .body("itens[2].editavel", equalTo(false));
-
-        // Edição de s3 (mais recente): 200 OK
-        given()
-                .header("Authorization", "Bearer " + token)
-                .contentType(ContentType.JSON)
-                .body("""
-                        {"duracaoSegundos": 360, "questoes": 25, "acertos": 22}
-                        """)
-                .when()
-                .patch(API_TRILHAS + "/" + setup.trilhaId() + "/sessoes/" + s3Id)
-                .then()
-                .statusCode(200)
-                .body("duracaoSegundos", equalTo(360))
-                .body("questoes", equalTo(25))
-                .body("acertos", equalTo(22))
-                .body("erros", equalTo(3))
-                .body("percentualAcerto", equalTo(88.0f))
-                .body("editavel", equalTo(true));
-
-        // Tentativa de edição em s2 ou s1: 409 Conflict (LATEST_SESSION_ONLY)
-        given()
-                .header("Authorization", "Bearer " + token)
-                .contentType(ContentType.JSON)
-                .body("""
-                        {"duracaoSegundos": 250, "questoes": 10, "acertos": 9}
-                        """)
-                .when()
-                .patch(API_TRILHAS + "/" + setup.trilhaId() + "/sessoes/" + s2Id)
-                .then()
-                .statusCode(409)
-                .body("code", equalTo("LATEST_SESSION_ONLY"));
-
-        given()
-                .header("Authorization", "Bearer " + token)
-                .contentType(ContentType.JSON)
-                .body("""
-                        {"duracaoSegundos": 150, "questoes": 5, "acertos": 4}
-                        """)
-                .when()
-                .patch(API_TRILHAS + "/" + setup.trilhaId() + "/sessoes/" + s1Id)
-                .then()
-                .statusCode(409)
-                .body("code", equalTo("LATEST_SESSION_ONLY"));
     }
 
     @Test
@@ -669,18 +568,6 @@ class SessaoNormalizadaIntegrationTest {
                 .then()
                 .statusCode(404);
 
-        // Usuário B tenta editar a sessão de A: 404 Not Found
-        given()
-                .header("Authorization", "Bearer " + tokenB)
-                .contentType(ContentType.JSON)
-                .body("""
-                        {"duracaoSegundos": 200, "questoes": 5, "acertos": 5}
-                        """)
-                .when()
-                .patch(API_TRILHAS + "/" + setupA.trilhaId() + "/sessoes/" + sessaoAId)
-                .then()
-                .statusCode(404);
-
         // Usuário B tenta excluir a sessão de A: 404 Not Found
         given()
                 .header("Authorization", "Bearer " + tokenB)
@@ -793,45 +680,6 @@ class SessaoNormalizadaIntegrationTest {
     }
 
     @Test
-    @DisplayName("3: retry após editar retorna a sessão já atualizada (mesma chave, mesmo hash)")
-    void retryAposEditarRetornaSessaoAtual() {
-        Setup ctx = setup();
-        String hoje = LocalDate.now(FUSO_TESTES).toString();
-        String chave = UUID.randomUUID().toString();
-        String payload = """
-                {"disciplinaId":"%s","dataSessao":"%s","duracaoSegundos":120,"questoes":5,"acertos":4}
-                """.formatted(ctx.trilhas().disciplina1Id(), hoje);
-
-        String sessaoId = postarSessao(ctx.token(), ctx.trilhas().trilhaId(),
-                ctx.trilhas().disciplina1Id(), hoje, 120, 5, 4, chave);
-
-        given()
-                .header("Authorization", "Bearer " + ctx.token())
-                .contentType(ContentType.JSON)
-                .body("""
-                        {"duracaoSegundos":240,"questoes":5,"acertos":5}
-                        """)
-                .when()
-                .patch(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes/" + sessaoId)
-                .then()
-                .statusCode(200)
-                .body("duracaoSegundos", equalTo(240));
-
-        // Retry do POST original: devolve o estado atual, não um 409.
-        given()
-                .header("Authorization", "Bearer " + ctx.token())
-                .header("Idempotency-Key", chave)
-                .contentType(ContentType.JSON)
-                .body(payload)
-                .when()
-                .post(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes")
-                .then()
-                .statusCode(200)
-                .body("id", equalTo(sessaoId))
-                .body("duracaoSegundos", equalTo(240));
-    }
-
-    @Test
     @DisplayName("4: retry após excluir retorna 409 IDEMPOTENCY_RESULT_REMOVED")
     void retryAposExcluirRetorna409ResultRemoved() {
         Setup ctx = setup();
@@ -861,62 +709,6 @@ class SessaoNormalizadaIntegrationTest {
                 .then()
                 .statusCode(409)
                 .body("code", equalTo("IDEMPOTENCY_RESULT_REMOVED"));
-    }
-
-    @Test
-    @DisplayName("5: editavel é global mesmo com filtro de disciplina que exclui a sessão nº 1")
-    void editavelEhGlobalMesmoComFiltroDeDisciplina() {
-        Setup ctx = setup();
-        LocalDate hoje = LocalDate.now(FUSO_TESTES);
-
-        postarSessao(ctx.token(), ctx.trilhas().trilhaId(), ctx.trilhas().disciplina1Id(),
-                hoje.minusDays(2).toString(), 100, 0, 0, UUID.randomUUID().toString());
-        String maisRecente = postarSessao(ctx.token(), ctx.trilhas().trilhaId(),
-                ctx.trilhas().disciplina2Id(), hoje.toString(), 200, 0, 0,
-                UUID.randomUUID().toString());
-
-        // Filtrando pela disciplina 1, a sessão nº 1 global (da disciplina 2) não aparece:
-        // a sessão listada NÃO pode ser marcada como editável.
-        given()
-                .header("Authorization", "Bearer " + ctx.token())
-                .when()
-                .get(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes?disciplinaId="
-                        + ctx.trilhas().disciplina1Id())
-                .then()
-                .statusCode(200)
-                .body("totalItens", equalTo(1))
-                .body("itens[0].editavel", equalTo(false));
-
-        given()
-                .header("Authorization", "Bearer " + ctx.token())
-                .when()
-                .get(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes")
-                .then()
-                .statusCode(200)
-                .body("itens[0].id", equalTo(maisRecente))
-                .body("itens[0].editavel", equalTo(true))
-                .body("itens[1].editavel", equalTo(false));
-    }
-
-    @Test
-    @DisplayName("6: editavel é falso em todas as sessões da página 2")
-    void editavelFalsoNaPagina2() {
-        Setup ctx = setup();
-        LocalDate hoje = LocalDate.now(FUSO_TESTES);
-
-        for (int i = 0; i < 3; i++) {
-            postarSessao(ctx.token(), ctx.trilhas().trilhaId(), ctx.trilhas().disciplina1Id(),
-                    hoje.minusDays(i).toString(), 100, 0, 0, UUID.randomUUID().toString());
-        }
-
-        given()
-                .header("Authorization", "Bearer " + ctx.token())
-                .when()
-                .get(API_TRILHAS + "/" + ctx.trilhas().trilhaId() + "/sessoes?pagina=2&tamanho=1")
-                .then()
-                .statusCode(200)
-                .body("itens", hasSize(1))
-                .body("itens[0].editavel", equalTo(false));
     }
 
     @Test

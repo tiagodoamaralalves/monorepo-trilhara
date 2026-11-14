@@ -309,6 +309,10 @@
   gap: 8px;
 }
 
+.modalFooterActionsSingle {
+  justify-content: flex-end;
+}
+
 .emptyDayContainer {
   display: flex;
   flex-direction: column;

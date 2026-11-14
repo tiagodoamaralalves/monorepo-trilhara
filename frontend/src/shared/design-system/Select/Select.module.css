@@ -97,6 +97,11 @@
   color: var(--primary-light);
 }
 
+.menuOptionDisabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .arrow {
   position: absolute;
   right: 12px;

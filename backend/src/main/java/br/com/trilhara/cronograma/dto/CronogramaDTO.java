@@ -15,6 +15,7 @@ public record CronogramaDTO(
         String dataFim,
         List<Integer> diasAtivosSemana,
         Integer blocosPorDia,
+        Map<Integer, Integer> blocosPorDiaSemana,
         List<String> disciplinasParticipantesIds,
         Map<Integer, List<String>> semanaModeloManual,
         Map<String, Object> configuracao,

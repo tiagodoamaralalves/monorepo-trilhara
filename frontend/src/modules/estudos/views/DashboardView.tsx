@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Award,
   Clock,
-  Edit2,
   Flame,
   Target,
   Trash2
@@ -13,8 +12,6 @@ import {
   DatePicker,
   DisciplineLabel,
   EmptyState,
-  FormModal,
-  Input,
   Pagination,
   PageBanner,
   ProgressBar,
@@ -32,12 +29,12 @@ import {
 } from '../types/trilhara';
 import type { BlocoCronogramaItemDTO } from '@shared/contracts';
 import { EstudosService, PaginaSessoes } from '../services/estudosService';
-import { useUnsavedChanges } from '@shared/hooks';
 import {
   formatarDataBR,
   formatarDuracao,
   hojeISO
 } from '../utils/format';
+import { calcularProgressoTrilha } from '../utils/progressoTrilha';
 import styles from './DashboardView.module.css';
 
 type Periodo = '7' | '14' | '30' | '180' | '0' | 'custom';
@@ -127,31 +124,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [erro, setErro] = useState<string | null>(null);
   const [paginaHistorico, setPaginaHistorico] = useState(1);
   const [tentativa, setTentativa] = useState(0);
-
-  // Estado para edição da sessão mais recente
-  const [sessaoEditando, setSessaoEditando] = useState<Sessao | null>(null);
-  const [editHoras, setEditHoras] = useState(0);
-  const [editMinutos, setEditMinutos] = useState(0);
-  const [editQuestoes, setEditQuestoes] = useState(0);
-  const [editAcertos, setEditAcertos] = useState(0);
-  const [salvandoEdicao, setSalvandoEdicao] = useState(false);
-
-  /**
- * Guarda de alterações do formulário de edição: o botão de salvar só habilita
- * quando algum campo muda em relação ao valor carregado da sessão.
- */
-  const edicaoSuja = useMemo(() => {
-    if (!sessaoEditando) return false;
-    const segundosOriginal = sessaoEditando.duracaoSegundos ?? 60;
-    const horasOriginal = Math.floor(segundosOriginal / 3600);
-    const minutosOriginal = Math.floor((segundosOriginal % 3600) / 60);
-    return editHoras !== horasOriginal
-      || editMinutos !== minutosOriginal
-      || editQuestoes !== (sessaoEditando.questoes ?? 0)
-      || editAcertos !== (sessaoEditando.acertos ?? 0);
-  }, [editAcertos, editHoras, editMinutos, editQuestoes, sessaoEditando]);
-
-  useUnsavedChanges(`sessao:${sessaoEditando?.id ?? 'nenhuma'}`, Boolean(sessaoEditando) && edicaoSuja);
 
   const cronogramaId = useMemo(() => cronogramaAtivoId(trilha), [trilha]);
   const hoje = hojeISO();
@@ -293,42 +265,46 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     ? Math.round(estatisticas?.percentualAcertoGlobal ?? ((totalAcertos / totalQuestoes) * 100))
     : null;
 
-  const cobertura = useMemo(() => {
-    const concluidosIds = new Set(trilha.topicosConcluidosIds ?? []);
-    const total = trilha.disciplinas.reduce(
-      (soma, d) => soma + (d.topicos ? d.topicos.length : 0),
-      0
-    );
-    const concluidos = trilha.disciplinas.reduce(
-      (soma, d) => soma + (d.topicos ? d.topicos.filter((t) => concluidosIds.has(t.id)).length : 0),
-      0
-    );
-    return {
-      total,
-      concluidos,
-      percentual: total > 0 ? Math.round((concluidos / total) * 100) : 0
-    };
-  }, [trilha]);
+  const cobertura = useMemo(
+    () =>
+      calcularProgressoTrilha(
+        trilha.disciplinas,
+        new Set(trilha.topicosConcluidosIds ?? [])
+      ),
+    [trilha]
+  );
 
   const ritmo = useMemo(() => {
-    const pendentes = Math.max(0, cobertura.total - cobertura.concluidos);
+    const apenasSemTopicos = cobertura.totalTopicos === 0;
+    const usarDisciplinas =
+      apenasSemTopicos ||
+      (cobertura.topicosConcluidos === cobertura.totalTopicos &&
+        cobertura.disciplinasSemTopicoPendentes > 0);
+    const pendentes = usarDisciplinas
+      ? cobertura.disciplinasSemTopicoPendentes
+      : Math.max(0, cobertura.totalTopicos - cobertura.topicosConcluidos);
+    const unidade = usarDisciplinas ? 'disciplinas' : 'assuntos';
+
     if (!trilha.dataProva) {
-      return { valor: `${pendentes} pendentes`, descricao: 'Defina a data da prova para calcular o ritmo diário.' };
+      return {
+        valor: `${pendentes} pendentes`,
+        descricao: 'Defina a data da prova para calcular o ritmo diário.'
+      };
     }
 
     const diasAteProva = diferencaEmDias(hoje, trilha.dataProva);
     if (diasAteProva < 0) {
-      return { valor: 'Prova realizada', descricao: `${pendentes} assuntos ainda pendentes.` };
+      return { valor: 'Prova realizada', descricao: `${pendentes} ${unidade} ainda pendentes.` };
     }
     if (diasAteProva === 0) {
-      return { valor: 'Prova hoje', descricao: `${pendentes} assuntos ainda pendentes.` };
+      return { valor: 'Prova hoje', descricao: `${pendentes} ${unidade} ainda pendentes.` };
     }
     return {
       valor: `${(pendentes / diasAteProva).toLocaleString('pt-BR', {
         minimumFractionDigits: 1,
         maximumFractionDigits: 1
-      })} assuntos/dia`,
-      descricao: `${pendentes} assuntos pendentes nos próximos ${diasAteProva} dias.`
+      })} ${unidade}/dia`,
+      descricao: `${pendentes} ${unidade} pendentes nos próximos ${diasAteProva} dias.`
     };
   }, [cobertura, hoje, trilha.dataProva]);
 
@@ -435,58 +411,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     setMostrarCustomPopover(false);
   }
 
-  // Ações 
-  function abrirEdicao(sessao: Sessao) {
-    setSessaoEditando(sessao);
-    const segundos = sessao.duracaoSegundos ?? 60;
-    setEditHoras(Math.floor(segundos / 3600));
-    setEditMinutos(Math.floor((segundos % 3600) / 60));
-    setEditQuestoes(sessao.questoes || 0);
-    setEditAcertos(sessao.acertos || 0);
-  }
-
-  async function handleSalvarEdicao() {
-    if (!sessaoEditando) return;
-    const duracaoSegundos = editHoras * 3600 + editMinutos * 60;
-    if (duracaoSegundos < 60) {
-      toast.error('A duração mínima da sessão é de 1 minuto (60 segundos).');
-      return;
-    }
-    if (duracaoSegundos > 86400) {
-      toast.error('A duração máxima da sessão é de 24 horas.');
-      return;
-    }
-    if (editAcertos > editQuestoes) {
-      toast.error('O número de acertos não pode ser maior que o total de questões.');
-      return;
-    }
-
-    setSalvandoEdicao(true);
-    try {
-      await EstudosService.atualizarSessao(trilha.id, sessaoEditando.id, {
-        duracaoSegundos,
-        questoes: editQuestoes,
-        acertos: editAcertos
-      });
-      toast.success('Sessão atualizada com sucesso.');
-      setSessaoEditando(null);
-      setTentativa((t) => t + 1);
-    } catch (err) {
-      // 409 LATEST_SESSION_ONLY: outra sessão passou a ser a nº 1 canônica da trilha.
-      // A UI avisa e recarrega o histórico para refletir a nova sessão editável.
-      const codigo = (err as { code?: string } | null)?.code;
-      if (codigo === 'LATEST_SESSION_ONLY') {
-        toast.error('Apenas a sessão mais recente pode ser editada. O histórico será atualizado.');
-        setSessaoEditando(null);
-        setTentativa((t) => t + 1);
-      } else {
-        toast.error(err instanceof Error ? err.message : 'Erro ao atualizar a sessão.');
-      }
-    } finally {
-      setSalvandoEdicao(false);
-    }
-  }
-
+  // Ações
   async function handleExcluirSessao(sessao: Sessao) {
     const duracao = formatarDuracao(sessao.duracaoSegundos ?? 0);
     const data = formatarDataBR(sessao.dataSessao ?? '');
@@ -832,7 +757,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         className={styles.discName}
                       />
                       {item.disciplinaRemovida && (
-                        <span className={styles.badgeRemovida}>Removida</span>
+                        <Badge variant="warning" size="sm">Disciplina removida</Badge>
                       )}
                     </div>
                     <div className={styles.barCol}>
@@ -901,11 +826,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                     Removida
                                   </Badge>
                                 )}
-                                {sessao.editavel && (
-                                  <span className={styles.badgeRecente} title="Sessão mais recente da trilha (editável)">
-                                    Mais recente
-                                  </span>
-                                )}
                               </div>
                             </td>
                             <td><strong>{duracaoFormatada}</strong></td>
@@ -916,18 +836,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             </td>
                             <td>
                               <div className={styles.acoesCol}>
-                                {sessao.editavel && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => abrirEdicao(sessao)}
-                                    title="Editar a sessão mais recente"
-                                  >
-                                    <Edit2 size={14} style={{ marginRight: 4 }} />
-                                    Editar
-                                  </Button>
-                                )}
                                 <Button
                                   type="button"
                                   variant="ghost"
@@ -962,65 +870,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             )}
           </section>
         </>
-      )}
-
-      {/* Modal de edição da sessão mais recente (FormModal com guarda de alterações) */}
-      {sessaoEditando && (
-        <FormModal
-          isOpen={true}
-          onClose={() => setSessaoEditando(null)}
-          title="Editar sessão mais recente"
-          subtitle={`Disciplina: ${sessaoEditando.disciplinaNome || 'Estudo'}`}
-          icon={<Edit2 size={20} />}
-          submitText="Salvar alterações"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void handleSalvarEdicao();
-          }}
-          loading={salvandoEdicao}
-          submitDisabled={!edicaoSuja}
-        >
-          <p className={styles.sectionDescription}>
-            Apenas a sessão mais recente da trilha pode ter duração e questões ajustadas.
-          </p>
-
-          <div className={styles.editModalGrid}>
-            <Input
-              label="Horas de estudo"
-              type="number"
-              min={0}
-              max={24}
-              value={String(editHoras)}
-              onChange={(e) => setEditHoras(Math.max(0, Number.parseInt(e.target.value, 10) || 0))}
-            />
-            <Input
-              label="Minutos de estudo"
-              type="number"
-              min={0}
-              max={59}
-              value={String(editMinutos)}
-              onChange={(e) => setEditMinutos(Math.max(0, Math.min(59, Number.parseInt(e.target.value, 10) || 0)))}
-            />
-          </div>
-
-          <div className={styles.editModalGrid}>
-            <Input
-              label="Total de questões"
-              type="number"
-              min={0}
-              value={String(editQuestoes)}
-              onChange={(e) => setEditQuestoes(Math.max(0, Number.parseInt(e.target.value, 10) || 0))}
-            />
-            <Input
-              label="Acertos"
-              type="number"
-              min={0}
-              max={editQuestoes}
-              value={String(editAcertos)}
-              onChange={(e) => setEditAcertos(Math.max(0, Number.parseInt(e.target.value, 10) || 0))}
-            />
-          </div>
-        </FormModal>
       )}
     </div>
   );

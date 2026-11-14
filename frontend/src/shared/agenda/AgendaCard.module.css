@@ -1,0 +1,270 @@
+/* Cartão horizontal compartilhado por Tarefas e Blocos de Estudo (espelho do padrão Disciplinas). */
+.card {
+  position: relative;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: all var(--transition-fast);
+}
+
+.card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+
+.card:has(.cardTrigger:focus-visible) {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.cardSelected {
+  border-color: var(--primary);
+  background: var(--primary-bg);
+}
+
+.cardDone {
+  opacity: 0.7;
+  background: var(--bg-elevated);
+  border-color: var(--border-subtle);
+}
+
+.cardDone:hover {
+  opacity: 0.9;
+}
+
+.cardRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(max-content, auto);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 18px;
+}
+
+.cardLead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.interactiveControl {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.cardTitleWrap {
+  min-width: 0;
+  flex: 1;
+}
+
+.cardTitle {
+  display: block;
+  min-width: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardTitleDone {
+  color: var(--text-soft);
+  text-decoration: line-through;
+}
+
+.cardTrigger {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cardTrigger::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.cardTrigger:focus-visible {
+  outline: none;
+}
+
+.cardTrigger :global(.name) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardMeta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: nowrap;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-width: max-content;
+}
+
+.subtaskPill {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: var(--status-pill-height);
+  padding: var(--status-pill-padding);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-mid);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.subtaskPill:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.subtaskPill:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.subtaskAllDone {
+  color: var(--green);
+  background: var(--green-bg);
+  border-color: var(--green-border);
+}
+
+.deleteBtn {
+  position: relative;
+  z-index: 1;
+  color: var(--text-soft);
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+}
+
+.deleteBtn:hover {
+  --icon-hover-background: var(--red-bg);
+  --icon-hover-color: var(--red-text);
+}
+
+.subtarefas {
+  position: relative;
+  z-index: 1;
+  margin: 0 18px 14px 50px;
+  padding-left: 10px;
+  border-left: 2px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.subtarefa {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.subtarefaConcluida {
+  color: var(--text-soft);
+  text-decoration: line-through;
+}
+
+.blocoCheckBtn {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-mid);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.blocoCheckBtn:hover {
+  background: var(--green-bg);
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.blocoCheckBtn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .cardRow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 12px 14px;
+  }
+
+  .cardTitle {
+    font-size: 13.5px;
+  }
+
+  .cardMeta {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    white-space: normal;
+    min-width: 0;
+    gap: 6px;
+    padding-left: 36px;
+  }
+
+  .subtarefas {
+    margin: 0 14px 12px 36px;
+  }
+}
+
+@media (pointer: coarse) {
+  .deleteBtn,
+  .blocoCheckBtn {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .subtaskPill,
+  .blocoCheckBtn {
+    transition: none;
+  }
+}

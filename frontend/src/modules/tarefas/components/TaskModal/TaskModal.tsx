@@ -32,7 +32,7 @@ import {
   TipoTermino,
   ModoLembrete
 } from '../../types/tarefa';
-import { hojeISO } from '../../utils/date';
+import { hojeISO } from '@shared/format';
 import styles from './TaskModal.module.css';
 
 export interface SalvarTarefaPayload extends Partial<Tarefa> {

@@ -6,7 +6,6 @@
   background: var(--surface-1);
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius-md);
-  margin-bottom: 16px;
   transition: all var(--transition-fast);
 }
 
@@ -42,6 +41,7 @@
 
 .input {
   flex: 1;
+  min-width: 0;
   background: transparent;
   border: none;
   outline: none;

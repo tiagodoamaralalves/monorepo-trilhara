@@ -44,9 +44,10 @@ function authValue(abrirContaModal = vi.fn()): AuthContextValue {
 const BRAND = { title: 'Trilhara', logoSrc: '/favicon.svg', titleAttr: 'Trilhara' };
 
 describe('entrada de Conta centralizada', () => {
-  it('a AppSidebar expõe a entrada de Conta no desktop e no mobile sem prop de ação', async () => {
+  it('a AppSidebar expõe a entrada de Conta e o botão de configurações no desktop e no mobile', async () => {
     const user = userEvent.setup();
     const abrirContaModal = vi.fn();
+    const onSettings = vi.fn();
 
     render(
       <ToastProvider>
@@ -54,7 +55,7 @@ describe('entrada de Conta centralizada', () => {
           <AppSidebar
             brand={BRAND}
             user={{ nome: USUARIO.nome, email: USUARIO.email }}
-            onLogout={vi.fn()}
+            onSettings={onSettings}
           />
         </AuthContext.Provider>
       </ToastProvider>
@@ -66,6 +67,12 @@ describe('entrada de Conta centralizada', () => {
 
     await user.click(entradas[0]);
     expect(abrirContaModal).toHaveBeenCalledTimes(1);
+
+    const botoesConfig = screen.getAllByRole('button', { name: 'Configurações' });
+    expect(botoesConfig.length).toBeGreaterThanOrEqual(2);
+
+    await user.click(botoesConfig[0]);
+    expect(onSettings).toHaveBeenCalledTimes(1);
   });
 
   it('a AppSidebar não exibe entrada de Conta para visitante', () => {

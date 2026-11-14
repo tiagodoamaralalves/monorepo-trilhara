@@ -77,7 +77,6 @@ export interface SessaoRegistradaDTO {
   criadoEm: string; // ISO RFC 3339
   atualizadoEm?: string;
   disciplinaRemovida?: boolean;
-  editavel?: boolean;
   chaveIdempotencia?: string;
 }
 
@@ -174,6 +173,8 @@ export interface TrilhaResumoDTO {
   cor?: string;
   origemEditalId?: string;
   totalDisciplinas: number;
+  disciplinasConcluidas?: number;
+  temDisciplinaSemTopico?: boolean;
   totalTopicos: number;
   topicosConcluidos: number;
   percentualProgresso: number;
@@ -200,6 +201,7 @@ export interface DisciplinaDTO {
   totalTopicos?: number;
   topicosConcluidos?: number;
   percentualProgresso?: number;
+  concluida?: boolean;
 }
 
 export interface TrilhaDetalheDTO {
@@ -213,6 +215,8 @@ export interface TrilhaDetalheDTO {
   informacoesComplementares?: string;
   cor?: string;
   totalDisciplinas?: number;
+  disciplinasConcluidas?: number;
+  temDisciplinaSemTopico?: boolean;
   totalTopicos?: number;
   topicosConcluidos?: number;
   percentualProgresso?: number;
@@ -296,6 +300,7 @@ export interface CronogramaDTO {
   dataFim: string;
   diasAtivosSemana?: number[];
   blocosPorDia?: number;
+  blocosPorDiaSemana?: Record<number, number>;
   disciplinasParticipantesIds: string[];
   semanaModeloManual?: Record<number, string[]>;
   configuracao?: Record<string, unknown>;
@@ -314,6 +319,7 @@ export interface CriarCronogramaPayload {
   dataFim?: string;
   diasAtivosSemana?: number[];
   blocosPorDia?: number;
+  blocosPorDiaSemana?: Record<number, number>;
   disciplinasParticipantesIds: string[];
   semanaModeloManual?: Record<number, string[]>;
 }

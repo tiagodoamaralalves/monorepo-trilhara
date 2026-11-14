@@ -42,7 +42,7 @@ function obterOrigemTrilhaInicial(): string | null {
 function NotasApp() {
   const toast = useToast();
   const { confirm } = useConfirm();
-  const { usuario, isAuthenticated, carregando, logout } = useAuth();
+  const { usuario, isAuthenticated, carregando } = useAuth();
   const [telaAuth, setTelaAuth] = useState<AuthScreen>(obterTelaAuthInicial);
 
   const [cadernos, setCadernos] = useState<Caderno[]>([]);
@@ -625,7 +625,7 @@ function NotasApp() {
         onAbrirBusca={() => setModalBuscaAberto(true)}
         onAbrirLixeira={() => setModalLixeiraAberto(true)}
         onAbrirLogin={() => alternarTelaAuth('login')}
-        onLogout={logout}
+        onSettings={() => toast.info('Configurações gerais em breve.')}
         onCollapsedChange={setSidebarCollapsed}
       />
 

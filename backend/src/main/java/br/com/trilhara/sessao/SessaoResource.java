@@ -3,18 +3,15 @@ package br.com.trilhara.sessao;
 import java.net.URI;
 
 import br.com.trilhara.auth.Autenticado;
-import br.com.trilhara.sessao.dto.AtualizarSessaoRequest;
 import br.com.trilhara.sessao.dto.EstatisticasTrilhaDTO;
 import br.com.trilhara.sessao.dto.PaginaSessoesDTO;
 import br.com.trilhara.sessao.dto.RegistrarSessaoRequest;
 import br.com.trilhara.sessao.dto.RemocaoSessoesDisciplinaResponse;
-import br.com.trilhara.sessao.dto.SessaoDTO;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.HeaderParam;
-import jakarta.ws.rs.PATCH;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
@@ -50,16 +47,6 @@ public class SessaoResource {
                     .build();
         }
         return Response.ok(resultado.sessao()).build();
-    }
-
-    @PATCH
-    @Path("sessoes/{sessaoId}")
-    public Response atualizar(
-            @PathParam("trilhaId") String trilhaId,
-            @PathParam("sessaoId") String sessaoId,
-            @Valid AtualizarSessaoRequest request) {
-        SessaoDTO atualizada = service.atualizar(trilhaId, sessaoId, request);
-        return Response.ok(atualizada).build();
     }
 
     @DELETE

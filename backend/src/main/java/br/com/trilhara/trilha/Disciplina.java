@@ -29,11 +29,26 @@ public record Disciplina(
         @Positive @Min(value = 1, message = "O peso mínimo da disciplina é 1.") @Max(value = 5, message = "O peso máximo da disciplina é 5.") Integer peso,
         @NotNull Integer ordem,
         @NotNull List<@Valid TopicoEmbutido> topicos,
+        boolean concluida,
         Instant criadoEm,
         Instant atualizadoEm) {
 
     public static final int MAX_NOME = 120;
     public static final int MAX_TOPICOS = 500;
+
+    public Disciplina(
+            ObjectId id,
+            ObjectId usuarioId,
+            ObjectId trilhaId,
+            String nome,
+            String cor,
+            Integer peso,
+            Integer ordem,
+            List<TopicoEmbutido> topicos,
+            Instant criadoEm,
+            Instant atualizadoEm) {
+        this(id, usuarioId, trilhaId, nome, cor, peso, ordem, topicos, false, criadoEm, atualizadoEm);
+    }
 
     public Disciplina {
         peso = peso == null ? 1 : Math.clamp(peso, 1, 5);

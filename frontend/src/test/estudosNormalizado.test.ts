@@ -257,4 +257,27 @@ describe('EstudosService e Contratos Normalizados', () => {
     expect(metodo).toBe('DELETE');
     expect(urlChamada).toContain('/api/trilhas/t-1/topicos/top-1/progresso');
   });
+
+  it('atualizarConclusaoDisciplina chama PATCH /api/trilhas/{trilhaId}/disciplinas/{disciplinaId}/conclusao', async () => {
+    let urlChamada = '';
+    let metodo = '';
+    let bodyEnviado: unknown = null;
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      urlChamada = url;
+      metodo = init?.method || '';
+      bodyEnviado = init?.body ? JSON.parse(String(init.body)) : null;
+      return new Response(
+        JSON.stringify({ id: 'd-1', nome: 'Constitucional', concluida: true, topicos: [] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    const res = await EstudosService.atualizarConclusaoDisciplina('t-1', 'd-1', true);
+
+    expect(metodo).toBe('PATCH');
+    expect(urlChamada).toContain('/api/trilhas/t-1/disciplinas/d-1/conclusao');
+    expect(bodyEnviado).toEqual({ concluida: true });
+    expect(res.concluida).toBe(true);
+  });
 });

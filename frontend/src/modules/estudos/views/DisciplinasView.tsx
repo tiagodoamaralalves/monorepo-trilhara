@@ -17,13 +17,18 @@ import {
   ToggleGroup,
   useToast
 } from '@shared/design-system';
-import { TrilhaDetalheDTO, Disciplina } from '../types/trilhara';
+import { CriarDisciplinaRequest, Disciplina, TrilhaDetalheDTO } from '../types/trilhara';
 import { EstudosService } from '../services/estudosService';
 import { iniciarHandoffParaApp, obterUrlAppNotas } from '@shared/auth';
 import { DisciplinaPesoButton } from '../components/DisciplinaPesoButton/DisciplinaPesoButton';
 import { EmptyJourneyState } from '../components/EmptyJourneyState/EmptyJourneyState';
 import { DisciplinasTopicosModal } from '../components/DisciplinasTopicosModal/DisciplinasTopicosModal';
 import { obterCorDisponivel } from '../utils/coresDisciplina';
+import {
+  calcularProgressoTrilha,
+  formatarPercentualEdital,
+  isDisciplinaConcluida
+} from '../utils/progressoTrilha';
 import styles from './DisciplinasView.module.css';
 
 export interface DisciplinasViewProps {
@@ -50,10 +55,9 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
     Record<string, { questoes: number; acertos: number }>
   >({});
 
-  const [modalTopicosAberto, setModalTopicosAberto] = useState(false);
-  const [disciplinaTopicosInicial, setDisciplinaTopicosInicial] = useState<string | null>(null);
-  const [disciplinaRascunho, setDisciplinaRascunho] = useState<Disciplina | null>(null);
-  const [salvandoRascunho, setSalvandoRascunho] = useState(false);
+  const [modalNovaDisciplinaAberto, setModalNovaDisciplinaAberto] = useState(false);
+  const [salvandoNovaDisciplina, setSalvandoNovaDisciplina] = useState(false);
+  const [disciplinaEmEdicaoId, setDisciplinaEmEdicaoId] = useState<string | null>(null);
   const [salvandoDisciplina, setSalvandoDisciplina] = useState(false);
   const [excluindoDisciplina, setExcluindoDisciplina] = useState(false);
   const toast = useToast();
@@ -86,26 +90,46 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
   }, [trilha.id]);
 
   /** marcar/desmarcar tópico é otimista com rollback + toast em falha. */
-  const aplicarTopicosConcluidos = (ids: ReadonlySet<string>) => {
+  const aplicarProgressoOtimista = (
+    ids: ReadonlySet<string>,
+    disciplinaAlteradaId?: string,
+    concluidaExplicita?: boolean
+  ) => {
     const topicosConcluidosIds = [...ids];
+    const disciplinasAtualizadas = trilha.disciplinas.map((disciplina) => {
+      const concluidos = disciplina.topicos.filter((t) => ids.has(t.id)).length;
+      const total = disciplina.topicos.length;
+      let concluida = Boolean(disciplina.concluida);
+      if (disciplina.id === disciplinaAlteradaId && concluidaExplicita !== undefined) {
+        concluida = concluidaExplicita;
+      } else if (disciplina.id === disciplinaAlteradaId && total > 0) {
+        concluida = concluidos === total;
+      }
+      return {
+        ...disciplina,
+        concluida,
+        topicosConcluidos: concluidos,
+        percentualProgresso: total > 0 ? (concluidos / total) * 100 : 0,
+        topicos: disciplina.topicos.map((t) => ({ ...t, concluido: ids.has(t.id) }))
+      };
+    });
+    const resumo = calcularProgressoTrilha(disciplinasAtualizadas, ids);
+
     onTrilhaAtualizada({
       ...trilha,
       topicosConcluidosIds,
-      topicosConcluidos: topicosConcluidosIds.length,
-      disciplinas: trilha.disciplinas.map((disciplina) => {
-        const concluidos = disciplina.topicos.filter((t) => ids.has(t.id)).length;
-        const total = disciplina.topicos.length;
-        return {
-          ...disciplina,
-          topicosConcluidos: concluidos,
-          percentualProgresso: total > 0 ? (concluidos / total) * 100 : 0,
-          topicos: disciplina.topicos.map((t) => ({ ...t, concluido: ids.has(t.id) }))
-        };
-      })
+      totalDisciplinas: resumo.totalDisciplinas,
+      disciplinasConcluidas: resumo.disciplinasConcluidas,
+      temDisciplinaSemTopico: resumo.temDisciplinaSemTopico,
+      totalTopicos: resumo.totalTopicos,
+      topicosConcluidos: resumo.topicosConcluidos,
+      percentualProgresso: resumo.percentualProgresso,
+      disciplinas: disciplinasAtualizadas
     });
   };
 
   const handleToggleTopicoCheck = async (topicoId: string, concluido: boolean) => {
+    const trilhaAnterior = trilha;
     const anterior = new Set<string>(trilha.topicosConcluidosIds ?? []);
     const otimista = new Set<string>(anterior);
     if (concluido) {
@@ -113,8 +137,11 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
     } else {
       otimista.delete(topicoId);
     }
+    const disciplinaDona = trilha.disciplinas.find((d) =>
+      d.topicos.some((t) => t.id === topicoId)
+    );
     // Aplica imediatamente (otimista) e reverte se a API falhar.
-    aplicarTopicosConcluidos(otimista);
+    aplicarProgressoOtimista(otimista, disciplinaDona?.id);
 
     try {
       if (concluido) {
@@ -123,95 +150,49 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
         await EstudosService.desmarcarTopicoConcluido(trilha.id, topicoId);
       }
     } catch (err) {
-      aplicarTopicosConcluidos(anterior);
+      onTrilhaAtualizada(trilhaAnterior);
       toast.error(err instanceof Error ? err : 'Não foi possível atualizar o assunto.');
     }
   };
 
-  const handleToggleTopicosDisciplina = async (disciplinaId: string, concluido: boolean) => {
+  const handleToggleConclusaoDisciplina = async (disciplinaId: string, concluida: boolean) => {
     const disciplina = trilha.disciplinas.find((item) => item.id === disciplinaId);
-    if (!disciplina || disciplina.topicos.length === 0) return;
+    if (!disciplina) return;
 
-    const anterior = new Set<string>(trilha.topicosConcluidosIds ?? []);
-    const otimista = new Set<string>(anterior);
-    const alterados: string[] = [];
+    const trilhaAnterior = trilha;
+    const otimista = new Set<string>(trilha.topicosConcluidosIds ?? []);
 
     for (const topico of disciplina.topicos) {
-      if (otimista.has(topico.id) === concluido) continue;
-      alterados.push(topico.id);
-      if (concluido) {
+      if (concluida) {
         otimista.add(topico.id);
       } else {
         otimista.delete(topico.id);
       }
     }
 
-    if (alterados.length === 0) return;
-
-    aplicarTopicosConcluidos(otimista);
+    aplicarProgressoOtimista(otimista, disciplinaId, concluida);
 
     try {
-      if (concluido) {
-        await Promise.all(alterados.map((tId) => EstudosService.marcarTopicoConcluido(trilha.id, tId)));
-      } else {
-        await Promise.all(alterados.map((tId) => EstudosService.desmarcarTopicoConcluido(trilha.id, tId)));
-      }
+      await EstudosService.atualizarConclusaoDisciplina(trilha.id, disciplinaId, concluida);
     } catch (err) {
-      aplicarTopicosConcluidos(anterior);
-      toast.error(err instanceof Error ? err : 'Não foi possível atualizar os assuntos.');
+      onTrilhaAtualizada(trilhaAnterior);
+      toast.error(err instanceof Error ? err : 'Não foi possível atualizar a conclusão da disciplina.');
     }
   };
 
-  const handleAlterarDisciplinasNoModal = async (disciplinas: Disciplina[]) => {
-    if (disciplinaRascunho) {
-      const atualizada = disciplinas.find((item) => item.id === disciplinaRascunho.id);
-      if (atualizada) {
-        setDisciplinaRascunho(atualizada);
-      }
-      return;
-    }
-
-    const ordemIds = disciplinas.map((item) => item.id);
-    const ordemOriginal = trilha.disciplinas.map((item) => item.id);
-    const mudouOrdem =
-      ordemIds.length === ordemOriginal.length &&
-      ordemIds.some((id, idx) => id !== ordemOriginal[idx]) &&
-      new Set(ordemIds).size === ordemOriginal.length;
-
-    if (mudouOrdem) {
-      try {
-        await EstudosService.reordenarDisciplinas(trilha.id, ordemIds);
-        const detalhe = await EstudosService.buscarTrilha(trilha.id);
-        onTrilhaAtualizada(detalhe);
-      } catch (err) {
-        toast.error(err instanceof Error ? err : 'Não foi possível reordenar as disciplinas.');
-      }
-    }
-  };
-
-  const salvarDisciplinaRascunho = async (disciplina: Disciplina) => {
-    if (salvandoRascunho) return;
-    setSalvandoRascunho(true);
+  const criarNovaDisciplina = async (payload: CriarDisciplinaRequest) => {
+    if (salvandoNovaDisciplina) return;
+    setSalvandoNovaDisciplina(true);
     try {
-      await EstudosService.criarDisciplina(trilha.id, {
-        nome: disciplina.nome,
-        cor: disciplina.cor,
-        peso: disciplina.peso,
-        topicos: disciplina.topicos.map((t, idx) => ({
-          nome: t.nome,
-          ordem: idx + 1
-        }))
-      });
+      await EstudosService.criarDisciplina(trilha.id, payload);
       const detalhe = await EstudosService.buscarTrilha(trilha.id);
       onTrilhaAtualizada(detalhe);
-      setModalTopicosAberto(false);
-      setDisciplinaTopicosInicial(null);
-      setDisciplinaRascunho(null);
+      setModalNovaDisciplinaAberto(false);
       toast.success('Disciplina adicionada com sucesso.');
     } catch (err) {
       toast.error(err instanceof Error ? err : 'Não foi possível salvar a disciplina.');
     } finally {
-      setSalvandoRascunho(false);
+      setSalvandoNovaDisciplina(false);
     }
   };
 
@@ -223,6 +204,9 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
     setSalvandoDisciplina(true);
 
     try {
+      const original = trilha.disciplinas.find((d) => d.id === disciplinaParaSalvar.id);
+      const idsPersistidos = new Set((original?.topicos ?? []).map((t) => t.id));
+
       if (zerarHistorico) {
         await EstudosService.excluirDisciplina(trilha.id, disciplinaParaSalvar.id);
         await EstudosService.criarDisciplina(trilha.id, {
@@ -240,7 +224,7 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
           cor: disciplinaParaSalvar.cor,
           peso: disciplinaParaSalvar.peso,
           topicos: disciplinaParaSalvar.topicos.map((t, idx) => ({
-            id: t.id,
+            ...(t.id && idsPersistidos.has(t.id) ? { id: t.id } : {}),
             nome: t.nome,
             ordem: idx + 1
           }))
@@ -248,9 +232,7 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
       }
       const detalhe = await EstudosService.buscarTrilha(trilha.id);
       onTrilhaAtualizada(detalhe);
-      setModalTopicosAberto(false);
-      setDisciplinaTopicosInicial(null);
-      setDisciplinaRascunho(null);
+      setDisciplinaEmEdicaoId(null);
       setRenomeacaoPendente(null);
       toast.success(
         zerarHistorico
@@ -281,9 +263,7 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
       await EstudosService.excluirDisciplina(trilha.id, disciplina.id);
       const detalhe = await EstudosService.buscarTrilha(trilha.id);
       onTrilhaAtualizada(detalhe);
-      setModalTopicosAberto(false);
-      setDisciplinaTopicosInicial(null);
-      setDisciplinaRascunho(null);
+      setDisciplinaEmEdicaoId(null);
       toast.success('Disciplina excluída com sucesso.');
     } catch (err) {
       toast.error(err instanceof Error ? err : 'Não foi possível excluir a disciplina.');
@@ -310,32 +290,22 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
   };
 
   const abrirNovaDisciplina = () => {
-    // Sem IDs sintéticos no cliente (N-5): o servidor gera o hex de 24 na criação.
-    const novoRascunho: Disciplina = {
-      id: '',
-      nome: '',
-      cor: obterCorDisponivel(trilha.disciplinas),
-      peso: 1,
-      ordem: trilha.disciplinas.length,
-      topicos: []
-    };
-    setDisciplinaRascunho(novoRascunho);
-    setDisciplinaTopicosInicial(null);
-    setModalTopicosAberto(true);
+    setDisciplinaEmEdicaoId(null);
+    setModalNovaDisciplinaAberto(true);
   };
 
-  const abrirTopicosDisciplina = (disciplina: Disciplina) => {
-    setDisciplinaTopicosInicial(disciplina.id);
-    setModalTopicosAberto(true);
+  const abrirEdicaoDisciplina = (disciplina: Disciplina) => {
+    setModalNovaDisciplinaAberto(false);
+    setDisciplinaEmEdicaoId(disciplina.id);
   };
 
   /**
- * "Abrir no Notas": SSO para o app de Notas já filtrado pela trilha.
- *
- * O handoff leva o access token para o outro subdomínio; o parâmetro `origemTrilhaId` é o
- * que `NotasApp` lê na carga inicial para listar só o caderno vinculado a esta trilha.
- * Sem trilha carregada, o botão é inerte — não inventamos um ID.
- */
+   * "Abrir no Notas": SSO para o app de Notas já filtrado pela trilha.
+   *
+   * O handoff leva o access token para o outro subdomínio; o parâmetro `origemTrilhaId` é o
+   * que `NotasApp` lê na carga inicial para listar só o caderno vinculado a esta trilha.
+   * Sem trilha carregada, o botão é inerte — não inventamos um ID.
+   */
   const abrirNotasDaTrilha = async () => {
     if (!trilha.id) return;
     try {
@@ -446,31 +416,32 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
     }
   };
 
-  const disciplinasModal = disciplinaRascunho
-    ? [...trilha.disciplinas, disciplinaRascunho]
-    : trilha.disciplinas;
+  const disciplinaEmEdicao = useMemo(
+    () => trilha.disciplinas.find((item) => item.id === disciplinaEmEdicaoId) ?? null,
+    [trilha.disciplinas, disciplinaEmEdicaoId]
+  );
 
   // Contagens gerais
-  const totalTopicos = trilha.disciplinas.flatMap((d) => d.topicos).length;
-  const concluidosSet = new Set(trilha.topicosConcluidosIds ?? []);
+  const concluidosSet = useMemo(
+    () => new Set(trilha.topicosConcluidosIds ?? []),
+    [trilha.topicosConcluidosIds]
+  );
+  const resumoProgresso = useMemo(
+    () => calcularProgressoTrilha(trilha.disciplinas, concluidosSet),
+    [trilha.disciplinas, concluidosSet]
+  );
 
   const disciplinasFiltradas = useMemo(() => {
     if (filtroStatus === 'todos') {
       return trilha.disciplinas;
     }
-    return trilha.disciplinas.filter((disc) =>
-      disc.topicos.some((top) => {
-        const isDone = concluidosSet.has(top.id);
-        return filtroStatus === 'pendentes' ? !isDone : isDone;
-      })
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trilha.disciplinas, trilha.topicosConcluidosIds, filtroStatus]);
+    return trilha.disciplinas.filter((disc) => {
+      const concluida = isDisciplinaConcluida(disc, concluidosSet);
+      return filtroStatus === 'concluidos' ? concluida : !concluida;
+    });
+  }, [trilha.disciplinas, concluidosSet, filtroStatus]);
 
-  const concluidosTotal = trilha.disciplinas
-    .flatMap((d) => d.topicos)
-    .filter((t) => concluidosSet.has(t.id)).length;
-  const pctGeral = totalTopicos > 0 ? Math.round((concluidosTotal / totalTopicos) * 100) : 0;
+  const pctGeralTexto = formatarPercentualEdital(resumoProgresso.percentualProgresso);
   const totalQuestoesConsolidadas = Object.values(resumoQuestoes)
     .reduce((total, resumo) => total + resumo.questoes, 0);
   const totalAcertosConsolidados = Object.values(resumoQuestoes)
@@ -489,147 +460,17 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
   }
 ]`;
 
-  const modalDisciplinasLote = (
-    <FormModal
-      isOpen={modalDisciplinasLoteAberto}
-      onClose={() => {
-        if (!salvandoDisciplinasLote) setModalDisciplinasLoteAberto(false);
-      }}
-      title="Cadastrar várias disciplinas"
-      subtitle="No TXT, digite ou cole uma disciplina por linha. No JSON, digite ou cole a disciplina com a lista de  assuntos se tiver."
-      icon={<BookOpen size={20} />}
-      onSubmit={salvarDisciplinasLote}
-      submitText="Salvar"
-      loading={salvandoDisciplinasLote}
-      error={erroDisciplinasLote}
-    >
-      <>
-        <div className={styles.loteFormatAction}>
-          <ToggleGroup<'txt' | 'json'>
-            ariaLabel="Formato das disciplinas"
-            value={formatoDisciplinasLote}
-            onChange={(value) => {
-              setFormatoDisciplinasLote(value);
-              setErroDisciplinasLote('');
-            }}
-            options={[
-              { value: 'txt', label: 'TXT' },
-              { value: 'json', label: 'JSON' }
-            ] as const}
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            leftIcon={<Copy size={14} />}
-            iconOnly
-            title="Copiar modelo JSON"
-            aria-label="Copiar modelo JSON"
-            onClick={() => {
-              void navigator.clipboard.writeText(modeloDisciplinasJson)
-                .then(() => {
-                  setFormatoDisciplinasLote('json');
-                  toast.success('Modelo JSON copiado.');
-                })
-                .catch(() => toast.error('Não foi possível copiar o modelo JSON.'));
-            }}
-          />
-        </div>
-        <Textarea
-          label="Disciplinas"
-          rows={16}
-          value={disciplinasLoteRaw}
-          onChange={(event) => {
-            setDisciplinasLoteRaw(event.target.value);
-            setErroDisciplinasLote('');
-          }}
-          placeholder={formatoDisciplinasLote === 'txt'
-            ? 'Uma disciplina por linha\nDireito Administrativo\nLíngua Portuguesa'
-            : modeloDisciplinasJson}
-          className={styles.loteTextarea}
-        />
-      </>
-    </FormModal>
-  );
-
-  if (trilha.disciplinas.length === 0) {
-    return (
-      <div className={styles.container}>
-        <PageBanner
-          title="Disciplinas & Assuntos do Edital"
-          description="Acompanhe a cobertura do edital e organize as matérias da sua trilha."
-          icon={<BookOpen size={26} />}
-          actions={
-            <div className={styles.pageActions}>
-              <Button
-                variant="primary"
-                size="md"
-                leftIcon={<Plus size={16} />}
-                onClick={abrirNovaDisciplina}
-              >
-                Adicionar Disciplina
-              </Button>
-              <Button
-                variant="secondary"
-                size="md"
-                onClick={() => {
-                  setDisciplinasLoteRaw('');
-                  setFormatoDisciplinasLote('txt');
-                  setErroDisciplinasLote('');
-                  setModalDisciplinasLoteAberto(true);
-                }}
-              >
-                Adicionar em lote
-              </Button>
-              <Button
-                variant="secondary"
-                size="md"
-                onClick={abrirNotasDaTrilha}
-              >
-                Abrir no Notas
-              </Button>
-            </div>
-          }
-        />
-        <EmptyJourneyState hasTrilha onPrimaryAction={abrirNovaDisciplina} />
-        {modalDisciplinasLote}
-        <DisciplinasTopicosModal
-          isOpen={modalTopicosAberto}
-          initialDisciplinaId={disciplinaTopicosInicial}
-          onClose={() => {
-            setModalTopicosAberto(false);
-            setDisciplinaTopicosInicial(null);
-            setDisciplinaRascunho(null);
-          }}
-          title="Editar disciplinas e assuntos"
-          subtitle="Gerencie as disciplinas e os assuntos cadastrados."
-          disciplinas={disciplinasModal}
-          progresso={concluidosSet}
-          onToggleTopico={(topicoId, concluido) => void handleToggleTopicoCheck(topicoId, concluido)}
-          onToggleTopicos={(disciplinaId, concluido) =>
-            void handleToggleTopicosDisciplina(disciplinaId, concluido)
-          }
-          editable
-          initialEditing={Boolean(disciplinaRascunho)}
-          creatingDiscipline={Boolean(disciplinaRascunho)}
-          savingNewDiscipline={salvandoRascunho}
-          onSaveNewDiscipline={(disciplina) => void salvarDisciplinaRascunho(disciplina)}
-          savingDiscipline={salvandoDisciplina}
-          onSaveDiscipline={(disciplina) => void salvarDisciplinaEditada(disciplina)}
-          deletingDiscipline={excluindoDisciplina}
-          onDeleteDiscipline={(disciplina) => void excluirDisciplina(disciplina)}
-          onChange={(disciplinas) => void handleAlterarDisciplinasNoModal(disciplinas)}
-          mostrarPeso
-        />
-      </div>
-    );
-  }
+  const semDisciplinas = trilha.disciplinas.length === 0;
 
   return (
     <div className={styles.container}>
       <PageBanner
-        title="Disciplinas &amp; Assuntos do Edital"
-        description="Acompanhe a cobertura do edital e marque os assuntos estudados de cada matéria."
+        title="Disciplinas & Assuntos do Edital"
+        description={
+          semDisciplinas
+            ? 'Acompanhe a cobertura do edital e organize as matérias da sua trilha.'
+            : 'Acompanhe a cobertura do edital e marque os assuntos estudados de cada matéria.'
+        }
         icon={<BookOpen size={26} />}
         actions={
           <div className={styles.pageActions}>
@@ -660,113 +501,207 @@ export const DisciplinasView: React.FC<DisciplinasViewProps> = ({
         }
       />
 
-      <div className={styles.toolbarRow}>
-        <ToggleGroup<'todos' | 'pendentes' | 'concluidos'>
-          className={styles.filterGroup}
-          ariaLabel="Filtrar disciplinas por status"
-          value={filtroStatus}
-          onChange={setFiltroStatus}
-          options={[
-            { value: 'todos', label: 'Todos' },
-            { value: 'pendentes', label: 'Pendentes' },
-            { value: 'concluidos', label: 'Concluídos' }
-          ] as const}
-        />
-        <div className={styles.toolbarRight}>
-          <div className={styles.progressoText}>
-            <CheckCircle2 size={15} className={styles.successIcon} />
-            <span>
-              <strong>{concluidosTotal}</strong> de <strong>{totalTopicos}</strong> assuntos ({pctGeral}%)
-            </span>
+      {semDisciplinas ? (
+        <EmptyJourneyState hasTrilha onPrimaryAction={abrirNovaDisciplina} />
+      ) : (
+        <>
+          <div className={styles.toolbarRow}>
+            <ToggleGroup<'todos' | 'pendentes' | 'concluidos'>
+              className={styles.filterGroup}
+              ariaLabel="Filtrar disciplinas por status"
+              value={filtroStatus}
+              onChange={setFiltroStatus}
+              options={[
+                { value: 'todos', label: 'Todos' },
+                { value: 'pendentes', label: 'Pendentes' },
+                { value: 'concluidos', label: 'Concluídos' }
+              ] as const}
+            />
+            <div className={styles.toolbarRight}>
+              <div className={styles.progressoText}>
+                <CheckCircle2 size={15} className={styles.successIcon} />
+                <span>
+                  {resumoProgresso.totalTopicos === 0 ? (
+                    <>
+                      <strong>{resumoProgresso.disciplinasConcluidas}</strong> de{' '}
+                      <strong>{resumoProgresso.totalDisciplinas}</strong> disciplinas ({pctGeralTexto})
+                    </>
+                  ) : resumoProgresso.temDisciplinaSemTopico ? (
+                    <>
+                      <strong>
+                        {resumoProgresso.disciplinasConcluidas}/{resumoProgresso.totalDisciplinas}
+                      </strong>{' '}
+                      disciplinas ·{' '}
+                      <strong>
+                        {resumoProgresso.topicosConcluidos}/{resumoProgresso.totalTopicos}
+                      </strong>{' '}
+                      assuntos ({pctGeralTexto})
+                    </>
+                  ) : (
+                    <>
+                      <strong>{resumoProgresso.topicosConcluidos}</strong> de{' '}
+                      <strong>{resumoProgresso.totalTopicos}</strong> assuntos ({pctGeralTexto})
+                    </>
+                  )}
+                </span>
+              </div>
+              <div className={styles.progressoText}>
+                <Award size={15} aria-hidden="true" />
+                <span>
+                  <strong>{totalAcertosConsolidados}</strong> de <strong>{totalQuestoesConsolidadas}</strong> questões
+                  {' '}({pctAcertosConsolidado === null ? '—' : `${pctAcertosConsolidado}%`})
+                </span>
+              </div>
+            </div>
           </div>
-          <div className={styles.progressoText}>
-            <Award size={15} aria-hidden="true" />
-            <span>
-              <strong>{totalAcertosConsolidados}</strong> de <strong>{totalQuestoesConsolidadas}</strong> questões
-              {' '}({pctAcertosConsolidado === null ? '—' : `${pctAcertosConsolidado}%`})
-            </span>
+
+          {/* Lista de disciplinas */}
+          <div className={styles.disciplinasList}>
+            {disciplinasFiltradas.length === 0 ? (
+              <p className={styles.calculationText} role="status">
+                Nenhuma disciplina encontrada para o filtro selecionado.
+              </p>
+            ) : (
+              disciplinasFiltradas.map((disc) => {
+                const topicos = disc.topicos;
+                const concluidosDisc = topicos.filter((t) => concluidosSet.has(t.id)).length;
+                const pctDisc = topicos.length > 0 ? Math.round((concluidosDisc / topicos.length) * 100) : 0;
+                const concluidaDisc = isDisciplinaConcluida(disc, concluidosSet);
+                return (
+                  <article
+                    key={disc.id}
+                    className={styles.disciplinaCard}
+                  >
+                    <div className={styles.discHeader}>
+                      <div className={styles.discTitleBlock}>
+                        <h3 className={styles.discNome}>
+                          <button
+                            type="button"
+                            className={styles.discCardTrigger}
+                            onClick={() => abrirEdicaoDisciplina(disc)}
+                            aria-label={`Editar disciplina ${disc.nome}`}
+                          >
+                            <DisciplineLabel name={disc.nome} color={disc.cor} />
+                          </button>
+                        </h3>
+                        <div className={styles.discMeta}>
+                          <DisciplinaPesoButton
+                            peso={disc.peso}
+                            onClick={() => abrirEdicaoDisciplina(disc)}
+                          />
+                          <Badge
+                            variant={concluidaDisc || pctDisc >= 60 ? 'success' : 'secondary'}
+                            size="md"
+                            className={styles.discCount}
+                          >
+                            {topicos.length === 0 && concluidaDisc
+                              ? 'Concluída'
+                              : `${concluidosDisc} / ${topicos.length} assuntos (${pctDisc}%)`}
+                          </Badge>
+                          <Badge
+                            variant={obterResumoQuestoes(disc.id).variant}
+                            size="md"
+                            aria-label={`${obterResumoQuestoes(disc.id).percentual}% de acerto`}
+                          >
+                            {obterResumoQuestoes(disc.id).percentual}% de acerto
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })
+            )}
           </div>
-        </div>
-      </div>
-
-      {/* Lista de disciplinas */}
-      <div className={styles.disciplinasList}>
-        {disciplinasFiltradas.length === 0 ? (
-          <p className={styles.calculationText} role="status">
-            Nenhuma disciplina encontrada para o filtro selecionado.
-          </p>
-        ) : (
-          disciplinasFiltradas.map((disc) => {
-            const topicos = disc.topicos;
-            const concluidosDisc = topicos.filter((t) => concluidosSet.has(t.id)).length;
-            const pctDisc = topicos.length > 0 ? Math.round((concluidosDisc / topicos.length) * 100) : 0;
-            return (
-              <article
-                key={disc.id}
-                className={styles.disciplinaCard}
-              >
-                {/* Header da Disciplina */}
-                <div className={styles.discHeader}>
-                <div className={styles.discTitleBlock}>
-                  <h3 className={styles.discNome}>
-                    <DisciplineLabel name={disc.nome} color={disc.cor} />
-                  </h3>
-                  <div className={styles.discMeta}>
-                    <DisciplinaPesoButton
-                      peso={disc.peso}
-                      onClick={() => abrirTopicosDisciplina(disc)}
-                    />
-                    <Badge
-                      variant={pctDisc >= 60 ? 'success' : 'secondary'}
-                      size="md"
-                      className={styles.discCount}
-                    >
-                      {concluidosDisc} / {topicos.length} assuntos ({pctDisc}%)
-                    </Badge>
-                    <Badge
-                      variant={obterResumoQuestoes(disc.id).variant}
-                      size="md"
-                      aria-label={`${obterResumoQuestoes(disc.id).percentual}% de acerto`}
-                    >
-                      {obterResumoQuestoes(disc.id).percentual}% de acerto
-                    </Badge>
-                  </div>
-                </div>
-
-                </div>
-              </article>
-          );
-        })
+        </>
       )}
-      </div>
 
-      {modalDisciplinasLote}
-      <DisciplinasTopicosModal
-        isOpen={modalTopicosAberto}
-        initialDisciplinaId={disciplinaTopicosInicial}
+      <FormModal
+        isOpen={modalDisciplinasLoteAberto}
         onClose={() => {
-          setModalTopicosAberto(false);
-          setDisciplinaTopicosInicial(null);
-          setDisciplinaRascunho(null);
+          if (!salvandoDisciplinasLote) setModalDisciplinasLoteAberto(false);
         }}
-        title="Editar disciplinas e assuntos"
-        subtitle="Gerencie as disciplinas e os assuntos cadastrados."
-        disciplinas={disciplinasModal}
+        title="Cadastrar várias disciplinas"
+        subtitle="No TXT, digite ou cole uma disciplina por linha. No JSON, digite ou cole a disciplina com a lista de  assuntos se tiver."
+        icon={<BookOpen size={20} />}
+        onSubmit={salvarDisciplinasLote}
+        submitText="Salvar"
+        loading={salvandoDisciplinasLote}
+        error={erroDisciplinasLote}
+      >
+        <>
+          <div className={styles.loteFormatAction}>
+            <ToggleGroup<'txt' | 'json'>
+              ariaLabel="Formato das disciplinas"
+              value={formatoDisciplinasLote}
+              onChange={(value) => {
+                setFormatoDisciplinasLote(value);
+                setErroDisciplinasLote('');
+              }}
+              options={[
+                { value: 'txt', label: 'TXT' },
+                { value: 'json', label: 'JSON' }
+              ] as const}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              leftIcon={<Copy size={14} />}
+              iconOnly
+              title="Copiar modelo JSON"
+              aria-label="Copiar modelo JSON"
+              onClick={() => {
+                void navigator.clipboard.writeText(modeloDisciplinasJson)
+                  .then(() => {
+                    setFormatoDisciplinasLote('json');
+                    toast.success('Modelo JSON copiado.');
+                  })
+                  .catch(() => toast.error('Não foi possível copiar o modelo JSON.'));
+              }}
+            />
+          </div>
+          <Textarea
+            label="Disciplinas"
+            rows={16}
+            value={disciplinasLoteRaw}
+            onChange={(event) => {
+              setDisciplinasLoteRaw(event.target.value);
+              setErroDisciplinasLote('');
+            }}
+            placeholder={formatoDisciplinasLote === 'txt'
+              ? 'Uma disciplina por linha\nDireito Administrativo\nLíngua Portuguesa'
+              : modeloDisciplinasJson}
+            className={styles.loteTextarea}
+          />
+        </>
+      </FormModal>
+
+      <DisciplinasTopicosModal
+        isOpen={modalNovaDisciplinaAberto || Boolean(disciplinaEmEdicao)}
+        mode={modalNovaDisciplinaAberto ? 'create' : 'edit'}
+        initialDisciplinaId={modalNovaDisciplinaAberto ? null : (disciplinaEmEdicao?.id ?? null)}
+        onClose={() => {
+          setModalNovaDisciplinaAberto(false);
+          setDisciplinaEmEdicaoId(null);
+        }}
+        title={modalNovaDisciplinaAberto ? 'Nova disciplina' : (disciplinaEmEdicao?.nome ?? 'Editar disciplina')}
+        disciplinas={
+          modalNovaDisciplinaAberto
+            ? trilha.disciplinas
+            : (disciplinaEmEdicao ? [disciplinaEmEdicao] : [])
+        }
         progresso={concluidosSet}
         onToggleTopico={(topicoId, concluido) => void handleToggleTopicoCheck(topicoId, concluido)}
-        onToggleTopicos={(disciplinaId, concluido) =>
-          void handleToggleTopicosDisciplina(disciplinaId, concluido)
+        onToggleConclusaoDisciplina={(disciplinaId, concluida) =>
+          void handleToggleConclusaoDisciplina(disciplinaId, concluida)
         }
         editable
-        initialEditing={Boolean(disciplinaRascunho)}
-        creatingDiscipline={Boolean(disciplinaRascunho)}
-        savingNewDiscipline={salvandoRascunho}
-        onSaveNewDiscipline={(disciplina) => void salvarDisciplinaRascunho(disciplina)}
-        savingDiscipline={salvandoDisciplina}
+        savingDiscipline={modalNovaDisciplinaAberto ? salvandoNovaDisciplina : salvandoDisciplina}
+        onCreateDiscipline={(payload) => void criarNovaDisciplina(payload)}
         onSaveDiscipline={(disciplina) => void salvarDisciplinaEditada(disciplina)}
         deletingDiscipline={excluindoDisciplina}
         onDeleteDiscipline={(disciplina) => void excluirDisciplina(disciplina)}
-        onChange={(disciplinas) => void handleAlterarDisciplinasNoModal(disciplinas)}
         mostrarPeso
       />
 

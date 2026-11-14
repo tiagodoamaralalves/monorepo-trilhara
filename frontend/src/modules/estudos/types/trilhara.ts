@@ -90,7 +90,6 @@ export interface Sessao {
   acertos: number;
   erros: number;
   percentualAcerto?: number;
-  editavel?: boolean;
   chaveIdempotencia?: string;
   criadoEm?: string;
   atualizadoEm?: string;

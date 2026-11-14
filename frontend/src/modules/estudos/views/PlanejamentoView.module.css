@@ -188,21 +188,6 @@
   padding: 24px;
 }
 
-.sectionHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.sectionTitleGroup {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  color: var(--primary-light);
-}
-
 .sectionTitle {
   margin: 0;
   color: var(--text);
@@ -867,10 +852,6 @@
     grid-template-columns: 1fr;
   }
 
-  .sectionHeader {
-    flex-direction: column;
-  }
-
   .sectionActions {
     width: 100%;
   }
@@ -1222,41 +1203,44 @@
 
 .errorMessage {
   padding: 12px 16px;
-  background-color: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #b91c1c;
-  border-radius: var(--radius-md, 6px);
+  background-color: var(--red-bg);
+  border: 1px solid var(--red-border);
+  color: var(--red-text);
+  border-radius: var(--radius-md);
   font-size: 14px;
 }
 
 .successMessage {
   padding: 12px 16px;
-  background-color: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  color: #15803d;
-  border-radius: var(--radius-md, 6px);
+  background-color: var(--green-bg);
+  border: 1px solid var(--green-border);
+  color: var(--green-text);
+  border-radius: var(--radius-md);
   font-size: 14px;
 }
 
 .sectionCard {
-  background-color: var(--surface-1, #ffffff);
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: var(--radius-lg, 8px);
+  background-color: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .formCard {
-  background-color: var(--surface-1, #ffffff);
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: var(--radius-lg, 8px);
+  background-color: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   padding: 20px;
 }
 
 .formTitle {
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
   margin: 0 0 16px 0;
-  color: var(--text, #111827);
+  color: var(--text);
 }
 
 .formGrid {
@@ -1274,54 +1258,253 @@
 .label {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-soft, #4b5563);
+  color: var(--text);
 }
 
-.input,
-.select {
-  padding: 8px 12px;
-  border: 1px solid var(--border, #d1d5db);
-  border-radius: var(--radius-md, 6px);
-  font-size: 14px;
-  background-color: var(--surface-1, #fff);
-  color: var(--text, #111827);
-}
-
-.filterRow {
+.daysFieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
   display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.badgeMuted {
-  font-size: 12px;
-  background-color: var(--surface-2, #f3f4f6);
-  padding: 4px 8px;
-  border-radius: var(--radius-sm, 4px);
-  color: var(--text-soft, #6b7280);
-}
-
-.diasCheckboxGroup {
-  display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 12px;
 }
 
-.diaCheckboxLabel {
+.daysFieldsetHeader {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.weekSummary {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--primary-light);
+  background: var(--primary-bg);
+  border: 1px solid var(--primary-border-subtle);
+  border-radius: var(--radius-pill, 999px);
+  padding: 4px 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.weekBlocksGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.dayBlockCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.dayBlockCardActive {
+  border-color: var(--primary-border-subtle);
+  background: var(--surface-1);
+}
+
+.dayStepperRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
   gap: 6px;
+}
+
+.dayBlocksInput input {
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 0 6px;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.dayBlocksInput input::-webkit-outer-spin-button,
+.dayBlocksInput input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.dayHours {
   font-size: 13px;
+  font-weight: 700;
+  color: var(--primary-light);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.dayHoursMuted {
+  color: var(--text-soft);
+  font-weight: 500;
+}
+
+.manualSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.manualDaysGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.manualDayCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.manualDayTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.manualSlots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cronogramasTabsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.modalityGuideGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 760px) {
+  .modalityGuideGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.modalityGuideCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
   cursor: pointer;
-  color: var(--text, #374151);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.modalityGuideCard:hover:not(:disabled),
+.modalityGuideCard:focus-visible {
+  border-color: var(--primary-light);
+  outline: none;
+}
+
+.modalityGuideCardSelected {
+  border-color: var(--primary);
+  background: var(--primary-bg);
+}
+
+.replaceAlert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--yellow-bg);
+  border: 1px solid var(--yellow-border);
+  border-radius: var(--radius-md);
+  color: var(--yellow);
+  font-size: 13px;
+  line-height: 1.45;
+  margin-bottom: 16px;
+}
+
+.replaceAlert svg {
+  flex-shrink: 0;
+}
+
+.modalityGuideHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.modalityGuideTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-size: 13.5px;
+}
+
+.modalityGuideTitle svg {
+  color: var(--primary-light);
+  flex-shrink: 0;
+}
+
+.modalityGuideDesc {
+  margin: 0;
+  color: var(--text-mid);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.modalityGuideExample {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 11.5px;
+  font-weight: 600;
 }
 
 .formActions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
-  margin-top: 20px;
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.formActionsLeading {
+  display: flex;
+  align-items: center;
+}
+
+.formActionsTrailing {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
 }
 
 .loadingText,
@@ -1397,20 +1580,110 @@
   border-radius: 4px;
 }
 
-.cronogramaMeta {
+.cronogramaSummaryCard {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--text-soft, #4b5563);
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
 }
 
-.cronogramaActions {
+.cronogramaSummaryTop {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.cronogramaSummaryContent {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
-  margin-top: 8px;
-  border-top: 1px solid var(--border, #e5e7eb);
-  padding-top: 8px;
+  min-width: 0;
+  flex: 1 1 320px;
+}
+
+.cronogramaModalitySummary {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-mid);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.cronogramaModalitySummary strong {
+  color: var(--text);
+}
+
+.cronogramaModalityIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+  color: var(--primary-light);
+  flex-shrink: 0;
+}
+
+.cronogramaMetaInfo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+.cronogramaMetaChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-soft);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.cronogramaSummaryActions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.modalityModalList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modalityModalItem {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.modalityModalItemActive {
+  border-color: var(--primary);
+  background: var(--primary-bg);
+}
+
+.modalityModalItemHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.modalityModalBadges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .actionButtonSmall {
@@ -1472,8 +1745,8 @@
   font-size: 11px;
   font-weight: 600;
   border-radius: 9999px;
-  background-color: #dcfce7;
-  color: #15803d;
+  background-color: var(--green-bg);
+  color: var(--green-text);
 }
 
 .statusBadgePendente {
@@ -1482,8 +1755,8 @@
   font-size: 11px;
   font-weight: 600;
   border-radius: 9999px;
-  background-color: #fef3c7;
-  color: #b45309;
+  background-color: var(--yellow-bg);
+  color: var(--yellow);
 }
 
 .actionCheckButton {

@@ -7,34 +7,6 @@ describe('Sessões normalizadas e estatísticas', () => {
     vi.restoreAllMocks();
   });
 
-  it('deve chamar PATCH para atualizar a sessão mais recente', async () => {
-    const requestSpy = vi.spyOn(apiModule, 'request').mockResolvedValueOnce({
-      id: 'sessao-1',
-      trilhaId: 'trilha-123',
-      disciplinaId: 'disc-456',
-      duracaoSegundos: 180,
-      questoes: 15,
-      acertos: 14,
-      editavel: true
-    });
-
-    const resposta = await EstudosService.atualizarSessao('trilha-123', 'sessao-1', {
-      duracaoSegundos: 180,
-      questoes: 15,
-      acertos: 14
-    });
-
-    expect(requestSpy).toHaveBeenCalledWith('/trilhas/trilha-123/sessoes/sessao-1', {
-      method: 'PATCH',
-      body: JSON.stringify({
-        duracaoSegundos: 180,
-        questoes: 15,
-        acertos: 14
-      })
-    });
-    expect(resposta.duracaoSegundos).toBe(180);
-  });
-
   it('deve chamar DELETE para excluir uma sessão individual', async () => {
     const requestSpy = vi.spyOn(apiModule, 'request').mockResolvedValueOnce(undefined);
 
@@ -76,7 +48,6 @@ describe('Sessões normalizadas e estatísticas', () => {
           acertos: 4,
           erros: 1,
           percentualAcerto: 80,
-          editavel: true,
           chaveIdempotencia: 'idemp-1',
           criadoEm: '2026-11-09T10:00:00Z',
           atualizadoEm: '2026-11-09T10:00:00Z'
@@ -99,7 +70,6 @@ describe('Sessões normalizadas e estatísticas', () => {
     expect(pag.total).toBe(1);
     expect(pag.itens[0].id).toBe('sessao-1');
     expect(pag.itens[0].duracaoSegundos).toBe(120);
-    expect(pag.itens[0].editavel).toBe(true);
     // `minutos`, `inicio` e `tipo` não existem mais no contrato do cliente.
     expect(pag.itens[0]).not.toHaveProperty('minutos');
     expect(pag.itens[0]).not.toHaveProperty('inicio');

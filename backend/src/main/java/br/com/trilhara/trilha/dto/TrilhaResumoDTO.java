@@ -19,6 +19,8 @@ public record TrilhaResumoDTO(
         String cor,
         String origemEditalId,
         int totalDisciplinas,
+        int disciplinasConcluidas,
+        boolean temDisciplinaSemTopico,
         int totalTopicos,
         int topicosConcluidos,
         double percentualProgresso,

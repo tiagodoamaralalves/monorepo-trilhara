@@ -496,7 +496,7 @@
   white-space: nowrap;
 }
 
-.logoutBtn {
+.settingsBtn {
   width: 28px;
   height: 28px;
   border-radius: var(--radius-xs);
@@ -511,10 +511,15 @@
   transition: all var(--transition-fast);
 }
 
-.logoutBtn:hover {
-  color: var(--red-text);
-  background: var(--red-bg);
-  border-color: var(--red-border);
+.settingsBtn:hover {
+  color: var(--text);
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+}
+
+.settingsBtn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
 }
 
 /* ── NAVEGAÇÃO MOBILE (OCULTA EM DESKTOP) ── */

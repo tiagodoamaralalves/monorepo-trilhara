@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, BookOpen, Check, Pencil, Trash2, Undo2, X } from 'lucide-react';
 import {
   Button,
@@ -8,45 +8,109 @@ import {
   DisciplineRow,
   Input,
   Modal,
+  QuickAddInput,
   Textarea,
   TopicRow,
   useConfirm
 } from '@shared/design-system';
-import { Disciplina, ProgressoTrilha, Topico } from '../../types/trilhara';
+import { CriarDisciplinaRequest, Disciplina, ProgressoTrilha, Topico } from '../../types/trilhara';
 import { obterCorDisponivel, obterCoresEmUso } from '../../utils/coresDisciplina';
 import { DisciplinaPesoSelector } from '../DisciplinaPesoSelector/DisciplinaPesoSelector';
 import { DisciplinaPesoButton } from '../DisciplinaPesoButton/DisciplinaPesoButton';
 import styles from './DisciplinasTopicosModal.module.css';
 
+const ID_NOVA_DISCIPLINA = '__nova_disciplina__';
+const PREFIXO_TOPICO_TEMPORARIO = '__novo_topico_';
+const MAX_CARACTERES_DISCIPLINA = 120;
+const MAX_CARACTERES_TOPICO = 300;
+const MAX_TOPICOS_POR_DISCIPLINA = 500;
+
 let contadorIdLocal = 0;
 
-function gerarId(prefixo: string): string {
+function gerarIdTemporario(): string {
   contadorIdLocal += 1;
-  return `${prefixo}_${Date.now()}_${contadorIdLocal.toString(36)}`;
+  return `${PREFIXO_TOPICO_TEMPORARIO}${Date.now()}_${contadorIdLocal.toString(36)}`;
 }
+
+function isTopicoTemporario(id: string): boolean {
+  return !id || id.startsWith(PREFIXO_TOPICO_TEMPORARIO);
+}
+
+interface InlineTopicTextareaProps {
+  value: string;
+  maxLength: number;
+  onChange: (value: string) => void;
+  onCommit: () => void;
+  onCancel: () => void;
+}
+
+const InlineTopicTextarea: React.FC<InlineTopicTextareaProps> = ({
+  value,
+  maxLength,
+  onChange,
+  onCommit,
+  onCancel
+}) => {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.focus();
+    const len = el.value.length;
+    el.setSelectionRange(len, len);
+  }, []);
+
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      rows={1}
+      className={styles.inlineEditTextarea}
+      value={value}
+      aria-label="Nome do assunto"
+      maxLength={maxLength}
+      onChange={(event) => onChange(event.target.value)}
+      onBlur={onCommit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          onCommit();
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          onCancel();
+        }
+      }}
+      onClick={(event) => event.stopPropagation()}
+    />
+  );
+};
 
 export interface DisciplinasTopicosModalProps {
   isOpen: boolean;
+  mode?: 'create' | 'edit';
   title: string;
   subtitle?: string;
   icon?: React.ReactNode;
   disciplinas: Disciplina[];
   initialDisciplinaId?: string | null;
-  initialEditing?: boolean;
-  creatingDiscipline?: boolean;
   /** Conjunto de IDs de tópicos concluídos (derivado de `topicosConcluidosIds`). */
   progresso?: ProgressoTrilha;
-  /** Se true ou se onChange for fornecido, permite adicionar, renomear e excluir disciplinas/assuntos */
+  /** Se true e callback de edição/criação fornecido, permite gerenciar a disciplina e seus assuntos */
   editable?: boolean;
-  onChange?: (disciplinas: Disciplina[]) => void;
-  onSaveNewDiscipline?: (disciplina: Disciplina) => void;
-  savingNewDiscipline?: boolean;
+  onCreateDiscipline?: (payload: CriarDisciplinaRequest) => void | Promise<void>;
   onSaveDiscipline?: (disciplina: Disciplina) => void;
   savingDiscipline?: boolean;
   onDeleteDiscipline?: (disciplina: Disciplina) => void;
   deletingDiscipline?: boolean;
   onToggleTopico?: (topicoId: string, concluido: boolean) => void;
-  onToggleTopicos?: (disciplinaId: string, concluido: boolean) => void;
+  onToggleConclusaoDisciplina?: (disciplinaId: string, concluida: boolean) => void;
   onClose: () => void;
   /** Ações extras no rodapé (ex: botão "Usar essa trilha") */
   extraFooterAction?: React.ReactNode;
@@ -57,24 +121,21 @@ export interface DisciplinasTopicosModalProps {
 
 export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = ({
   isOpen,
+  mode = 'edit',
   title,
   subtitle = 'Disciplinas cadastradas',
   icon = <BookOpen size={22} />,
   disciplinas,
   initialDisciplinaId = null,
-  initialEditing = false,
-  creatingDiscipline = false,
   progresso,
   editable = false,
-  onChange,
-  onSaveNewDiscipline,
-  savingNewDiscipline = false,
+  onCreateDiscipline,
   onSaveDiscipline,
   savingDiscipline = false,
   onDeleteDiscipline,
   deletingDiscipline = false,
   onToggleTopico,
-  onToggleTopicos,
+  onToggleConclusaoDisciplina,
   onClose,
   extraFooterAction,
   mostrarPeso,
@@ -86,40 +147,67 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
 
   // Estados de edição
   const [novosTopicosTexto, setNovosTopicosTexto] = useState('');
+  const [novoTopicoRapido, setNovoTopicoRapido] = useState('');
+  const [erroTopicos, setErroTopicos] = useState('');
   const [editandoDisciplinaId, setEditandoDisciplinaId] = useState<string | null>(null);
   const [nomeDisciplinaEditado, setNomeDisciplinaEditado] = useState('');
   const [editandoTopicoId, setEditandoTopicoId] = useState<string | null>(null);
   const [nomeTopicoEditado, setNomeTopicoEditado] = useState('');
   const [mostrarCores, setMostrarCores] = useState(false);
   const colorPickerContainerRef = useRef<HTMLDivElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   const prevIsOpenRef = useRef(isOpen);
   const prevInitialIdRef = useRef(initialDisciplinaId);
+  const prevModeRef = useRef(mode);
 
-  // Sincroniza rascunho local ao abrir ou trocar de disciplina
+  const isCreateMode = mode === 'create';
+  const isEditable = Boolean(
+    editable && (onSaveDiscipline || (isCreateMode && onCreateDiscipline))
+  );
+
+  // Sincroniza rascunho local ao abrir, trocar de modo ou trocar de disciplina
   useEffect(() => {
     const justOpened = isOpen && !prevIsOpenRef.current;
     const switchedDisciplina = isOpen && initialDisciplinaId !== prevInitialIdRef.current;
+    const switchedMode = isOpen && mode !== prevModeRef.current;
 
-    if (justOpened || switchedDisciplina) {
-      setDisciplinasLocais(disciplinas);
-      setDisciplinaAbertaId(initialDisciplinaId);
-      setEditandoDisciplinaId(
-        creatingDiscipline
-          ? initialDisciplinaId
-          : initialEditing && initialDisciplinaId
-            ? initialDisciplinaId
-            : null
-      );
-      const disciplinaInicial = disciplinas.find((item) => item.id === initialDisciplinaId);
-      setNomeDisciplinaEditado(disciplinaInicial?.nome ?? '');
+    if (justOpened || switchedDisciplina || switchedMode) {
+      if (isCreateMode) {
+        const corInicial = obterCorDisponivel(disciplinas);
+        const rascunhoNova: Disciplina = {
+          id: ID_NOVA_DISCIPLINA,
+          nome: '',
+          cor: corInicial,
+          peso: 1,
+          ordem: disciplinas.length,
+          topicos: [],
+          concluida: false
+        };
+        setDisciplinasLocais([rascunhoNova]);
+        setDisciplinaAbertaId(ID_NOVA_DISCIPLINA);
+        setEditandoDisciplinaId(ID_NOVA_DISCIPLINA);
+        setNomeDisciplinaEditado('');
+      } else {
+        const targetId =
+          initialDisciplinaId ?? (isEditable && disciplinas.length === 1 ? disciplinas[0].id : null);
+        setDisciplinasLocais(disciplinas);
+        setDisciplinaAbertaId(targetId);
+        setEditandoDisciplinaId(null);
+        const disciplinaInicial = disciplinas.find((item) => item.id === targetId);
+        setNomeDisciplinaEditado(disciplinaInicial?.nome ?? '');
+      }
       setNovosTopicosTexto('');
+      setNovoTopicoRapido('');
+      setErroTopicos('');
       setEditandoTopicoId(null);
       setNomeTopicoEditado('');
       setMostrarCores(false);
     } else if (!isOpen && prevIsOpenRef.current) {
       setDisciplinaAbertaId(null);
       setNovosTopicosTexto('');
+      setNovoTopicoRapido('');
+      setErroTopicos('');
       setEditandoDisciplinaId(null);
       setEditandoTopicoId(null);
       setNomeTopicoEditado('');
@@ -128,7 +216,22 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
 
     prevIsOpenRef.current = isOpen;
     prevInitialIdRef.current = initialDisciplinaId;
-  }, [isOpen, initialDisciplinaId, initialEditing, creatingDiscipline, disciplinas]);
+    prevModeRef.current = mode;
+  }, [isOpen, initialDisciplinaId, mode, isCreateMode, isEditable, disciplinas]);
+
+  // Mantém `concluida` sincronizado com atualizações otimistas/rollback vindas do pai
+  useEffect(() => {
+    if (!isOpen || isCreateMode) return;
+    setDisciplinasLocais((prev) =>
+      prev.map((local) => {
+        const atualizada = disciplinas.find((item) => item.id === local.id);
+        if (!atualizada || atualizada.concluida === local.concluida) {
+          return local;
+        }
+        return { ...local, concluida: atualizada.concluida };
+      })
+    );
+  }, [isOpen, isCreateMode, disciplinas]);
 
   // Fecha o popover de cores ao clicar fora ou pressionar Escape
   useEffect(() => {
@@ -163,28 +266,36 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
   );
 
   const coresEmUso = useMemo(
-    () => obterCoresEmUso(disciplinasLocais, disciplinaSelecionada?.id),
-    [disciplinasLocais, disciplinaSelecionada?.id]
+    () =>
+      isCreateMode
+        ? obterCoresEmUso(disciplinas)
+        : obterCoresEmUso(disciplinasLocais, disciplinaSelecionada?.id),
+    [isCreateMode, disciplinas, disciplinasLocais, disciplinaSelecionada?.id]
   );
 
-  const isEditable = Boolean(editable && (onChange || onSaveDiscipline || onSaveNewDiscipline));
   const exibePeso = mostrarPeso ?? !isEditable;
 
   const handleRenomearDisciplina = () => {
     const valor = nomeDisciplinaEditado.trim();
-    if (!editandoDisciplinaId || !valor) {
-      if (creatingDiscipline) return;
+    if (!editandoDisciplinaId) return;
+    if (!valor) {
+      if (isCreateMode) {
+        setDisciplinasLocais((prev) =>
+          prev.map((item) => (item.id === editandoDisciplinaId ? { ...item, nome: '' } : item))
+        );
+        return;
+      }
       setEditandoDisciplinaId(null);
       return;
     }
     setDisciplinasLocais((prev) =>
       prev.map((item) => (item.id === editandoDisciplinaId ? { ...item, nome: valor } : item))
     );
-    if (!creatingDiscipline) setEditandoDisciplinaId(null);
+    setEditandoDisciplinaId(null);
   };
 
   const handleAlterarDisciplina = (campo: 'cor' | 'peso', valor: string | number) => {
-    if (!disciplinaAbertaId) return;
+    if (disciplinaAbertaId === null) return;
     setDisciplinasLocais((prev) =>
       prev.map((disciplina) =>
         disciplina.id === disciplinaAbertaId
@@ -205,18 +316,27 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
 
     if (onDeleteDiscipline) {
       onDeleteDiscipline(disciplina);
-    } else if (onChange) {
-      onChange(disciplinasLocais.filter((item) => item.id !== disciplina.id));
-      if (disciplinaAbertaId === disciplina.id) {
-        setDisciplinaAbertaId(null);
-      }
     }
   };
 
-  const handleAdicionarTopicos = () => {
-    if (!disciplinaAbertaId) return;
-    const nomes = novosTopicosTexto.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
-    if (nomes.length === 0) return;
+  const validarNovosTopicos = (nomes: string[], quantidadeAtual: number): string | null => {
+    if (nomes.some((nome) => nome.length > MAX_CARACTERES_TOPICO)) {
+      return `Cada assunto deve ter no máximo ${MAX_CARACTERES_TOPICO} caracteres.`;
+    }
+    if (quantidadeAtual + nomes.length > MAX_TOPICOS_POR_DISCIPLINA) {
+      return `Cada disciplina pode ter no máximo ${MAX_TOPICOS_POR_DISCIPLINA} assuntos.`;
+    }
+    return null;
+  };
+
+  const anexarTopicosLocais = (nomes: string[]): boolean => {
+    if (disciplinaAbertaId === null || !disciplinaSelecionada || nomes.length === 0) return false;
+
+    const erroValidacao = validarNovosTopicos(nomes, disciplinaSelecionada.topicos.length);
+    if (erroValidacao) {
+      setErroTopicos(erroValidacao);
+      return false;
+    }
 
     setDisciplinasLocais((prev) =>
       prev.map((disciplina) =>
@@ -225,20 +345,33 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
               ...disciplina,
               topicos: [
                 ...disciplina.topicos,
-                ...nomes.map((nome) => ({ id: gerarId('topico'), nome }))
+                ...nomes.map((nome) => ({ id: gerarIdTemporario(), nome }))
               ]
             }
           : disciplina
       )
     );
-    setNovosTopicosTexto('');
+    setErroTopicos('');
+    return true;
+  };
+
+  const handleAdicionarTopicos = () => {
+    const nomes = novosTopicosTexto.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+    if (anexarTopicosLocais(nomes)) {
+      setNovosTopicosTexto('');
+    }
+  };
+
+  const handleAdicionarTopicoRapido = (nome: string): boolean => {
+    return anexarTopicosLocais([nome]);
   };
 
   const handleRenomearTopico = () => {
-    if (!disciplinaAbertaId) return;
+    if (disciplinaAbertaId === null) return;
     const valor = nomeTopicoEditado.trim();
     if (!editandoTopicoId || !valor) {
       setEditandoTopicoId(null);
+      setNomeTopicoEditado('');
       return;
     }
     setDisciplinasLocais((prev) =>
@@ -254,10 +387,11 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
       )
     );
     setEditandoTopicoId(null);
+    setNomeTopicoEditado('');
   };
 
   const handleExcluirTopico = async (topico: Topico) => {
-    if (!disciplinaAbertaId || !disciplinaSelecionada) return;
+    if (disciplinaAbertaId === null || !disciplinaSelecionada) return;
     const ok = await confirm({
       title: 'Excluir assunto?',
       description: `O assunto "${topico.nome}" será removido.`,
@@ -265,6 +399,11 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
       variant: 'danger'
     });
     if (!ok) return;
+
+    if (editandoTopicoId === topico.id) {
+      setEditandoTopicoId(null);
+      setNomeTopicoEditado('');
+    }
 
     setDisciplinasLocais((prev) =>
       prev.map((item) =>
@@ -278,7 +417,13 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
   const isEditingSelectedTitle =
     isEditable &&
     Boolean(disciplinaSelecionada) &&
-    (creatingDiscipline || editandoDisciplinaId === disciplinaSelecionada?.id);
+    editandoDisciplinaId === disciplinaSelecionada?.id;
+
+  useEffect(() => {
+    if (isOpen && isEditingSelectedTitle) {
+      titleInputRef.current?.focus();
+    }
+  }, [isOpen, isEditingSelectedTitle]);
 
   const startEditingDiscipline = (disciplina: Disciplina) => {
     if (!isEditable) return;
@@ -291,7 +436,7 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
   ).trim();
   const nomeFinalValido = Boolean(nomeFinalAtual);
 
-  const isSaving = creatingDiscipline ? Boolean(savingNewDiscipline) : Boolean(savingDiscipline);
+  const isSaving = Boolean(savingDiscipline);
   const isDeleting = Boolean(deletingDiscipline);
 
   const handleSalvar = () => {
@@ -304,55 +449,75 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
       );
     }
 
-    const pendentes = novosTopicosTexto
-      .split(/\r?\n/)
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .map((nome) => ({ id: gerarId('topico'), nome }));
+    const pendentesNomes = [
+      ...novosTopicosTexto.split(/\r?\n/).map((item) => item.trim()).filter(Boolean),
+      ...(novoTopicoRapido.trim() ? [novoTopicoRapido.trim()] : [])
+    ];
+
+    const erroValidacao = validarNovosTopicos(pendentesNomes, topicosAtuais.length);
+    if (erroValidacao) {
+      setErroTopicos(erroValidacao);
+      return;
+    }
+
+    const topicosNormalizados = [
+      ...topicosAtuais.map((t) => ({
+        ...t,
+        id: isTopicoTemporario(t.id) ? '' : t.id
+      })),
+      ...pendentesNomes.map((nome) => ({ id: '', nome }))
+    ];
+
+    setNovosTopicosTexto('');
+    setNovoTopicoRapido('');
+    setErroTopicos('');
+    setEditandoTopicoId(null);
+    setNomeTopicoEditado('');
+
+    if (isCreateMode && onCreateDiscipline) {
+      void onCreateDiscipline({
+        nome: nomeFinalAtual,
+        cor: disciplinaSelecionada.cor,
+        peso: disciplinaSelecionada.peso ?? 1,
+        topicos: topicosNormalizados.map((t, idx) => ({
+          nome: t.nome,
+          ordem: idx + 1
+        }))
+      });
+      return;
+    }
 
     const disciplinaFinal: Disciplina = {
       ...disciplinaSelecionada,
       nome: nomeFinalAtual,
-      topicos: [...topicosAtuais, ...pendentes]
+      topicos: topicosNormalizados
     };
 
-    setNovosTopicosTexto('');
-    setEditandoTopicoId(null);
-
-    if (creatingDiscipline) {
-      onSaveNewDiscipline?.(disciplinaFinal);
-    } else {
-      if (onSaveDiscipline) {
-        onSaveDiscipline(disciplinaFinal);
-      } else if (onChange) {
-        const disciplinasFinais = disciplinasLocais.map((d) =>
-          d.id === disciplinaFinal.id ? disciplinaFinal : d
-        );
-        onChange(disciplinasFinais);
-      }
-    }
+    onSaveDiscipline?.(disciplinaFinal);
   };
 
   const modalTitle = disciplinaSelecionada ? (
     isEditingSelectedTitle ? (
       <Input
+        ref={titleInputRef}
         className={styles.titleEditInput}
         value={nomeDisciplinaEditado}
-        placeholder={creatingDiscipline ? 'Digite o nome da disciplina' : undefined}
-        maxLength={100}
+        maxLength={MAX_CARACTERES_DISCIPLINA}
+        placeholder={isCreateMode ? 'Nome da disciplina' : undefined}
         aria-label="Nome da disciplina"
         onChange={(event) => setNomeDisciplinaEditado(event.target.value)}
         onBlur={handleRenomearDisciplina}
         onKeyDown={(event) => {
           if (event.key === 'Enter') {
             event.preventDefault();
-            event.currentTarget.blur();
+            handleRenomearDisciplina();
           } else if (event.key === 'Escape') {
             event.preventDefault();
-            if (!creatingDiscipline) {
-              setNomeDisciplinaEditado(disciplinaSelecionada.nome);
-              setEditandoDisciplinaId(null);
+            if (isCreateMode && !disciplinaSelecionada.nome.trim()) {
+              return;
             }
+            setNomeDisciplinaEditado(disciplinaSelecionada.nome);
+            setEditandoDisciplinaId(null);
           }
         }}
       />
@@ -372,29 +537,38 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
   ) : (
     title
   );
+
   const totalTopicosSelecionados = disciplinaSelecionada?.topicos.length ?? 0;
-  const topicosConcluidosSelecionados = disciplinaSelecionada
-    ? disciplinaSelecionada.topicos.filter((topico) => progresso?.has(topico.id)).length
-    : 0;
+  const topicosPersistidos = disciplinaSelecionada
+    ? disciplinaSelecionada.topicos.filter((topico) => !isTopicoTemporario(topico.id))
+    : [];
+  const topicosConcluidosSelecionados = topicosPersistidos.filter((topico) =>
+    progresso?.has(topico.id)
+  ).length;
   const percentualSelecionado = totalTopicosSelecionados > 0
     ? Math.round((topicosConcluidosSelecionados / totalTopicosSelecionados) * 100)
     : 0;
   const todosTopicosConcluidos =
-    totalTopicosSelecionados > 0 &&
-    topicosConcluidosSelecionados === totalTopicosSelecionados;
+    topicosPersistidos.length > 0 &&
+    topicosConcluidosSelecionados === topicosPersistidos.length;
+  const disciplinaConcluida = Boolean(disciplinaSelecionada?.concluida) || todosTopicosConcluidos;
+
   const voltarParaDisciplinas = () => {
     setDisciplinaAbertaId(null);
     setEditandoDisciplinaId(null);
     setEditandoTopicoId(null);
     setMostrarCores(false);
   };
+
   const handleModalClose = () => {
+    if (isSaving || isDeleting) return;
     if (disciplinaSelecionada && !isEditable) {
       voltarParaDisciplinas();
       return;
     }
     onClose();
   };
+
   const modalSubtitle = disciplinaSelecionada ? (
     <div className={styles.modalSubtitleMeta}>
       {!isEditable && (
@@ -408,33 +582,35 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
           Voltar para disciplinas
         </Button>
       )}
-      {isEditable && totalTopicosSelecionados > 0 && (
+      {isEditable && !isCreateMode && onToggleConclusaoDisciplina && (
         <Button
           type="button"
           variant="ghost"
           size="sm"
           className={`${styles.topicCompletionButton} ${
-            todosTopicosConcluidos
+            disciplinaConcluida
               ? styles.topicCompletionButtonUndo
               : styles.topicCompletionButtonComplete
           }`}
-          aria-pressed={todosTopicosConcluidos}
-          aria-label={todosTopicosConcluidos ? 'Desmarcar todos' : 'Marcar todos'}
+          aria-pressed={disciplinaConcluida}
+          aria-label={disciplinaConcluida ? 'Reabrir disciplina' : 'Concluir disciplina'}
           onClick={() =>
-            onToggleTopicos?.(disciplinaSelecionada.id, !todosTopicosConcluidos)
+            onToggleConclusaoDisciplina(disciplinaSelecionada.id, !disciplinaConcluida)
           }
-          leftIcon={todosTopicosConcluidos ? <Undo2 size={15} /> : <Check size={15} />}
+          leftIcon={disciplinaConcluida ? <Undo2 size={15} /> : <Check size={15} />}
         >
-          {todosTopicosConcluidos ? 'Desmarcar todos' : 'Marcar todos'}
+          {disciplinaConcluida ? 'Reabrir disciplina' : 'Concluir disciplina'}
         </Button>
       )}
       <Badge
-        variant={percentualSelecionado >= 60 ? 'success' : 'secondary'}
+        variant={disciplinaConcluida || percentualSelecionado >= 60 ? 'success' : 'secondary'}
         size="md"
         className={styles.discCount}
       >
         {isEditable
-          ? `${topicosConcluidosSelecionados} / ${totalTopicosSelecionados} assuntos (${percentualSelecionado}%)`
+          ? totalTopicosSelecionados === 0 && disciplinaConcluida
+            ? 'Concluída'
+            : `${topicosConcluidosSelecionados} / ${totalTopicosSelecionados} assuntos (${percentualSelecionado}%)`
           : `${totalTopicosSelecionados} ${totalTopicosSelecionados === 1 ? 'assunto' : 'assuntos'}`}
       </Badge>
       {isEditable ? (
@@ -549,11 +725,12 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
       icon={disciplinaIcon}
       iconBadgeStyle={iconBadgeStyle}
       maxWidth={maxWidth}
+      isSaving={isSaving || isDeleting}
       footer={
         isEditable && disciplinaSelecionada ? (
           <div className={styles.modalFooter}>
-            <div className={styles.modalFooterLeft}>
-              {!creatingDiscipline && (
+            {!isCreateMode && (
+              <div className={styles.modalFooterLeft}>
                 <Button
                   type="button"
                   variant="danger"
@@ -565,8 +742,8 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
                 >
                   Excluir disciplina
                 </Button>
-              )}
-            </div>
+              </div>
+            )}
             <div className={styles.modalFooterRight}>
               <Button
                 type="button"
@@ -596,9 +773,9 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
     >
       <div className={styles.modalContentMeta}>
         {disciplinaSelecionada ? modalSubtitle : subtitle}
-        </div>
-        {disciplinaSelecionada ? (
-          <div className={styles.topicosView}>
+      </div>
+      {disciplinaSelecionada ? (
+        <div className={styles.topicosView}>
           {isEditable && (
             <div className={styles.formCadastro}>
               <div className={styles.topicField}>
@@ -624,19 +801,39 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
                   rows={4}
                   placeholder={'Digite um assunto por linha e todos serão cadastrados simultaneamente:\nPrincípios fundamentais\nDireitos e garantias\nOrganização do Estado'}
                   value={novosTopicosTexto}
-                  onChange={(event) => setNovosTopicosTexto(event.target.value)}
+                  error={erroTopicos || undefined}
+                  onChange={(event) => {
+                    setNovosTopicosTexto(event.target.value);
+                    if (erroTopicos) setErroTopicos('');
+                  }}
                 />
               </div>
+
+              <QuickAddInput
+                className={styles.quickAddTopic}
+                value={novoTopicoRapido}
+                onValueChange={(value) => {
+                  setNovoTopicoRapido(value);
+                  if (erroTopicos) setErroTopicos('');
+                }}
+                onAdd={handleAdicionarTopicoRapido}
+                placeholder="Adicionar um assunto... (Pressione Enter para salvar)"
+                buttonTitle="Adicionar assunto (Enter)"
+                buttonAriaLabel="Adicionar assunto"
+                inputAriaLabel="Adicionar um assunto"
+                maxLength={MAX_CARACTERES_TOPICO}
+                disabled={isSaving || isDeleting}
+              />
             </div>
           )}
 
           {disciplinaSelecionada.topicos.length === 0 ? (
             <p className={styles.emptyList}>Nenhum assunto cadastrado.</p>
           ) : (
-            <>
-              <ul className={styles.topicList}>
+            <ul className={styles.topicList}>
               {disciplinaSelecionada.topicos.map((topico, index) => {
                 const isEditing = isEditable && editandoTopicoId === topico.id;
+                const topicoNovo = isTopicoTemporario(topico.id);
                 return (
                   <TopicRow
                     key={topico.id}
@@ -646,68 +843,76 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
                       onToggleTopico ? (
                         <Checkbox
                           checked={Boolean(progresso?.has(topico.id))}
+                          disabled={topicoNovo}
+                          title={
+                            topicoNovo
+                              ? 'Salve a disciplina para marcar este assunto como concluído'
+                              : undefined
+                          }
                           aria-label={`Marcar assunto ${topico.nome} como concluído`}
-                          onChange={(event) => onToggleTopico(topico.id, event.target.checked)}
+                          onChange={(event) => {
+                            if (topicoNovo) return;
+                            onToggleTopico(topico.id, event.target.checked);
+                          }}
                         />
                       ) : undefined
                     }
                     content={
                       isEditing ? (
-                        <Input
-                          className={styles.inlineEditInput}
+                        <InlineTopicTextarea
                           value={nomeTopicoEditado}
-                          aria-label="Nome do assunto"
-                          maxLength={500}
-                          onChange={(event) => setNomeTopicoEditado(event.target.value)}
-                          onBlur={handleRenomearTopico}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') {
-                              event.preventDefault();
-                              event.currentTarget.blur();
-                            } else if (event.key === 'Escape') {
-                              event.preventDefault();
-                              setNomeTopicoEditado('');
-                              setEditandoTopicoId(null);
-                            }
+                          maxLength={MAX_CARACTERES_TOPICO}
+                          onChange={setNomeTopicoEditado}
+                          onCommit={handleRenomearTopico}
+                          onCancel={() => {
+                            setNomeTopicoEditado('');
+                            setEditandoTopicoId(null);
                           }}
-                          onClick={(event) => event.stopPropagation()}
                         />
-                      ) : isEditable ? (
-                        <button
-                          type="button"
-                          className={styles.topicNameButton}
-                          onClick={() => {
-                            setEditandoTopicoId(topico.id);
-                            setNomeTopicoEditado(topico.nome);
-                          }}
-                        >
-                          {topico.nome}
-                        </button>
                       ) : undefined
                     }
                     actions={
                       isEditable ? (
-                        <Button
-                          type="button"
-                          variant="danger"
-                          size="sm"
-                          iconOnly
-                          title="Excluir assunto"
-                          aria-label="Excluir assunto"
-                          onClick={() => void handleExcluirTopico(topico)}
-                          leftIcon={<Trash2 size={15} />}
-                        />
+                        isEditing ? (
+                          <Button
+                            type="button"
+                            variant="danger"
+                            size="sm"
+                            iconOnly
+                            title="Excluir assunto"
+                            aria-label="Excluir assunto"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => void handleExcluirTopico(topico)}
+                            leftIcon={<Trash2 size={15} />}
+                          />
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            iconOnly
+                            title="Editar assunto"
+                            aria-label={`Editar assunto ${topico.nome}`}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => {
+                              if (editandoTopicoId) {
+                                handleRenomearTopico();
+                              }
+                              setEditandoTopicoId(topico.id);
+                              setNomeTopicoEditado(topico.nome);
+                            }}
+                            leftIcon={<Pencil size={15} />}
+                          />
+                        )
                       ) : undefined
                     }
                   />
                 );
               })}
-              </ul>
-            </>
+            </ul>
           )}
-
         </div>
-      ) : (
+      ) : !isEditable ? (
         <div className={styles.disciplinasView}>
           {disciplinasLocais.length === 0 ? (
             <p className={styles.emptyList}>Nenhuma disciplina cadastrada.</p>
@@ -741,7 +946,7 @@ export const DisciplinasTopicosModal: React.FC<DisciplinasTopicosModalProps> = (
             </ul>
           )}
         </div>
-      )}
+      ) : null}
     </Modal>
   );
 };

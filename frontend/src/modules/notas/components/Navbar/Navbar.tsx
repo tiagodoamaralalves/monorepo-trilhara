@@ -25,7 +25,7 @@ export interface NavbarProps {
   onAbrirBusca?: () => void;
   onAbrirLixeira?: () => void;
   onAbrirLogin?: () => void;
-  onLogout?: () => void;
+  onSettings?: () => void;
   onCollapsedChange?: (collapsed: boolean) => void;
 }
 
@@ -49,7 +49,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onAbrirBusca,
   onAbrirLixeira,
   onAbrirLogin,
-  onLogout,
+  onSettings,
   onCollapsedChange
 }) => {
   const cadernoAtivo = cadernos.find((c) => c.id === cadernoAtivoId);
@@ -74,7 +74,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             }
           : null
       }
-      onLogout={onLogout}
+      onSettings={onSettings}
       onLogin={onAbrirLogin}
       contextSlot={
         <div>

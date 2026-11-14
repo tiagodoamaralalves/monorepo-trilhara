@@ -3,10 +3,12 @@ import { ChevronDown } from 'lucide-react';
 import { DisciplineLabel } from '../DisciplineLabel/DisciplineLabel';
 import styles from './Select.module.css';
 
-interface SelectOption {
+export interface SelectOption {
   value: string;
   label: string;
   dotColor?: string;
+  disabled?: boolean;
+  title?: string;
 }
 
 export interface SelectProps extends React.AriaAttributes {
@@ -64,14 +66,28 @@ export const Select: React.FC<SelectProps> = ({
   }, [isOpen]);
 
   const openAtSelection = () => {
-    setActiveIndex(initialActiveIndex);
+    const startIdx = options[initialActiveIndex]?.disabled
+      ? Math.max(0, options.findIndex((option) => !option.disabled))
+      : initialActiveIndex;
+    setActiveIndex(startIdx);
     setIsOpen(true);
   };
 
   const selectOption = (option: SelectOption) => {
+    if (option.disabled) return;
     onChange(option.value);
     setIsOpen(false);
     triggerRef.current?.focus();
+  };
+
+  const findNextEnabledIndex = (fromIndex: number, direction: 1 | -1) => {
+    for (let step = 1; step <= options.length; step++) {
+      const candidate = (fromIndex + direction * step + options.length) % options.length;
+      if (!options[candidate]?.disabled) {
+        return candidate;
+      }
+    }
+    return fromIndex;
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
@@ -89,7 +105,7 @@ export const Select: React.FC<SelectProps> = ({
         return;
       }
       const direction = event.key === 'ArrowDown' ? 1 : -1;
-      const nextIndex = (activeIndex + direction + options.length) % options.length;
+      const nextIndex = findNextEnabledIndex(activeIndex, direction);
       setActiveIndex(nextIndex);
       optionRefs.current[nextIndex]?.scrollIntoView({ block: 'nearest' });
       return;
@@ -98,7 +114,13 @@ export const Select: React.FC<SelectProps> = ({
     if (event.key === 'Home' || event.key === 'End') {
       if (!isOpen || options.length === 0) return;
       event.preventDefault();
-      const nextIndex = event.key === 'Home' ? 0 : options.length - 1;
+      const candidateIndices = options
+        .map((option, index) => (!option.disabled ? index : -1))
+        .filter((index) => index >= 0);
+      if (candidateIndices.length === 0) return;
+      const nextIndex = event.key === 'Home'
+        ? candidateIndices[0]
+        : candidateIndices[candidateIndices.length - 1];
       setActiveIndex(nextIndex);
       optionRefs.current[nextIndex]?.scrollIntoView({ block: 'nearest' });
       return;
@@ -108,7 +130,7 @@ export const Select: React.FC<SelectProps> = ({
       event.preventDefault();
       if (!isOpen) {
         openAtSelection();
-      } else if (activeOption) {
+      } else if (activeOption && !activeOption.disabled) {
         selectOption(activeOption);
       }
     }
@@ -175,12 +197,16 @@ export const Select: React.FC<SelectProps> = ({
                   optionRefs.current[index] = el;
                 }}
                 id={`${listboxId}-${index}`}
-                className={`${styles.menuOption} ${activeIndex === index ? styles.menuOptionActive : ''} ${value === option.value ? styles.menuOptionSelected : ''}`}
+                className={`${styles.menuOption} ${activeIndex === index ? styles.menuOptionActive : ''} ${value === option.value ? styles.menuOptionSelected : ''} ${option.disabled ? styles.menuOptionDisabled : ''}`}
                 role="option"
                 aria-selected={value === option.value}
+                aria-disabled={option.disabled || undefined}
+                title={option.title}
                 tabIndex={activeIndex === index ? 0 : -1}
                 onMouseDown={(event) => event.preventDefault()}
-                onMouseMove={() => setActiveIndex(index)}
+                onMouseMove={() => {
+                  if (!option.disabled) setActiveIndex(index);
+                }}
                 onClick={() => selectOption(option)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {

@@ -638,7 +638,8 @@ export const GlobalSessionModal: React.FC = () => {
           </button>
         </header>
 
-        <form onSubmit={handleSubmit} className={styles.body}>
+        <form onSubmit={handleSubmit} className={styles.form}>
+          <div className={styles.body}>
           {erroOffline && (
             <div className={styles.alertWarning} role="alert">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, marginBottom: 4 }}>
@@ -904,6 +905,8 @@ export const GlobalSessionModal: React.FC = () => {
             </div>
           )}
 
+          </div>
+
           <div className={styles.footer}>
             {modoComBloco && !sessaoSalva && (
               <div className={styles.footerLeft}>
@@ -918,23 +921,25 @@ export const GlobalSessionModal: React.FC = () => {
               </div>
             )}
 
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => void handleFechar()}
-              disabled={isSaving}
-            >
-              Cancelar
-            </Button>
+            <div className={styles.footerActions}>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => void handleFechar()}
+                disabled={isSaving}
+              >
+                Cancelar
+              </Button>
 
-            <Button
-              type="submit"
-              variant="primary"
-              loading={isSaving}
-              disabled={isSaving}
-            >
-              {blocoPendente ? 'Tentar concluir bloco novamente' : 'Salvar sessão'}
-            </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                loading={isSaving}
+                disabled={isSaving}
+              >
+                {blocoPendente ? 'Tentar concluir bloco novamente' : 'Salvar sessão'}
+              </Button>
+            </div>
           </div>
         </form>
       </div>

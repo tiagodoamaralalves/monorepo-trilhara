@@ -95,7 +95,7 @@
 .taskList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
 /* ── SEÇÃO DE TAREFAS CONCLUÍDAS ── */
@@ -213,82 +213,64 @@
   background: var(--bg);
 }
 
-/* ── ESTILOS PARA BLOCOS DE ESTUDO NA VISÃO HOJE E LISTA VIRTUAL ── */
-.blocoItemRow {
+/* ── LIXEIRA ── */
+.lixeiraSection {
+  margin-bottom: 24px;
+}
+
+.lixeiraTitle {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+  margin: 0 0 10px 0;
+}
+
+.lixeiraCard {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 14px;
+  padding: 14px 18px;
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  transition: all var(--transition-fast, 150ms ease);
 }
 
-.blocoItemRow:hover {
-  background: var(--surface-2);
-  border-color: var(--border-strong);
-}
-
-.blocoItemContent {
+.lixeiraCardInfo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
   flex: 1;
 }
 
-.blocoCheckBtn {
+.lixeiraCardText {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 1.5px solid var(--text-soft);
-  background: transparent;
-  color: transparent;
-  cursor: pointer;
-  padding: 0;
-  flex-shrink: 0;
-  transition: all var(--transition-fast, 150ms ease);
-}
-
-.blocoCheckBtn:hover {
-  border-color: var(--primary-light);
-  color: var(--primary-light);
-  background: var(--primary-bg);
-}
-
-.blocoDetails {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
-.blocoTrilhaPill {
-  display: inline-flex;
-  align-items: center;
+  flex-direction: column;
   gap: 4px;
-  padding: 2px 8px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-soft);
-  background: var(--surface-3);
-  border-radius: var(--radius-pill);
+  min-width: 0;
+  flex: 1;
 }
 
-.blocoMeta {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.lixeiraCardTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.lixeiraCardDesc {
   font-size: 12px;
   color: var(--text-soft);
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
+  word-break: break-word;
+}
+
+.lixeiraEmpty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-soft);
 }
 
 .virtualListTopBar {

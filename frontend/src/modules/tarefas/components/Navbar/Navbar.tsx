@@ -30,7 +30,7 @@ export interface NavbarProps {
   onNavegar: (filtro: FiltroVisualizacao) => void;
   onAbrirNovaTarefa: () => void;
   onAbrirLogin?: () => void;
-  onLogout?: () => void;
+  onSettings?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -50,7 +50,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNavegar,
   onAbrirNovaTarefa,
   onAbrirLogin,
-  onLogout
+  onSettings
 }) => {
   return (
     <AppSidebar<FiltroVisualizacao>
@@ -69,7 +69,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             }
           : null
       }
-      onLogout={onLogout}
+      onSettings={onSettings}
+      settingsLabel="Configurar lembretes"
       onLogin={onAbrirLogin}
       contextSlot={
         <TarefaContextPod

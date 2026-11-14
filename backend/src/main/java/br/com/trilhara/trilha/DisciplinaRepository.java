@@ -31,6 +31,7 @@ public class DisciplinaRepository {
     private static final String CAMPO_TRILHA_ID = "trilhaId";
     private static final String CAMPO_ORDEM = "ordem";
     private static final String CAMPO_TOPICOS = "topicos";
+    private static final String CAMPO_CONCLUIDA = "concluida";
     private static final String CAMPO_ATUALIZADO_EM = "atualizadoEm";
 
     private final MongoCollection<Document> collection;
@@ -94,11 +95,21 @@ public class DisciplinaRepository {
                 .append("peso", disciplina.peso())
                 .append(CAMPO_ORDEM, disciplina.ordem())
                 .append(CAMPO_TOPICOS, topicosDoc)
+                .append(CAMPO_CONCLUIDA, disciplina.concluida())
                 .append(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(disciplina.atualizadoEm() != null ? disciplina.atualizadoEm() : Instant.now()));
 
         return collection.updateOne(
                 and(eq("_id", disciplina.id()), eq(CAMPO_USUARIO_ID, disciplina.usuarioId()), eq(CAMPO_TRILHA_ID, disciplina.trilhaId())),
                 new Document("$set", setDoc)).getMatchedCount() > 0;
+    }
+
+    public boolean atualizarConclusao(ObjectId usuarioId, ObjectId trilhaId, ObjectId disciplinaId, boolean concluida) {
+        return collection.updateOne(
+                and(eq("_id", disciplinaId), eq(CAMPO_USUARIO_ID, usuarioId), eq(CAMPO_TRILHA_ID, trilhaId)),
+                Updates.combine(
+                        Updates.set(CAMPO_CONCLUIDA, concluida),
+                        Updates.set(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(Instant.now()))
+                )).getMatchedCount() > 0;
     }
 
     public boolean atualizarOrdem(ObjectId usuarioId, ObjectId trilhaId, ObjectId disciplinaId, int novaOrdem) {
@@ -136,6 +147,7 @@ public class DisciplinaRepository {
                 .append("peso", disciplina.peso())
                 .append(CAMPO_ORDEM, disciplina.ordem())
                 .append(CAMPO_TOPICOS, topicosDoc)
+                .append(CAMPO_CONCLUIDA, disciplina.concluida())
                 .append("criadoEm", BsonDates.toBsonDate(disciplina.criadoEm() != null ? disciplina.criadoEm() : Instant.now()))
                 .append(CAMPO_ATUALIZADO_EM, BsonDates.toBsonDate(disciplina.atualizadoEm() != null ? disciplina.atualizadoEm() : Instant.now()));
     }
@@ -148,6 +160,7 @@ public class DisciplinaRepository {
         String cor = doc.getString("cor");
         Integer peso = doc.getInteger("peso", 1);
         Integer ordem = doc.getInteger(CAMPO_ORDEM, 0);
+        boolean concluida = Boolean.TRUE.equals(doc.getBoolean(CAMPO_CONCLUIDA));
 
         List<TopicoEmbutido> topicos = new ArrayList<>();
         List<Document> topicosDoc = doc.getList(CAMPO_TOPICOS, Document.class);
@@ -162,6 +175,6 @@ public class DisciplinaRepository {
         Instant criadoEm = BsonDates.lerInstant(doc, "criadoEm");
         Instant atualizadoEm = BsonDates.lerInstant(doc, CAMPO_ATUALIZADO_EM);
 
-        return new Disciplina(id, usuarioId, trilhaId, nome, cor, peso, ordem, topicos, criadoEm, atualizadoEm);
+        return new Disciplina(id, usuarioId, trilhaId, nome, cor, peso, ordem, topicos, concluida, criadoEm, atualizadoEm);
     }
 }

@@ -1,5 +1,5 @@
 import React, { useContext, useState } from 'react';
-import { AlertTriangle, ShieldAlert, Trash2 } from 'lucide-react';
+import { AlertTriangle, LogOut, ShieldAlert, Trash2 } from 'lucide-react';
 import { Button, Input, Modal, ConfirmContext } from '../design-system';
 import { ApiError } from './api';
 import { UsuarioAutenticado } from './types';
@@ -32,6 +32,7 @@ export interface ContaModalProps {
   isOpen: boolean;
   onClose: () => void;
   usuario?: UsuarioAutenticado | null;
+  onLogout?: () => Promise<void> | void;
   onExcluirConta?: (senha: string) => Promise<unknown>;
 }
 
@@ -39,6 +40,7 @@ export const ContaModal: React.FC<ContaModalProps> = ({
   isOpen,
   onClose,
   usuario,
+  onLogout,
   onExcluirConta
 }) => {
   const confirmContext = useContext(ConfirmContext);
@@ -47,6 +49,7 @@ export const ContaModal: React.FC<ContaModalProps> = ({
   const [senha, setSenha] = useState<string>('');
   const [confirmacaoTexto, setConfirmacaoTexto] = useState<string>('');
   const [carregando, setCarregando] = useState<boolean>(false);
+  const [saindo, setSaindo] = useState<boolean>(false);
   const [erro, setErro] = useState<string | null>(null);
 
   const resetarEstado = () => {
@@ -55,11 +58,23 @@ export const ContaModal: React.FC<ContaModalProps> = ({
     setConfirmacaoTexto('');
     setErro(null);
     setCarregando(false);
+    setSaindo(false);
   };
 
   const handleClose = () => {
     resetarEstado();
     onClose();
+  };
+
+  const handleSair = async () => {
+    if (!onLogout || saindo || carregando) return;
+    setSaindo(true);
+    try {
+      await onLogout();
+      handleClose();
+    } finally {
+      setSaindo(false);
+    }
   };
 
   const handleIniciarExclusao = async () => {
@@ -123,6 +138,20 @@ export const ContaModal: React.FC<ContaModalProps> = ({
               <span className={styles.label}>E-mail:</span>
               <span className={styles.value}>{usuario.email}</span>
             </div>
+            {onLogout && (
+              <div className={styles.sessionActions}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleSair}
+                  disabled={saindo || carregando}
+                  loading={saindo}
+                  leftIcon={<LogOut size={16} />}
+                >
+                  Sair da conta
+                </Button>
+              </div>
+            )}
           </div>
         )}
 

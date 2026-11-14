@@ -1,12 +1,14 @@
-import React, { useId, useState } from 'react';
-import { AlertTriangle, BookOpen, Check, ChevronDown, ChevronRight, ListTodo } from 'lucide-react';
-import { Badge, DisciplineLabel, EmptyState, SectionErrorCard, Skeleton } from '../design-system';
+import React, { useState } from 'react';
+import { Check, ChevronDown, ChevronRight } from 'lucide-react';
+import { EmptyState, SectionErrorCard, Skeleton, ToggleGroup } from '../design-system';
 import { BlocoHojeDTO, TarefaDTO } from '../contracts/domainContracts';
 import { AgendaHojeDerivado } from './agendaHojeService';
-import { TarefaAgendaItem } from './TarefaAgendaItem';
+import { BlocoAgendaItem } from './BlocoAgendaItem';
+import { StatusAgendaTarefa, TarefaAgendaItem } from './TarefaAgendaItem';
 import styles from './AgendaHoje.module.css';
 
 type ModoAgendaHoje = 'tarefas' | 'pomodoro';
+type FiltroAgendaHoje = 'todos' | 'atrasadas' | 'hoje' | 'blocos' | 'sem-data';
 
 interface FocoAgenda {
   tipo: 'TAREFA' | 'BLOCO';
@@ -14,7 +16,7 @@ interface FocoAgenda {
 }
 
 export interface AgendaHojeProps {
-  /** `tarefas` (densidade confortável, ações de edição) ou `pomodoro` (compacta, foco). */
+  /** `tarefas` (clique abre edição) ou `pomodoro` (clique define foco, sem edição). */
   modo: ModoAgendaHoje;
   /** Saída de `useAgendaHoje.dados`; `null` para visitante (nunca renderizado). */
   dados: AgendaHojeDerivado | null;
@@ -22,12 +24,11 @@ export interface AgendaHojeProps {
   onConcluirBloco: (bloco: BlocoHojeDTO) => void;
   /** Retry isolado da fonte de Tarefas (Atrasadas, tarefas de Hoje e Sem data). */
   onRetryTarefas: () => void;
-  /** Retry isolado da fonte de Blocos (subgrupo "Blocos de estudo"). */
+  /** Retry isolado da fonte de Blocos. */
   onRetryBlocos: () => void;
   recarregando?: boolean;
   onEditarTarefa?: (tarefa: TarefaDTO) => void;
   onExcluirTarefa?: (tarefa: TarefaDTO) => void;
-  onPularTarefa?: (id: string) => void;
   onAlternarSubtarefa?: (tarefaId: string, subtarefaId: string, concluida: boolean) => void;
   /** Somente em `modo="pomodoro"`: contexto visual de foco atual. */
   foco?: FocoAgenda | null;
@@ -35,6 +36,14 @@ export interface AgendaHojeProps {
 }
 
 const TEXTO_ERRO_REDE = 'Verifique sua conexão e tente novamente.';
+
+const OPCOES_FILTRO = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'atrasadas', label: 'Atrasadas' },
+  { value: 'hoje', label: 'Hoje' },
+  { value: 'blocos', label: 'Blocos' },
+  { value: 'sem-data', label: 'Sem data' }
+] as const;
 
 /** Mensagem de falha da fonte, sem expor detalhes internos do servidor. */
 function mensagemErro(erro: Error | null): string {
@@ -44,15 +53,11 @@ function mensagemErro(erro: Error | null): string {
 }
 
 /**
- * Visão Hoje compartilhada por Tarefas e Pomodoro (§9 / / ).
+ * Visão Hoje compartilhada por Tarefas e Pomodoro.
  *
- * Seções: Atrasadas (agrupadas por série), Hoje (subgrupos "Blocos de estudo" e
- * "Tarefas") e Sem data, cada uma com contador;
- * carregamento inicial: `Skeleton row` ×3 por seção;
- * falha de uma fonte: `SectionErrorCard variant="inline"` apenas no subgrupo afetado,
- * mantendo os dados da outra fonte;
- * tudo vazio com as duas fontes OK: `EmptyState` "Tudo em dia por hoje";
- * `modo` controla densidade e a ação "Definir como foco" (exclusiva do Pomodoro).
+ * Lista única de cartões no padrão de Disciplinas com filtros no topo
+ * (`Todos | Atrasadas | Hoje | Blocos | Sem data`) e pílulas de status horizontais
+ * dentro de cada cartão.
  */
 export const AgendaHoje: React.FC<AgendaHojeProps> = ({
   modo,
@@ -64,36 +69,36 @@ export const AgendaHoje: React.FC<AgendaHojeProps> = ({
   recarregando = false,
   onEditarTarefa,
   onExcluirTarefa,
-  onPularTarefa,
   onAlternarSubtarefa,
   foco = null,
   onDefinirFoco
 }) => {
+  const [filtro, setFiltro] = useState<FiltroAgendaHoje>('todos');
   const [expansores, setExpansores] = useState<Record<string, boolean>>({});
-  const idBase = useId();
-
-  const compacta = modo === 'pomodoro';
-  const densidade = compacta ? 'compacta' : 'confortavel';
-  const permiteFoco = compacta && Boolean(onDefinirFoco);
 
   if (!dados) return null;
+
+  const isPomodoro = modo === 'pomodoro';
+  const permiteFoco = isPomodoro && Boolean(onDefinirFoco);
 
   const carregandoTarefas = dados.statusTarefas === 'carregando';
   const carregandoBlocos = dados.statusBlocos === 'carregando';
   const erroTarefas = dados.statusTarefas === 'erro' ? dados.erroTarefas : null;
   const erroBlocos = dados.statusBlocos === 'erro' ? dados.erroBlocos : null;
 
+  const incluiTarefas = filtro !== 'blocos';
+  const incluiBlocos = filtro === 'todos' || filtro === 'blocos';
+
   const chaveGrupo = (principal: TarefaDTO): string => principal.serieId || principal.id;
 
-  const renderTarefa = (tarefa: TarefaDTO) => (
+  const renderTarefa = (tarefa: TarefaDTO, statusAgenda: StatusAgendaTarefa) => (
     <TarefaAgendaItem
       key={tarefa.id}
       tarefa={tarefa}
-      densidade={densidade}
+      statusAgenda={statusAgenda}
       onAlternar={onAlternarTarefa}
-      onEditar={compacta ? undefined : onEditarTarefa}
-      onExcluir={compacta ? undefined : onExcluirTarefa}
-      onPular={compacta ? undefined : onPularTarefa}
+      onEditar={isPomodoro ? undefined : onEditarTarefa}
+      onExcluir={onExcluirTarefa}
       onAlternarSubtarefa={onAlternarSubtarefa}
       onSelecionar={
         permiteFoco
@@ -109,58 +114,22 @@ export const AgendaHoje: React.FC<AgendaHojeProps> = ({
     const selecionado = foco?.tipo === 'BLOCO' && foco.id === blocoId;
 
     return (
-      <div
+      <BlocoAgendaItem
         key={blocoId}
-        className={`${styles.blocoItem} ${selecionado ? styles.blocoSelecionado : ''}`}
-      >
-        <div className={styles.blocoConteudo}>
-          <button
-            type="button"
-            className={styles.blocoConcluir}
-            onClick={() => onConcluirBloco(bloco)}
-            title="Concluir bloco e registrar sessão"
-            aria-label={`Concluir bloco de ${bloco.disciplinaNome}`}
-          >
-            <Check size={compacta ? 12 : 14} />
-          </button>
-
-          <div className={styles.blocoInfo}>
-            {permiteFoco ? (
-              <button
-                type="button"
-                className={styles.blocoFoco}
-                onClick={() => onDefinirFoco?.({ tipo: 'BLOCO', id: blocoId })}
-                title="Definir como foco"
-                aria-label="Definir como foco"
-              >
-                <DisciplineLabel name={bloco.disciplinaNome} color={bloco.disciplinaCor} />
-              </button>
-            ) : (
-              <DisciplineLabel name={bloco.disciplinaNome} color={bloco.disciplinaCor} />
-            )}
-
-            {bloco.trilhaNome && (
-              <span className={styles.blocoTrilhaPill}>
-                <BookOpen size={11} />
-                <span>{bloco.trilhaNome}</span>
-              </span>
-            )}
-
-            <span className={styles.blocoMeta}>
-              <span>{bloco.duracaoMinutos} min</span>
-            </span>
-          </div>
-        </div>
-
-        <Badge variant="warning">Hoje</Badge>
-      </div>
+        disciplinaNome={bloco.disciplinaNome}
+        disciplinaCor={bloco.disciplinaCor}
+        duracaoMinutos={bloco.duracaoMinutos}
+        trilhaNome={bloco.trilhaNome}
+        statusData="HOJE"
+        selecionado={selecionado}
+        onConcluir={() => onConcluirBloco(bloco)}
+        onDefinirFoco={
+          permiteFoco ? () => onDefinirFoco?.({ tipo: 'BLOCO', id: blocoId }) : undefined
+        }
+      />
     );
   };
 
-  /** Carregamento inicial da fonte: skeleton `row` ×3. */
-  const renderSkeleton = () => <Skeleton variant="row" linhas={3} className={styles.carregando} />;
-
-  /** Erro recuperável da fonte, sempre dentro do subgrupo afetado. */
   const renderErro = (origem: 'tarefas' | 'blocos', erro: Error | null) => (
     <SectionErrorCard
       variant="inline"
@@ -171,138 +140,127 @@ export const AgendaHoje: React.FC<AgendaHojeProps> = ({
     />
   );
 
-  const listaVazia = (texto: string) => <p className={styles.vazioSecao}>{texto}</p>;
+  const carregandoFiltroAtual =
+    (filtro === 'todos' && carregandoTarefas && carregandoBlocos) ||
+    (filtro === 'blocos' && carregandoBlocos) ||
+    (filtro !== 'todos' && filtro !== 'blocos' && carregandoTarefas);
 
-  return (
-    <div className={`${styles.container} ${compacta ? styles.compacta : ''}`}>
-      {/* ── Seção 1: Atrasadas ─────────────────────────────────────────── */}
-      <section className={styles.secao} aria-labelledby={`${idBase}-atrasadas`}>
-        <h2
-          id={`${idBase}-atrasadas`}
-          className={`${styles.secaoTitulo} ${styles.secaoTituloAtrasadas}`}
-        >
-          <AlertTriangle size={compacta ? 15 : 18} aria-hidden="true" />
-          <span>Atrasadas</span>
-          <span className={styles.contador}>({dados.atrasadas.length})</span>
-        </h2>
+  const exibirAtrasadas =
+    (filtro === 'todos' || filtro === 'atrasadas') && !erroTarefas && dados.atrasadasAgrupadas.length > 0;
+  const exibirBlocos =
+    (filtro === 'todos' || filtro === 'blocos') && !erroBlocos && dados.blocosHoje.length > 0;
+  const exibirHoje =
+    (filtro === 'todos' || filtro === 'hoje') && !erroTarefas && dados.tarefasHoje.length > 0;
+  const exibirSemData =
+    (filtro === 'todos' || filtro === 'sem-data') && !erroTarefas && dados.semData.length > 0;
 
-        {carregandoTarefas ? (
-          renderSkeleton()
-        ) : erroTarefas ? (
-          renderErro('tarefas', erroTarefas)
-        ) : dados.atrasadasAgrupadas.length === 0 ? (
-          listaVazia('Nenhuma tarefa atrasada.')
-        ) : (
-          <div className={styles.lista}>
-            {dados.atrasadasAgrupadas.map(({ principal, anteriores }) => {
-              const chave = chaveGrupo(principal);
-              const expandido = Boolean(expansores[chave]);
+  const temItensVisiveis = exibirAtrasadas || exibirBlocos || exibirHoje || exibirSemData;
 
-              return (
-                <div key={chave}>
-                  {renderTarefa(principal)}
-
-                  {anteriores.length > 0 && (
-                    <>
-                      <button
-                        type="button"
-                        className={styles.expansor}
-                        aria-expanded={expandido}
-                        onClick={() =>
-                          setExpansores((prev) => ({ ...prev, [chave]: !prev[chave] }))
-                        }
-                      >
-                        {expandido ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        <span>
-                          {expandido
-                            ? 'Ocultar ocorrências anteriores'
-                            : `+ ${anteriores.length} ocorrência(s) anterior(es) atrasada(s)`}
-                        </span>
-                      </button>
-
-                      {expandido && (
-                        <div className={styles.anteriores}>{anteriores.map(renderTarefa)}</div>
-                      )}
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* ── Seção 2: Hoje ──────────────────────────────────────────────── */}
-      <section className={styles.secao} aria-labelledby={`${idBase}-hoje`}>
-        <h2 id={`${idBase}-hoje`} className={styles.secaoTitulo}>
-          <ListTodo size={compacta ? 15 : 18} aria-hidden="true" />
-          <span>Hoje</span>
-        </h2>
-
-        <div className={styles.subgrupo}>
-          <h3 className={styles.subgrupoTitulo}>
-            <BookOpen size={compacta ? 14 : 15} aria-hidden="true" />
-            <span>Blocos de estudo</span>
-            <span className={styles.contador}>({dados.blocosHoje.length})</span>
-          </h3>
-
-          {carregandoBlocos ? (
-            renderSkeleton()
-          ) : erroBlocos ? (
-            renderErro('blocos', erroBlocos)
-          ) : dados.blocosHoje.length === 0 ? (
-            listaVazia('Nenhum bloco de estudo para hoje.')
-          ) : (
-            <div className={styles.lista}>{dados.blocosHoje.map(renderBloco)}</div>
-          )}
-        </div>
-
-        <div className={styles.subgrupo}>
-          <h3 className={styles.subgrupoTitulo}>
-            <ListTodo size={compacta ? 14 : 15} aria-hidden="true" />
-            <span>Tarefas</span>
-            <span className={styles.contador}>({dados.tarefasHoje.length})</span>
-          </h3>
-
-          {carregandoTarefas ? (
-            renderSkeleton()
-          ) : erroTarefas ? (
-            renderErro('tarefas', erroTarefas)
-          ) : dados.tarefasHoje.length === 0 ? (
-            listaVazia('Nenhuma tarefa com vencimento para hoje.')
-          ) : (
-            <div className={styles.lista}>{dados.tarefasHoje.map(renderTarefa)}</div>
-          )}
-        </div>
-      </section>
-
-      {/* ── Seção 3: Sem data ──────────────────────────────────────────── */}
-      <section className={styles.secao} aria-labelledby={`${idBase}-sem-data`}>
-        <h2 id={`${idBase}-sem-data`} className={styles.secaoTitulo}>
-          <Check size={compacta ? 15 : 18} aria-hidden="true" />
-          <span>Sem data</span>
-          <span className={styles.contador}>({dados.semData.length})</span>
-        </h2>
-
-        {carregandoTarefas ? (
-          renderSkeleton()
-        ) : erroTarefas ? (
-          renderErro('tarefas', erroTarefas)
-        ) : dados.semData.length === 0 ? (
-          listaVazia('Nenhuma tarefa sem data.')
-        ) : (
-          <div className={styles.lista}>{dados.semData.map(renderTarefa)}</div>
-        )}
-      </section>
-
-      {dados.vazioTotal && (
+  const renderVazioFiltro = () => {
+    if (filtro === 'todos' && dados.vazioTotal) {
+      return (
         <EmptyState
-          icone={<Check size={compacta ? 20 : 24} />}
+          icone={<Check size={isPomodoro ? 20 : 24} />}
           titulo="Tudo em dia por hoje"
           descricao="Nenhuma tarefa ou bloco pendente para hoje."
         />
+      );
+    }
+
+    if (
+      !carregandoFiltroAtual &&
+      !temItensVisiveis &&
+      !(incluiTarefas && erroTarefas) &&
+      !(incluiBlocos && erroBlocos)
+    ) {
+      const mensagens: Record<Exclude<FiltroAgendaHoje, 'todos'>, string> = {
+        atrasadas: 'Nenhuma tarefa atrasada.',
+        hoje: 'Nenhuma tarefa para hoje.',
+        blocos: 'Nenhum bloco de estudo para hoje.',
+        'sem-data': 'Nenhuma tarefa sem data.'
+      };
+      if (filtro !== 'todos') {
+        return (
+          <p className={styles.vazioFiltro} role="status">
+            {mensagens[filtro]}
+          </p>
+        );
+      }
+    }
+
+    return null;
+  };
+
+  return (
+    <div className={styles.container}>
+      <div className={styles.toolbarRow}>
+        <ToggleGroup<FiltroAgendaHoje>
+          className={styles.filterGroup}
+          ariaLabel="Filtrar itens da agenda de hoje"
+          value={filtro}
+          onChange={setFiltro}
+          options={OPCOES_FILTRO}
+        />
+      </div>
+
+      {carregandoFiltroAtual ? (
+        <Skeleton variant="row" linhas={3} className={styles.carregando} />
+      ) : (
+        <>
+          {incluiTarefas && erroTarefas && renderErro('tarefas', erroTarefas)}
+          {incluiBlocos && erroBlocos && renderErro('blocos', erroBlocos)}
+
+          {temItensVisiveis && (
+            <div className={styles.lista}>
+              {exibirAtrasadas &&
+                dados.atrasadasAgrupadas.map(({ principal, anteriores }) => {
+                  const chave = chaveGrupo(principal);
+                  const expandido = Boolean(expansores[chave]);
+
+                  return (
+                    <div key={chave} className={styles.grupoAtrasado}>
+                      {renderTarefa(principal, 'atrasada')}
+
+                      {anteriores.length > 0 && (
+                        <>
+                          <button
+                            type="button"
+                            className={styles.expansor}
+                            aria-expanded={expandido}
+                            onClick={() =>
+                              setExpansores((prev) => ({ ...prev, [chave]: !prev[chave] }))
+                            }
+                          >
+                            {expandido ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                            <span>
+                              {expandido
+                                ? 'Ocultar ocorrências anteriores'
+                                : `+ ${anteriores.length} ocorrência(s) anterior(es) atrasada(s)`}
+                            </span>
+                          </button>
+
+                          {expandido && (
+                            <div className={styles.anteriores}>
+                              {anteriores.map((ant) => renderTarefa(ant, 'atrasada'))}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+
+              {exibirBlocos && dados.blocosHoje.map(renderBloco)}
+
+              {exibirHoje && dados.tarefasHoje.map((t) => renderTarefa(t, 'hoje'))}
+
+              {exibirSemData && dados.semData.map((t) => renderTarefa(t, 'sem-data'))}
+            </div>
+          )}
+
+          {renderVazioFiltro()}
+        </>
       )}
     </div>
   );
 };
-

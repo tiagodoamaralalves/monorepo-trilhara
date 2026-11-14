@@ -3,6 +3,7 @@ export * from './Badge/Badge';
 export * from './Checkbox/Checkbox';
 export * from './IconButton/IconButton';
 export * from './Input/Input';
+export * from './QuickAddInput/QuickAddInput';
 export * from './Select/Select';
 export * from './Modal/Modal';
 export * from './PageBanner/PageBanner';
@@ -32,4 +33,7 @@ export * from './SectionErrorCard';
 export * from './SyncStatusBadge';
 export * from './ContaMenuButton/ContaMenuButton';
 export * from './AvisoContaExcluida/AvisoContaExcluida';
+export * from './CalendarView/CalendarView';
+export * from './CalendarView/dateUtils';
+
 

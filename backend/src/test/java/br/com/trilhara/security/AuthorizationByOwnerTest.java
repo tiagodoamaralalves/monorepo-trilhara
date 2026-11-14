@@ -760,10 +760,6 @@ public class AuthorizationByOwnerTest {
             // ConcluirAtrasadosRequest exige operationId (UUID) — chave de idempotência.
             return "{\"operationId\":\"" + java.util.UUID.randomUUID() + "\"}";
         }
-        if (caminho.contains("/sessoes") && caminho.contains("/sessoes/")) {
-            // AtualizarSessaoRequest: duracaoSegundos entre 60 e 86400.
-            return "{\"duracaoSegundos\":1800,\"questoes\":10,\"acertos\":8}";
-        }
         if (caminho.contains("/sessoes")) {
             // RegistrarSessaoRequest: disciplinaId, dataSessao e duracaoSegundos (>= 60).
             // A data precisa ser passada: o serviço rejeita sessão futura com 400.

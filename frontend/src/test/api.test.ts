@@ -146,10 +146,9 @@ describe('API compartilhada: contratos base e cabeçalhos', () => {
       duracaoSegundos: 3600,
       dataSessao: '2026-11-09',
       criadoEm: '2026-11-09T14:00:00Z',
-      disciplinaRemovida: false,
-      editavel: true
+      disciplinaRemovida: false
     };
-    expect(sessao.editavel).toBe(true);
+    expect(sessao.disciplinaRemovida).toBe(false);
 
     const bloco: BlocoHojeDTO = {
       blocoId: 'bloco-1',

@@ -21,7 +21,11 @@ const USUARIO = {
   criadoEm: '2026-11-09T00:00:00Z'
 };
 
-function montar(onExcluirConta = vi.fn().mockResolvedValue(undefined), onClose = vi.fn()) {
+function montar(
+  onExcluirConta = vi.fn().mockResolvedValue(undefined),
+  onClose = vi.fn(),
+  onLogout?: () => Promise<void> | void
+) {
   return render(
     <ToastProvider>
       <ConfirmProvider>
@@ -30,6 +34,7 @@ function montar(onExcluirConta = vi.fn().mockResolvedValue(undefined), onClose =
           onClose={onClose}
           usuario={USUARIO}
           onExcluirConta={onExcluirConta}
+          onLogout={onLogout}
         />
       </ConfirmProvider>
     </ToastProvider>
@@ -144,5 +149,15 @@ describe('ContaModal: confirmação dupla, erros inline e envio único', () => {
     expect(
       await screen.findByText(/Muitas tentativas\. Tente novamente em 42 segundos\./i)
     ).toBeInTheDocument();
+  });
+
+  it('chama onLogout ao clicar no botão Sair da conta', async () => {
+    const user = userEvent.setup();
+    const onLogout = vi.fn().mockResolvedValue(undefined);
+    montar(vi.fn().mockResolvedValue(undefined), vi.fn(), onLogout);
+
+    await user.click(screen.getByRole('button', { name: /Sair da conta/i }));
+
+    await waitFor(() => expect(onLogout).toHaveBeenCalledTimes(1));
   });
 });

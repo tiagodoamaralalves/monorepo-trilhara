@@ -84,6 +84,7 @@ export const TopicRow: React.FC<TopicRowProps> = ({
 }) => {
   const isEditing = Boolean(content);
   const isClickable = Boolean(onClick && !isEditing);
+  const actionsRef = React.useRef<HTMLDivElement>(null);
 
   return (
     <li className={`${styles.topicItem} ${isClickable ? styles.topicItemClickable : ''} ${className}`}>
@@ -91,7 +92,14 @@ export const TopicRow: React.FC<TopicRowProps> = ({
         className={styles.topicRowContent}
         role={isClickable ? 'button' : undefined}
         tabIndex={isClickable ? 0 : undefined}
-        onClick={isClickable ? onClick : undefined}
+        onClick={
+          isClickable
+            ? (event) => {
+                if (actionsRef.current?.contains(event.target as Node)) return;
+                onClick?.();
+              }
+            : undefined
+        }
         onKeyDown={(event) => {
           if (!isClickable) return;
           if (event.target !== event.currentTarget) return;
@@ -105,7 +113,7 @@ export const TopicRow: React.FC<TopicRowProps> = ({
       <span className={styles.topicNumber}>{index + 1}.</span>
       {content ?? <span className={styles.topicText}>{name}</span>}
         {actions && (
-          <div className={styles.itemActions} onClickCapture={(event) => event.stopPropagation()}>
+          <div ref={actionsRef} className={styles.itemActions}>
             {actions}
           </div>
         )}

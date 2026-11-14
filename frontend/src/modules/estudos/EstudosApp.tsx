@@ -52,6 +52,8 @@ function resumoDe(detalhe: TrilhaDetalheDTO): TrilhaResumoDTO {
     cor: detalhe.cor,
     origemEditalId: detalhe.origemEditalId,
     totalDisciplinas: detalhe.totalDisciplinas ?? detalhe.disciplinas.length,
+    disciplinasConcluidas: detalhe.disciplinasConcluidas,
+    temDisciplinaSemTopico: detalhe.temDisciplinaSemTopico,
     totalTopicos: detalhe.totalTopicos ?? 0,
     topicosConcluidos: detalhe.topicosConcluidos ?? 0,
     percentualProgresso: detalhe.percentualProgresso ?? 0,
@@ -295,6 +297,10 @@ export default function EstudosApp() {
               cor: atualizada.cor,
               totalDisciplinas:
                 atualizada.totalDisciplinas ?? atualizada.disciplinas.length,
+              disciplinasConcluidas:
+                atualizada.disciplinasConcluidas ?? t.disciplinasConcluidas,
+              temDisciplinaSemTopico:
+                atualizada.temDisciplinaSemTopico ?? t.temDisciplinaSemTopico,
               totalTopicos: atualizada.totalTopicos ?? t.totalTopicos,
               topicosConcluidos:
                 atualizada.topicosConcluidos ?? t.topicosConcluidos,
@@ -451,14 +457,6 @@ export default function EstudosApp() {
     }
   };
 
-  const handleLogout = async () => {
-    await logout();
-    setTrilhas([]);
-    setTrilhaAtivaId('');
-    toast.info('Você saiu da sua conta.');
-    navegar('landing');
-  };
-
   if (paginaAtiva === 'landing') {
     return (
       <LandingView
@@ -540,7 +538,7 @@ export default function EstudosApp() {
           if (trilhaAtiva) setTrilhaEmEdicao(resumoDe(trilhaAtiva));
         }}
         onAbrirNovaTrilha={abrirNovaTrilha}
-        onLogout={() => void handleLogout()}
+        onSettings={() => toast.info('Configurações gerais em breve.')}
       />
 
       {/* Conteúdo da Página */}

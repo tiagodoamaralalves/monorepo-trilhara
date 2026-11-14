@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import {
   LogIn,
-  LogOut,
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
+  Settings,
   Sun
 } from 'lucide-react';
 import { useTheme } from '../Theme/useTheme';
@@ -22,7 +22,8 @@ export interface AppSidebarProps<TId extends string = string> {
   user?: SidebarUser | null;
   currentApp?: ModuloApp;
   showAppSwitcher?: boolean;
-  onLogout?: () => void;
+  onSettings?: () => void;
+  settingsLabel?: string;
   onLogin?: () => void;
   storageKey?: string;
   contextSlot?: React.ReactNode;
@@ -45,7 +46,8 @@ export const AppSidebar = <TId extends string = string>({
   user,
   currentApp,
   showAppSwitcher = true,
-  onLogout,
+  onSettings,
+  settingsLabel = 'Configurações',
   onLogin,
   storageKey = 'trilhara_sidebar_collapsed',
   contextSlot,
@@ -220,17 +222,15 @@ export const AppSidebar = <TId extends string = string>({
                   )}
                 </div>
               )}
-              {onLogout && (
-                <button
-                  type="button"
-                  className={styles.logoutBtn}
-                  onClick={onLogout}
-                  title="Sair da conta"
-                  aria-label="Sair da conta"
-                >
-                  <LogOut size={15} />
-                </button>
-              )}
+              <button
+                type="button"
+                className={styles.settingsBtn}
+                onClick={onSettings}
+                title={settingsLabel}
+                aria-label={settingsLabel}
+              >
+                <Settings size={15} />
+              </button>
             </div>
           ) : onLogin ? (
             <button
@@ -290,15 +290,15 @@ export const AppSidebar = <TId extends string = string>({
             {isLight ? <Moon size={14} /> : <Sun size={14} />}
           </button>
 
-          {onLogout && (
+          {user && (
             <button
               type="button"
               className={styles.mobileActionBtn}
-              onClick={onLogout}
-              title="Sair da conta"
-              aria-label="Sair da conta"
+              onClick={onSettings}
+              title={settingsLabel}
+              aria-label={settingsLabel}
             >
-              <LogOut size={14} />
+              <Settings size={14} />
             </button>
           )}
         </div>

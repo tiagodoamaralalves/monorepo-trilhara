@@ -177,7 +177,7 @@ public final class RotasPrivadas {
             "PATCH /api/tarefas/{tarefaId}/conclusao",
             "PATCH /api/tarefas/{tarefaId}/subtarefas/{subtarefaId}",
             "PATCH /api/trilhas/{trilhaId}/cronogramas/{cronogramaId}/ativar",
-            "PATCH /api/trilhas/{trilhaId}/sessoes/{sessaoId}",
+            "PATCH /api/trilhas/{trilhaId}/disciplinas/{disciplinaId}/conclusao",
             "POST /api/admin/editais",
             "POST /api/auth/cadastro",
             "POST /api/auth/confirmar-email",
@@ -233,7 +233,8 @@ public final class RotasPrivadas {
     public static final Set<String> REMOVIDAS = Set.of(
             "PATCH /api/trilhas/{trilhaId}/progresso/{topicoId}",
             "GET /api/cadernos/{cadernoId}/secoes/{secaoId}/notas/{notaId}",
-            "PATCH /api/push/preferencias"
+            "PATCH /api/push/preferencias",
+            "PATCH /api/trilhas/{trilhaId}/sessoes/{sessaoId}"
     );
 
     /** Todas as rotas declaradas, para asserções de contrato. */
@@ -267,6 +268,8 @@ public final class RotasPrivadas {
                         "trilha de A: reordenar disciplinas"),
                 new Caso("PUT", "/api/trilhas/{trilhaA}/disciplinas/{disciplinaA}", true, 404,
                         "disciplina de A: atualizar"),
+                new Caso("PATCH", "/api/trilhas/{trilhaA}/disciplinas/{disciplinaA}/conclusao", true, 404,
+                        "disciplina de A: atualizar conclusão"),
                 new Caso("DELETE", "/api/trilhas/{trilhaA}/disciplinas/{disciplinaA}", false, 404,
                         "disciplina de A: excluir"),
                 new Caso("PUT", "/api/trilhas/{trilhaA}/topicos/{topicoA}/progresso", true, 404,
@@ -277,8 +280,6 @@ public final class RotasPrivadas {
                 // ── Sessões e estatísticas ──
                 new Caso("GET", "/api/trilhas/{trilhaA}/sessoes", false, 404, "sessões de A: listar"),
                 new Caso("POST", "/api/trilhas/{trilhaA}/sessoes", true, 404, "sessões de A: registrar"),
-                new Caso("PATCH", "/api/trilhas/{trilhaA}/sessoes/{sessaoA}", true, 404,
-                        "sessão de A: editar"),
                 new Caso("DELETE", "/api/trilhas/{trilhaA}/sessoes/{sessaoA}", false, 404,
                         "sessão de A: excluir"),
                 new Caso("DELETE", "/api/trilhas/{trilhaA}/disciplinas/{disciplinaA}/sessoes", false, 404,

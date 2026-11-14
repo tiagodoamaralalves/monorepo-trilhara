@@ -23,6 +23,7 @@ import {
   trilhaCardStyles
 } from '../components/TrilhaCard/TrilhaCard';
 import { diasAte, formatarDataBR } from '../utils/format';
+import { formatarPercentualEdital } from '../utils/progressoTrilha';
 import styles from './HubView.module.css';
 
 export type StatusCarregamento = 'carregando' | 'sucesso' | 'erro';
@@ -100,10 +101,21 @@ export const HubView: React.FC<HubViewProps> = ({
     );
   };
 
+  const formatarProgressoResumo = (trilha: TrilhaResumoDTO): string => {
+    const pctTexto = formatarPercentualEdital(trilha.percentualProgresso ?? 0);
+    if (trilha.totalTopicos === 0 && trilha.totalDisciplinas > 0) {
+      return `${pctTexto} (${trilha.disciplinasConcluidas ?? 0}/${trilha.totalDisciplinas} disc.)`;
+    }
+    if (trilha.temDisciplinaSemTopico) {
+      return `${pctTexto} (${trilha.disciplinasConcluidas ?? 0}/${trilha.totalDisciplinas} disc. · ${trilha.topicosConcluidos}/${trilha.totalTopicos} ass.)`;
+    }
+    return `${pctTexto} (${trilha.topicosConcluidos}/${trilha.totalTopicos})`;
+  };
+
   const renderCard = (trilha: TrilhaResumoDTO) => {
     const isAtiva = trilha.id === trilhaAtivaId;
     const prazo = diasAte(trilha.dataProva);
-    const pct = Math.round(trilha.percentualProgresso ?? 0);
+    const progressoTexto = formatarProgressoResumo(trilha);
 
     return (
       <TrilhaCard
@@ -155,7 +167,7 @@ export const HubView: React.FC<HubViewProps> = ({
             value: (
               <>
                 <CheckCircle size={13} className={trilhaCardStyles.metricIcon} />
-                {pct}% ({trilha.topicosConcluidos}/{trilha.totalTopicos})
+                {progressoTexto}
               </>
             )
           }

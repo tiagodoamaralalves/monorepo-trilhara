@@ -19,7 +19,7 @@ describe('classificação de erros', () => {
   });
 
   it('classifica 409 como conflito', () => {
-    expect(classificarErro(new ApiError({ status: 409, code: 'LATEST_SESSION_ONLY', detail: 'x' }))).toBe('conflito');
+    expect(classificarErro(new ApiError({ status: 409, code: 'DUPLICATE_RESOURCE', detail: 'x' }))).toBe('conflito');
   });
 
   it('classifica validação e limite', () => {

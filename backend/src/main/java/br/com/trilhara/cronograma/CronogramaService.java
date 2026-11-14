@@ -65,6 +65,7 @@ public class CronogramaService {
     private static final String CAMPO_CRONOGRAMA_ID = "cronogramaId";
     private static final String CAMPO_CRONOGRAMA_ATIVO_ID = "cronogramaAtivoId";
     private static final String CAMPO_SEMANA_MODELO_MANUAL = "semanaModeloManual";
+    private static final String CAMPO_BLOCOS_POR_DIA_SEMANA = "blocosPorDiaSemana";
     private static final String CAMPO_DISCIPLINAS_PARTICIPANTES_IDS = "disciplinasParticipantesIds";
     private static final int MAX_CRONOGRAMAS_POR_TRILHA = 3;
     private static final int MAX_DIAS_HORIZONTE = 366;
@@ -92,6 +93,7 @@ public class CronogramaService {
             LocalDate dataFim,
             List<Integer> diasAtivosSemana,
             Integer blocosPorDia,
+            Map<Integer, Integer> blocosPorDiaSemana,
             List<Disciplina> participantes,
             Map<Integer, List<String>> semanaModeloManual,
             Document configuracao,
@@ -107,6 +109,7 @@ public class CronogramaService {
             LocalDate dataFim,
             List<Integer> diasAtivosSemana,
             Integer blocosPorDia,
+            Map<Integer, Integer> blocosPorDiaSemana,
             List<ObjectId> disciplinasParticipantesIds,
             Map<Integer, List<String>> semanaModeloManual) {
     }
@@ -172,8 +175,11 @@ public class CronogramaService {
 
             List<Disciplina> participantes = validarDisciplinasParticipantes(
                     usuarioId, trilhaId, request.disciplinasParticipantesIds());
-            validarConfiguracao(request.tipoPeriodo(), request.diasAtivosSemana(), request.blocosPorDia(),
-                    request.duracaoBlocoMinutos(), request.semanaModeloManual(), participantes);
+            List<Integer> diasAtivosNormalizados = normalizarDiasAtivos(
+                    request.diasAtivosSemana(), request.blocosPorDiaSemana());
+            validarConfiguracao(request.tipoPeriodo(), diasAtivosNormalizados, request.blocosPorDia(),
+                    request.blocosPorDiaSemana(), request.duracaoBlocoMinutos(),
+                    request.semanaModeloManual(), participantes);
 
             ObjectId cronogramaId = new ObjectId();
             long versaoNova = trilhaRepository.proximaVersaoCronograma(usuarioId, trilhaId)
@@ -182,7 +188,8 @@ public class CronogramaService {
             Instant agora = Instant.now();
             Document configDoc = montarConfiguracaoDocumento(new DadosConfiguracao(
                     request.modalidade(), request.duracaoBlocoMinutos(), request.tipoPeriodo(),
-                    dataInicio, dataFim, request.diasAtivosSemana(), request.blocosPorDia(),
+                    dataInicio, dataFim, diasAtivosNormalizados, request.blocosPorDia(),
+                    request.blocosPorDiaSemana(),
                     participantes.stream().map(Disciplina::id).toList(), request.semanaModeloManual()));
 
             // ETAPA 1 — documento em PREPARANDO e inativo (respeita o índice parcial único)
@@ -192,15 +199,17 @@ public class CronogramaService {
                     cronogramaId, usuarioId, trilhaId, request.modalidade(),
                     false, versaoNova, null, VALOR_PREPARANDO,
                     request.duracaoBlocoMinutos(), request.tipoPeriodo(),
-                    dataInicio, dataFim, request.diasAtivosSemana(),
-                    request.blocosPorDia(), participantes.stream().map(Disciplina::id).toList(),
+                    dataInicio, dataFim, diasAtivosNormalizados,
+                    request.blocosPorDia(), request.blocosPorDiaSemana(),
+                    participantes.stream().map(Disciplina::id).toList(),
                     request.semanaModeloManual(), null, configDoc, agora, agora);
             cronogramaRepository.inserir(novo);
 
             return publicar(heartbeat, new ContextoPublicacao(
                     usuarioId, trilhaId, cronogramaId, versaoNova,
                     request.modalidade(), request.duracaoBlocoMinutos(), request.tipoPeriodo(),
-                    dataInicio, dataFim, request.diasAtivosSemana(), request.blocosPorDia(),
+                    dataInicio, dataFim, diasAtivosNormalizados, request.blocosPorDia(),
+                    request.blocosPorDiaSemana(),
                     participantes, request.semanaModeloManual(), configDoc,
                     agora, novo.criadoEm()));
         } finally {
@@ -231,15 +240,19 @@ public class CronogramaService {
 
             List<Disciplina> participantes = validarDisciplinasParticipantes(
                     usuarioId, trilhaId, request.disciplinasParticipantesIds());
-            validarConfiguracao(request.tipoPeriodo(), request.diasAtivosSemana(), request.blocosPorDia(),
-                    request.duracaoBlocoMinutos(), request.semanaModeloManual(), participantes);
+            List<Integer> diasAtivosNormalizados = normalizarDiasAtivos(
+                    request.diasAtivosSemana(), request.blocosPorDiaSemana());
+            validarConfiguracao(request.tipoPeriodo(), diasAtivosNormalizados, request.blocosPorDia(),
+                    request.blocosPorDiaSemana(), request.duracaoBlocoMinutos(),
+                    request.semanaModeloManual(), participantes);
 
             long versaoNova = trilhaRepository.proximaVersaoCronograma(usuarioId, trilhaId)
                     .orElseThrow(() -> new NotFoundException(ERRO_TRILHA_NAO_ENCONTRADA));
 
             Document configPreparada = montarConfiguracaoDocumento(new DadosConfiguracao(
                     request.modalidade(), request.duracaoBlocoMinutos(), request.tipoPeriodo(),
-                    dataInicio, dataFim, request.diasAtivosSemana(), request.blocosPorDia(),
+                    dataInicio, dataFim, diasAtivosNormalizados, request.blocosPorDia(),
+                    request.blocosPorDiaSemana(),
                     participantes.stream().map(Disciplina::id).toList(), request.semanaModeloManual()));
 
             // ETAPA 1 — marca a versão preparada no documento (flags atuais preservadas)
@@ -249,8 +262,9 @@ public class CronogramaService {
                     existente.id(), usuarioId, trilhaId, request.modalidade(),
                     existente.ativo(), existente.versaoAtiva(), versaoNova, VALOR_PREPARANDO,
                     request.duracaoBlocoMinutos(), request.tipoPeriodo(),
-                    dataInicio, dataFim, request.diasAtivosSemana(),
-                    request.blocosPorDia(), participantes.stream().map(Disciplina::id).toList(),
+                    dataInicio, dataFim, diasAtivosNormalizados,
+                    request.blocosPorDia(), request.blocosPorDiaSemana(),
+                    participantes.stream().map(Disciplina::id).toList(),
                     request.semanaModeloManual(), existente.configuracaoAtiva(), configPreparada,
                     existente.criadoEm(), Instant.now());
             cronogramaRepository.atualizar(preparando);
@@ -258,7 +272,8 @@ public class CronogramaService {
             return publicar(heartbeat, new ContextoPublicacao(
                     usuarioId, trilhaId, cronogramaId, versaoNova,
                     request.modalidade(), request.duracaoBlocoMinutos(), request.tipoPeriodo(),
-                    dataInicio, dataFim, request.diasAtivosSemana(), request.blocosPorDia(),
+                    dataInicio, dataFim, diasAtivosNormalizados, request.blocosPorDia(),
+                    request.blocosPorDiaSemana(),
                     participantes, request.semanaModeloManual(), configPreparada,
                     Instant.now(), existente.criadoEm()));
         } finally {
@@ -295,7 +310,8 @@ public class CronogramaService {
                     true, cronograma.versaoAtiva(), cronograma.versaoPreparada(), VALOR_ATIVO,
                     cronograma.duracaoBlocoMinutos(), cronograma.tipoPeriodo(),
                     cronograma.dataInicio(), cronograma.dataFim(), cronograma.diasAtivosSemana(),
-                    cronograma.blocosPorDia(), cronograma.disciplinasParticipantesIds(),
+                    cronograma.blocosPorDia(), cronograma.blocosPorDiaSemana(),
+                    cronograma.disciplinasParticipantesIds(),
                     cronograma.semanaModeloManual(), cronograma.configuracaoAtiva(), cronograma.configuracaoPreparada(),
                     cronograma.criadoEm(), Instant.now());
             cronogramaRepository.atualizar(atualizado);
@@ -345,7 +361,8 @@ public class CronogramaService {
                             true, restante.versaoAtiva(), restante.versaoPreparada(), VALOR_ATIVO,
                             restante.duracaoBlocoMinutos(), restante.tipoPeriodo(),
                             restante.dataInicio(), restante.dataFim(), restante.diasAtivosSemana(),
-                            restante.blocosPorDia(), restante.disciplinasParticipantesIds(),
+                            restante.blocosPorDia(), restante.blocosPorDiaSemana(),
+                            restante.disciplinasParticipantesIds(),
                             restante.semanaModeloManual(), restante.configuracaoAtiva(), restante.configuracaoPreparada(),
                             restante.criadoEm(), Instant.now());
                     cronogramaRepository.atualizar(promovido);
@@ -625,10 +642,12 @@ public class CronogramaService {
     }
 
     private void calcularCargaSequencialOuPonderada(Cronograma c, List<Integer> carga) {
-        int blocosDia = c.blocosPorDia() != null ? c.blocosPorDia() : 1;
         int duracao = c.duracaoBlocoMinutos();
         for (Integer dia : c.diasAtivosSemana()) {
             if (dia != null && dia >= 1 && dia <= 7) {
+                int blocosDia = (c.blocosPorDiaSemana() != null && c.blocosPorDiaSemana().containsKey(dia))
+                        ? c.blocosPorDiaSemana().get(dia)
+                        : (c.blocosPorDia() != null ? c.blocosPorDia() : 1);
                 carga.set(dia - 1, blocosDia * duracao);
             }
         }
@@ -692,7 +711,8 @@ public class CronogramaService {
                     new GeradorBlocosCronograma.ParametrosGeracao(
                             ctx.usuarioId(), ctx.trilhaId(), ctx.cronogramaId(), ctx.versaoNova(),
                             ctx.modalidade(), ctx.duracaoBlocoMinutos(), ctx.dataInicio(), ctx.dataFim(),
-                            ctx.diasAtivosSemana(), ctx.blocosPorDia(), ctx.participantes(), ctx.semanaModeloManual()));
+                            ctx.diasAtivosSemana(), ctx.blocosPorDia(), ctx.blocosPorDiaSemana(),
+                            ctx.participantes(), ctx.semanaModeloManual()));
             blocoCronogramaRepository.inserirLote(blocos);
 
             // ETAPA 3 — contagem esperada antes de publicar
@@ -724,7 +744,7 @@ public class CronogramaService {
                     ctx.cronogramaId(), ctx.usuarioId(), ctx.trilhaId(), ctx.modalidade(),
                     true, ctx.versaoNova(), null, VALOR_ATIVO,
                     ctx.duracaoBlocoMinutos(), ctx.tipoPeriodo(), ctx.dataInicio(), ctx.dataFim(), ctx.diasAtivosSemana(),
-                    ctx.blocosPorDia(), ctx.participantes().stream().map(Disciplina::id).toList(),
+                    ctx.blocosPorDia(), ctx.blocosPorDiaSemana(), ctx.participantes().stream().map(Disciplina::id).toList(),
                     ctx.semanaModeloManual(), ctx.configuracao(), null,
                     ctx.criadoEm() != null ? ctx.criadoEm() : ctx.agora(), Instant.now());
             cronogramaRepository.atualizar(publicado);
@@ -750,7 +770,7 @@ public class CronogramaService {
                     c.id(), c.usuarioId(), c.trilhaId(), c.modalidade(), c.ativo(),
                     c.versaoAtiva(), c.versaoPreparada(), VALOR_RECUPERACAO,
                     c.duracaoBlocoMinutos(), c.tipoPeriodo(), c.dataInicio(), c.dataFim(),
-                    c.diasAtivosSemana(), c.blocosPorDia(), c.disciplinasParticipantesIds(),
+                    c.diasAtivosSemana(), c.blocosPorDia(), c.blocosPorDiaSemana(), c.disciplinasParticipantesIds(),
                     c.semanaModeloManual(), c.configuracaoAtiva(), c.configuracaoPreparada(),
                     c.criadoEm(), Instant.now());
             cronogramaRepository.atualizar(emRecuperacao);
@@ -810,17 +830,33 @@ public class CronogramaService {
         return normalizado;
     }
 
+    private static List<Integer> normalizarDiasAtivos(
+            List<Integer> diasAtivosSemana, Map<Integer, Integer> blocosPorDiaSemana) {
+        if (diasAtivosSemana != null && !diasAtivosSemana.isEmpty()) {
+            return diasAtivosSemana;
+        }
+        if (blocosPorDiaSemana != null && !blocosPorDiaSemana.isEmpty()) {
+            return blocosPorDiaSemana.entrySet().stream()
+                    .filter(e -> e.getKey() != null && e.getValue() != null && e.getValue() > 0)
+                    .map(Map.Entry::getKey)
+                    .sorted()
+                    .toList();
+        }
+        return diasAtivosSemana;
+    }
+
     /** Validações de entrada que o Bean Validation não alcança (dependem de estado da trilha). */
     private void validarConfiguracao(
             String tipoPeriodo,
             List<Integer> diasAtivosSemana,
             Integer blocosPorDia,
+            Map<Integer, Integer> blocosPorDiaSemana,
             int duracaoBlocoMinutos,
             Map<Integer, List<String>> semanaModeloManual,
             List<Disciplina> participantes) {
 
         validarPeriodoEDuracao(tipoPeriodo, duracaoBlocoMinutos);
-        validarDiasAtivosEBlocosPorDia(diasAtivosSemana, blocosPorDia);
+        validarDiasAtivosEBlocosPorDia(diasAtivosSemana, blocosPorDia, blocosPorDiaSemana);
 
         Set<ObjectId> participantesIds = participantes.stream()
                 .map(Disciplina::id)
@@ -841,7 +877,8 @@ public class CronogramaService {
         }
     }
 
-    private static void validarDiasAtivosEBlocosPorDia(List<Integer> diasAtivosSemana, Integer blocosPorDia) {
+    private static void validarDiasAtivosEBlocosPorDia(
+            List<Integer> diasAtivosSemana, Integer blocosPorDia, Map<Integer, Integer> blocosPorDiaSemana) {
         if (diasAtivosSemana != null) {
             Set<Integer> vistos = new HashSet<>();
             for (Integer dia : diasAtivosSemana) {
@@ -858,6 +895,29 @@ public class CronogramaService {
                 && (blocosPorDia < 1 || blocosPorDia > GeradorBlocosCronograma.MAX_BLOCOS_POR_DIA)) {
             throw new ValidationException("blocosPorDia",
                     "A quantidade de blocos por dia deve estar entre 1 e 24.");
+        }
+        if (blocosPorDiaSemana != null) {
+            for (Map.Entry<Integer, Integer> entry : blocosPorDiaSemana.entrySet()) {
+                Integer dia = entry.getKey();
+                Integer qtd = entry.getValue();
+                if (dia == null || dia < 1 || dia > 7) {
+                    throw new ValidationException(CAMPO_BLOCOS_POR_DIA_SEMANA,
+                            "Cada dia em blocosPorDiaSemana deve estar entre 1 (segunda) e 7 (domingo).");
+                }
+                if (qtd == null || qtd < 0 || qtd > GeradorBlocosCronograma.MAX_BLOCOS_POR_DIA) {
+                    throw new ValidationException(CAMPO_BLOCOS_POR_DIA_SEMANA,
+                            "A quantidade de blocos por dia deve estar entre 0 e 24.");
+                }
+            }
+            if (diasAtivosSemana != null) {
+                for (Integer dia : diasAtivosSemana) {
+                    Integer qtd = blocosPorDiaSemana.containsKey(dia) ? blocosPorDiaSemana.get(dia) : blocosPorDia;
+                    if (qtd != null && (qtd < 1 || qtd > GeradorBlocosCronograma.MAX_BLOCOS_POR_DIA)) {
+                        throw new ValidationException(CAMPO_BLOCOS_POR_DIA_SEMANA,
+                                "Cada dia ativo deve possuir entre 1 e 24 blocos.");
+                    }
+                }
+            }
         }
     }
 
@@ -923,6 +983,11 @@ public class CronogramaService {
         config.put("dataFim", dados.dataFim().toString());
         config.put("diasAtivosSemana", dados.diasAtivosSemana());
         config.put("blocosPorDia", dados.blocosPorDia());
+        if (dados.blocosPorDiaSemana() != null && !dados.blocosPorDiaSemana().isEmpty()) {
+            Document bDoc = new Document();
+            dados.blocosPorDiaSemana().forEach((k, v) -> bDoc.put(String.valueOf(k), v));
+            config.put(CAMPO_BLOCOS_POR_DIA_SEMANA, bDoc);
+        }
         config.put(CAMPO_DISCIPLINAS_PARTICIPANTES_IDS, dados.disciplinasParticipantesIds());
         if (dados.semanaModeloManual() != null) {
             Document mDoc = new Document();
@@ -943,6 +1008,7 @@ public class CronogramaService {
         configMap.put("dataFim", c.dataFim().toString());
         configMap.put("diasAtivosSemana", c.diasAtivosSemana());
         configMap.put("blocosPorDia", c.blocosPorDia());
+        configMap.put("blocosPorDiaSemana", c.blocosPorDiaSemana());
         configMap.put("disciplinasParticipantesIds", c.disciplinasParticipantesIds().stream().map(ObjectId::toHexString).toList());
         configMap.put("semanaModeloManual", c.semanaModeloManual());
 
@@ -958,6 +1024,7 @@ public class CronogramaService {
                 c.dataFim().toString(),
                 c.diasAtivosSemana(),
                 c.blocosPorDia(),
+                c.blocosPorDiaSemana(),
                 c.disciplinasParticipantesIds().stream().map(ObjectId::toHexString).toList(),
                 c.semanaModeloManual(),
                 configMap,
